@@ -1,0 +1,24 @@
+---
+title: "Pre/Post-Trikafta"
+author: "Tim Vigers"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+library(arsenal)
+library(tidyverse)
+library(performance)
+library(knitr)
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_knit$set(root.dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Christine Chan/Prepost Triakfta")
+```
+
+```{r import}
+cgm_c <- read.csv("./Data_Raw/Data From CHCO/REDCap Upload_chco.csv")
+```
