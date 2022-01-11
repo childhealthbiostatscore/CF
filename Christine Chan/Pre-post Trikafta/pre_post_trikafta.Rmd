@@ -13,12 +13,246 @@ output:
 ```{r setup, include=FALSE}
 library(arsenal)
 library(tidyverse)
+library(readxl)
 library(performance)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_knit$set(root.dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Christine Chan/Prepost Triakfta")
 ```
 
-```{r import}
+```{r chco data}
+# Import CGM
 cgm_c <- read.csv("./Data_Raw/Data From CHCO/REDCap Upload_chco.csv")
+cgm_c$date_cgm <- as.Date(cgm_c$date_cgm_placement, "%Y-%m-%d")
+
+cgm_m <- read.csv("./Data_Raw/Data From Montana/CGM_Montana/REDCap Upload_mt.csv")
+cgm_m$date_cgm <- as.Date(cgm_m$date_cgm_placement, "%m/%d/%Y")
+
+cgm_w <- read.csv("./Data_Raw/Data From Washington/REDCap Upload_Washington.csv")
+cgm_w$date_cgm <- as.Date(cgm_w$date_cgm_placement, "%Y-%m-%d")
+
+cgm <- rbind(cgm_c, cgm_m,cgm_w )
+
+reg0 <- read.csv("./Data_Raw/Data From CHCO/Registry/Copy of Earliest Trikafta Dates in Registry_updated 2.2.21 cc modified_cfrdyn.csv")
+# Exclude participants
+reg <- subset(reg0,!reg0$MRN %in% c("1714343","787372"))
+# Dates and A1c
+reg$Earliest.Trikafta.Date.in.PortCF <- ifelse(reg$MRN =="1053930", "12/1/2019", 
+                                               ifelse(reg$MRN =="1695512", "12/12/2019", 
+                                                      ifelse(reg$MRN =="815274", "12/13/2019", 
+                                                             ifelse(reg$MRN =="1078408",   "3/9/2020",
+                                                                    ifelse(reg$MRN =="899717", "2/14/2020", as.character(reg$Earliest.Trikafta.Date.in.PortCF))))))
+
+a1c <- read.csv("./Data_Raw/Data From CHCO/Copy of A1C and OGTTs Before and After Trikafta_cc modified 8.25.20.csv")
+# Weight
+weight <- read.csv("./Data_Raw/Data From CHCO/Registry/weightdata.csv")
+
+weight$Earliest.Trikafta.Date.in.PCF <- 
+  ifelse(weight$MRN =="1053930", "12/1/2019", 
+         ifelse(weight$MRN =="1695512", "12/12/2019", 
+                ifelse(weight$MRN =="815274", "12/13/2019", 
+                       ifelse(weight$MRN =="1078408",   "3/9/2020",
+                              ifelse(weight$MRN =="899717", "2/14/2020", as.character(weight$Earliest.Trikafta.Date.in.PCF))))))
+
+```
+
+```{r montana data}
+reg_montana <- 
+  read.csv("./Data_Raw/Data From Montana/Copy of Paper patient population glycemic (+hofer).csv")
+demo_adult <- read.csv("./Data_Raw/Data From Montana/demo_adults.csv")
+demo_kids <- read.csv("./Data_Raw/Data From Montana/demo_kids.csv")
+
+reg_montana$age <- ifelse(reg_montana$CFF.ID %in% demo_adult$CFF.ID, "Adult", 
+                          ifelse(reg_montana$CFF.ID %in% demo_kids$CFF.ID, "Kids", "Check"))
+
+reg_montana$trik <- as.Date(reg_montana$Trikafta.start.date,"%m/%d/%Y")
+
+reg_montana$test <- as.Date(reg_montana$Date.of.Encounter,  "%m/%d/%Y")
+reg_montana$prepost <- ifelse(reg_montana$trik > reg_montana$test, "before", "after")
+
+reg_montana$diff <- reg_montana$trik-reg_montana$test 
+reg_montana2 <- subset(reg_montana, abs(diff) <= 365)
+
+reg_montana3 <- reg_montana2 %>% group_by(CFF.ID, prepost) %>% count()
+reg_montana4 <- reg_montana3 %>% group_by(CFF.ID) %>% count()
+# Weight/FEV
+pft_adult <- read.csv("./Data_Raw/Data From Montana/Copy of PFTs growth adult (+hofer).csv")
+pft_kids <- read.csv("./Data_Raw/Data From Montana/PFTs kids.csv")
+
+pft_montana <- rbind(pft_adult, pft_kids)
+
+pft_montana_1 <- subset(pft_montana, pft_montana$CFF.ID %in% reg_montana$CFF.ID)
+# Age at pft
+pft_montana_1$pft <- as.Date(pft_montana_1$Date.of.Encounter,  "%m/%d/%Y")
+
+reg_montana_first <- reg_montana %>% group_by(CFF.ID) %>% filter(row_number()==1)
+
+reg_montana_first$trik <- ifelse(reg_montana_first$CFF.ID == "1044621", "2019-12-02", 
+                                 ifelse(reg_montana_first$CFF.ID == "1008380", "2020-1-1", as.character(reg_montana_first$trik)))
+
+pft_montana_2 <- merge(pft_montana_1, reg_montana_first[,c("CFF.ID" ,"Date.Of.Birth..mm.dd.yyyy.", "trik")])
+# Need pfts within a year of trik
+pft_montana_2$diff <-as.numeric(as.Date(pft_montana_2$pft) - as.Date(pft_montana_2$trik))
+pft_montana_3 <- subset(pft_montana_2, abs(diff) <= 365 )
+pft_montana_3$prepost <- ifelse(pft_montana_3$trik > pft_montana_3$pft, "before", "after")
+pft_montana_4 <- subset(pft_montana_3, pft_montana_3$prepost == "before")
+pft_montana_5 <- pft_montana_4 %>% group_by(CFF.ID) %>% arrange(diff) %>% filter(row_number()==1)
+
+pft_montana_5$DOB <- as.Date(pft_montana_5$Date.Of.Birth..mm.dd.yyyy.,  "%m/%d/%Y")
+
+pft_montana_5$age <- as.numeric(pft_montana_5$pft-pft_montana_5$DOB)/365.25
+
+pft_montana_5$BMI.Percentile
+# eed sex
+demo_montana <- rbind(demo_kids[,c("CFF.ID","Gender")], demo_adult[,c("CFF.ID","Gender")])
+
+analytic_montana <- merge(pft_montana_5, demo_montana ,by = "CFF.ID", all.x=T)
+# Need cfrd start date - don't have dates
+#gtube status
+gt_adult <- read.csv("./Data_Raw/Data From Montana/gtubes_adult.csv")
+gt_kids <- read.csv("./Data_Raw/Data From Montana/GT users kids.csv")
+
+gt_montana <- rbind(gt_adult, gt_kids)
+
+gt_montana_1 <- merge(gt_montana, reg_montana_first[,c("CFF.ID" , "trik")])
+gt_montana_1$gt <- as.Date(gt_montana_1$Date.of.Encounter,  "%m/%d/%Y")
+gt_montana_1$diff <-as.numeric(as.Date(gt_montana_1$gt) - as.Date(gt_montana_1$trik))
+gt_montana_2 <- subset(gt_montana_1, abs(diff) <= 365 )
+analytic_montana$gtube <- ifelse(analytic_montana$CFF.ID %in% gt_montana_2$CFF.ID, "Yes", "No")
+# Insufficent
+is_adult <- read.csv("./Data_Raw/Data From Montana/pancreatic insufficient adult.csv")
+is_kids <- read.csv("./Data_Raw/Data From Montana/pancreatic insufficient kids.csv")
+
+analytic_montana$is <- 
+  ifelse(analytic_montana$CFF.ID %in% c(is_adult$CFF.ID, is_kids$CFF.ID), "Insufficient", "Not")
+# Genotypes
+g_adult <- read.csv("./Data_Raw/Data From Montana/genotypes_adult.csv")
+g_kids <- read.csv("./Data_Raw/Data From Montana/genotypes kids.csv")[,1:3]
+geno_montana <- rbind(g_adult,g_kids)
+geno_montana$Genotypes1 <- geno_montana$Name.of.the.first.mutation
+geno_montana$Genotypes2 <- geno_montana$Name.of.the.second.mutation
+geno_montana$class2 <-
+  ifelse(geno_montana$Genotypes2%in%c('1717-1G->A','1717-1G-A','G542X','Q493X',
+                                      'R1162X','R553X','R553x','W1089X','W1282X',
+                                      '1078delT','R75X','3659delC','621+1G->T',
+                                      '621+1G>T','394delTT','3120+1g->A',
+                                      '1154InsTC','1154insTC','1213delT',
+                                      '1259insA','1288insTA','3791delC',
+                                      'E60X','K710X','2184delA','CFTRdele2,3',
+                                      '663delT','Glu528','1461ins4',
+                                      '306insA','R709X','CFTRdele22-24',
+                                      '2711delT','2183AA->G'),"I",
+         ifelse(geno_montana$Genotypes2 %in% c('F508','F508del','F508del ',
+                                               'G85E', 'I507','I 507',
+                                               'N1303K', 'A559T', 'R560T','A561E'),"II", 
+                ifelse(geno_montana$Genotypes2 %in% c('G551D', 'G551S','S549N'), "III", 
+                       ifelse(geno_montana$Genotypes2 %in% c('R334W','R347P', 
+                                                             'R117H','R117C', 
+                                                             'P67L','L206W', 
+                                                             'I206w','D614G', 
+                                                             'R347H','D1152H', 
+                                                             '3849+10kbC>T'),"IV", 
+                              ifelse(geno_montana$Genotypes2 %in% c('A455E', 
+                                                                    '2789+5G->A',
+                                                                    '3849+10CT', 
+                                                                    '3849+10kbC->T', 
+                                                                    '711+3A->G', 
+                                                                    '1898+5G->T',
+                                                                    'P574H', 
+                                                                    '3272-26A->G5'),"V","")))))   
+geno_montana$severity2 <- 
+  ifelse(geno_montana$Genotypes2%in%c('1717-1G->A','1717-1G-A','G542X','Q493X',
+                                      'R1162X','R553X','R553x','W1089X','W1282X',
+                                      '1078delT','R75X','3659delC','621+1G->T',
+                                      '621+1G>T','394delTT','3120+1g->A','1154InsTC',
+                                      '1154insTC','1213delT','1259insA','1288insTA',
+                                      '3791delC','E60X','K710X','2184delA',
+                                      'CFTRdele2,3','663delT','Glu528','1461ins4',
+                                      '306insA','R709X','CFTRdele22-24','2711delT',
+                                      '2183AA->G','F508','F508del','F508del','G85E',
+                                      'I507','I507','N1303K','A559T','R560T',
+                                      'A561E','G551D','G551S','S549N',
+                                      '1898+1G->A','2143delT','2183AA-G',
+                                      '2183delAA->G','2184insA','S434X',
+                                      '2585delT','3120+1G->A','3905insT','406-1G->A',
+                                      '712-1G->T','L1245X','Q2X','R1158X',
+                                      'R851X','V520F','L1077P','S489X','F311del',
+                                      'W846X','M1101K','2622+1G->A','S945L',
+                                      "Y1092X","R1066C","G178R","2957delT",
+                                      "CFTRdele1",'W1204X',"q493x","W57G",
+                                      "1585-8G>A","1717-8G->A","G1244E"),"Severe",
+         ifelse(geno_montana$Genotypes2%in%c('R334W','R347P','R117H','R117C',
+                                             'P67L','L206W','I206w','D614G',
+                                             'R347H','D1152H','3849+10kbC>T',
+                                             "D110H","R1070W",'A455E','2789+5G->A',
+                                             '3849+10CT','3849+10kbC->T','711+3A->G',
+                                             '1898+5G->T','P574H','3272-26A->G5',
+                                             '3849G->A','H199Y','H199y','S492F','S531P',
+                                             'L1335P','R352Q',"D1270N","2789+2insA",
+                                             "3849+10kbc->T","Q98R","Phe1052Val",
+                                             "F1052V","Tyr1014Cys","Y1014C","T338I",
+                                             "5T","c.2249C>T","P750L"),"Mild",
+                ifelse(geno_montana$Genotypes2%in%c('1262insA','I506T','3363delGT',
+                                                    'Q1209P','3349insT','G178R',
+                                                    'L467P','317insC','I336K',	
+                                                    'ex14a','3500-2A->G','c.3407_3422del16',
+                                                    '3349insT','1248+1G->A','M470V','1812-1G->A',
+                                                    'delX22-24','Q237H','Q237H','W57G',
+                                                    '1078delA','G178R','2957delT','G576A',
+                                                    'other','Other','Unknown','unknown',
+                                                    'CFTRdele1','1811+1.6kbA->','UNK',
+                                                    "I336K","M470V","S1235R","M470V","F508C",
+                                                    "R1066H","P205S"),"Unk","")))
+geno_montana$class1 <- 
+  ifelse(geno_montana$Genotypes1 %in% c('1717-1G->A', '1717-1G-A',  'G542X', 'Q493X', 'R1162X', 'R553X', 'R553x', 'W1089X', 'W1282X', '1078delT', 'R75X',
+                                                             '3659delC', '621+1G->T', '621+1G>T', '394delTT', '3120 + 1g->A', '1154InsTC',  '1154insTC', '1213delT',
+                                                             '1259insA', '1288insTA', '3791delC', 'E60X', 'K710X', '2184delA', 'CFTRdele2,3', '663delT', 'Glu528',
+                                                             '1461ins4', '306insA', 'R709X', 'CFTRdele22-24', '2711delT', '2183AA- >G'), "I", 
+                              ifelse(geno_montana$Genotypes1 %in% c('F508', 'F508del', 'F508del ', 'G85E', 'I507', 'I 507', 'N1303K', 'A559T', 'R560T', 'A561E'), 
+                                     "II", 
+                                     ifelse(geno_montana$Genotypes1 %in% c('G551D', 'G551S', 'S549N'), "III", 
+                                            ifelse(geno_montana$Genotypes1 %in% c('R334W', 'R347P', 'R117H', 'R117C', 'P67L', 'L206W', 'I206w', 'D614G', 'R347H', 'D1152H', '3849+10kbC>T'), 
+                                                   "IV", 
+                                                   ifelse(geno_montana$Genotypes1 %in% c('A455E', '2789+5G->A', '3849+10CT', '3849+10kbC->T', '711+3A->G', '1898+5G->T',
+                                                                                         'P574H', '3272-26A->G5'), "V" , "")))))   
+geno_montana$severity1 <- ifelse(geno_montana$Genotypes1 %in% c('1717-1G->A', '1717-1G-A',  'G542X', 'Q493X', 'R1162X', 'R553X', 'R553x', 'W1089X', 'W1282X', '1078delT', 'R75X',
+                                                                '3659delC', '621+1G->T', '621+1G>T', '394delTT', '3120 + 1g->A', '1154InsTC',  '1154insTC', '1213delT',
+                                                                '1259insA', '1288insTA', '3791delC', 'E60X', 'K710X', '2184delA', 'CFTRdele2,3', '663delT', 'Glu528',
+                                                                '1461ins4', '306insA', 'R709X', 'CFTRdele22-24', '2711delT', '2183AA- >G','F508', 'F508del', 'F508del ', 'G85E', 
+                                                                'I507', 'I 507', 'N1303K', 'A559T', 'R560T', 'A561E','G551D', 'G551S', 'S549N','1898+1G->A', '2143delT', '2183AA-G',
+                                                                '2183delAA->G', '2184insA', 'S434X',
+                                                                '2585delT', '3120+1G->A',  '3905insT',  '406-1G->A', '712-1G->T', 'L1245X', 'Q2X', 'R1158X',
+                                                                'R851X', 'V520F', 'L1077P', 'S489X', 'F311del', 'W846X', 'M1101K', '2622+1G->A', 'S945L', 
+                                                                "Y1092X", "R1066C", "G178R", "2957delT", "CFTRdele1", 'W1204X', "q493x", "W57G", "1585-8G>A", "1717-8G->A","G1244E"), 
+                                 "Severe", 
+                                 ifelse(geno_montana$Genotypes1 %in% c('R334W', 'R347P', 'R117H', 'R117C', 'P67L', 'L206W', 'I206w', 'D614G', 'R347H', 'D1152H', '3849+10kbC>T', "D110H", "R1070W",
+                                                                       'A455E', '2789+5G->A', '3849+10CT', '3849+10kbC->T', '711+3A->G', '1898+5G->T',
+                                                                       'P574H', '3272-26A->G5','3849G->A', 'H199Y', 'H199y',  'S492F', 'S531P',
+                                                                       'L1335P', 'R352Q', "D1270N", "2789+2insA", "3849+10kbc->T", "Q98R", "Phe1052Val", 
+                                                                       "F1052V", "Tyr1014Cys", "Y1014C", "T338I", "5T", "c.2249C>T", "P750L"), "Mild" ,
+                                        
+                                        ifelse(geno_montana$Genotypes1 %in% c(  '1262insA', 'I506T', '3363delGT' , 'Q1209P', '3349insT', 'G178R', 'L467P', '317insC', 'I336K',	
+                                                                                'ex14a', '3500-2A->G', 'c.3407_3422del16', '3349insT', '1248+1G->A', 'M470V', '1812-1G->A',
+                                                                                'del X22-24', 'Q237H', 'Q237H', 'W57G', '1078delA', 'G178R', '2957delT', 'G576A',
+                                                                                'other', 'Other', 'Unknown', 'unknown', 'CFTRdele1', '1811+1.6kb A->', 'UNK', "I336K", "M470V", "S1235R", "M470V", "F508C",
+                                                                                "R1066H", "P205S"), 
+                                               "Unk","")))
+
+
+geno_montana$genoRisk <- ifelse(geno_montana$severity1 == "Mild" | geno_montana$severity2 == "Mild", "Low", 
+                                ifelse(geno_montana$severity1 == "Severe" & geno_montana$severity2 == "Severe", "High", ""))
+
+
+
+
+
+analytic_montana$genotype <- ifelse(analytic_montana$CFF.ID %in% geno_montana[geno_montana$genoRisk == "High", ]$CFF.ID, "High", 
+                                    ifelse(analytic_montana$CFF.ID %in% geno_montana[geno_montana$genoRisk == "Low", ]$CFF.ID, "Low",   ""   ))
+
+
+
+
+
+
+
 ```
