@@ -14,20 +14,26 @@ output:
 library(arsenal)
 library(tidyverse)
 library(readxl)
+library(PAutilities)
 library(AGD)
+library(rspiro)
+library(anthro)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_knit$set(root.dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Christine Chan/Prepost Triakfta")
 ```
 
-```{r chco data}
-# CGM
-chco_cgm = read.csv("./Data_Cleaned/chco_cgm.csv")
-chco_cgm$timepoint = sub(".*_","",chco_cgm$subject_id)
-chco_cgm$timepoint = factor(chco_cgm$timepoint)
-levels(chco_cgm$timepoint) = c("Post","Post","Pre","Pre")
-chco_cgm$subject_id = sub("_.*","",chco_cgm$subject_id)
-colnames(chco_cgm)[which(colnames(chco_cgm) == "subject_id")] = "CFF.ID"
+```{r code from maxie,eval=FALSE}
+# Source Maxie's code, and write final ID lists
+source("~/GitHub/CF/Christine Chan/Pre-post Trikafta/p001+cmw_UPDATED.R")
+ids = data.frame(unique(analytic_cm$CFF.ID))
+colnames(ids) = "CFF.ID"
+write.csv(ids,file = "./Data_Cleaned/final_ids.csv",row.names = F)
+```
+
+# Table 1: Demographics at Trikafta Start
+
+```{r}
 # Start dates
 chco_dates = read.csv("./Data_Cleaned/chco_trikafta_dates.csv")
 # Fix select dates
@@ -36,10 +42,48 @@ chco_dates$Earliest.Trikafta.Date.in.PortCF[chco_dates$MRN =="1695512"] = "12/12
 chco_dates$Earliest.Trikafta.Date.in.PortCF[chco_dates$MRN =="815274"] = "12/13/2019"
 chco_dates$Earliest.Trikafta.Date.in.PortCF[chco_dates$MRN =="1078408"] = "3/9/2020"
 chco_dates$Earliest.Trikafta.Date.in.PortCF[chco_dates$MRN =="899717"] = "2/14/2020"
+chco_dates$CFF.ID = as.character(chco_dates$CFF.ID)
 # A1C and OGTT
 chco_a1c = read.csv("./Data_Cleaned/chco_a1c_ogtt.csv")
 chco_a1c$CFF.ID = as.character(chco_a1c$CFF.ID)
 chco_pft = read.csv("./Data_Cleaned/chco_bmi_pft.csv")
+# Merge
+chco = left_join(chco_dates,chco_a1c,by = "CFF.ID")
+chco = full_join(chco,chco_pft,by = c("MRN", "Date"))
+# Diabetes only
+chco = chco %>% filter(!is.na(Diabetes)) %>% mutate(Location = "CHCO")
+# Montana
+montana = read.csv("./Data_Raw/Data From Montana/Copy of Paper patient population glycemic (+hofer).csv")
+demo_adult <- read.csv("./Data_Raw/Data From Montana/demo_adults.csv")
+demo_kids <- read.csv("./Data_Raw/Data From Montana/demo_kids.csv")
+montana
+```
+
+```{r cgm data,eval=FALSE}
+# IDs from Maxie
+ids = read.csv("./Data_Cleaned/final_ids.csv")
+# CGM
+chco_cgm = read.csv("./Data_Cleaned/chco_cgm.csv")
+chco_cgm$timepoint = sub(".*_","",chco_cgm$subject_id)
+chco_cgm$timepoint = factor(chco_cgm$timepoint)
+levels(chco_cgm$timepoint) = c("Post","Post","Pre","Pre")
+chco_cgm$subject_id = sub("_.*","",chco_cgm$subject_id)
+colnames(chco_cgm)[which(colnames(chco_cgm) == "subject_id")] = "CFF.ID"
+# First visit post if more than 1, and only those with pre and post
+chco_cgm = chco_cgm %>% group_by(CFF.ID,timepoint) %>%
+  slice(which.min(as.Date(date_cgm_placement, '%m/%d/%Y %H:%M')))
+
+
 # Put everything together
-chco = left_join(chco_cgm,chco_a1c,by = "CFF.ID")
+chco = left_join(chco_cgm,chco_dates)
+
+chco = full_join(chco_dates,chco_a1c,by = "CFF.ID")
+chco = full_join(chco,chco_pft,by = c("MRN", "Date"))
+chco = full_join(chco,chco_cgm,by = c("CFF.ID", "Date"))
+# Filter and select columns
+chco = chco %>% filter(CFF.ID %in% ids$CFF.ID)
+```
+
+```{r montana data}
+
 ```
