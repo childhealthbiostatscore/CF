@@ -963,6 +963,9 @@ analytic_uofm3 <- analytic_uofm2_2[,c("CFF.ID", "age", "bmipct", "Weight", "Sex"
 
 
 analytic_cm <- rbind(reg_tab1 , analytic_montana1,analytic_wash1,analytic_uofm3 )
+# Add BMI category
+analytic_cm$bmicat = reg3_BMI$bmicat[match(analytic_cm$CFF.ID,reg3_BMI$CFF.ID)]
+
 
 tab1 <- tableby(~age+bmipct + Weight + Sex + ppFEV1 + ppFVC  +
                   G.tube.in.past.12.months + Pancreatic.Status +
@@ -1179,8 +1182,6 @@ timing <- rbind(weigh_before1,weigh_after1)
 tab2 <- tableby(time~Weight+ bmiz + ppFEV1+ppFVC, data=timing)
 timing2 <- merge(weigh_before1,weigh_after1, by = "MRN", all.y=T)
 
-
-
 #weight and fev data
 pfts_wash2$ppFVC <- pfts_wash2$Predicted.Value.for.FVC
 pfts_wash2$ppFEV1 <- pfts_wash2$Predicted.Value.for.FEV1
@@ -1307,7 +1308,7 @@ cgm0_time$diff <- cgm0_time$date_cgm - as.Date(cgm0_time$trik, "%Y-%m-%d")
 
 tab3_extra <- tableby(time ~ diff, cgm0_time, control=mycontrols)
 
-tab3 <- tableby(time~ average_sensor
+tab3a <- tableby(time~ average_sensor
                 + min_sensor
                 + max_sensor
                 + percent_time_over_120
@@ -1320,7 +1321,7 @@ tab3 <- tableby(time~ average_sensor
                 + average_auc_per_day
                 + standard_deviation
                 + r_mage, data=cgm0_small, control=mycontrols)
-tab3 <- tableby(~average_sensor
+tab3c <- tableby(~average_sensor
                 + min_sensor
                 + max_sensor
                 + percent_time_over_120
@@ -1342,9 +1343,12 @@ temp <-merge(cgm0_small[cgm0_small$time=="pre",],
 analytic_cm$ppFVC <- as.numeric(analytic_cm$ppFVC)
 
 
-tab1 <- tableby(~age+bmipct + Weight + Sex + ppFEV1 + ppFVC  +
+tab3b <- tableby(~age+bmipct + Weight + Sex + ppFEV1 + ppFVC  +
                   G.tube.in.past.12.months + Pancreatic.Status +
                   genoRisk + location+BMI.Value + age_category, 
                 data=analytic_cm[analytic_cm$CFF.ID %in% cgm0_small$ID,])
-summary(tab1)
+summary(tab3a)
+summary(tab3b)
+summary(tab3c)
 ```
+
