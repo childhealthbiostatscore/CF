@@ -34,6 +34,8 @@ write.csv(ids,file = "./Data_Cleaned/final_ids.csv",row.names = F)
 
 ```{r closest date function}
 closest_dates = function(df,start = "Start",date = "Date"){
+  # Remove MRN
+  df$MRN = NULL
   # Start and date columns must be formated for subtraction (ideally with lubridate)
   df$Timepoint = as.numeric(df[,date] - df[,start])
   # Remove visits on start date or > 1 year out
@@ -46,11 +48,33 @@ closest_dates = function(df,start = "Start",date = "Date"){
   # Timepoint as factor
   df$Timepoint = factor(df$Timepoint,labels = c("Before","After"))
   # Delete unnecessary columns
-  df = df %>% select(-all_of(c(start,date)))
+  df = df %>% select(-all_of(c(start,date))) %>% select(CFF.ID,Timepoint,everything())
   # Return
   df = data.frame(df)
   return(df)
 } 
+pre_post_average = function(df,start = "Start",date = "Date"){
+  # Remove MRN
+  df$MRN = NULL
+  # Start and date columns must be formated for subtraction (ideally with lubridate)
+  df$Timepoint = as.numeric(df[,date] - df[,start])
+  # Columns to exclude
+  excluded_vars = c(start,date,"CFF.ID","Timepoint","sign(Timepoint)")
+  # Remove visits on start date or > 1 year out
+  df = df %>% filter(Timepoint !=0 & abs(Timepoint) <= 365) %>% 
+    # Get closest visit before and closest after
+    group_by(CFF.ID,sign(Timepoint)) %>%
+    summarise(across(-any_of(excluded_vars), ~mean(.x,na.rm = T)),.groups = "drop") %>%
+    # Format
+    rename(Timepoint = `sign(Timepoint)`) %>%
+    mutate_all(~replace(., is.nan(.), NA)) # Replace NaN
+  # Timepoint as factor
+  df$Timepoint = factor(df$Timepoint,labels = c("Before","After"))
+  # Select
+  df = df %>% select(CFF.ID,Timepoint,everything())
+  # Return
+  df = data.frame(df)
+}
 ```
 
 # Table 1: Demographics at Trikafta Start
