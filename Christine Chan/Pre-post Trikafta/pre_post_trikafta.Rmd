@@ -13,6 +13,7 @@ output:
 ```{r setup, include=FALSE}
 library(arsenal)
 library(tidyverse)
+library(lubridate)
 library(readxl)
 library(PAutilities)
 library(AGD)
@@ -33,9 +34,9 @@ write.csv(ids,file = "./Data_Cleaned/final_ids.csv",row.names = F)
 
 # Table 1: Demographics at Trikafta Start
 
-```{r}
+```{r eval=FALSE}
 # Start dates
-chco_dates = read.csv("./Data_Cleaned/chco_trikafta_dates.csv")
+chco_dates = read.csv("./Data_Cleaned/chco_trikafta_dates.csv",na.strings = "")
 # Fix select dates
 chco_dates$Earliest.Trikafta.Date.in.PortCF[chco_dates$MRN =="1053930"] = "12/1/2019"
 chco_dates$Earliest.Trikafta.Date.in.PortCF[chco_dates$MRN =="1695512"] = "12/12/2019"
@@ -51,39 +52,28 @@ chco_pft = read.csv("./Data_Cleaned/chco_bmi_pft.csv")
 chco = left_join(chco_dates,chco_a1c,by = "CFF.ID")
 chco = full_join(chco,chco_pft,by = c("MRN", "Date"))
 # Diabetes only
-chco = chco %>% filter(!is.na(Diabetes)) %>% mutate(Location = "CHCO")
+chco = chco %>% filter(Diabetes == 1) %>% mutate(Location = "CHCO") %>%
+  select(CFF.ID,DOB,Earliest.Trikafta.Date.in.PortCF,
+         Sex,Race,Hispanic.Latinx,Genotypes1,Genotypes2,Pancreatic.Status,G.tube.in.past.12.months,
+         Date,HbA1c,OGTT_Fasting,OGTT_TwoHour,Height:Location) %>%
+  rename(Start = Earliest.Trikafta.Date.in.PortCF)
 # Montana
-montana = read.csv("./Data_Raw/Data From Montana/Copy of Paper patient population glycemic (+hofer).csv")
-demo_adult <- read.csv("./Data_Raw/Data From Montana/demo_adults.csv")
-demo_kids <- read.csv("./Data_Raw/Data From Montana/demo_kids.csv")
-montana
+montana = read.csv("./Data_Raw/Data From Montana/Copy of Paper patient population glycemic (+hofer).csv",na.strings = "")
+demo_adult = read.csv("./Data_Raw/Data From Montana/demo_adults.csv",na.strings = "")
+demo_kids = read.csv("./Data_Raw/Data From Montana/demo_kids.csv",na.strings = "")
+demo_kids$Date.Of.Birth..mm.dd.yyyy. = NULL
+demo_kids = demo_kids[,colnames(demo_adult)]
+demo = rbind(demo_adult,demo_kids)
+# Get within a year of Trikafta start
+montana$time_diff = mdy(montana$Trikafta.start.date) - mdy(montana$Date.of.Encounter)
+montana = montana %>% filter(abs(montana$time_diff)<=365)
+# Add demographics
+montana = left_join(montana,demo,by = "CFF.ID")
+# PFTs
+pft_adult <- read.csv("./Data_Raw/Data From Montana/Copy of PFTs growth adult (+hofer).csv")
+pft_kids <- read.csv("./Data_Raw/Data From Montana/PFTs kids.csv")
 ```
 
-```{r cgm data,eval=FALSE}
-# IDs from Maxie
-ids = read.csv("./Data_Cleaned/final_ids.csv")
-# CGM
-chco_cgm = read.csv("./Data_Cleaned/chco_cgm.csv")
-chco_cgm$timepoint = sub(".*_","",chco_cgm$subject_id)
-chco_cgm$timepoint = factor(chco_cgm$timepoint)
-levels(chco_cgm$timepoint) = c("Post","Post","Pre","Pre")
-chco_cgm$subject_id = sub("_.*","",chco_cgm$subject_id)
-colnames(chco_cgm)[which(colnames(chco_cgm) == "subject_id")] = "CFF.ID"
-# First visit post if more than 1, and only those with pre and post
-chco_cgm = chco_cgm %>% group_by(CFF.ID,timepoint) %>%
-  slice(which.min(as.Date(date_cgm_placement, '%m/%d/%Y %H:%M')))
-
-
-# Put everything together
-chco = left_join(chco_cgm,chco_dates)
-
-chco = full_join(chco_dates,chco_a1c,by = "CFF.ID")
-chco = full_join(chco,chco_pft,by = c("MRN", "Date"))
-chco = full_join(chco,chco_cgm,by = c("CFF.ID", "Date"))
-# Filter and select columns
-chco = chco %>% filter(CFF.ID %in% ids$CFF.ID)
-```
-
-```{r montana data}
+```{r}
 
 ```
