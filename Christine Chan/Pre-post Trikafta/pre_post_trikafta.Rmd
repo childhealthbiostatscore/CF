@@ -142,3 +142,35 @@ pfts = rbind(pft_adult,pft_kids)
 montana = full_join(montana,pfts,by = c("CFF.ID", "Date.of.Encounter"))
 ```
 
+# Spline regression
+
+```{r}
+a1c = read.csv("./Data_Raw/Data From CHCO/Copy of A1C and OGTTs Before and After Trikafta_cc modified 8.25.20.csv")
+a1c$Earliest.Trikafta.Date.in.PortCF = mdy(a1c$Earliest.Trikafta.Date.in.PortCF)
+a1c$Date.of.A1C.or.OGTT = mdy(a1c$Date.of.A1C.or.OGTT)
+a1c = a1c %>% 
+  mutate(time = as.numeric(difftime(Date.of.A1C.or.OGTT,
+                                    Earliest.Trikafta.Date.in.PortCF,
+                                    units = "days"))) %>%
+  filter(!is.na(Hgb.A1C),abs(time)<=365)
+a1c$spline = ifelse(a1c$time>0,1,0)
+a1c$X = a1c$time * a1c$spline
+# Segmented model, knot at 0
+smod = lme(Hgb.A1C ~ time + X,random = ~1|MRN,data = a1c,na.action = na.omit)
+# Plot
+# Segments
+xs1 = c(min(a1c$time),0)
+beta1 = summary(smod)$tTable[1:2]
+ys1 = cbind(1, xs1) %*% beta1
+
+xs2 = c(0,max(a1c$time))
+beta2 = c(summary(smod)$tTable[1],sum(summary(smod)$tTable[2:3]))
+ys2 = cbind(1,xs2) %*% beta2
+
+p = ggplot(a1c,aes(x = time,y = Hgb.A1C)) + 
+  geom_point() + 
+  geom_segment(aes(x = xs1[1], xend = xs1[2], y = ys1[1], yend = ys1[2]),color = "blue") +
+  geom_segment(aes(x = xs2[1], xend = xs2[2], y = ys2[1], yend = ys2[2]),color = "blue") +
+  xlab("Days from Trikafta Start") + ylab("HbA1c") + theme_bw()
+p
+```
