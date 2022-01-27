@@ -11,9 +11,9 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-library(arsenal)
+library(Hmisc)
+library(mixOmics)
 library(tidyverse)
-library(performance)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
 if (Sys.info()["sysname"] == "Linux"){
@@ -25,8 +25,86 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r}
+clean_metab = function(data,prefix = "M"){
+  # Replace 1 with NA
+  data[data == 1] = NA
+  # Compound names
+  data$compound_id = paste0(prefix,1:nrow(data))
+  rownames(data) = data$compound_id
+  compounds = data[,c("compound_id","Compound")]
+  # Get samples only
+  data = data[,grep("area2height",colnames(data))]
+  data = data[,!grepl("blank",tolower(colnames(data)))]
+  colnames(data) = gsub("Lipid_Pos_|Lipid_Neg_|Hilic_Pos_|_area2height.raw.|_dup","",colnames(data))
+  # Transpose
+  data = data.frame(t(data))
+  # Fix subject names
+  data$subject_id = str_pad(rownames(data),3,"left","0")
+  # Return data and compounds
+  return(list(data,compounds))
+}
+```
+
+```{r}
 # Clinical data
 source("/Users/timvigers/Dropbox/Mac/Documents/GitHub/CF/Christine Chan/CF Metabolomics/import_data.r")
-# Metabolomics
-metab_pos = read.csv("./Christine Chan/CF Metabolomics/Data_Raw/Christine Chan - CF-Diabetes - C18 Pos.csv")
+df = data %>% group_by(medical_record_number) %>% filter(row_number() == 1) %>% ungroup() %>%
+  select(subject_id,group_category.factor,age_at_visit_1,gender.factor,race_ethnicity.factor,
+         average_bmi_z_score,fvc,fev1_percent,poc_a1c,ag,fructosamine,
+         percent_glycated_albumin)
+df$subject_id = as.character(sub("--\\d","",df$subject_id))
+
+# Import metabolomics
+metab_pos = read.csv("./Christine Chan/CF Metabolomics/Data_Raw/Christine Chan - CF-Diabetes - C18 Pos.csv",na.strings = "")
+metab_neg = read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Christine Chan/CF Metabolomics/Data_Raw/Christine Chan - CF-Diabetes - C18 Neg.csv",na.strings = "")
+hilic = read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Christine Chan/CF Metabolomics/Data_Raw/Christine Chan - CF-Diabetes - HILIC Pos.csv",na.strings = "")
+# Clean
+## Positive
+metab_pos = clean_metab(metab_pos,prefix = "P")
+compounds = metab_pos[[2]]
+## Negative
+metab_neg = clean_metab(metab_neg,prefix = "N")
+compounds = rbind(compounds,metab_neg[[2]])
+## HILIC
+hilic = clean_metab(hilic,prefix = "H")
+compounds = rbind(compounds,hilic[[2]])
+# Merge
+df = df %>% filter(subject_id %in% metab_pos[[1]]$subject_id) %>%
+  left_join(.,metab_pos[[1]],by = "subject_id") %>% 
+  left_join(.,metab_neg[[1]],by = "subject_id") %>%
+  left_join(.,hilic[[1]],by = "subject_id")
+# Larger groups
+df$combined = df$group_category.factor
+levels(df$combined) = c("HC & CFNGT","HC & CFNGT","CFAGT & CFRD", "CFAGT & CFRD")
+# Remove low variance
+df = df[,-nearZeroVar(df)$Position]
+# Matrices for mixOmics
+X = df %>% select(P1:H651)
+Y_all = df$group_category.factor
+Y_two = df$combined
+```
+
+# PCA
+
+## Four groups
+
+```{r}
+pca_res = pca(X,center = T,scale = T)
+plotIndiv(pca_res,group = df$group_category.factor,legend = TRUE,pch = 16,
+          title = "PCA Components 1 - 2")
+```
+
+## Control and CFNGT vs. Abnormal Glycemia
+
+```{r}
+plotIndiv(pca_res,group = df$combined,legend = TRUE,pch = 16,
+          title = "PCA Components 1 - 2")
+```
+
+# PLS-DA
+
+```{r}
+plsda_res = splsda(X, Y_all)
+plotIndiv(plsda_res,group = df$group_category.factor,legend = TRUE,pch = 16,
+          title = "PCA Components 1 - 2")
 ```
