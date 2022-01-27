@@ -10,11 +10,14 @@ output:
     toc_float: yes
 ---
 
+NOTE: I HAVE THE SHARED DRIVE AS S:, to change if mapped to another letter
 ```{r setup, include=FALSE}
 library(arsenal)
 library(tidyverse)
 library(performance)
 library(knitr)
+library(lubridate)
+library(stringr)
 knitr::opts_chunk$set(echo = FALSE)
 if(Sys.info()["sysname"] == "Windows"){
   home_dir = "S://PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Christine Chan"
@@ -26,7 +29,114 @@ if(Sys.info()["sysname"] == "Windows"){
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
-```{r}
-# Import 
-df = read.csv("./Prepost Triakfta/Data_Cleaned/chco_bmi_pft.csv")
+
+Import the datasets (I'll be doing this one site at a time to look at the variables etc)
+```{r data import}
+###### Import CHCO data ###########
+
+# bmi, pulm function 577 obs
+# 8 vars MRN - ID, date for visits; start - ? start of trt?, fev, bmi, height, weight, fec 
+chco_bmi_pft = read_csv("S:/Vigers/CF/Christine Chan/Prepost Triakfta/Data_Cleaned/chco_bmi_pft.csv")
+
+# continuous glucose monitoring, 23 obs
+# 105 vars subjectid - number_pre/post for visit and a date; numbers dont seem to correspond to mrn in bmi pft
+chco_cgm = read_csv("S:/Vigers/CF/Christine Chan/Prepost Triakfta/Data_Cleaned/chco_cgm.csv")
+
+# chco glycemic, 261 obs
+# 7 var MRN and CFF id (=subjectid?), date for visits; start... etc
+chco_glycemic = read_csv("S:/Vigers/CF/Christine Chan/Prepost Triakfta/Data_Cleaned/chco_glycemic.csv")
+
+# chco registry 108 obs
+# CFF ID and MRN, start date
+chco_registry = read_csv("S:/Vigers/CF/Christine Chan/Prepost Triakfta/Data_Cleaned/chco_registry.csv")
+###################################
+
+
+###### IMPORT MONTANA DATA ########
+
+# NEED TO RENAME VARIABLES TO MATCH CHCO#
+# bmi, pulm function 975 obs
+montana_bmi_pft <- read_csv("S:/Vigers/CF/Christine Chan/Prepost Triakfta/Data_Cleaned/montana_bmi_pft.csv")
+
+# cgm 16 obs
+montana_cgm <- read_csv("S:/Vigers/CF/Christine Chan/Prepost Triakfta/Data_Cleaned/montana_cgm.csv")
+
+# registry: we need to combine demo (126), genotypes (126), pancreatic (241), gtubes (155)
+montana_demo <- read_csv("S:/Vigers/CF/Christine Chan/Prepost Triakfta/Data_Cleaned/montana_demo.csv")
+montana_genotypes <- read_csv("S:/Vigers/CF/Christine Chan/Prepost Triakfta/Data_Cleaned/montana_genotypes.csv")
+montana_gtubes <- read_csv("S:/Vigers/CF/Christine Chan/Prepost Triakfta/Data_Cleaned/montana_gtubes.csv") # what are the dates here
+montana_pancreatic <- read_csv("S:/Vigers/CF/Christine Chan/Prepost Triakfta/Data_Cleaned/montana_pancreatic.csv") # what is this? just dates and cffid
+# ask tim:what do we need to do with gtubes and pancreatic dates? dont look like chco data
+
+# glycemic 279
+montana_glycemic_registry <- read_csv("S:/Vigers/CF/Christine Chan/Prepost Triakfta/Data_Cleaned/montana_glycemic_registry.csv") # looks identical
+###################################
+
+###### IMPORT UW DATA #############
+###################################
+
+###### IMPORT ? DATA ########
+###################################
+
+```
+
+Lets try and stitch these sets together by site (one site at a time as above)
+note: by default, the dplyr join functions join by all variables in common. So we need to make sure the common variables are same format and name
+```{r form stitching}
+####### CHCO ############
+# CGM Data Cleaning
+# get a CFF ID and visit variable by splitting subjectid variable into CFF ID and Visit
+chco_cgm$`CFF ID` = as.numeric(sub("_.*", "", chco_cgm$subject_id))
+chco_cgm$Visit = sub(".*_", "", chco_cgm$subject_id)
+
+# Get a Date variable by taking the date from "date time" char variable date_cgm_placement
+# weird because one obs isnt in a date time, just a date so ill just brute it
+chco_cgm = chco_cgm %>% mutate(datewithtime = str_detect(date_cgm_placement, " "),
+                               Date = ifelse(datewithtime,sub(" .*", "", chco_cgm$date_cgm_placement), date_cgm_placement))
+
+
+# per tim, its ok to have more than 2 dates per subject,
+# as it looks like a lot of this stuff was collected at different times for different subjects;
+# i expect this will make it pretty long
+
+chco_long = full_join(chco_glycemic, chco_bmi_pft) # will join by MRN, Start, Date
+
+chco_long = full_join( chco_registry, chco_long) # joins by MRN, CFFID, Start
+chco_long = full_join(chco_long, chco_cgm) # joins by cff id and date
+
+# add in a site id variable
+chco_long$site = "CHCO"
+
+#########################
+
+
+####### Montana ############
+# to do: registry var differences in name and type
+# rename the bmi_pft to chco names
+# cgm, glycemic look good
+
+# differences in montana and chco registry vars:
+# Race labels
+# make registry dataframe
+montana_registry = full_join(montana_demo, montana_genotypes)
+montana_registry = full_join(montana_registry, montana_pancreatic)
+montana_registry = full_join(montana_registry, montana_gtubes)
+
+# CGM looks like this is the same as CHCO (GROOVY)
+# cgm data cleaning
+montana_cgm$`CFF ID` = as.numeric(sub("_.*", "", montana_cgm$subject_id))
+montana_cgm$Visit = sub(".*_", "", montana_cgm$subject_id)
+
+# Get a Date variable by taking the date from "date time" char variable date_cgm_placement
+montana_cgm = montana_cgm %>% mutate(datewithtime = str_detect(date_cgm_placement, " "),
+                               Date = ifelse(datewithtime,sub(" .*", "", montana_cgm$date_cgm_placement), date_cgm_placement))
+
+#########################
+
+####### UW ############
+#########################
+
+####### UM? ############
+#########################
+
 ```
