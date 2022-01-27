@@ -1,7 +1,5 @@
-#Load Hmisc library
-library(Hmisc)
 #Read Data
-data=read.csv('./Christine Chan/CF Metabolomics/Data_Raw/CGMInHealthyControls_DATA_2022-01-27_1346.csv')
+data=read.csv('./Christine Chan/CF Metabolomics/Data_Raw/CGMInHealthyControls_DATA_2022-01-27_1346.csv',na.strings = "")
 #Setting Labels
 label(data$subject_id)="Subject ID"
 label(data$consent)="Consent"
