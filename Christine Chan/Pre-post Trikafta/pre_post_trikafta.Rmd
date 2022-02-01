@@ -163,6 +163,12 @@ montana_long = full_join(montana_glycemic_registry, montana_bmi_pft) # will join
 montana_long = full_join(montana_registry, montana_long) # joins by MRN, CFFID, Start
 montana_long = full_join(montana_long, montana_cgm) # joins by cff id and date
 
+#hba1c should be a numeric, one with a note : pre trikafta cffid 1433411
+montana_long = montana_long %>% rename(HbA1c_original = HbA1c)
+montana_long = montana_long %>% mutate(hba1c_spc = str_detect(HbA1c_original, " "),
+                               HbA1c = as.numeric(ifelse(hba1c_spc,sub(" .*", "", montana_long$HbA1c_original), HbA1c_original)))
+
+montana_long = montana_long %>% select(-c(hba1c_spc, HbA1c_original))
 # add in a site id variable
 montana_long$site = "Montana"
 #########################
@@ -223,3 +229,12 @@ TO ASK TIM:
 -why do UW and Montana files (pancreatic) just have dates? are these different dates/ significant? do we need this file/ rename the date? gtubes similar
 
 bmi pft: didnt worry about percent predicted (included in uw and montana), wasnt in chco data
+
+```{r analysis dataset}
+# full join long datasets
+analysis_data = full_join(chco_long, montana_long)
+analysis_data = full_join(analysis_data, uw_long)
+
+# export csv analysis_data
+write.csv(analysis_data, file = "S:/Vigers/CF/Christine Chan/Prepost Triakfta/Data_Cleaned/analysis_data.csv")
+```
