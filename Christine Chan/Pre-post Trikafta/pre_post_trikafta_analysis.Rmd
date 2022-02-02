@@ -68,6 +68,7 @@ df = df %>% group_by(CFF.ID) %>% fill(DOB,Start:CFRD.Diagnosis.Date,.direction =
   ungroup() %>% filter(!is.na(Time),abs(Time) <= 365,!is.na(CFF.ID),
                        (!is.na(CFRD.Diagnosis.Date) | !is.na(CFRD.Status) | site == "UW")) %>%
   select(-MRN) %>% select(CFF.ID,site,DOB,Start,everything()) %>% rename(Site = "site")
+
 ```
 
 ```{r}
@@ -83,9 +84,9 @@ piecewise = function(outcome,data = df){
   mod = lmer(f,data = data)
   res = tidy(mod,"fixed")
   res$effect = NULL
-  res$term[2] = "Slope Prior"
+  #res$term[2] = "Slope Prior"
   # Segmented fit
-  fit = lme(as.formula(paste0(outcome,"~Time + Change")),random = ~1|CFF.ID,data = data,na.action = na.omit)
+  fit1 = lme(as.formula(paste0(outcome,"~Time + Change")),random = ~1|CFF.ID,data = data,na.action = na.omit)
   seg = suppressWarnings(segmented(fit, seg.Z = ~Time, npsi=1))
   # Model check if necessary
   check = check_model(mod)
@@ -113,9 +114,11 @@ piecewise = function(outcome,data = df){
 
 For each outcome, we fit a piecewise linear mixed effects model with random intercept for each person and a "knot" at 0. This approach can be thought of as fitting two separate linear models, while ensuring that the two regression lines meet at Trikafta start. In the model results, "Slope Prior" indicates the slope prior to start of treatment (i.e. the average change in outcome for each "1 unit increase" in time). The "Change" term indicates the *change in slope* after medication start. To find the slope post-Trikafta, you add the "Slope Prior" and "Change" estimates. 
 
+The random intercept model was selected because it performed better (by AIC) than a model with random intercept and continuous AR1 correlation structure. Random slope models did not converge for some outcomes, so were not used for the sake of consistency between results. 
+
 # HbA1c
 
-```{r results='asis',warning=FALSE}
+```{r results='asis'}
 a1c = piecewise(outcome = "HbA1c",df)
 ggplotly(a1c$plot)
 kable(a1c$table,digits = 3)
@@ -123,3 +126,14 @@ a1c$check
 ```
 
 `r if(class(a1c$seg)=="lme"){"Automated R package was not able to find a better breakpoint."}`
+
+# BMI
+
+```{r results='asis'}
+bmi = piecewise(outcome = "BMI",df)
+ggplotly(bmi$plot)
+kable(bmi$table,digits = 3)
+bmi$check
+```
+
+`r if(class(bmi$seg)=="lme"){"Automated R package was not able to find a better breakpoint."}`
