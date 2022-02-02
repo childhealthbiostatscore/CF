@@ -1,6 +1,6 @@
 ---
 title: ""
-author: "Tim Vigers & Laura Pyle"
+author: "Tim Vigers"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output:
   html_document:
@@ -16,8 +16,10 @@ library(tidyverse)
 library(performance)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
-if (Sys.info()["sysname"] == "Linux"){
-  home_dir = "~/UCD//PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
+if(Sys.info()["sysname"] == "Windows"){
+  home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
+} else if (Sys.info()["sysname"] == "Linux"){
+  home_dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
 } else if (Sys.info()["sysname"] == "Darwin"){
   home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
 }
