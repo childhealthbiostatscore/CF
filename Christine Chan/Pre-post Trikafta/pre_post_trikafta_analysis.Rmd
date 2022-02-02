@@ -13,10 +13,13 @@ output:
 ```{r setup, include=FALSE}
 library(arsenal)
 library(tidyverse)
+library(lmerTest)
+library(broom.mixed)
 library(performance)
 library(lubridate)
+library(plotly)
 library(knitr)
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE,fig.height = 8,fig.width = 10)
 if(Sys.info()["sysname"] == "Windows"){
   home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
 } else if (Sys.info()["sysname"] == "Linux"){
@@ -27,20 +30,16 @@ if(Sys.info()["sysname"] == "Windows"){
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
-```{r}
+```{r include=FALSE}
 # Import cleaned data from Casey
 df = read.csv("./Christine Chan/Prepost Triakfta/Data_Cleaned/analysis_data.csv",na.strings = "NA")
 df$X = NULL
 # Fill in MRN and CFF ID for everyone
 df = df %>% 
   group_by(CFF.ID) %>% fill(MRN,.direction = "downup") %>% 
-  group_by(MRN) %>% fill(CFF.ID,.direction = "downup") %>%
-  arrange(CFF.ID,Date)
-# Fill in constant variables for all rows
-df = df %>% group_by(MRN) %>% fill(CFF.ID,.direction = "downup") %>% 
-  group_by(CFF.ID) %>% fill(DOB,Start:CFRD.Diagnosis.Date,.direction = "downup") %>% ungroup()
-df$Hispanic.Latinx[is.na(df$Hispanic.Latinx)] = FALSE
+  group_by(MRN) %>% fill(CFF.ID,.direction = "downup")
 # Assume that blanks for pancreatic and G tube indicate "no"
+df$Hispanic.Latinx[is.na(df$Hispanic.Latinx)] = FALSE
 df$Pancreatic.Status[is.na(df$Pancreatic.Status)] = "Sufficient"
 df$G.tube.in.past.12.months[is.na(df$G.tube.in.past.12.months)] = "No"
 # Convert dates
@@ -49,22 +48,66 @@ df[,date_vars] = lapply(df[,date_vars], function(d){
   parse_date_time(d,orders = c("mdy","ymd","dmy"),quiet = T)
 })
 # Time from start and filtering
-df = df %>% mutate(time = as.numeric(difftime(Date,Start,units = "days"))) %>%
-  filter(!is.na(time),abs(time) <= 365,!is.na(CFF.ID),
-         !is.na(CFRD.Diagnosis.Date) | !is.na(CFRD.Status)) %>%
-  select(-MRN,CFF.ID,DOB,Start,everything())
+df = df %>% mutate(Time = as.numeric(difftime(Date,Start,units = "days"))) 
+# Add UM (they did not provide dates, so need Time column)
+um_a1cs = read.csv("./Christine Chan/Prepost Triakfta/Data_Cleaned/um_a1cs.csv",na.strings = "")
+um_bmi = read.csv("./Christine Chan/Prepost Triakfta/Data_Cleaned/um_bmi.csv",na.strings = "")
+um_demo = read.csv("./Christine Chan/Prepost Triakfta/Data_Cleaned/um_demo.csv",na.strings = "")
+um_ogtt = read.csv("./Christine Chan/Prepost Triakfta/Data_Cleaned/um_ogtt.csv",na.strings = "")
+um_pfts = read.csv("./Christine Chan/Prepost Triakfta/Data_Cleaned/um_pfts.csv",na.strings = "")
+um = full_join(um_a1cs,um_bmi)
+um = full_join(um,um_ogtt)
+um = full_join(um,um_pfts)
+um = left_join(um,um_demo)
+um = um %>% filter(!is.na(CFRD.Status))
+df = full_join(df,um)
+# Filter and fill constants
+df = df %>% group_by(CFF.ID) %>% fill(DOB,Start:CFRD.Diagnosis.Date,.direction = "downup") %>%
+  ungroup() %>% filter(!is.na(Time),abs(Time) <= 365,!is.na(CFF.ID),
+                       (!is.na(CFRD.Diagnosis.Date) | !is.na(CFRD.Status) | site == "UW")) %>%
+  select(-MRN) %>% select(CFF.ID,site,DOB,Start,everything()) %>% rename(Site = "site")
 ```
 
-# Table 1: Participant Characteristics
-
 ```{r}
-demographics = df %>% group_by(CFF.ID) %>% filter(row_number() == 1)
-
-```
-
-```{r}
+data = df
+outcome = "HbA1c"
 # Piecewise model function
 piecewise = function(outcome,data = df){
-  
+  # Add spline column
+  data$Change = ifelse(data$Time < 0,0,1)
+  data$Change = data$Change * data$Time
+  # Model
+  f = as.formula(paste0(outcome,"~Time + Change + (1|CFF.ID)"))
+  mod = lmer(f,data = data)
+  res = tidy(mod,"fixed")
+  res$effect = NULL
+  # Coordinates for model plotting
+  x1_start = -365
+  y1_start = res$estimate[1] + res$estimate[2]*x1_start
+  x1_end = 0
+  y1_end = res$estimate[1] 
+  x2_start = 0
+  y2_start = res$estimate[1] 
+  x2_end = 365
+  y2_end = res$estimate[1] + (res$estimate[2]+res$estimate[3])*x2_end
+  # Plot
+  p = ggplot(data,aes_string(x = "Time",y = outcome,group = "CFF.ID",color = "Site")) +
+    geom_point(alpha = 0.5) + geom_line(alpha = 0.2) +
+    annotate("segment",x=x1_start,y=y1_start,xend=x1_end,yend=y1_end,color = "blue",size = 1) +
+    annotate("segment",x=x2_start,y=y2_start,xend=x2_end,yend=y2_end,color = "blue",size = 1) +
+    xlab("Days from Trikafta Start") + theme_bw()
+  # Interactive plot and model results
+  return(list(plot = ggplotly(p),table = res))
 }
 ```
+
+# Methods
+
+# HbA1c
+
+```{r results='asis'}
+a1c = piecewise(outcome = "HbA1c",df)
+ggplotly(a1c$plot)
+kable(a1c$table,digits = 3)
+```
+
