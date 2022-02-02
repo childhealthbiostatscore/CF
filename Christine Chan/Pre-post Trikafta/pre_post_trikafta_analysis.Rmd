@@ -17,15 +17,34 @@ library(performance)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
 if(Sys.info()["sysname"] == "Windows"){
-  home_dir = "B:/Projects"
+  home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
 } else if (Sys.info()["sysname"] == "Linux"){
-  home_dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/BDC/Projects"
+  home_dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
 } else if (Sys.info()["sysname"] == "Darwin"){
-  home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/BDC/Projects"
+  home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
 }
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r}
+# Import cleaned data from Casey
+df = read.csv("./Christine Chan/Prepost Triakfta/Data_Cleaned/analysis_data.csv",na.strings = "NA")
+df$X = NULL
+# Fill in MRN and CFF ID for everyone
+df = df %>% 
+  group_by(CFF.ID) %>% fill(MRN,.direction = "downup") %>% 
+  group_by(MRN) %>% fill(CFF.ID,.direction = "downup") %>%
+  arrange(CFF.ID,Date)
+# Fill in constant variables for all rows
+df = df %>% group_by(MRN) %>% fill(CFF.ID,.direction = "downup") %>% 
+  group_by(CFF.ID) %>% fill(DOB,Start:Genotypes2,CFRD.Diagnosis.Date,.direction = "downup")
+# Remove those without a start date
+t = df %>% filter(is.na(Start)) %>% select(CFF.ID,site)
+```
 
+```{r}
+# Piecewise model function
+piecewise = function(outcome,data = df){
+  
+}
 ```
