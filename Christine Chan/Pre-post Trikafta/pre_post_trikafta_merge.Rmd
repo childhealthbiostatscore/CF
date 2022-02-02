@@ -86,7 +86,7 @@ uw_pancreatic <- read_csv("./Prepost Triakfta/Data_Cleaned/uw_pancreatic.csv") #
 ###################################
 
 ###### IMPORT UM DATA ########
-um_all <- read_csv("./Prepost Triakfta/Data_Cleaned/um_all.csv")
+#um_all <- read_csv("./Prepost Triakfta/Data_Cleaned/um_all.csv")
 ###################################
 
 ```
@@ -177,7 +177,7 @@ montana_long$site = "Montana"
 ####### UM  ############
 # to do: rename variables to match CHCO
 # most variables have mult columns and no notation: FEV, A1C, FVC, CFRD Status, etc
-um_all %>% select(`CFF ID`, `CFRD Status...10`, `CFRD Status...34`) %>% filter(`CFRD Status...10` != `CFRD Status...34`)
+#um_all %>% select(`CFF ID`, `CFRD Status...10`, `CFRD Status...34`) %>% filter(`CFRD Status...10` != `CFRD Status...34`)
 
 ########################
 
