@@ -14,6 +14,7 @@ output:
 library(arsenal)
 library(tidyverse)
 library(performance)
+library(lubridate)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
 if(Sys.info()["sysname"] == "Windows"){
@@ -37,9 +38,28 @@ df = df %>%
   arrange(CFF.ID,Date)
 # Fill in constant variables for all rows
 df = df %>% group_by(MRN) %>% fill(CFF.ID,.direction = "downup") %>% 
-  group_by(CFF.ID) %>% fill(DOB,Start:Genotypes2,CFRD.Diagnosis.Date,.direction = "downup")
-# Remove those without a start date
-t = df %>% filter(is.na(Start)) %>% select(CFF.ID,site)
+  group_by(CFF.ID) %>% fill(DOB,Start:CFRD.Diagnosis.Date,.direction = "downup") %>% ungroup()
+df$Hispanic.Latinx[is.na(df$Hispanic.Latinx)] = FALSE
+# Assume that blanks for pancreatic and G tube indicate "no"
+df$Pancreatic.Status[is.na(df$Pancreatic.Status)] = "Sufficient"
+df$G.tube.in.past.12.months[is.na(df$G.tube.in.past.12.months)] = "No"
+# Convert dates
+date_vars = c("DOB","Start","Date")
+df[,date_vars] = lapply(df[,date_vars], function(d){
+  parse_date_time(d,orders = c("mdy","ymd","dmy"),quiet = T)
+})
+# Time from start and filtering
+df = df %>% mutate(time = as.numeric(difftime(Date,Start,units = "days"))) %>%
+  filter(!is.na(time),abs(time) <= 365,!is.na(CFF.ID),
+         !is.na(CFRD.Diagnosis.Date) | !is.na(CFRD.Status)) %>%
+  select(-MRN,CFF.ID,DOB,Start,everything())
+```
+
+# Table 1: Participant Characteristics
+
+```{r}
+demographics = df %>% group_by(CFF.ID) %>% filter(row_number() == 1)
+
 ```
 
 ```{r}
