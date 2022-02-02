@@ -14,7 +14,9 @@ output:
 library(arsenal)
 library(tidyverse)
 library(lmerTest)
+library(nlme)
 library(broom.mixed)
+library(segmented)
 library(performance)
 library(lubridate)
 library(plotly)
@@ -81,6 +83,12 @@ piecewise = function(outcome,data = df){
   mod = lmer(f,data = data)
   res = tidy(mod,"fixed")
   res$effect = NULL
+  res$term[2] = "Slope Prior"
+  # Segmented fit
+  fit = lme(as.formula(paste0(outcome,"~Time + Change")),random = ~1|CFF.ID,data = data,na.action = na.omit)
+  seg = suppressWarnings(segmented(fit, seg.Z = ~Time, npsi=1))
+  # Model check if necessary
+  check = check_model(mod)
   # Coordinates for model plotting
   x1_start = -365
   y1_start = res$estimate[1] + res$estimate[2]*x1_start
@@ -97,17 +105,21 @@ piecewise = function(outcome,data = df){
     annotate("segment",x=x2_start,y=y2_start,xend=x2_end,yend=y2_end,color = "blue",size = 1) +
     xlab("Days from Trikafta Start") + theme_bw()
   # Interactive plot and model results
-  return(list(plot = ggplotly(p),table = res))
+  return(list(plot = ggplotly(p),table = res,check = check,seg = seg))
 }
 ```
 
 # Methods
 
+For each outcome, we fit a piecewise linear mixed effects model with random intercept for each person and a "knot" at 0. This approach can be thought of as fitting two separate linear models, while ensuring that the two regression lines meet at Trikafta start. In the model results, "Slope Prior" indicates the slope prior to start of treatment (i.e. the average change in outcome for each "1 unit increase" in time). The "Change" term indicates the *change in slope* after medication start. To find the slope post-Trikafta, you add the "Slope Prior" and "Change" estimates. 
+
 # HbA1c
 
-```{r results='asis'}
+```{r results='asis',warning=FALSE}
 a1c = piecewise(outcome = "HbA1c",df)
 ggplotly(a1c$plot)
 kable(a1c$table,digits = 3)
+a1c$check
 ```
 
+`r if(class(a1c$seg)=="lme"){"Automated R package was not able to find a better breakpoint."}`
