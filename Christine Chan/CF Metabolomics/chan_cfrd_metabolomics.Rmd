@@ -13,7 +13,9 @@ output:
 ```{r setup, include=FALSE}
 library(Hmisc)
 library(mixOmics)
+library(combinat)
 library(tidyverse)
+library(parallel)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
 if (Sys.info()["sysname"] == "Linux"){
@@ -103,8 +105,58 @@ plotIndiv(pca_res,group = df$combined,legend = TRUE,pch = 16,
 
 # PLS-DA
 
+## Four groups
+
 ```{r}
 plsda_res = splsda(X, Y_all)
-plotIndiv(plsda_res,group = df$group_category.factor,legend = TRUE,pch = 16,
-          title = "PCA Components 1 - 2")
+plotIndiv(plsda_res,group = df$group_category.factor,legend = TRUE,pch = 16)
 ```
+
+## Control and CFNGT vs. Abnormal Glycemia
+
+```{r}
+plsda_res = splsda(X, Y_two)
+plotIndiv(plsda_res,group = df$combined,legend = TRUE,pch = 16)
+```
+
+### Permutation testing
+
+```{r cache=TRUE}
+real_auc_1 = auroc(plsda_res,print = F,plot = F)$Comp1[1]
+real_auc_2 = auroc(plsda_res,print = F,plot = F)$Comp2[1]
+perms = 1000
+cl = makeCluster(8,type = "FORK")
+aucs = parLapply(cl,1:perms, function(s){
+  set.seed(s)
+  Y_perm = sample(df$combined,length(df$combined))
+  plsda_res = splsda(X, Y_perm)
+  aucs = auroc(plsda_res,print = F,plot = F)
+  comp1_auc = aucs$Comp1[1]
+  comp2_auc = aucs$Comp2[1]
+  return(c(comp1 = comp1_auc,comp2 = comp2_auc))
+})
+stopCluster(cl)
+aucs = as.data.frame(do.call(rbind,aucs))
+```
+
+Two group outcome was "shuffled" `r perms` times and sPLSDA re-fit on the permuted outcome. 
+
+#### Component 1
+
+```{r}
+ggplot(aucs,aes(x = comp1)) + geom_histogram(binwidth = 0.02) + theme_bw() + 
+  geom_vline(xintercept = real_auc_1,color = "red") +
+  xlab("AUC") + ylab("Count")
+```
+
+Permutation p value for component 1 is `r round((1 + sum(aucs$comp1 > real_auc_1))/perms,3)` 
+
+#### Component 2
+
+```{r}
+ggplot(aucs,aes(x = comp2)) + geom_histogram(binwidth = 0.02) + theme_bw() + 
+  geom_vline(xintercept = real_auc_2,color = "red") +
+  xlab("AUC") + ylab("Count")
+```
+
+Permutation p value for component 1 is `r round((1 + sum(aucs$comp2 > real_auc_2))/perms,3)` 
