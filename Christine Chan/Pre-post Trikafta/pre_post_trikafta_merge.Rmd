@@ -41,7 +41,8 @@ chco_bmi_pft = read_csv("./Prepost Triakfta/Data_Cleaned/chco_bmi_pft.csv")
 # continuous glucose monitoring, 23 obs
 # 105 vars subjectid - number_pre/post for visit and a date; numbers dont seem to correspond to mrn in bmi pft
 chco_cgm = read_csv("./Prepost Triakfta/Data_Cleaned/chco_cgm.csv")
-
+chco_cgm$Date = lubridate::date(parse_date_time(chco_cgm$date_cgm_placement,
+                                                orders = c("mdyHM","mdy")))
 # chco glycemic, 261 obs
 # 7 var MRN and CFF id (=subjectid?), date for visits; start... etc
 chco_glycemic = read_csv("./Prepost Triakfta/Data_Cleaned/chco_glycemic.csv")
