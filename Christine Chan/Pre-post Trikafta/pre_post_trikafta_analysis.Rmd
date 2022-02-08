@@ -52,6 +52,7 @@ df[,date_vars] = lapply(df[,date_vars], function(d){
   parse_date_time(d,orders = c("mdy","ymd","dmy"),quiet = T)
 })
 # Time from start and filtering
+df = df %>% group_by(CFF.ID) %>% fill(Start,.direction = "downup")
 df = df %>% mutate(Time = as.numeric(difftime(Date,Start,units = "days"))) 
 # Add UM (they did not provide dates, so need Time column)
 um_a1cs = read.csv("./Christine Chan/Prepost Triakfta/Data_Cleaned/um_a1cs.csv",na.strings = "")
@@ -108,7 +109,7 @@ df$ppFVC = pctpred_GLI(df$Age,df$Height/100,gender = as.numeric(df$Sex),
 data = df
 outcome = "HbA1c"
 # Piecewise model function
-piecewise = function(outcome,data = df,ordinal = F){
+piecewise = function(outcome,data = df,simple = F){
   # Add spline column
   data$Change = ifelse(data$Time < 0,0,1)
   data$Change = data$Change * data$Time
@@ -117,12 +118,6 @@ piecewise = function(outcome,data = df,ordinal = F){
   mod = lmer(f,data = data)
   res = tidy(mod,"fixed")
   res$effect = NULL
-  # Fit ordinal GEE (for example BMI group)
-  if(ordinal){
-    f = as.formula(paste0(outcome,"~Time + Change"))
-    mod = ordgee(f,data = data,id = data$CFF.ID)
-    res = summary(mod)
-  }
   # Segmented fit
   fit = lme(as.formula(paste0(outcome,"~Time + Change")),random = ~1|CFF.ID,
             data = data,na.action = na.omit)
@@ -161,7 +156,6 @@ The random intercept model was selected because it performed better (by AIC) tha
 a1c = piecewise(outcome = "HbA1c",df)
 ggplotly(a1c$plot)
 kable(a1c$table,digits = 3)
-a1c$check
 ```
 
 `r if(class(a1c$seg)=="lme"){"Automated R package was not able to find a better breakpoint."}`
@@ -180,7 +174,6 @@ Most participants only have one observation of insulin dose, so these results wo
 ppFEV = piecewise(outcome = "ppFEV",df)
 ggplotly(ppFEV$plot)
 kable(ppFEV$table,digits = 3)
-ppFEV$check
 ```
 
 # ppFVC
@@ -189,5 +182,110 @@ ppFEV$check
 ppFVC = piecewise(outcome = "ppFVC",df)
 ggplotly(ppFVC$plot)
 kable(ppFVC$table,digits = 3)
-ppFVC$check
+```
+
+# CGM Metrics
+
+## Mean
+
+```{r results='asis'}
+meansg = piecewise(outcome = "average_sensor",df)
+ggplotly(meansg$plot)
+kable(meansg$table,digits = 3)
+```
+
+## Min
+
+```{r results='asis'}
+minsg = piecewise(outcome = "min_sensor",df)
+ggplotly(minsg$plot)
+kable(minsg$table,digits = 3)
+```
+
+## Max
+
+```{r results='asis'}
+maxsg = piecewise(outcome = "max_sensor",df)
+ggplotly(maxsg$plot)
+kable(maxsg$table,digits = 3)
+```
+
+## % Time > 120
+
+```{r results='asis'}
+over120 = piecewise(outcome = "percent_time_over_120",df)
+ggplotly(over120$plot)
+kable(over120$table,digits = 3)
+```
+
+## % Time > 140
+
+```{r results='asis'}
+over140 = piecewise(outcome = "percent_time_over_140",df)
+ggplotly(over140$plot)
+kable(over140$table,digits = 3)
+```
+
+## % Time > 200
+
+```{r results='asis'}
+over200 = piecewise(outcome = "percent_time_over_200",df)
+ggplotly(over200$plot)
+kable(over200$table,digits = 3)
+```
+
+## Mean excursions > 140
+
+```{r results='asis'}
+numover140 = piecewise(outcome = "avg_excur_over_140_per_day",df)
+ggplotly(numover140$plot)
+kable(numover140$table,digits = 3)
+```
+
+## Mean excursions > 200
+
+```{r results='asis'}
+numover200 = piecewise(outcome = "avg_excur_over_200_per_day",df)
+ggplotly(numover200$plot)
+kable(numover200$table,digits = 3)
+```
+
+## % Time < 70
+
+```{r results='asis'}
+under70 = piecewise(outcome = "percent_time_under_70",df)
+ggplotly(under70$plot)
+kable(under70$table,digits = 3)
+```
+
+## % Time < 60
+
+```{r results='asis'}
+under60 = piecewise(outcome = "percent_time_under_60",df)
+ggplotly(under60$plot)
+kable(under60$table,digits = 3)
+```
+
+## Average AUC per day
+
+```{r results='asis'}
+auc = piecewise(outcome = "average_auc_per_day",df)
+ggplotly(auc$plot)
+kable(auc$table,digits = 3)
+```
+
+## SD
+
+```{r results='asis'}
+sd = piecewise(outcome = "standard_deviation",df)
+ggplotly(sd$plot)
+kable(sd$table,digits = 3)
+```
+
+## MAGE
+
+```{r results='asis'}
+mage = piecewise(outcome = "r_mage",df)
+ggplotly(mage$plot)
+kable(mage$table,digits = 3)
 ```
