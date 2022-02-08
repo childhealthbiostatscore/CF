@@ -2,3 +2,5 @@
 *.Rhistory
 *.html
 *checkpoint.ipynb
+*_cache
+*_files
