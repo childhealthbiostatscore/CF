@@ -18,6 +18,8 @@ library(nlme)
 library(broom.mixed)
 library(segmented)
 library(performance)
+library(AGD)
+library(rspiro)
 library(lubridate)
 library(plotly)
 library(knitr)
@@ -68,14 +70,45 @@ df = df %>% group_by(CFF.ID) %>% fill(DOB,Start:CFRD.Diagnosis.Date,.direction =
   ungroup() %>% filter(!is.na(Time),abs(Time) <= 365,!is.na(CFF.ID),
                        (!is.na(CFRD.Diagnosis.Date) | !is.na(CFRD.Status) | site == "UW")) %>%
   select(-MRN) %>% select(CFF.ID,site,DOB,Start,everything()) %>% rename(Site = "site")
-
+df$Sex = as.factor(df$Sex)
+levels(df$Sex) = c("F","M")
+# BMI category
+df$Age = pmax(as.numeric(difftime(df$Date,df$DOB,units = "days")),df$Age,na.rm = T)/365.25
+df$BMIz = y2z(df$BMI,x = df$Age,sex = df$Sex,ref=nl4.bmi)
+df$BMI_group = apply(df,1,function(r){
+  age = as.numeric(r["Age"])
+  if(!is.na(age) & age > 19){
+    bmi = as.numeric(r["BMI"])
+    group = cut(bmi,c(-Inf,18.5,25,30,35,40,Inf),
+        labels = c("Under Weight","Normal Weight","Overweight","Obese (Class I)",
+                   "Obese (Class II)","Obese (Class III+)"),right = F)
+  } else if (!is.na(age) & age <= 19){
+    z = as.numeric(r["BMIz"])
+    perc = pnorm(z)
+    group = cut(perc,c(-Inf,5,85,95,Inf),
+        labels = c("Under Weight","Normal Weight","Overweight","Obese (Class I)"),right = F)
+  } else {group = NA}
+  return(as.character(group))
+})
+df$BMI_group = as.factor(df$BMI_group)
+df$BMI_group = ordered(df$BMI_group,c("Under Weight","Normal Weight","Overweight",
+                                      "Obese (Class I)","Obese (Class II)","Obese (Class III+)"))
+# PFTs
+old <- c("Caucasian","Black","Other")
+new <- c(1,2,5)
+df$ppFEV = pctpred_GLI(df$Age,df$Height/100,gender = as.numeric(df$Sex),
+            ethnicity = new[match(df$Race, old)],
+            FEV1 = df$FEV1)
+df$ppFVC = pctpred_GLI(df$Age,df$Height/100,gender = as.numeric(df$Sex),
+            ethnicity = new[match(df$Race, old)],
+            FEV1 = df$FVC)
 ```
 
 ```{r}
 data = df
 outcome = "HbA1c"
 # Piecewise model function
-piecewise = function(outcome,data = df){
+piecewise = function(outcome,data = df,ordinal = F){
   # Add spline column
   data$Change = ifelse(data$Time < 0,0,1)
   data$Change = data$Change * data$Time
@@ -84,9 +117,15 @@ piecewise = function(outcome,data = df){
   mod = lmer(f,data = data)
   res = tidy(mod,"fixed")
   res$effect = NULL
-  #res$term[2] = "Slope Prior"
+  # Fit ordinal GEE (for example BMI group)
+  if(ordinal){
+    f = as.formula(paste0(outcome,"~Time + Change"))
+    mod = ordgee(f,data = data,id = data$CFF.ID)
+    res = summary(mod)
+  }
   # Segmented fit
-  fit1 = lme(as.formula(paste0(outcome,"~Time + Change")),random = ~1|CFF.ID,data = data,na.action = na.omit)
+  fit = lme(as.formula(paste0(outcome,"~Time + Change")),random = ~1|CFF.ID,
+            data = data,na.action = na.omit)
   seg = suppressWarnings(segmented(fit, seg.Z = ~Time, npsi=1))
   # Model check if necessary
   check = check_model(mod)
@@ -129,11 +168,26 @@ a1c$check
 
 # BMI
 
+Models did not converge with BMI converted to under weight, normal weight, etc. This is most likely due to lack of within-patient variability in terms of BMI group (i.e. people's BMIs aren't changing enough that they move from one group to another).
+
+# Insulin
+
+Most participants only have one observation of insulin dose, so these results would be the same as Maxie's previous reports.
+
+# ppFEV
+
 ```{r results='asis'}
-bmi = piecewise(outcome = "BMI",df)
-ggplotly(bmi$plot)
-kable(bmi$table,digits = 3)
-bmi$check
+ppFEV = piecewise(outcome = "ppFEV",df)
+ggplotly(ppFEV$plot)
+kable(ppFEV$table,digits = 3)
+ppFEV$check
 ```
 
-`r if(class(bmi$seg)=="lme"){"Automated R package was not able to find a better breakpoint."}`
+# ppFVC
+
+```{r results='asis'}
+ppFVC = piecewise(outcome = "ppFVC",df)
+ggplotly(ppFVC$plot)
+kable(ppFVC$table,digits = 3)
+ppFVC$check
+```
