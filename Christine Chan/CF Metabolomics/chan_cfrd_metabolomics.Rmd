@@ -1,5 +1,5 @@
 ---
-title: ""
+title: "Metabolomics in CF and Healthy Controls"
 author: "Tim Vigers & Laura Pyle"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output:
@@ -16,6 +16,7 @@ library(mixOmics)
 library(combinat)
 library(tidyverse)
 library(parallel)
+library(limma)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
 if (Sys.info()["sysname"] == "Linux"){
@@ -78,6 +79,7 @@ df = df %>% filter(subject_id %in% metab_pos[[1]]$subject_id) %>%
 # Larger groups
 df$combined = df$group_category.factor
 levels(df$combined) = c("HC & CFNGT","HC & CFNGT","CFAGT & CFRD", "CFAGT & CFRD")
+levels(df$group_category.factor) = c("HC","CFNGT","CFAGT","CFRD")
 # Remove low variance
 df = df[,-nearZeroVar(df)$Position]
 # Matrices for mixOmics
@@ -149,7 +151,7 @@ ggplot(aucs,aes(x = comp1)) + geom_histogram(binwidth = 0.02) + theme_bw() +
   xlab("AUC") + ylab("Count")
 ```
 
-Permutation p value for component 1 is `r round((1 + sum(aucs$comp1 > real_auc_1))/perms,3)` 
+Permutation p value for component 1 is `r round(sum(aucs$comp1 > real_auc_1)/perms,3)` 
 
 #### Component 2
 
@@ -159,4 +161,38 @@ ggplot(aucs,aes(x = comp2)) + geom_histogram(binwidth = 0.02) + theme_bw() +
   xlab("AUC") + ylab("Count")
 ```
 
-Permutation p value for component 1 is `r round((1 + sum(aucs$comp2 > real_auc_2))/perms,3)` 
+Permutation p value for component 1 is `r round(sum(aucs$comp2 >= real_auc_2)/perms,3)` 
+
+# Moderated t tests
+
+## Four groups
+
+```{r warning=FALSE,message=FALSE}
+l = t(log(X))
+design = model.matrix(~group_category.factor,df)
+fit = lmFit(l,design)
+fit <- eBayes(fit)
+res = topTable(fit,number = nrow(l))
+colnames(res)[1:3] = c("CFNGT","CFAGT","CFRD")
+res = res[res$adj.P.Val < 0.05 & !is.na(res$adj.P.Val),]
+res$Compound = compounds$Compound[match(rownames(res),compounds$compound_id)]
+res = res %>% select(Compound,everything())
+kable(res,row.names = F)
+```
+
+`r nrow(res)` metabolites were different in at least one of the glycemia groups. Healthy controls are the reference group in the table above.
+
+## Control and CFNGT vs. Abnormal Glycemia
+
+```{r warning=FALSE,message=FALSE}
+design = model.matrix(~combined,df)
+fit = lmFit(l,design)
+fit <- eBayes(fit)
+res = topTable(fit,number = nrow(l))
+res = res[res$adj.P.Val < 0.05 & !is.na(res$adj.P.Val),]
+res$Compound = compounds$Compound[match(rownames(res),compounds$compound_id)]
+res = res %>% select(Compound,everything())
+kable(res,row.names = F)
+```
+
+`r nrow(res)` metabolites were different between the combined glycemia groups. Healthy controls and CFNGT is the reference group in the table above, and logFC refers to the log fold change between groups.
