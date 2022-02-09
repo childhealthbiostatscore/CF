@@ -24,6 +24,7 @@ if(Sys.info()["sysname"] == "Windows"){
   home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
 }
 knitr::opts_knit$set(root.dir = home_dir)
+rm(home_dir)
 ```
 
 ```{r}
