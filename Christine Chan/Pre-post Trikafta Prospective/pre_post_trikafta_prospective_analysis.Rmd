@@ -17,7 +17,7 @@ library(performance)
 library(AGD)
 library(pracma)
 library(knitr)
-knitr::opts_chunk$set(echo = FALSE,warning = TRUE)
+knitr::opts_chunk$set(echo = FALSE,warning = FALSE)
 if(Sys.info()["sysname"] == "Windows"){
   home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
 } else if (Sys.info()["sysname"] == "Linux"){
@@ -81,19 +81,14 @@ All metrics calculated based on 2 hour OGTT (0, 10, 30, 60, 90, and 120 minutes)
 
 ```{r results='asis'}
 # Make dataset for HOMA2 calculations - glucose in mmol/L and cpep in nmol/L
-homa = df %>% select(Study.ID,Event.Name,Glucose.0.minute:Glucose.180.min,
-                     c.peptide.0.minute:c.peptide.180.min)
-glu_cols = colnames(df)[grep("glucose\\.\\d{1,}",tolower(colnames(df)))]
-cpep_cols = colnames(df)[grep("c.peptide",tolower(colnames(df)))]
-homa[,glu_cols] = lapply(homa[,glu_cols], function(c){
-  c/18
-})
-homa[,cpep_cols] = lapply(homa[,cpep_cols], function(c){
-  c = suppressWarnings(as.numeric(c))/1000
-  c*0.33
-})
+homa = df %>% select(Study.ID,Event.Name,Glucose.0.minute,c.peptide.0.minute)
+homa$Glucose.0.minute = homa$Glucose.0.minute/18
+homa$c.peptide.0.minute = homa$c.peptide.0.minute/1000*0.33
 write.csv(homa,"./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/homa_data.csv",
           na = "",row.names = F)
+# Import HOMA2 data (calculated with https://www.dtu.ox.ac.uk/homacalculator/download.php)
+homa = read.csv("./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/homa_calculated.csv")
+df = left_join(df,homa,by = c("Study.ID", "Event.Name"))
 # Glucose tolerance group
 glu_cols = c("Glucose.0.minute","Glucose.60.min","Glucose.120.min")
 df$Group = apply(df[,glu_cols],1,function(r){
@@ -152,10 +147,68 @@ newlabels["Glucose.60.min"] = "1hr glucose (mg/dL)"
 newlabels["Glucose.120.min"] = "2hr glucose (mg/dL)"
 newlabels["c.peptide.0.minute"] = "Fasting C-peptide (pmol/L)"
 newlabels["iAUC_ratio"] = "C pep iAUC:Glucose iAUC"
+newlabels["homa2B"] = "HOMA2 %B"
+newlabels["homa2S"] = "HOMA2 %S"
+newlabels["homa2IR"] = "HOMA2 IR"
 p <- paired(Event.Name ~ A1C.result+BMIz+FEV1..+FVC....+Group+Glucose.0.minute+
               Glucose.60.min+Glucose.120.min+c.peptide.0.minute+
               `Glucose AUC`+`C Peptide AUC`+`C Peptide Index`+`Adapted Matsuda`+
-              `C Peptide ODI`+iAUC_ratio, 
+              `C Peptide ODI`+iAUC_ratio+homa2B+homa2S+homa2IR, 
             data = df, id = Study.ID)
 summary(p,pfootnote = T,labelTranslations = newlabels)
+```
+
+# Figures
+
+## HbA1c
+
+```{r}
+ggplot(df,aes(x = Event.Name, y = A1C.result,fill = Event.Name)) + 
+  geom_boxplot() + geom_jitter(width = 0.25) + 
+  xlab("Visit") + ylab("HbA1c (%)") + theme_bw() + theme(legend.position = "none")
+```
+
+## Glucose
+
+```{r}
+plot_df = df %>% pivot_longer(all_of(glu_cols)) %>% select(Study.ID,Event.Name,name,value)
+plot_df$name = as.numeric(gsub("Glucose|\\.|min|minute","",plot_df$name))
+plot_df = plot_df %>% group_by(name,Event.Name) %>% 
+  summarise(m = mean(value,na.rm = T),
+            se = sd(value)/sqrt(n()),.groups = "drop")
+ggplot(plot_df,aes(x = name,y = m,color = Event.Name)) + 
+  geom_line() + geom_point() + 
+  geom_errorbar(aes(ymin=m-(1.96*se), ymax=m+(1.96*se)), width=2) +
+  xlab("Time (minutes)") + ylab("Glucose (mg/dL)") + ylim(0,200) + 
+  theme_bw()
+```
+
+## Glucose
+
+```{r}
+plot_df = df %>% pivot_longer(all_of(cpep_cols)) %>% select(Study.ID,Event.Name,name,value)
+plot_df$name = as.numeric(gsub("c.peptide|\\.|min|minute","",plot_df$name))
+plot_df = plot_df %>% group_by(name,Event.Name) %>% 
+  summarise(m = mean(value,na.rm = T),
+            se = sd(value)/sqrt(n()),.groups = "drop")
+ggplot(plot_df,aes(x = name,y = m,color = Event.Name)) + 
+  geom_line() + geom_point() + 
+  geom_errorbar(aes(ymin=m-(1.96*se), ymax=m+(1.96*se)), width=2) +
+  xlab("Time (minutes)") + ylab("C Peptide (pmol/L)") + 
+  theme_bw()
+```
+
+## Insulin
+
+```{r}
+plot_df = df %>% pivot_longer(all_of(ins_cols)) %>% select(Study.ID,Event.Name,name,value)
+plot_df$name = as.numeric(gsub("Insulin|insulin|\\.|min|minute","",plot_df$name))
+plot_df = plot_df %>% group_by(name,Event.Name) %>% 
+  summarise(m = mean(value,na.rm = T),
+            se = sd(value)/sqrt(n()),.groups = "drop")
+ggplot(plot_df,aes(x = name,y = m,color = Event.Name)) + 
+  geom_line() + geom_point() + 
+  geom_errorbar(aes(ymin=m-(1.96*se), ymax=m+(1.96*se)), width=2) +
+  xlab("Time (minutes)") + ylab("Insulin (mcU/mL)") + 
+  theme_bw()
 ```
