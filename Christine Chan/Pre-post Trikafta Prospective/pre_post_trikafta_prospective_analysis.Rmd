@@ -80,6 +80,20 @@ summary(t1,digits = 2,labelTranslations = newlabels)
 All metrics calculated based on 2 hour OGTT (0, 10, 30, 60, 90, and 120 minutes).
 
 ```{r results='asis'}
+# Make dataset for HOMA2 calculations - glucose in mmol/L and cpep in nmol/L
+homa = df %>% select(Study.ID,Event.Name,Glucose.0.minute:Glucose.180.min,
+                     c.peptide.0.minute:c.peptide.180.min)
+glu_cols = colnames(df)[grep("glucose\\.\\d{1,}",tolower(colnames(df)))]
+cpep_cols = colnames(df)[grep("c.peptide",tolower(colnames(df)))]
+homa[,glu_cols] = lapply(homa[,glu_cols], function(c){
+  c/18
+})
+homa[,cpep_cols] = lapply(homa[,cpep_cols], function(c){
+  c = suppressWarnings(as.numeric(c))/1000
+  c*0.33
+})
+write.csv(homa,"./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/homa_data.csv",
+          na = "",row.names = F)
 # Glucose tolerance group
 glu_cols = c("Glucose.0.minute","Glucose.60.min","Glucose.120.min")
 df$Group = apply(df[,glu_cols],1,function(r){
@@ -99,7 +113,6 @@ df[,ins_cols] = lapply(df[,ins_cols], function(c){
 # cpeptide to pmol/L
 cpep_cols = colnames(df)[head(grep("c.peptide",tolower(colnames(df))),-2)]
 df[,cpep_cols] = lapply(df[,cpep_cols], function(c){
-  c = as.numeric(c)/1000
   return(c * 0.33)
 })
 # Calculate AUCs
@@ -109,6 +122,15 @@ df$`Glucose AUC` = apply(df %>% select(Glucose.0.minute:Glucose.120.min),1,funct
 df$`C Peptide AUC` = apply(df %>% select(c.peptide.0.minute:c.peptide.120.min),1,function(r){
   trapz(c(0,10,30,60,90,120),as.numeric(r))
 })
+# Incremental AUCs
+df$`Glucose iAUC` = apply(df %>% select(Glucose.0.minute:Glucose.120.min),1,function(r){
+  r = r - r[1]
+  trapz(c(0,10,30,60,90,120),as.numeric(r))
+})
+df$`C Peptide iAUC` = apply(df %>% select(c.peptide.0.minute:c.peptide.120.min),1,function(r){
+  r = r - r[1]
+  trapz(c(0,10,30,60,90,120),as.numeric(r))
+})
 # Other indices
 # Cpeptide index = delta cpeptide 0-30/delta glucose 0-30
 df$`C Peptide Index` = (df$c.peptide.30.min - df$c.peptide.0.minute)/
@@ -116,22 +138,24 @@ df$`C Peptide Index` = (df$c.peptide.30.min - df$c.peptide.0.minute)/
 # Matsuda c peptide (500,000/√[fasting glucose*fasting cpep*mean glucose*mean cpep])   [Glucose mg/dL, cpeptide pmol/L]
 glu_cols = colnames(df)[head(grep("glucose\\.\\d{1,}",tolower(colnames(df))),-2)]
 df$mean_glucose = rowMeans(df[,glu_cols])
-cpep_cols = head(cpep_cols,-2)
 df$mean_cpep = rowMeans(df[,cpep_cols])
 df$`Adapted Matsuda` = 500000/(sqrt(df$Glucose.0.minute*df$c.peptide.0.minute*
                                       df$mean_glucose*df$mean_cpep))
 # C Pep ODI
 df$`C Peptide ODI` = df$`C Peptide Index`/df$`Adapted Matsuda`
+# iAUC ratio
+df$iAUC_ratio = df$`C Peptide iAUC`/df$`Glucose iAUC`
 # Add labels
 newlabels["A1C.result"] = "HbA1c (%)"
 newlabels["Glucose.0.minute"] = "Fasting glucose (mg/dL)"
 newlabels["Glucose.60.min"] = "1hr glucose (mg/dL)"
 newlabels["Glucose.120.min"] = "2hr glucose (mg/dL)"
 newlabels["c.peptide.0.minute"] = "Fasting C-peptide (pmol/L)"
+newlabels["iAUC_ratio"] = "C pep iAUC:Glucose iAUC"
 p <- paired(Event.Name ~ A1C.result+BMIz+FEV1..+FVC....+Group+Glucose.0.minute+
               Glucose.60.min+Glucose.120.min+c.peptide.0.minute+
               `Glucose AUC`+`C Peptide AUC`+`C Peptide Index`+`Adapted Matsuda`+
-              `C Peptide ODI`, 
+              `C Peptide ODI`+iAUC_ratio, 
             data = df, id = Study.ID)
 summary(p,pfootnote = T,labelTranslations = newlabels)
 ```
