@@ -77,16 +77,27 @@ summary(t1,digits = 2,labelTranslations = newlabels)
 
 # Table 2: Pre-/Post-Trikafta Comparisons
 
-All metrics calculated based on 2 hour 
+All metrics calculated based on 2 hour OGTT (0, 10, 30, 60, 90, and 120 minutes).
 
-```{r}
+```{r results='asis'}
+# Glucose tolerance group
+glu_cols = c("Glucose.0.minute","Glucose.60.min","Glucose.120.min")
+df$Group = apply(df[,glu_cols],1,function(r){
+  if(r[1]<126 & r[2] < 200 & r[3] < 140){
+    return("NGT")
+  } else if (r[1] >= 126 | r[3] >= 200){
+    return("CFRD")
+  } else {
+    return("AGT")
+  }
+})
 # convert Insulin to mcU/mL
-ins_cols = colnames(df)[grep("insulin",tolower(colnames(df)))]
+ins_cols = colnames(df)[head(grep("insulin",tolower(colnames(df))),-2)]
 df[,ins_cols] = lapply(df[,ins_cols], function(c){
   return(as.numeric(c) * 0.02869)
 })
 # cpeptide to pmol/L
-cpep_cols = colnames(df)[grep("c.peptide",tolower(colnames(df)))]
+cpep_cols = colnames(df)[head(grep("c.peptide",tolower(colnames(df))),-2)]
 df[,cpep_cols] = lapply(df[,cpep_cols], function(c){
   c = as.numeric(c)/1000
   return(c * 0.33)
@@ -102,10 +113,25 @@ df$`C Peptide AUC` = apply(df %>% select(c.peptide.0.minute:c.peptide.120.min),1
 # Cpeptide index = delta cpeptide 0-30/delta glucose 0-30
 df$`C Peptide Index` = (df$c.peptide.30.min - df$c.peptide.0.minute)/
   (df$Glucose.30.min - df$Glucose.0.minute)
+# Matsuda c peptide (500,000/√[fasting glucose*fasting cpep*mean glucose*mean cpep])   [Glucose mg/dL, cpeptide pmol/L]
+glu_cols = colnames(df)[head(grep("glucose\\.\\d{1,}",tolower(colnames(df))),-2)]
+df$mean_glucose = rowMeans(df[,glu_cols])
+cpep_cols = head(cpep_cols,-2)
+df$mean_cpep = rowMeans(df[,cpep_cols])
+df$`Adapted Matsuda` = 500000/(sqrt(df$Glucose.0.minute*df$c.peptide.0.minute*
+                                      df$mean_glucose*df$mean_cpep))
+# C Pep ODI
+df$`C Peptide ODI` = df$`C Peptide Index`/df$`Adapted Matsuda`
 # Add labels
 newlabels["A1C.result"] = "HbA1c (%)"
-p <- paired(Event.Name ~ A1C.result+BMIz+FEV1..+FVC....+
-              `Glucose AUC`+`C Peptide AUC`+`C Peptide Index`, 
+newlabels["Glucose.0.minute"] = "Fasting glucose (mg/dL)"
+newlabels["Glucose.60.min"] = "1hr glucose (mg/dL)"
+newlabels["Glucose.120.min"] = "2hr glucose (mg/dL)"
+newlabels["c.peptide.0.minute"] = "Fasting C-peptide (pmol/L)"
+p <- paired(Event.Name ~ A1C.result+BMIz+FEV1..+FVC....+Group+Glucose.0.minute+
+              Glucose.60.min+Glucose.120.min+c.peptide.0.minute+
+              `Glucose AUC`+`C Peptide AUC`+`C Peptide Index`+`Adapted Matsuda`+
+              `C Peptide ODI`, 
             data = df, id = Study.ID)
 summary(p,pfootnote = T,labelTranslations = newlabels)
 ```
