@@ -14,6 +14,7 @@ output:
 library(arsenal)
 library(tidyverse)
 library(performance)
+library(AGD)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
 if(Sys.info()["sysname"] == "Windows"){
@@ -24,8 +25,50 @@ if(Sys.info()["sysname"] == "Windows"){
   home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
 }
 knitr::opts_knit$set(root.dir = home_dir)
+rm(home_dir)
 ```
 
 ```{r}
+# Import
+df = read.csv("./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/trikafta_2022-02-8.csv",
+              na.strings = c(""))
+# Clean up
+df$Sex = factor(df$Sex..Male.1.)
+levels(df$Sex) = c("F","M")
+df = df %>% group_by(Study.ID) %>% mutate(trikafta_duration = sum(Time.on.trikafta.in.months))
+df[,c("Kalydeco","Orkambi","Symdeko")] = 
+  lapply(df[,c("Kalydeco.1","orkambi.1","tezacaftor.ivacaftor..symdeko..1")],function(c){
+    c = as.factor(c)
+    levels(c) = c("No","Yes")
+    return(c)
+  })
+# Genotype
+df$Genotype = apply(df,1,function(r){
+  if(tolower(r["CFTR.Mutation.1"]) == "f508del" & tolower(r["CFTR.Mutation.2"]) == "f508del"){
+    g = "Homozygous F508del"
+  } else if (tolower(r["CFTR.Mutation.1"]) == "f508del"){
+    g = "Heterozygous F508del"
+  } else {
+    g = "Other"
+  }
+  return(g)
+})
+# BMI z score (count everyone over 20 as 20)
+df$Age = ifelse(df$Age.at.visit. >= 20, 20, df$Age.at.visit.)
+df$BMIz = y2z(df$BMI,x = df$Age,sex = df$Sex,ref=nl4.bmi)
+```
 
+# Table 1: Demographics at Baseline
+
+For calculating BMI z scores for adults > 20, we used CDC references for 20 year olds.
+
+```{r results='asis'}
+t1 = tableby(~Age.at.visit.+Sex..Male.1.+BMIz+FEV1..+FVC....+trikafta_duration+
+               Genotype+Pancreatic.Status+Kalydeco+Orkambi+Symdeko,
+             data = df[df$Event.Name == "Visit 1",])
+summary(t1,digits = 2,labelTranslations = 
+          list(Age.at.visit. = "Age (years)",Sex..Male.1. = "Sex",
+               BMIz = "BMI z score",FEV1.. = "ppFEV1",FVC.... = "ppFVC",
+               trikafta_duration = "Duration on Trikafta (months) at Visit 2",
+               Pancreatic.Status = "Pancreatic Status"))
 ```
