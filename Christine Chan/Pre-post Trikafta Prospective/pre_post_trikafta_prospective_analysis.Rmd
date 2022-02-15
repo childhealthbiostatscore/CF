@@ -118,6 +118,7 @@ df$Group = apply(df[,glu_cols],1,function(r){
     return("AGT")
   }
 })
+df$Group = factor(df$Group,levels = c("NGT","AGT","CFRD"),ordered = T)
 # convert Insulin to mcU/mL
 ins_cols = colnames(df)[head(grep("insulin",tolower(colnames(df))),-2)]
 df[,ins_cols] = lapply(df[,ins_cols], function(c){
@@ -188,20 +189,11 @@ t2_vars = c("A1C.result","BMIz","FEV1..","FVC....","Group","Glucose.0.minute",
             "percent_time_over_140","percent_time_over_180","percent_time_over_250",
             "percent_time_under_70","percent_time_under_54","standard_deviation","cv","r_mage")
 f = as.formula(paste0("Event.Name ~ ",paste0(t2_vars,collapse = "+")))
-p <- paired(f,data = df, id = Study.ID)
+p <- paired(f,data = df, id = Study.ID,numeric.test = "signed.rank",signed.rank.exact = F)
 summary(p,pfootnote = T,labelTranslations = newlabels)
 ```
 
-```{r}
-for (v in t2_vars) {
-  v = gsub("`","",v)
-  if(is.numeric(df[,v])){
-    print(hist(df[,v]))
-  } else {
-    kable(table(df[,v]))
-  }
-}
-```
+Group was treated as an ordered variable with NGT < AGT < CFRD.
 
 # Figures
 
