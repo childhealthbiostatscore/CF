@@ -14,6 +14,7 @@ output:
 library(arsenal)
 library(tidyverse)
 library(performance)
+library(cgmanalysis)
 library(AGD)
 library(pracma)
 library(knitr)
@@ -58,6 +59,23 @@ df$Genotype = apply(df,1,function(r){
 # BMI z score (count everyone over 20 as 20)
 df$Age = ifelse(df$Age.at.visit. >= 20, 20, df$Age.at.visit.)
 df$BMIz = y2z(df$BMI,x = df$Age,sex = df$Sex,ref=nl4.bmi)
+```
+
+```{r cgm data,include=FALSE}
+# Clean and calculate
+cleandata("./Christine Chan/Pre-post Trikafta Prospective/Data_Raw/CGM",
+          "./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/CGM",
+          verbose = T,removegaps = F)
+cgmvariables("./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/CGM",
+             "./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/",
+             outputname = "cgm_vars",printname = T,id_filename = T)
+# Merge
+cgm = read.csv("./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/cgm_vars.csv")
+cgm$Study.ID = str_extract(cgm$subject_id,"^[[:upper:]]{2}\\d{4}")
+cgm$Event.Name = 
+  str_extract(tolower(cgm$subject_id),"visit\\d{1}|visit \\d{1}|yr\\d{1}|year\\d{1}|year \\d{1}")
+cgm$Event.Name = paste("Visit",gsub("[[:alpha:]]|\\s","",cgm$Event.Name))
+df = left_join(df,cgm,by = c("Study.ID", "Event.Name"))
 ```
 
 # Table 1: Demographics at Baseline
@@ -137,7 +155,7 @@ df$mean_cpep = rowMeans(df[,cpep_cols])
 df$`Adapted Matsuda` = 500000/(sqrt(df$Glucose.0.minute*df$c.peptide.0.minute*
                                       df$mean_glucose*df$mean_cpep))
 # C Pep ODI
-df$`C Peptide ODI` = df$`C Peptide Index`/df$`Adapted Matsuda`
+df$`C Peptide ODI` = df$`C Peptide Index`*df$`Adapted Matsuda`
 # iAUC ratio
 df$iAUC_ratio = df$`C Peptide iAUC`/df$`Glucose iAUC`
 # Add labels
@@ -150,12 +168,39 @@ newlabels["iAUC_ratio"] = "C pep iAUC:Glucose iAUC"
 newlabels["homa2B"] = "HOMA2 %B"
 newlabels["homa2S"] = "HOMA2 %S"
 newlabels["homa2IR"] = "HOMA2 IR"
-p <- paired(Event.Name ~ A1C.result+BMIz+FEV1..+FVC....+Group+Glucose.0.minute+
-              Glucose.60.min+Glucose.120.min+c.peptide.0.minute+
-              `Glucose AUC`+`C Peptide AUC`+`C Peptide Index`+`Adapted Matsuda`+
-              `C Peptide ODI`+iAUC_ratio+homa2B+homa2S+homa2IR, 
-            data = df, id = Study.ID)
+newlabels["mean_sensor"] = "Mean SG (mg/dL)"
+newlabels["max_sensor"] = "Max. SG (mg/dL)"
+newlabels["min_sensor"] = "Min SG (mg/dL)"
+newlabels["percent_time_70_180"] = "% TIR 70-180 mg/dL"
+newlabels["percent_time_over_140"] = "% Time >140 mg/dL"
+newlabels["percent_time_over_180"] = "% Time >180 mg/dL"
+newlabels["percent_time_over_250"] = "% Time >250 mg/dL"
+newlabels["percent_time_under_70"] = "% Time <70 mg/dL"
+newlabels["percent_time_under_54"] = "% Time <54 mg/dL"
+newlabels["standard_deviation"] = "SD"
+newlabels["cv"] = "CV"
+newlabels["r_mage"] = "MAGE"
+t2_vars = c("A1C.result","BMIz","FEV1..","FVC....","Group","Glucose.0.minute",
+            "Glucose.60.min","Glucose.120.min","c.peptide.0.minute",
+            "`Glucose AUC`","`C Peptide AUC`","`C Peptide Index`",
+            "`Adapted Matsuda`","`C Peptide ODI`","iAUC_ratio","homa2B","homa2S","homa2IR",
+            "mean_sensor","max_sensor","min_sensor","percent_time_70_180",
+            "percent_time_over_140","percent_time_over_180","percent_time_over_250",
+            "percent_time_under_70","percent_time_under_54","standard_deviation","cv","r_mage")
+f = as.formula(paste0("Event.Name ~ ",paste0(t2_vars,collapse = "+")))
+p <- paired(f,data = df, id = Study.ID)
 summary(p,pfootnote = T,labelTranslations = newlabels)
+```
+
+```{r}
+for (v in t2_vars) {
+  v = gsub("`","",v)
+  if(is.numeric(df[,v])){
+    print(hist(df[,v]))
+  } else {
+    kable(table(df[,v]))
+  }
+}
 ```
 
 # Figures
