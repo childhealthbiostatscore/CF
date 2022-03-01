@@ -1,0 +1,51 @@
+---
+title: "Sweat electrolytes and CFTR activity in the era of CFTR modulators"
+author: "Tim Vigers"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+library(arsenal)
+library(tidyverse)
+library(performance)
+library(knitr)
+knitr::opts_chunk$set(echo = FALSE)
+if(Sys.info()["sysname"] == "Windows"){
+  home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Edith Zemanick/Sweat Test"
+} else if (Sys.info()["sysname"] == "Linux"){
+  home_dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Edith Zemanick/Sweat Test"
+} else if (Sys.info()["sysname"] == "Darwin"){
+  home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Edith Zemanick/Sweat Test"
+}
+knitr::opts_knit$set(root.dir = home_dir)
+rm(home_dir)
+```
+
+```{r}
+# Import data
+df = read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv",na.strings = "")
+# Filter per Maxie's code
+df = df %>% 
+  filter(Age.at.Test.in.Years < 50,
+         !(Diagnosis == "Non-CF" & PatientID %in% 
+             c(22,23,24,29,31,474,483,484,485,505,510,785,791,792,793))) %>% 
+  distinct(.) %>% filter(Sex != "",Demographics.Available == "TRUE") %>%
+  mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks*7)
+# Add modulator info
+
+```
+
+# Table 1: Patient Demographics and Sample Characteristics for sweat tests done on individuals not on CFTR modulators 
+
+```{r results='asis'}
+t1_df = df %>% filter(Age.at.Test.in.Days >= 2) %>%
+  group_by(PatientID) %>% arrange(Age.at.Test.in.Weeks) %>%  filter(row_number()==1)
+t1 = tableby(Method ~ Sex,data = t1_df)
+summary(t1)
+```
