@@ -1,3 +1,4 @@
+# Make table
 I = c('1717-1G->A', '1717-1G-A',  'G542X', 'Q493X', 'R1162X', 'R553X', 'R553x', 'W1089X', 'W1282X', '1078delT', 'R75X',
       '3659delC', '621+1G->T', '621+1G>T', '394delTT', '3120 + 1g->A', '1154InsTC',  '1154insTC', '1213delT',
       '1259insA', '1288insTA', '3791delC', 'E60X', 'K710X', '2184delA', 'CFTRdele2,3', '663delT', 'Glu528',
@@ -24,5 +25,4 @@ V = matrix(c(V,class = rep("V",length(V))),ncol = 2)
 
 geno = data.frame(do.call(rbind,list(I,II,III,IV,V)))
 colnames(geno) = c("Genotype","Class")
-write.csv(geno,na = "",row.names = F,
-          file = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/genotype_classes.csv")
+
