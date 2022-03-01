@@ -26,13 +26,23 @@ get_cf_genotype_class_severity = function(genotypes,out = "severity",na_unknown 
   geno$Severity = factor(geno$Class,levels = c("I","II","III","IV","V","Unknown"),
                          labels = c("Severe","Severe","Severe","Mild","Mild","Unknown"))
   # Add some without class
-  severity_only = matrix(c("S531P","Unknown","Mild",
-                           "2184insa","Unknown","Severe",
-                           "I506T","Unknown","Unknown",
-                           "P205S","Unknown","Unknown",
-                           "Phe1052Val","Unknown","Mild",
-                           "I336K","Unknown","Mild",
-                           "2143delt","Unknown","Severe"),ncol = 3,byrow = T)
+  severity_only = matrix(c("S531P","Unknown","Mild","2184insa","Unknown","Severe",
+                           "I506T","Unknown","Unknown","P205S","Unknown","Unknown",
+                           "Phe1052Val","Unknown","Mild","I336K","Unknown","Mild",
+                           "2143delt","Unknown","Severe","M470V","Unknown","Unknown",
+                           "Y1092X","Unknown","Severe","R1066C","Unknown","Severe",
+                           "3905insT","Unknown","Severe","R851X","Unknown","Severe",
+                           "D110H","Unknown","Mild","R1158X","Unknown","Severe",
+                           "R1070W","Unknown","Mild","Q2X","Unknown","Severe",
+                           "H199Y","Unknown","Mild","D1270N","Unknown","Mild",
+                           "G178R","Unknown","Severe","2957delT","Unknown","Severe",
+                           "V520F","Unknown","Severe","ex14a","Unknown","Unknown",
+                           "Q1209P","Unknown","Unknown","S492F","Unknown","Mild",
+                           "R1066H","Unknown","Unknown","M1101K","Unknown","Severe",
+                           "CFTRdele1","Unknown","Severe"),ncol = 3,byrow = T)
+  
+  
+  
   colnames(severity_only) = c("Genotype","Class","Severity")
   severity_only[,1] = tolower(gsub("[[:punct:]]|\\s","",severity_only[,1]))
   geno = rbind(geno,severity_only)
