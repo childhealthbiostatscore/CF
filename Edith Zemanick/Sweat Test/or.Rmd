@@ -1,0 +1,27 @@
+---
+title: "Untitled"
+author: "Maxene Meier"
+date: "4/7/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+
+kable(summary(tab2_paper))
+
+kable(summary(tab))
+
+kable(
+  # mod2_1
+# mod2$coefficients$random$onoff
+
+
+# 
+  # p3
+# cbind(l1,u1)
+# round(m2.ci$reStruct$onoff,4)
+m2.ci$reStruct$onoff
+
+)
+```

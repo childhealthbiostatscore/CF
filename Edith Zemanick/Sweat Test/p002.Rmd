@@ -1,0 +1,18 @@
+---
+title: "Untitled"
+author: "Maxene Meier"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+library(knitr)
+source("S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Meier/CF/2020.10.27 - Zemanick - sweat test/prog/p001.R")
+
+kable(summary(tab1))
+```
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+kable(summary(tab2))
+kable(summary(tab3))
+```
