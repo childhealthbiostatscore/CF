@@ -25,11 +25,15 @@ if(Sys.info()["sysname"] == "Windows"){
 }
 knitr::opts_knit$set(root.dir = home_dir)
 rm(home_dir)
+source("~/GitHub/CF/get_genotype_class_severity.R")
 ```
 
 ```{r}
 # Import data
 df = read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv",na.strings = "")
+df$Diagnosis = factor(df$Diagnosis,
+                      levels = c("CFTR-related disorder","CRMS","Cystic Fibrosis","Non-CF","Normal"),
+                      labels = c("CFTR-related disorder","CRMS","Cystic Fibrosis","Non-CF","Non-CF"))
 # Filter per Maxie's code
 df = df %>% 
   filter(Age.at.Test.in.Years < 50,
@@ -38,7 +42,28 @@ df = df %>%
   distinct(.) %>% filter(Sex != "",Demographics.Available == "TRUE") %>%
   mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks*7)
 # Add modulator info
-
+cftr = read.csv("./Data_Raw/Copy of Report CFTR Modulators.csv")
+df$Modulator = apply(df,1,function(r){
+  mod = cftr[cftr$Patient.ID == as.numeric(r["PatientID"]),]
+  if (any(duplicated(mod$Age.at.Start..years.))){
+    mod = mod[-which(duplicated(mod$Age.at.Start..years.)),]
+  }
+  mod = mod[order(mod$Age.at.Start..years.),]
+  age = as.numeric(r["Age.at.Test.in.Years"])
+  as.character(cut(age,c(-Inf,mod$Age.at.Start..years.,Inf),
+                   labels = c("None",mod$Modulator),right = F))
+})
+df = left_join(df,cftr,by = c("PatientID" = "Patient.ID"))
+# Genotype info
+df$geno1 = get_cf_genotype_class_severity(df$Genotypes1)
+df$geno2 = get_cf_genotype_class_severity(df$Genotypes2)
+df$geno1[df$Diagnosis == "Non-CF"] = "Not CF"
+df$geno2[df$Diagnosis == "Non-CF"] = "Not CF"
+df$geno_risk = paste(df$geno1,df$geno2,sep = "_")
+df$geno_risk = factor(df$geno_risk,
+                      levels = c("Mild_Severe","Mild_Unknown","Not CF_Not CF","Severe_Mild","Mild_Mild",
+                                 "Severe_Severe","Severe_Unknown","Unknown_Severe","Unknown_Unknown"),
+                      labels = c("Low","Low","Not CF","Low","Low","High","Unknown","Unknown","Unknown"))
 ```
 
 # Table 1: Patient Demographics and Sample Characteristics for sweat tests done on individuals not on CFTR modulators 
@@ -46,6 +71,6 @@ df = df %>%
 ```{r results='asis'}
 t1_df = df %>% filter(Age.at.Test.in.Days >= 2) %>%
   group_by(PatientID) %>% arrange(Age.at.Test.in.Weeks) %>%  filter(row_number()==1)
-t1 = tableby(Method ~ Sex,data = t1_df)
+t1 = tableby(Method ~ Sex+Age.at.Test.in.Years+geno_risk,data = t1_df)
 summary(t1)
 ```
