@@ -1,0 +1,18 @@
+---
+title: "Untitled"
+author: "Maxene Meier"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+library(knitr)
+source("~/GitHub/CF/Edith Zemanick/Sweat Test/maxie_code/p001.R")
+
+kable(summary(tab1))
+```
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+kable(summary(tab2))
+kable(summary(tab3))
+```
