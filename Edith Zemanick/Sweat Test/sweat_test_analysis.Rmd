@@ -15,7 +15,7 @@ library(arsenal)
 library(tidyverse)
 library(performance)
 library(knitr)
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE,warning = FALSE)
 if(Sys.info()["sysname"] == "Windows"){
   home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Edith Zemanick/Sweat Test"
 } else if (Sys.info()["sysname"] == "Linux"){
@@ -53,7 +53,6 @@ df$Modulator = apply(df,1,function(r){
   as.character(cut(age,c(-Inf,mod$Age.at.Start..years.,Inf),
                    labels = c("None",mod$Modulator),right = F))
 })
-df = left_join(df,cftr,by = c("PatientID" = "Patient.ID"))
 # Genotype info
 df$geno1 = get_cf_genotype_class_severity(df$Genotypes1)
 df$geno2 = get_cf_genotype_class_severity(df$Genotypes2)
@@ -61,16 +60,68 @@ df$geno1[df$Diagnosis == "Non-CF"] = "Not CF"
 df$geno2[df$Diagnosis == "Non-CF"] = "Not CF"
 df$geno_risk = paste(df$geno1,df$geno2,sep = "_")
 df$geno_risk = factor(df$geno_risk,
-                      levels = c("Mild_Severe","Mild_Unknown","Not CF_Not CF","Severe_Mild","Mild_Mild",
-                                 "Severe_Severe","Severe_Unknown","Unknown_Severe","Unknown_Unknown"),
-                      labels = c("Low","Low","Not CF","Low","Low","High","Unknown","Unknown","Unknown"))
+                      levels = c("Mild_Severe","Mild_Unknown","Not CF_Not CF",
+                                 "Severe_Mild","Mild_Mild",
+                                 "Severe_Severe","Severe_Unknown","Unknown_Severe",
+                                 "Unknown_Unknown"),
+                      labels = c("Low","Low","Not CF","Low","Low","High","Unknown",
+                                 "Unknown","Unknown"))
+# Merge left and right values
+df$Amount = apply(df[,c("Amount","Amount_Left","Amount_Right")],1,function(r){
+  amt = suppressWarnings(as.numeric(as.character(r)))
+  mean(amt,na.rm = T)
+})
+df$Cl = apply(df[,c("Cl","Cl_Left","Cl_Right")],1,function(r){
+  cl = suppressWarnings(as.numeric(as.character(r)))
+  mean(cl,na.rm = T)
+})
+df$Na = apply(df[,c("Na","Na_Left","Na_Right")],1,function(r){
+  na = suppressWarnings(as.numeric(as.character(r)))
+  mean(na,na.rm = T)
+})
+df$K = apply(df[,c("K","K_Left","K_Right")],1,function(r){
+  k = suppressWarnings(as.numeric(as.character(r)))
+  mean(k,na.rm = T)
+})
 ```
 
-# Table 1: Patient Demographics and Sample Characteristics for sweat tests done on individuals not on CFTR modulators 
+# Table 1: Patient Demographics and Sample Characteristics
+
+For those with two sweat electrolyte measures (left and right), the average of the two was used.
 
 ```{r results='asis'}
 t1_df = df %>% filter(Age.at.Test.in.Days >= 2) %>%
   group_by(PatientID) %>% arrange(Age.at.Test.in.Weeks) %>%  filter(row_number()==1)
-t1 = tableby(Method ~ Sex+Age.at.Test.in.Years+geno_risk,data = t1_df)
-summary(t1)
+t1 = tableby(Diagnosis ~ Sex+Age.at.Test.in.Years+geno_risk+Amount+Cl+Na+K,
+             data = t1_df)
+summary(t1,labelTranslations = 
+          list(Age.at.Test.in.Years = "Age (Years)",geno_risk = "Genotype Severity"))
+```
+
+# Chloride and Diagnosis
+
+## Table
+
+```{r}
+df$Cl_group = cut(df$Cl,c(0,30,60,Inf),right = F)
+t = table(df$Cl_group,df$Diagnosis)
+t = rownames_to_column(as.data.frame.matrix(t))
+colnames(t)[1] = "Chloride Range"
+kable(t,row.names = F)
+```
+
+## Plot
+
+```{r}
+ggplot(df,aes(x = Diagnosis,y = Cl)) + geom_boxplot() + theme_bw()
+```
+
+```{r}
+# Write groups of interest
+write.csv(df %>% filter(Diagnosis == "Non-CF",Cl >= 60),na = "",
+          file = "./Data_Cleaned/non_cf_cl_over_60.csv",row.names = F)
+write.csv(df %>% filter(Diagnosis == "Cystic Fibrosis",Cl < 60),na = "",
+          file = "./Data_Cleaned/cf_cl_under_60.csv",row.names = F)
+write.csv(df %>% filter(Diagnosis == "Cystic Fibrosis",Cl >= 30 & Cl < 60),na = "",
+          file = "./Data_Cleaned/cf_cl_30_59.csv",row.names = F)
 ```
