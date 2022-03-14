@@ -9,6 +9,7 @@ cftr_mods = pd.read_excel(wd + 'Data_Raw/Report CFTR Modulators_throughDecember2
 crp_sed = pd.read_excel(wd + 'Data_Raw/Report CRP and Sed Rate_ThroughDecember2021.xlsx')
 cultures = pd.read_excel(wd + 'Data_Raw/Report Cultures_throughDecember2021.xlsx')
 cultures.rename(columns = {'Culture Date':'Date','Age at Culture (years)':'Age at Test (Years)'},inplace=True)
+cultures['Bacteria/Fungi'].replace('Postive','Positive',inplace=True)
 electrolytes = pd.read_excel(wd + 'Data_Raw/Report Electrolytes_throughDecember2021.xlsx')
 elastase = pd.read_excel(wd + 'Data_Raw/Report Fecal Elastase_throughDecember2021.xlsx')
 elastase.drop(['Age at Test (weeks)'],axis=1,inplace=True)
