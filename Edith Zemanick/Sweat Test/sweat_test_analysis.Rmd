@@ -120,6 +120,8 @@ ggplot(df,aes(x = Diagnosis,y = Cl)) + geom_boxplot() + theme_bw()
 # Write groups of interest
 write.csv(df %>% filter(Diagnosis == "Non-CF",Cl >= 60),na = "",
           file = "./Data_Cleaned/non_cf_cl_over_60.csv",row.names = F)
+write.csv(df %>% filter(Diagnosis == "Non-CF",Cl >= 30 & Cl < 60),na = "",
+          file = "./Data_Cleaned/non_cf_cl_30_59.csv",row.names = F)
 write.csv(df %>% filter(Diagnosis == "Cystic Fibrosis",Cl < 60),na = "",
           file = "./Data_Cleaned/cf_cl_under_60.csv",row.names = F)
 write.csv(df %>% filter(Diagnosis == "Cystic Fibrosis",Cl >= 30 & Cl < 60),na = "",
