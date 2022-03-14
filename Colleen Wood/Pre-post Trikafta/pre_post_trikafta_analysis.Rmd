@@ -36,7 +36,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 
 ```{r include=FALSE}
 # Import cleaned data from Casey
-df = read.csv("./Christine Chan/Prepost Triakfta/Data_Cleaned/analysis_data.csv",na.strings = "NA")
+df = read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/analysis_data.csv",na.strings = "NA")
 df$X = NULL
 # Fill in MRN and CFF ID for everyone
 df = df %>% 
@@ -55,11 +55,11 @@ df[,date_vars] = lapply(df[,date_vars], function(d){
 df = df %>% group_by(CFF.ID) %>% fill(Start,.direction = "downup")
 df = df %>% mutate(Time = as.numeric(difftime(Date,Start,units = "days"))) 
 # Add UM (they did not provide dates, so need Time column)
-um_a1cs = read.csv("./Christine Chan/Prepost Triakfta/Data_Cleaned/um_a1cs.csv",na.strings = "")
-um_bmi = read.csv("./Christine Chan/Prepost Triakfta/Data_Cleaned/um_bmi.csv",na.strings = "")
-um_demo = read.csv("./Christine Chan/Prepost Triakfta/Data_Cleaned/um_demo.csv",na.strings = "")
-um_ogtt = read.csv("./Christine Chan/Prepost Triakfta/Data_Cleaned/um_ogtt.csv",na.strings = "")
-um_pfts = read.csv("./Christine Chan/Prepost Triakfta/Data_Cleaned/um_pfts.csv",na.strings = "")
+um_a1cs = read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_a1cs.csv",na.strings = "")
+um_bmi = read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_bmi.csv",na.strings = "")
+um_demo = read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_demo.csv",na.strings = "")
+um_ogtt = read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_ogtt.csv",na.strings = "")
+um_pfts = read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_pfts.csv",na.strings = "")
 um = full_join(um_a1cs,um_bmi)
 um = full_join(um,um_ogtt)
 um = full_join(um,um_pfts)
@@ -75,7 +75,10 @@ df$Sex = as.factor(df$Sex)
 levels(df$Sex) = c("F","M")
 # BMI category
 df$Age = pmax(as.numeric(difftime(df$Date,df$DOB,units = "days")),df$Age,na.rm = T)/365.25
-df$BMIz = y2z(df$BMI,x = df$Age,sex = df$Sex,ref=nl4.bmi)
+# Treat adults as age = 20
+df$Age_for_BMI = ifelse(df$Age > 20,20,df$Age)
+df$BMIz = y2z(df$BMI,x = df$Age_for_BMI,sex = df$Sex,ref=nl4.bmi)
+df$BMIz[is.infinite(df$BMIz)] = NA
 df$BMI_group = apply(df,1,function(r){
   age = as.numeric(r["Age"])
   if(!is.na(age) & age > 19){
@@ -106,10 +109,10 @@ df$ppFVC = pctpred_GLI(df$Age,df$Height/100,gender = as.numeric(df$Sex),
 ```
 
 ```{r}
-data = df
 outcome = "HbA1c"
+data = df
 # Piecewise model function
-piecewise = function(outcome,data = df,simple = F){
+piecewise = function(outcome = "HbA1c",data = df,simple = F){
   # Add spline column
   data$Change = ifelse(data$Time < 0,0,1)
   data$Change = data$Change * data$Time
@@ -153,7 +156,7 @@ The random intercept model was selected because it performed better (by AIC) tha
 # HbA1c
 
 ```{r results='asis'}
-a1c = piecewise(outcome = "HbA1c",df)
+a1c = piecewise(outcome = "HbA1c",data = df)
 ggplotly(a1c$plot)
 kable(a1c$table,digits = 3)
 ```
@@ -171,7 +174,7 @@ Most participants only have one observation of insulin dose, so these results wo
 # ppFEV
 
 ```{r results='asis'}
-ppFEV = piecewise(outcome = "ppFEV",df)
+ppFEV = piecewise(outcome = "ppFEV",data = df)
 ggplotly(ppFEV$plot)
 kable(ppFEV$table,digits = 3)
 ```
@@ -179,7 +182,7 @@ kable(ppFEV$table,digits = 3)
 # ppFVC
 
 ```{r results='asis'}
-ppFVC = piecewise(outcome = "ppFVC",df)
+ppFVC = piecewise(outcome = "ppFVC",data = df)
 ggplotly(ppFVC$plot)
 kable(ppFVC$table,digits = 3)
 ```
@@ -189,7 +192,7 @@ kable(ppFVC$table,digits = 3)
 ## Mean
 
 ```{r results='asis'}
-meansg = piecewise(outcome = "average_sensor",df)
+meansg = piecewise(outcome = "average_sensor",data = df)
 ggplotly(meansg$plot)
 kable(meansg$table,digits = 3)
 ```
@@ -197,7 +200,7 @@ kable(meansg$table,digits = 3)
 ## Min
 
 ```{r results='asis'}
-minsg = piecewise(outcome = "min_sensor",df)
+minsg = piecewise(outcome = "min_sensor",data = df)
 ggplotly(minsg$plot)
 kable(minsg$table,digits = 3)
 ```
@@ -205,7 +208,7 @@ kable(minsg$table,digits = 3)
 ## Max
 
 ```{r results='asis'}
-maxsg = piecewise(outcome = "max_sensor",df)
+maxsg = piecewise(outcome = "max_sensor",data = df)
 ggplotly(maxsg$plot)
 kable(maxsg$table,digits = 3)
 ```
@@ -213,7 +216,7 @@ kable(maxsg$table,digits = 3)
 ## % Time > 120
 
 ```{r results='asis'}
-over120 = piecewise(outcome = "percent_time_over_120",df)
+over120 = piecewise(outcome = "percent_time_over_120",data = df)
 ggplotly(over120$plot)
 kable(over120$table,digits = 3)
 ```
@@ -221,7 +224,7 @@ kable(over120$table,digits = 3)
 ## % Time > 140
 
 ```{r results='asis'}
-over140 = piecewise(outcome = "percent_time_over_140",df)
+over140 = piecewise(outcome = "percent_time_over_140",data = df)
 ggplotly(over140$plot)
 kable(over140$table,digits = 3)
 ```
@@ -229,7 +232,7 @@ kable(over140$table,digits = 3)
 ## % Time > 200
 
 ```{r results='asis'}
-over200 = piecewise(outcome = "percent_time_over_200",df)
+over200 = piecewise(outcome = "percent_time_over_200",data = df)
 ggplotly(over200$plot)
 kable(over200$table,digits = 3)
 ```
@@ -237,7 +240,7 @@ kable(over200$table,digits = 3)
 ## Mean excursions > 140
 
 ```{r results='asis'}
-numover140 = piecewise(outcome = "avg_excur_over_140_per_day",df)
+numover140 = piecewise(outcome = "avg_excur_over_140_per_day",data = df)
 ggplotly(numover140$plot)
 kable(numover140$table,digits = 3)
 ```
@@ -245,7 +248,7 @@ kable(numover140$table,digits = 3)
 ## Mean excursions > 200
 
 ```{r results='asis'}
-numover200 = piecewise(outcome = "avg_excur_over_200_per_day",df)
+numover200 = piecewise(outcome = "avg_excur_over_200_per_day",data = df)
 ggplotly(numover200$plot)
 kable(numover200$table,digits = 3)
 ```
@@ -253,7 +256,7 @@ kable(numover200$table,digits = 3)
 ## % Time < 70
 
 ```{r results='asis'}
-under70 = piecewise(outcome = "percent_time_under_70",df)
+under70 = piecewise(outcome = "percent_time_under_70",data = df)
 ggplotly(under70$plot)
 kable(under70$table,digits = 3)
 ```
@@ -261,7 +264,7 @@ kable(under70$table,digits = 3)
 ## % Time < 60
 
 ```{r results='asis'}
-under60 = piecewise(outcome = "percent_time_under_60",df)
+under60 = piecewise(outcome = "percent_time_under_60",data = df)
 ggplotly(under60$plot)
 kable(under60$table,digits = 3)
 ```
@@ -269,7 +272,7 @@ kable(under60$table,digits = 3)
 ## Average AUC per day
 
 ```{r results='asis'}
-auc = piecewise(outcome = "average_auc_per_day",df)
+auc = piecewise(outcome = "average_auc_per_day",data = df)
 ggplotly(auc$plot)
 kable(auc$table,digits = 3)
 ```
@@ -277,7 +280,7 @@ kable(auc$table,digits = 3)
 ## SD
 
 ```{r results='asis'}
-sd = piecewise(outcome = "standard_deviation",df)
+sd = piecewise(outcome = "standard_deviation",data = df)
 ggplotly(sd$plot)
 kable(sd$table,digits = 3)
 ```
@@ -285,7 +288,7 @@ kable(sd$table,digits = 3)
 ## MAGE
 
 ```{r results='asis'}
-mage = piecewise(outcome = "r_mage",df)
+mage = piecewise(outcome = "r_mage",data = df)
 ggplotly(mage$plot)
 kable(mage$table,digits = 3)
 ```
