@@ -106,11 +106,21 @@ df$ppFEV = pctpred_GLI(df$Age,df$Height/100,gender = as.numeric(df$Sex),
 df$ppFVC = pctpred_GLI(df$Age,df$Height/100,gender = as.numeric(df$Sex),
             ethnicity = new[match(df$Race, old)],
             FEV1 = df$FVC)
+# Before or after start
+df$Before_After = cut(df$Time,c(-Inf,0,Inf),labels = c("Before","After"),right = F)
+# Most recent before/after
+most_recent = df %>% group_by(CFF.ID,Before_After) %>% slice_min(abs(Time))
 ```
 
+# Pre-post
+
 ```{r}
-outcome = "HbA1c"
-data = df
+summary(tableby( ~ ppFEV + ppFVC + BMIz,data = df[!is.na(df$average_sensor),]))
+```
+
+# Piecewise Models
+
+```{r}
 # Piecewise model function
 piecewise = function(outcome = "HbA1c",data = df,simple = F){
   # Add spline column
@@ -121,10 +131,6 @@ piecewise = function(outcome = "HbA1c",data = df,simple = F){
   mod = lmer(f,data = data)
   res = tidy(mod,"fixed")
   res$effect = NULL
-  # Segmented fit
-  fit = lme(as.formula(paste0(outcome,"~Time + Change")),random = ~1|CFF.ID,
-            data = data,na.action = na.omit)
-  seg = suppressWarnings(segmented(fit, seg.Z = ~Time, npsi=1))
   # Model check if necessary
   check = check_model(mod)
   # Coordinates for model plotting
@@ -143,7 +149,7 @@ piecewise = function(outcome = "HbA1c",data = df,simple = F){
     annotate("segment",x=x2_start,y=y2_start,xend=x2_end,yend=y2_end,color = "blue",size = 1) +
     xlab("Days from Trikafta Start") + theme_bw()
   # Interactive plot and model results
-  return(list(plot = ggplotly(p),table = res,check = check,seg = seg))
+  return(list(plot = ggplotly(p),table = res,check = check))
 }
 ```
 
