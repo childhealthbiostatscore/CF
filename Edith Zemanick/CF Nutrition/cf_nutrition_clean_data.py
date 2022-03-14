@@ -10,6 +10,10 @@ crp_sed = pd.read_excel(wd + 'Data_Raw/Report CRP and Sed Rate_ThroughDecember20
 cultures = pd.read_excel(wd + 'Data_Raw/Report Cultures_throughDecember2021.xlsx')
 cultures.rename(columns = {'Culture Date':'Date','Age at Culture (years)':'Age at Test (Years)'},inplace=True)
 cultures['Bacteria/Fungi'].replace('Postive','Positive',inplace=True)
+# For those with negative test, set bacteria (not fungi) to 0
+cultures.loc[cultures['Bacteria/Fungi']=="Negative",\
+    ['PsANonMucoid','PsAMucoid','Burkholderia (any)','Stenotrophomonas','Pseudomonas not aeruginosa','S. aureus',\
+        'MRSA','H. flu','E. coli','Klebsiella','A. xylosoxidans','Acinetobacter','Inquilinus']] = 0
 electrolytes = pd.read_excel(wd + 'Data_Raw/Report Electrolytes_throughDecember2021.xlsx')
 elastase = pd.read_excel(wd + 'Data_Raw/Report Fecal Elastase_throughDecember2021.xlsx')
 elastase.drop(['Age at Test (weeks)'],axis=1,inplace=True)
@@ -22,9 +26,12 @@ albumin = pd.read_excel(wd + 'Data_Raw/Report Total Proten Albumin and Prealbumi
 vitamins = pd.read_excel(wd + 'Data_Raw/Report Vitamins_throughDecember2021.xlsx')
 vitamins.rename(columns = {'Age at Test (years)':'Age at Test (Years)'},inplace=True)
 bun_creat = pd.read_excel(wd + 'Data_Raw/Report_BUNandCreatinine_throughDecember2021.xlsx')
+bun_creat.loc[bun_creat['Creatinine']==129,'Creatinine'] = np.nan
 lfts = pd.read_excel(wd + 'Data_Raw/Report_LFTs_ThroughDecember2021.xlsx')
 pfts = pd.read_excel(wd + 'Data_Raw/Report_PFTs_ThroughDecember2021.xlsx')
 pfts.rename(columns = {'PatientID':'Patient ID','Age At PFT (years)':'Age at Test (Years)'},inplace=True)
+pfts.loc[pfts['FEV1'] == 98,'FEV1'] = np.nan
+pfts.loc[pfts['FEV1 % pred'] == 222,'FEV1 % pred'] = np.nan
 # Merge
 df = pd.merge(crp_sed,cultures,how='outer',on=['Patient ID','Date','Age at Test (Years)'])
 df = pd.merge(df,electrolytes,how='outer',on=['Patient ID','Date','Age at Test (Years)'])
