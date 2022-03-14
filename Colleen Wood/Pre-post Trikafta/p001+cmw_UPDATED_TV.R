@@ -1330,8 +1330,6 @@ cgm_temp <- merge(cgm, a1c6_big2, by.x="ID", by.y="CFF.ID", all.x=T)
 cgm1 <- cgm0 %>% group_by(ID, time) %>% count()
 cgm2 <- cgm1 %>% group_by(ID) %>% count()
 
-View(cgm0[,c("subject_id", "ID", "time")])
-
 #pull first post and then do an overall
 
 cgm0$date <- as.Date(cgm0$date_cgm_placement)
@@ -1349,8 +1347,6 @@ cgm0_time <- merge(cgm0_small, a1c6_big2_tim[,c("CFF.ID", "trik" )], by.y = "CFF
 
 cgm0_time$cgm_date <- as.Date(cgm0_time$date_cgm_placement, "%Y-%m-%d")
 cgm0_time$diff <- cgm0_time$date_cgm - as.Date(cgm0_time$trik, "%Y-%m-%d")
-
-View(cgm0_time[,c("date_cgm", "trik", "diff", "ID", "time")])
 
 tab3_extra <- tableby(time ~ diff, cgm0_time, control=mycontrols)
 
