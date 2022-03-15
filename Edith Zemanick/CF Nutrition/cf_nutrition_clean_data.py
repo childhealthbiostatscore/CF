@@ -6,6 +6,10 @@ wd = '/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Edith
 # Import data, drop and rename columns
 cftr_mods = pd.read_excel(wd + 'Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx',\
     usecols=['Patient ID', 'Modulator','Age at Start (years)'])
+
+cftr_mods.sort_values(by = ['Patient ID','Age at Start (years)'],inplace=True)
+start_effective = cftr_mods[cftr_mods['Modulator'].isin(['Trikafta','Symdeko'])].groupby('Patient ID').first()
+
 crp_sed = pd.read_excel(wd + 'Data_Raw/Report CRP and Sed Rate_ThroughDecember2021.xlsx')
 cultures = pd.read_excel(wd + 'Data_Raw/Report Cultures_throughDecember2021.xlsx')
 cultures.rename(columns = {'Culture Date':'Date','Age at Culture (years)':'Age at Test (Years)'},inplace=True)
@@ -43,6 +47,7 @@ df = pd.merge(df,vitamins,how='outer',on=['Patient ID','Date','Age at Test (Year
 df = pd.merge(df,bun_creat,how='outer',on=['Patient ID','Date','Age at Test (Years)'])
 df = pd.merge(df,lfts,how='outer',on=['Patient ID','Date','Age at Test (Years)'])
 df = pd.merge(df,pfts,how='outer',on=['Patient ID','Date','Age at Test (Years)'])
+df = pd.merge(df,start_effective,how='outer',on=['Patient ID'])
 # Add CFTR modulator
 df['Modulator'] = np.nan
 for index, row in df.iterrows():
@@ -67,6 +72,8 @@ df['Vitamin E Gamma'].replace({'LESS THAN 0.4':0.4,'LESS THAN 1.0':1,'NONE DETEC
 df['Creatinine'].replace({'LESS THAN 0.15':0.15},inplace=True)
 df['GGTP'].replace({'<10':10},inplace=True)
 df['Total Bilirubin'].replace({'<0.1':0.1},inplace=True)
+# Sort
+df.sort_values(by=['Patient ID','Age at Test (Years)'],inplace=True)
 # Write
 df.to_csv(wd + 'Data_Cleaned/analysis_dataset.csv',index=False)
 my_report = sv.analyze(df)
