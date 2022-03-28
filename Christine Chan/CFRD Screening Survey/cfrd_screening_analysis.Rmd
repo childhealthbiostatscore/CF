@@ -1,0 +1,302 @@
+---
+title: ""
+author: "Tim Vigers"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+library(arsenal)
+library(tidyverse)
+library(performance)
+library(broom)
+library(gtsummary)
+library(knitr)
+knitr::opts_chunk$set(echo = FALSE,message = FALSE)
+if(Sys.info()["sysname"] == "Windows"){
+  home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
+} else if (Sys.info()["sysname"] == "Linux"){
+  home_dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
+} else if (Sys.info()["sysname"] == "Darwin"){
+  home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
+}
+knitr::opts_knit$set(root.dir = home_dir)
+rm(home_dir)
+source("~/GitHub/CF/get_genotype_class_severity.R")
+```
+
+```{r}
+endo = read.csv("./Christine Chan/CFRD Screening/Data_Raw/endo.csv",na.strings = "")
+non_endo = read.csv("./Christine Chan/CFRD Screening/Data_Raw/non_endo.csv",na.strings = "")
+```
+
+# Hypothesis Tests
+
+## Centers with at least 50% of patients with state-funded health insurance have less than50% OGTT completion rates (CF center directors survey, questions #4 and #6).
+
+```{r}
+# Combine levels
+non_endo$state_funded = factor(non_endo$What.percent.of.your.CF.patients.have.state.funded.health.insurance..i.e...Medicaid..etc...)
+levels(non_endo$state_funded) = c('less than 50%','more than 50%','less than 50%','more than 50%',NA)
+non_endo$ogtt_completion = factor(non_endo$What.percent.of.eligible.CF.patients....10.years.old.at.your.center.were.screened.for.CFRD.with.an.OGTT.in.the.past.year.)
+levels(non_endo$ogtt_completion) = c('less than 50%','more than 50%','less than 50%','more than 50%',NA)
+```
+
+### Cross-tab
+
+```{r}
+# Table
+tbl_cross(non_endo, row=state_funded, col=ogtt_completion, percent="row",missing = "no")
+```
+
+### Model results
+
+```{r}
+# Logistic model
+m = glm(ogtt_completion ~ state_funded,data = non_endo,family = binomial)
+kable(tidy(m,exponentiate = T),digits = 3)
+```
+
+There was no association between state-funded health insurance and OGTT completion (p = `r round(summary(m)$coefficients[2,4],3)`).
+
+## Centers with an identified Endocrinologist in coordinated clinic have >50% OGTT completion rates (CF center directors survey, questions #6 and #8)
+
+For this question, all "Other" responses were counted as "No."
+
+```{r}
+# Combine levels
+non_endo$endocrinologist = factor(non_endo$Does.your.center.have.an.identified.Endocrinologist.s..to.whom.you.refer.your.CF.patients.)
+levels(non_endo$endocrinologist) = c('No','No','Yes')
+```
+
+### Cross-tab
+
+```{r}
+# Table
+tbl_cross(non_endo, row=endocrinologist, col=ogtt_completion, percent="row",missing = "no")
+```
+
+### Model results
+
+```{r}
+# Logistic model
+m = glm(ogtt_completion ~ endocrinologist,data = non_endo,family = binomial)
+kable(tidy(m,exponentiate = T),digits = 3)
+```
+
+There was no association between having an endocrinologist and OGTT completion (p = `r round(summary(m)$coefficients[2,4],3)`).
+
+## Centers with a protocol or standardized method for ordering OGTTs are more likely to have >50% OGTT completion rates (CF center directors survey, questions #6 and #9)
+
+```{r}
+# Combine levels
+non_endo$protocol = factor(non_endo$Do.you.have.a.protocol.or.standardized.method.for.how.OGTTs.are.ordered.at.your.center.)
+levels(non_endo$protocol) = c('No','No','Yes','Yes')
+```
+
+### Cross-tab
+
+```{r}
+# Table
+tbl_cross(non_endo, row=protocol, col=ogtt_completion, percent="row",missing = "no")
+```
+
+### Model results
+
+Unable to perform a statistical tests because there were 0 centers without a protocol and over 50% OGTT completion. 
+
+## Centers with an identified role for placing orders for OGTTs are more likely to have >50% OGTT completion rates (test for 1 role response vs 2 responses vs 3 vs 4 or more); CF center directors survey, questions #6 and #10)
+
+```{r}
+# Combine levels
+non_endo$role = apply(non_endo,1,function(r){
+  s = strsplit(as.character(r['Who.typically.places.the.orders..even.if.a.co.signer.is.needed..for.OGTTs.at.your.center...please.select.all.that.apply..']),",")
+  return(length(s[[1]]))
+})
+non_endo$role = factor(non_endo$role)
+```
+
+### Cross-tab
+
+```{r}
+# Table
+tbl_cross(non_endo, row=role, col=ogtt_completion, percent="row",missing = "no")
+```
+
+### Model results
+
+```{r}
+# Logistic model
+m = glm(ogtt_completion ~ role,data = non_endo,family = binomial)
+kable(tidy(m,exponentiate = T),digits = 3)
+```
+
+There was no association between OGTT ordering roles and OGTT completion.
+
+## Centers with an identified role for contacting patients to schedule the OGTT are more likely to have >50% completion rates (test for 1 role response vs 2 responses vs 3 vs 4 or more); CF center directors survey, questions #6 and #11
+
+```{r}
+# Combine levels
+non_endo$role = apply(non_endo,1,function(r){
+  s = strsplit(as.character(r['Who.typically.contacts.patients.to.schedule.the.OGTT...please.select.all.that.apply..']),",")
+  return(length(s[[1]]))
+})
+non_endo$role = factor(non_endo$role)
+```
+
+### Cross-tab
+
+```{r}
+# Table
+tbl_cross(non_endo, row=role, col=ogtt_completion, percent="row",missing = "no")
+```
+
+### Model results
+
+Unable to perform a statistical test due to 0 centers with 3 roles and < 50% completion.
+
+## Centers with an identified role for providing directions for patients re: how to prepare for the OGTT are more likely to have >50% completion rates (test for 1 role response vs 2 responses vs 3 vs 4 or more); CF center directors survey, questions #6 and #12
+
+```{r}
+# Combine levels
+non_endo$role = apply(non_endo,1,function(r){
+  s = strsplit(as.character(r['Who.typically.provides.directions.to.patients.regarding.how.to.prepare.for.the.OGTT...please.select.all.that.apply...']),",")
+  return(length(s[[1]]))
+})
+non_endo$role = factor(non_endo$role)
+```
+
+### Cross-tab
+
+```{r}
+# Table
+tbl_cross(non_endo, row=role, col=ogtt_completion, percent="row",missing = "no")
+```
+
+### Model results
+
+```{r}
+# Logistic model
+m = glm(ogtt_completion ~ role,data = non_endo,family = binomial)
+kable(tidy(m,exponentiate = T),digits = 3)
+```
+
+There was no association between OGTT direction roles and OGTT completion.
+
+## Centers that perform OGTTs in clinic are more likely to have >50% OGTT completion rates (CF center directors survey, questions #6 and #13)
+
+```{r}
+# Combine levels
+non_endo$location = apply(non_endo,1,function(r){
+  s = as.character(r['In.what.setting.s..do.your.patients.have.OGTTs.done..please.select.all.that.apply...'])
+  if(grepl("In our CF clinic",s)){
+    return("In clinic")
+  } else {
+    return("Other")
+  }
+})
+non_endo$location = as.factor(non_endo$location)
+```
+
+### Cross-tab
+
+```{r}
+# Table
+tbl_cross(non_endo, row=location, col=ogtt_completion, percent="row",missing = "no")
+```
+
+### Model results
+
+```{r}
+# Logistic model
+m = glm(ogtt_completion ~ state_funded,data = non_endo,family = binomial)
+kable(tidy(m,exponentiate = T),digits = 3)
+```
+
+There was no association between in-clinic OGTTs and OGTT completion (p = `r round(summary(m)$coefficients[2,4],3)`).
+
+## Centers that always/almost always provide reminders to patients for OGTTs are more likely to have >50% OGTT completion rates (CF center directors survey, questions #6 and #15)
+
+```{r}
+# Combine levels
+non_endo$reminders = as.factor(non_endo$How.often.does.your.center.provide.routine.reminders.to.patients.when.an.OGTT.is.upcoming..due..and.or.overdue..)
+levels(non_endo$reminders) = c("Other","Yes, always or almost always","Other")
+```
+
+### Cross-tab
+
+```{r}
+# Table
+tbl_cross(non_endo, row=reminders, col=ogtt_completion, percent="row",missing = "no")
+```
+
+### Model results
+
+```{r}
+# Logistic model
+m = glm(ogtt_completion ~ reminders,data = non_endo,family = binomial)
+kable(tidy(m,exponentiate = T),digits = 3)
+```
+
+There was a significant association between reminders and OGTT completion (p = `r round(summary(m)$coefficients[2,4],3)`). Centers with regular reminders were approximately 5 times more likely to have an over 50% OGTT completion rate.
+
+# Combined data
+
+```{r}
+endo = read.csv("./Christine Chan/CFRD Screening/Data_Raw/endo_checkboxes.csv",na.strings = "")
+non_endo = read.csv("./Christine Chan/CFRD Screening/Data_Raw/non_endo_checkboxes.csv",na.strings = "")
+```
+
+## Alternative OGTT sources
+
+```{r}
+# Combine and format
+endo_alt = factor(endo$How.often.have.you.recommended.using.an.alternative.glucose.source.for.OGTT.testing..i.e...juice..pop.soda..jelly.beans..licorice..etc...)
+non_endo_alt = factor(non_endo$How.often.does.your.center.use.alternative.glucose.sources.for.OGTT.testing..i.e...juice..pop.soda..jelly.beans..licorice..etc...)
+length(endo_alt) = length(non_endo_alt)
+levels(non_endo_alt) = c(NA,"Never","Rarely","Sometimes")
+plot_df = data.frame(list("Endocrinologist" = endo_alt,"Directors" = non_endo_alt))
+plot_df = plot_df %>% pivot_longer(cols = c("Endocrinologist","Directors")) %>%
+  group_by(name) %>% count(value) %>% drop_na(.)
+# Plot
+ggplot(plot_df,aes(x = value,y = n,group = name,fill = name)) + 
+  geom_bar(stat="identity",position=position_dodge()) +
+  theme_bw() + theme(legend.title = element_blank()) + 
+  xlab("Alternative Glucose Sources for OGTT")
+```
+
+Center directors and endocrinologists were not significantly different in terms of how often they recommend alternative glucose sources (p = 0.823).
+
+## OGTT Time Points Collected
+
+```{r}
+# Combine and format
+endo_alt = factor(endo$What.OGTT.glucose.time.points.are.collected.)
+non_endo_alt = non_endo %>% 
+  select(What.OGTT.time.points.for.glucose.levels.does.your.center.collect...choice.0..30..60..90..and.120.min.,
+         What.OGTT.time.points.for.glucose.levels.does.your.center.collect...choice.0..60..and.120.min.,
+         What.OGTT.time.points.for.glucose.levels.does.your.center.collect...choice.0.and.120.min.)
+non_endo_alt = factor(apply(non_endo_alt,1,function(r){
+  w = which(as.character(r) == "Checked")
+  if(length(w)>0){
+    names(r)[w[1]]
+  } else {NA}
+}))
+levels(non_endo_alt) = c("0, 30, 60, 90, and 120 min","0, 60, and 120 min","0 and 120 min")
+length(endo_alt) = length(non_endo_alt)
+plot_df = data.frame(list("Endocrinologist" = endo_alt,"Directors" = non_endo_alt))
+plot_df = plot_df %>% pivot_longer(cols = c("Endocrinologist","Directors")) %>%
+  group_by(name) %>% count(value) %>% drop_na(.)
+# Plot
+ggplot(plot_df,aes(x = value,y = n,group = name,fill = name)) + 
+  geom_bar(stat="identity",position=position_dodge()) +
+  theme_bw() + theme(legend.title = element_blank()) + 
+  xlab("OGTT Time Points Collected")
+```
+
+Center directors and endocrinologists were significantly different in terms of which timepoints were collected (p = 0.004).
