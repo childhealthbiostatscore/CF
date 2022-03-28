@@ -300,3 +300,36 @@ ggplot(plot_df,aes(x = value,y = n,group = name,fill = name)) +
 ```
 
 Center directors and endocrinologists were significantly different in terms of which timepoints were collected (p = 0.004).
+
+## Other Diabetes Screening Methods
+
+```{r}
+# Combine and format
+endo_alt = endo %>% select(Have.you.used.any.of.the.following.tests.to.screen.diagnose.CFRD.in.the.outpatient.setting...please.select.all.that.apply...choice.HbA1c.:Have.you.used.any.of.the.following.tests.to.screen.diagnose.CFRD.in.the.outpatient.setting...please.select.all.that.apply...choice.Other..specify.in.comment..) %>% 
+  pivot_longer(everything()) %>% group_by(name) %>% summarise(n = sum(value == "Checked")) 
+endo_alt$name = factor(endo_alt$name)
+levels(endo_alt$name) = c("CGM","Fasting glucose","2 hr. glucose","HbA1c","Home fingerstick",
+                          "Other","Random glucose")
+endo_alt$type = "Endocrinologist"
+
+non_endo_alt = non_endo %>% 
+  select(Has.your.center.used.any.of.the.following.tests.to.screen.diagnose.CFRD.in.the.outpatient.setting...please.select.all.that.apply...choice.HbA1c.:
+           Has.your.center.used.any.of.the.following.tests.to.screen.diagnose.CFRD.in.the.outpatient.setting...please.select.all.that.apply...choice.None.of.the.above.) %>%
+  pivot_longer(everything()) %>% group_by(name) %>% summarise(n = sum(value == "Checked")) 
+non_endo_alt$name = factor(non_endo_alt$name)
+levels(non_endo_alt$name) = c("CGM","Fasting glucose","2 hr. glucose","HbA1c","Home fingerstick",
+                              "Other","Other","Random glucose")
+non_endo_alt = non_endo_alt %>% group_by(name) %>% summarise(n = sum(n))
+non_endo_alt$type = "Directors"
+
+plot_df = data.frame(rbind(endo_alt,non_endo_alt))
+t = plot_df %>% pivot_wider(id_cols = name,values_from = n,names_from = type) %>%
+  column_to_rownames(.,var = "name")
+# Plot
+ggplot(plot_df,aes(x = name,y = n,group = type,fill = type)) + 
+  geom_bar(stat="identity",position=position_dodge()) +
+  theme_bw() + theme(legend.title = element_blank()) + 
+  xlab("Other Diabetes Screening Methods")
+```
+
+Center directors and endocrinologists were not significantly different in terms of how often they use alternative screening measures (p = 0.116).
