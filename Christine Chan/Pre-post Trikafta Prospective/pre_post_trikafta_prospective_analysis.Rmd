@@ -59,16 +59,18 @@ df$Genotype = apply(df,1,function(r){
 # BMI z score (count everyone over 20 as 20)
 df$Age = ifelse(df$Age.at.visit. >= 20, 20, df$Age.at.visit.)
 df$BMIz = y2z(df$BMI,x = df$Age,sex = df$Sex,ref=nl4.bmi)
+# Weight z score
+df$weightz = y2z(df$Weight..kg.,x = df$Age,sex = df$Sex,ref=nl4.wgt)
 ```
 
 ```{r cgm data,include=FALSE}
 # Clean and calculate
 cleandata("./Christine Chan/Pre-post Trikafta Prospective/Data_Raw/CGM",
           "./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/CGM",
-          verbose = T,removegaps = F)
+          removegaps = F)
 cgmvariables("./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/CGM",
              "./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/",
-             outputname = "cgm_vars",printname = T,id_filename = T)
+             outputname = "cgm_vars",id_filename = T)
 # Merge
 cgm = read.csv("./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/cgm_vars.csv")
 cgm$Study.ID = str_extract(cgm$subject_id,"^[[:upper:]]{2}\\d{4}")
@@ -82,22 +84,65 @@ df = left_join(df,cgm,by = c("Study.ID", "Event.Name"))
 
 For calculating BMI z scores for adults > 20, we used CDC references for 20 year olds.
 
-```{r results='asis'}
-t1 = tableby(~Age.at.visit.+Sex..Male.1.+BMIz+FEV1..+FVC....+trikafta_duration+
-               Genotype+Pancreatic.Status+Kalydeco+Orkambi+Symdeko,
-             data = df[df$Event.Name == "Visit 1",])
+```{r}
+# Labels for all tables - not the prettiest code
 newlabels = list(Age.at.visit. = "Age (years)",Sex..Male.1. = "Sex",
                  BMIz = "BMI z score",FEV1.. = "ppFEV1",FVC.... = "ppFVC",
                  trikafta_duration = "Duration on Trikafta (months) at Visit 2",
                  Pancreatic.Status = "Pancreatic Status")
+newlabels["A1C.result"] = "HbA1c (%)"
+newlabels["Weight..kg."] = "Weight (kg)"
+newlabels["weightz"] = "Weight Z"
+newlabels["Glucose.0.minute"] = "Fasting glucose (mg/dL)"
+newlabels["Glucose.60.min"] = "1hr glucose (mg/dL)"
+newlabels["Glucose.120.min"] = "2hr glucose (mg/dL)"
+newlabels["c.peptide.0.minute"] = "Fasting C-peptide (pmol/L)"
+newlabels["iAUC_ratio"] = "C pep iAUC:Glucose iAUC"
+newlabels["homa2B"] = "HOMA2 %B"
+newlabels["homa2S"] = "HOMA2 %S"
+newlabels["homa2IR"] = "HOMA2 IR"
+newlabels["mean_sensor"] = "Mean SG (mg/dL)"
+newlabels["max_sensor"] = "Max. SG (mg/dL)"
+newlabels["min_sensor"] = "Min SG (mg/dL)"
+newlabels["percent_time_70_180"] = "% TIR 70-180 mg/dL"
+newlabels["percent_time_over_140"] = "% Time >140 mg/dL"
+newlabels["percent_time_over_180"] = "% Time >180 mg/dL"
+newlabels["percent_time_over_250"] = "% Time >250 mg/dL"
+newlabels["percent_time_under_70"] = "% Time <70 mg/dL"
+newlabels["percent_time_under_54"] = "% Time <54 mg/dL"
+newlabels["standard_deviation"] = "SD"
+newlabels["cv"] = "CV"
+newlabels["r_mage"] = "MAGE"
+newlabels["trikafta_duration"] = "Modulator Duration"
+```
+
+## Full cohort
+
+```{r results='asis'}
+t1 = tableby(~Age.at.visit.+Weight..kg.+weightz+trikafta_duration+
+               Sex..Male.1.+BMIz+FEV1..+FVC....+trikafta_duration+
+               Genotype+Pancreatic.Status+Kalydeco+Orkambi+Symdeko,
+             data = df[df$Event.Name == "Visit 1",])
+summary(t1,digits = 2,labelTranslations = newlabels)
+```
+
+## Reduced Cohort
+
+```{r results='asis'}
+t1 = tableby(~Age.at.visit.+Weight..kg.+weightz+trikafta_duration+
+               Sex..Male.1.+BMIz+FEV1..+FVC....+trikafta_duration+
+               Genotype+Pancreatic.Status+Kalydeco+Orkambi+Symdeko,
+             data = df[df$Event.Name == "Visit 1" & 
+                         !is.na(df$date_cgm_placement) & 
+                         !is.na(df$A1C.result),])
 summary(t1,digits = 2,labelTranslations = newlabels)
 ```
 
 # Table 2: Pre-/Post-Trikafta Comparisons
 
-All metrics calculated based on 2 hour OGTT (0, 10, 30, 60, 90, and 120 minutes).
+All metrics calculated based on 2 hour OGTT (0, 10, 30, 60, 90, and 120 minutes). Group was treated as an ordered variable with NGT < AGT < CFRD.
 
-```{r results='asis'}
+```{r}
 # Make dataset for HOMA2 calculations - glucose in mmol/L and cpep in nmol/L
 homa = df %>% select(Study.ID,Event.Name,Glucose.0.minute,c.peptide.0.minute)
 homa$Glucose.0.minute = homa$Glucose.0.minute/18
@@ -120,7 +165,7 @@ df$Group = apply(df[,glu_cols],1,function(r){
 })
 df$Group = factor(df$Group,levels = c("NGT","AGT","CFRD"),ordered = T)
 # convert Insulin to mcU/mL
-ins_cols = colnames(df)[head(grep("insulin",tolower(colnames(df))),-2)]
+ins_cols = colnames(df)[head(grep("insulin",tolower(colnames(df))),-1)]
 df[,ins_cols] = lapply(df[,ins_cols], function(c){
   return(as.numeric(c) * 0.02869)
 })
@@ -136,6 +181,9 @@ df$`Glucose AUC` = apply(df %>% select(Glucose.0.minute:Glucose.120.min),1,funct
 df$`C Peptide AUC` = apply(df %>% select(c.peptide.0.minute:c.peptide.120.min),1,function(r){
   trapz(c(0,10,30,60,90,120),as.numeric(r))
 })
+df$`Insulin AUC` = apply(df %>% select(Insulin.0.minute:Insulin.120.min),1,function(r){
+  trapz(c(0,10,30,60,90,120),as.numeric(r))
+})
 # Incremental AUCs
 df$`Glucose iAUC` = apply(df %>% select(Glucose.0.minute:Glucose.120.min),1,function(r){
   r = r - r[1]
@@ -145,46 +193,47 @@ df$`C Peptide iAUC` = apply(df %>% select(c.peptide.0.minute:c.peptide.120.min),
   r = r - r[1]
   trapz(c(0,10,30,60,90,120),as.numeric(r))
 })
+df$`Insulin iAUC` = apply(df %>% select(Insulin.0.minute:Insulin.120.min),1,function(r){
+  r = r - r[1]
+  trapz(c(0,10,30,60,90,120),as.numeric(r))
+})
 # Other indices
 # Cpeptide index = delta cpeptide 0-30/delta glucose 0-30
 df$`C Peptide Index` = (df$c.peptide.30.min - df$c.peptide.0.minute)/
   (df$Glucose.30.min - df$Glucose.0.minute)
 # Matsuda c peptide (500,000/√[fasting glucose*fasting cpep*mean glucose*mean cpep])   [Glucose mg/dL, cpeptide pmol/L]
 glu_cols = colnames(df)[head(grep("glucose\\.\\d{1,}",tolower(colnames(df))),-2)]
+glu_cols = glu_cols[-2]
+ins_cols = colnames(df)[head(grep("insulin\\.\\d{1,}",tolower(colnames(df))),-2)]
+ins_cols = ins_cols[-1]
 df$mean_glucose = rowMeans(df[,glu_cols])
 df$mean_cpep = rowMeans(df[,cpep_cols])
 df$`Adapted Matsuda` = 500000/(sqrt(df$Glucose.0.minute*df$c.peptide.0.minute*
                                       df$mean_glucose*df$mean_cpep))
+df$Matsuda = apply(df,1,function(r){
+  glu = round(as.numeric(r[glu_cols]))
+  ins = round(as.numeric(r[ins_cols]),1)
+  matsuda = 10000/sqrt(glu[1]*ins[1]*(glu[1]+glu[2]*2+glu[3]*2+glu[4]*2+glu[5])/
+                         8*(ins[1]+ins[2]*2+ins[3]*2+ins[4]*2+ins[5])/8)
+})
 # C Pep ODI
 df$`C Peptide ODI` = df$`C Peptide Index`*df$`Adapted Matsuda`
+# Matsuda ODI
+df$`ODI (Cpeptide index x Matsuda)` = df$`C Peptide Index`*df$Matsuda
 # iAUC ratio
 df$iAUC_ratio = df$`C Peptide iAUC`/df$`Glucose iAUC`
-# Add labels
-newlabels["A1C.result"] = "HbA1c (%)"
-newlabels["Glucose.0.minute"] = "Fasting glucose (mg/dL)"
-newlabels["Glucose.60.min"] = "1hr glucose (mg/dL)"
-newlabels["Glucose.120.min"] = "2hr glucose (mg/dL)"
-newlabels["c.peptide.0.minute"] = "Fasting C-peptide (pmol/L)"
-newlabels["iAUC_ratio"] = "C pep iAUC:Glucose iAUC"
-newlabels["homa2B"] = "HOMA2 %B"
-newlabels["homa2S"] = "HOMA2 %S"
-newlabels["homa2IR"] = "HOMA2 IR"
-newlabels["mean_sensor"] = "Mean SG (mg/dL)"
-newlabels["max_sensor"] = "Max. SG (mg/dL)"
-newlabels["min_sensor"] = "Min SG (mg/dL)"
-newlabels["percent_time_70_180"] = "% TIR 70-180 mg/dL"
-newlabels["percent_time_over_140"] = "% Time >140 mg/dL"
-newlabels["percent_time_over_180"] = "% Time >180 mg/dL"
-newlabels["percent_time_over_250"] = "% Time >250 mg/dL"
-newlabels["percent_time_under_70"] = "% Time <70 mg/dL"
-newlabels["percent_time_under_54"] = "% Time <54 mg/dL"
-newlabels["standard_deviation"] = "SD"
-newlabels["cv"] = "CV"
-newlabels["r_mage"] = "MAGE"
-t2_vars = c("A1C.result","BMIz","FEV1..","FVC....","Group","Glucose.0.minute",
+```
+
+## Full cohort
+
+```{r results='asis'}
+t2_vars = c("A1C.result","Weight..kg.","BMIz","FEV1..","FVC....","trikafta_duration",
+            "Group","Glucose.0.minute",
             "Glucose.60.min","Glucose.120.min","c.peptide.0.minute",
-            "`Glucose AUC`","`C Peptide AUC`","`C Peptide Index`",
-            "`Adapted Matsuda`","`C Peptide ODI`","iAUC_ratio","homa2B","homa2S","homa2IR",
+            "`Glucose iAUC`","`C Peptide iAUC`","`Insulin iAUC`",
+            "`C Peptide Index`","Matsuda",
+            "`Adapted Matsuda`","`C Peptide ODI`","`ODI (Cpeptide index x Matsuda)`",
+            "iAUC_ratio","homa2B","homa2S","homa2IR",
             "mean_sensor","max_sensor","min_sensor","percent_time_70_180",
             "percent_time_over_140","percent_time_over_180","percent_time_over_250",
             "percent_time_under_70","percent_time_under_54","standard_deviation","cv","r_mage")
@@ -193,7 +242,14 @@ p <- paired(f,data = df, id = Study.ID,numeric.test = "signed.rank",signed.rank.
 summary(p,pfootnote = T,labelTranslations = newlabels)
 ```
 
-Group was treated as an ordered variable with NGT < AGT < CFRD.
+## Reduced Cohort
+
+```{r results='asis'}
+f = as.formula(paste0("Event.Name ~ ",paste0(t2_vars,collapse = "+")))
+p = paired(f,data = df[!is.na(df$date_cgm_placement) & !is.na(df$A1C.result),], 
+           id = Study.ID,numeric.test = "signed.rank",signed.rank.exact = F)
+summary(p,pfootnote = T,labelTranslations = newlabels)
+```
 
 # Figures
 
@@ -249,3 +305,17 @@ ggplot(plot_df,aes(x = name,y = m,color = Event.Name)) +
   xlab("Time (minutes)") + ylab("Insulin (mcU/mL)") + 
   theme_bw()
 ```
+
+# Notes
+
+1. The A1C numbers look correct to me. The p value in Table 2 is calculated for only those people with a measure at V1 and V2, so in this case it was calculated based on n = 15. Similarly, for "HbA1c (%) for those with CGM," there are 12 values missing out of 20, so the p value is for 8 participants.
+
+2. The citation for the trapezoidal method R package is:
+  
+    Borchers, Hans W. Pracma: Practical Numerical Math Functions, 2022. https://CRAN.R-project.org/package=pracma.
+
+3. Citation for R (version `r paste0(R.version$major,".","1.3")`):
+
+    R Core Team. R: A Language and Environment for Statistical Computing. Vienna, Austria: R Foundation for Statistical Computing, 2022. https://www.R-project.org/.
+
+
