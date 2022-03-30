@@ -64,13 +64,6 @@ df$weightz = y2z(df$Weight..kg.,x = df$Age,sex = df$Sex,ref=nl4.wgt)
 ```
 
 ```{r cgm data,include=FALSE}
-# Clean and calculate
-cleandata("./Christine Chan/Pre-post Trikafta Prospective/Data_Raw/CGM",
-          "./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/CGM",
-          removegaps = F)
-cgmvariables("./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/CGM",
-             "./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/",
-             outputname = "cgm_vars",id_filename = T)
 # Merge
 cgm = read.csv("./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/cgm_vars.csv")
 cgm$Study.ID = str_extract(cgm$subject_id,"^[[:upper:]]{2}\\d{4}")
@@ -78,6 +71,17 @@ cgm$Event.Name =
   str_extract(tolower(cgm$subject_id),"visit\\d{1}|visit \\d{1}|yr\\d{1}|year\\d{1}|year \\d{1}")
 cgm$Event.Name = paste("Visit",gsub("[[:alpha:]]|\\s","",cgm$Event.Name))
 df = left_join(df,cgm,by = c("Study.ID", "Event.Name"))
+# Update DXA variables
+dxa_vars = c("Tissue..g.","Total.Fat.Mass....","Fat.Body.Mass..g.","Fat.Free.Mass..g.",
+            "Lean.Body.Mass..g.","Total.Mass..kg.","Fat.Free.Mass..",
+            "Fat.Mass.Index..FMI...","Lean.body.mass.fat.mass..LBM.FM.",
+            "Fat.Free.Mass.Index...FFMI.","Lean.Body.Mass.Index..LBMI.",
+            "BMD.Total.z.score","BMD.Subtotal.z.score",
+            "DXA.FMI.calculated.z.score","DXA.LBMI.calculated.z.score")
+dxa = read.csv("./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/dxa_data.csv")
+dxa = dxa %>% select(Study.ID,all_of(dxa_vars))
+df = left_join(df,dxa)
+keep = dxa$Study.ID
 ```
 
 # Table 1: Demographics at Baseline
@@ -114,6 +118,12 @@ newlabels["standard_deviation"] = "SD"
 newlabels["cv"] = "CV"
 newlabels["r_mage"] = "MAGE"
 newlabels["trikafta_duration"] = "Modulator Duration"
+newlabels[dxa_vars] = 
+  c("Tissue (g)","Total Fat Mass (%)","Fat Body Mass (g)","Fat Free Mass (g)",
+    "Lean Body Mass (g)","Total Mass (kg)","Fat Free Mass %","Fat Mass Index (FMI)",
+    "Lean body mass/fat mass (LBM/FM)","Fat Free Mass Index (FFMI)","Lean Body Mass Index (LBMI)",
+    "BMD Total z-score","BMD Subtotal z-score","DXA FMI calculated z-score",
+    "DXA LBMI calculated z-score")
 ```
 
 ## Full cohort
@@ -122,6 +132,7 @@ newlabels["trikafta_duration"] = "Modulator Duration"
 t1 = tableby(~Age.at.visit.+Weight..kg.+weightz+trikafta_duration+
                Sex..Male.1.+BMIz+FEV1..+FVC....+trikafta_duration+
                Genotype+Pancreatic.Status+Kalydeco+Orkambi+Symdeko,
+             control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),
              data = df[df$Event.Name == "Visit 1",])
 summary(t1,digits = 2,labelTranslations = newlabels)
 ```
@@ -132,9 +143,8 @@ summary(t1,digits = 2,labelTranslations = newlabels)
 t1 = tableby(~Age.at.visit.+Weight..kg.+weightz+trikafta_duration+
                Sex..Male.1.+BMIz+FEV1..+FVC....+trikafta_duration+
                Genotype+Pancreatic.Status+Kalydeco+Orkambi+Symdeko,
-             data = df[df$Event.Name == "Visit 1" & 
-                         !is.na(df$date_cgm_placement) & 
-                         !is.na(df$A1C.result),])
+             control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),
+             data = df[df$Event.Name == "Visit 1" & df$Study.ID %in% keep,])
 summary(t1,digits = 2,labelTranslations = newlabels)
 ```
 
@@ -234,11 +244,18 @@ t2_vars = c("A1C.result","Weight..kg.","BMIz","FEV1..","FVC....","trikafta_durat
             "`C Peptide Index`","Matsuda",
             "`Adapted Matsuda`","`C Peptide ODI`","`ODI (Cpeptide index x Matsuda)`",
             "iAUC_ratio","homa2B","homa2S","homa2IR",
+            "Tissue..g.","Total.Fat.Mass....","Fat.Body.Mass..g.","Fat.Free.Mass..g.",
+            "Lean.Body.Mass..g.","Total.Mass..kg.","Fat.Free.Mass..",
+            "Fat.Mass.Index..FMI...","Lean.body.mass.fat.mass..LBM.FM.",
+            "Fat.Free.Mass.Index...FFMI.","Lean.Body.Mass.Index..LBMI.",
+            "BMD.Total.z.score","BMD.Subtotal.z.score",
+            "DXA.FMI.calculated.z.score","DXA.LBMI.calculated.z.score",
             "mean_sensor","max_sensor","min_sensor","percent_time_70_180",
             "percent_time_over_140","percent_time_over_180","percent_time_over_250",
             "percent_time_under_70","percent_time_under_54","standard_deviation","cv","r_mage")
 f = as.formula(paste0("Event.Name ~ ",paste0(t2_vars,collapse = "+")))
-p <- paired(f,data = df, id = Study.ID,numeric.test = "signed.rank",signed.rank.exact = F)
+p <- paired(f,data = df, id = Study.ID,numeric.test = "signed.rank",signed.rank.exact = F,
+            control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),)
 summary(p,pfootnote = T,labelTranslations = newlabels)
 ```
 
@@ -246,10 +263,31 @@ summary(p,pfootnote = T,labelTranslations = newlabels)
 
 ```{r results='asis'}
 f = as.formula(paste0("Event.Name ~ ",paste0(t2_vars,collapse = "+")))
-p = paired(f,data = df[!is.na(df$date_cgm_placement) & !is.na(df$A1C.result),], 
+p = paired(f,data = df[!is.na(df$date_cgm_placement) & df$Study.ID %in% keep,], 
+           control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),
            id = Study.ID,numeric.test = "signed.rank",signed.rank.exact = F)
 summary(p,pfootnote = T,labelTranslations = newlabels)
 ```
+
+# Table 3: Adults vs. Children
+
+```{r}
+df$`Age Group` = cut(df$Age.at.visit.,c(-Inf,18,Inf),labels = c("Child","Adult"))
+```
+
+The following table includes `r as.numeric(table(df[df$Event.Name == "Visit 1","Age Group"])["Child"])` children and `r as.numeric(table(df[df$Event.Name == "Visit 1","Age Group"])["Adult"])` adults.
+
+```{r results='asis'}
+f = as.formula(paste0("Event.Name ~ ",paste0(t2_vars,collapse = "+")))
+p <- paired(f,data = df, id = Study.ID,numeric.test = "signed.rank",signed.rank.exact = F,
+            control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),
+            strata = `Age Group`)
+summary(p,pfootnote = T,labelTranslations = newlabels)
+```
+
+# Table 4: Prior Modulator Use
+
+Unable to perform statistical tests due to too many missing values.
 
 # Figures
 
