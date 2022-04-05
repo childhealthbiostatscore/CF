@@ -240,8 +240,8 @@ df$iAUC_ratio = df$`C Peptide iAUC`/df$`Glucose iAUC`
 ## Full cohort
 
 ```{r results='asis'}
-t2_vars = c("A1C.result","Weight..kg.","BMIz","FEV1..","FVC....","trikafta_duration",
-            "Group","Glucose.0.minute",
+t2_vars = c("A1C.result","Weight..kg.","weightz","BMIz","FEV1..","FVC....",
+            "trikafta_duration","Group","Glucose.0.minute",
             "Glucose.60.min","Glucose.120.min","c.peptide.0.minute",
             "`Glucose iAUC`","`C Peptide iAUC`","`Insulin iAUC`",
             "`C Peptide Index`","Matsuda",
