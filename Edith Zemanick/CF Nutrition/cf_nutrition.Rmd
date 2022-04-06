@@ -18,15 +18,6 @@ library(performance)
 library(mcp)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
-if(Sys.info()["sysname"] == "Windows"){
-  home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
-} else if (Sys.info()["sysname"] == "Linux"){
-  home_dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
-} else if (Sys.info()["sysname"] == "Darwin"){
-  home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
-}
-knitr::opts_knit$set(root.dir = home_dir)
-rm(home_dir)
 source("~/GitHub/CF/get_genotype_class_severity.R")
 ```
 
@@ -73,14 +64,32 @@ colnames(years)[2:3] = c('max_years_to_start','max_years_from_start')
 df = left_join(df,years,by = "Patient.ID")
 ```
 
-# Table 1: Participant Characteristics
+# Participant Characteristics
+
+For each person, we calculated the maximum amount of time from the earliest nutrition measure before modulator start to start date, and the amount of time from modulator start date to most recent nutrition measure. The ranges of these values are presented below ("Years to start" and "Years From start," respectively).
 
 ```{r results='asis'}
 df$Sex[df$Sex == ""] = NA
 demo = df %>% group_by(Patient.ID) %>% fill(Sex,.direction = "downup") %>% 
   filter(row_number() == 1)
 t1 = tableby(first_mod ~ Age.at.Start..years. + Sex + genoRisk + 
-               vit_measures_after + vit_measures_before,
-             data = demo)
-summary(t1)
+               vit_measures_after + vit_measures_before +
+               notest(max_years_to_start,"min","max") + 
+               notest(max_years_from_start,"min","max"),
+             data = demo,
+             control = tableby.control(numeric.stats=c("Nmiss", "median", "q1q3"),))
+summary(t1,test = F,
+        labelTranslations = 
+          list(Age.at.Start..years. = "Age at Start (years)",
+               genoRisk = "Genotype risk group",
+               vit_measures_after = "No. of vitamin measures post",
+               vit_measures_before = "No. of vitamin measures pre",
+               max_years_to_start = "Years to start",max_years_from_start = "Years From start"))
 ```
+
+# Vitamin measures before and after modulator initiation
+
+```{r results='asis'}
+
+```
+
