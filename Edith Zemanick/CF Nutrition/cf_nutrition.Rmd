@@ -54,14 +54,15 @@ geno = read_excel("/Users/timvigers/Dropbox/Work/CF/CF Info/Sweat Tests from Int
 geno = geno[,c('PatientID','genoRisk')]
 df = left_join(df,geno,by = c('Patient.ID' = 'PatientID'))
 # Time prior to first modulator
-years = df %>% mutate(years_to_start = Age.at.Test..Years. - Age.at.Start..years.) %>%
-  group_by(Patient.ID,Before_After) %>% 
-  mutate(years_to_start_max = max(abs(years_to_start))) %>% ungroup() %>%
-  select(Patient.ID,Before_After,years_to_start_max) %>% distinct(.) %>%
+years = df %>% group_by(Patient.ID,Before_After) %>% 
+  mutate(years_to_start_max = max(abs(Age.at.Test..Years. - Age.at.Start..years.))) %>% 
+  select(Patient.ID,Before_After,years_to_start_max) %>% 
+  ungroup() %>% distinct(.) %>%
   pivot_wider(id_cols = Patient.ID,names_from = Before_After,values_from = years_to_start_max)
 years$`NA` = NULL
 colnames(years)[2:3] = c('max_years_to_start','max_years_from_start')
 df = left_join(df,years,by = "Patient.ID")
+df$years = df$Age.at.Test..Years. - df$Age.at.Start..years.
 ```
 
 # Participant Characteristics
@@ -89,7 +90,47 @@ summary(t1,test = F,
 
 # Vitamin measures before and after modulator initiation
 
-```{r results='asis'}
+For each participant, we selected the pre and post visit closest to modulator start (and at least 3 months after start) with both a vitamin A and FEV1 % predicted value measure. Some visits were on different days and had different measures, so some missing values were filled in with the closest value (within 1 month). 
 
+```{r results='asis'}
+nutrition_vars = c("VitaminA_Retinol","X25OH.Vitamin.D","Vitamin.E.Alpha",
+                   "BMI","FEV1...pred")
+# Get the most recent 
+paired_df = df %>% 
+  select(Patient.ID,Before_After,years,first_mod,all_of(nutrition_vars)) %>% 
+  filter(years >= 0.25 | years < 0) %>%
+  mutate(years = round(years)) %>%
+  group_by(Patient.ID,years) %>%
+  fill(all_of(nutrition_vars),.direction = "downup") %>%
+  drop_na(any_of(c("VitaminA_Retinol","FEV1...pred"))) %>%
+  group_by(Patient.ID,Before_After) %>%
+  slice_min(abs(years)) %>% distinct() %>% filter(row_number()==1) 
+paired_df$Before_After = relevel(paired_df$Before_After,ref = "Before")
+
+f = as.formula(paste0("Before_After ~ ",paste0(nutrition_vars,collapse = "+")))
+p = paired(f,data = paired_df,id = Patient.ID,strata = first_mod)
+summary(p,
+        labelTranslations = list(VitaminA_Retinol = "Vitamin A Retinol",
+                                 X25OH.Vitamin.D = "25OH-Vitamin D",
+                                 Vitamin.E.Alpha = "FEV1 % Predicted",
+                                 first_mod = "First Modulator"))
+```
+
+# Piecewise longitudinal models
+
+```{r}
+# Set up data again
+df = read.csv("~/Dropbox/Work/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_dataset.csv")
+df$years = df$Age.at.Test..Years. - df$Age.at.Start..years.
+t = df %>% group_by(Patient.ID) %>% summarise(n = sum(!is.na(VitaminA_Retinol)))
+```
+
+```{r}
+outcome = "VitaminA_Retinol"
+piecewise_mod = function(outcome,data){
+  data = data %>% select(Patient.ID,years,all_of(outcome)) %>% drop_na()
+  plot = ggplot(data,aes_string(x = "years",y = outcome,group = "Patient.ID")) + 
+    geom_point() + geom_line()
+}
 ```
 
