@@ -1,0 +1,86 @@
+---
+title: "Serum Biomarkers of Nutrition Pre and Post CFTR Modulator Use in Children with Cystic Fibrosis"
+author: "Tim Vigers"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+library(arsenal)
+library(tidyverse)
+library(readxl)
+library(performance)
+library(mcp)
+library(knitr)
+knitr::opts_chunk$set(echo = FALSE)
+if(Sys.info()["sysname"] == "Windows"){
+  home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
+} else if (Sys.info()["sysname"] == "Linux"){
+  home_dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
+} else if (Sys.info()["sysname"] == "Darwin"){
+  home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
+}
+knitr::opts_knit$set(root.dir = home_dir)
+rm(home_dir)
+source("~/GitHub/CF/get_genotype_class_severity.R")
+```
+
+```{r data cleaning}
+# Import
+df = read.csv("~/Dropbox/Work/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_dataset.csv")
+# Only those on effective modulators
+on_effective = unique(df$Patient.ID[which(df[,'Modulator'] %in% c('Kalydeco','Trikafta'))])
+df = df %>% filter(Patient.ID %in% on_effective)
+# Non-highy efective to "None
+df$Modulator[!df$Modulator %in% c('Kalydeco','Trikafta')] = "None"
+# Before or after
+df$Before_After = df$Age.at.Test..Years. < df$Age.at.Start..years.
+df$Before_After = factor(df$Before_After,levels = c(FALSE,TRUE),labels = c("After","Before"))
+# Count number of measures 
+num_values = df %>% group_by(Patient.ID,Before_After) %>% 
+  summarise(n = sum(!is.na(X25OH.Vitamin.D)),.groups = "drop") %>%
+  pivot_wider(id_cols = Patient.ID,names_from = Before_After,values_from = n)
+num_values$`NA` = NULL
+colnames(num_values)[2:3] = c("vit_measures_after","vit_measures_before")
+df = left_join(df,num_values,by = "Patient.ID")
+# At least two annual nutritional measurements prior to first modulator start date
+two_measures = num_values$Patient.ID[which(num_values$`vit_measures_before` >= 2)]
+# At least one measurement of nutritional markers and one weight/height measurement >= three months post-modulator
+time_after = df %>% 
+  filter(Age.at.Test..Years. >= (Age.at.Start..years. + 0.25),!is.na(X25OH.Vitamin.D)) %>%
+  pull(Patient.ID) %>% unique(.)
+# Filter out those without above criteria, get first modulator
+df = df %>% filter(Patient.ID %in% intersect(two_measures,time_after)) %>%
+  group_by(Patient.ID) %>% 
+  mutate(first_mod = head(Modulator[Modulator != "None"],1)) %>% ungroup()
+# Genotype group
+geno = read_excel("/Users/timvigers/Dropbox/Work/CF/CF Info/Sweat Tests from Internal Database_genotype class.xlsx")
+geno = geno[,c('PatientID','genoRisk')]
+df = left_join(df,geno,by = c('Patient.ID' = 'PatientID'))
+# Time prior to first modulator
+years = df %>% mutate(years_to_start = Age.at.Test..Years. - Age.at.Start..years.) %>%
+  group_by(Patient.ID,Before_After) %>% 
+  mutate(years_to_start_max = max(abs(years_to_start))) %>% ungroup() %>%
+  select(Patient.ID,Before_After,years_to_start_max) %>% distinct(.) %>%
+  pivot_wider(id_cols = Patient.ID,names_from = Before_After,values_from = years_to_start_max)
+years$`NA` = NULL
+colnames(years)[2:3] = c('max_years_to_start','max_years_from_start')
+df = left_join(df,years,by = "Patient.ID")
+```
+
+# Table 1: Participant Characteristics
+
+```{r results='asis'}
+df$Sex[df$Sex == ""] = NA
+demo = df %>% group_by(Patient.ID) %>% fill(Sex,.direction = "downup") %>% 
+  filter(row_number() == 1)
+t1 = tableby(first_mod ~ Age.at.Start..years. + Sex + genoRisk + 
+               vit_measures_after + vit_measures_before,
+             data = demo)
+summary(t1)
+```
