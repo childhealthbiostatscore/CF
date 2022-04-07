@@ -16,6 +16,8 @@ library(tidyverse)
 library(readxl)
 library(performance)
 library(mcp)
+library(lmerTest)
+library(plotly)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
 source("~/GitHub/CF/get_genotype_class_severity.R")
@@ -23,7 +25,7 @@ source("~/GitHub/CF/get_genotype_class_severity.R")
 
 ```{r data cleaning}
 # Import
-df = read.csv("~/Dropbox/Work/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_dataset.csv")
+df = read.csv("~/Dropbox/Work/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_dataset.csv",na.strings = "")
 # Only those on effective modulators
 on_effective = unique(df$Patient.ID[which(df[,'Modulator'] %in% c('Kalydeco','Trikafta'))])
 df = df %>% filter(Patient.ID %in% on_effective)
@@ -99,16 +101,17 @@ nutrition_vars = c("VitaminA_Retinol","X25OH.Vitamin.D","Vitamin.E.Alpha",
 paired_df = df %>% 
   select(Patient.ID,Before_After,years,first_mod,all_of(nutrition_vars)) %>% 
   filter(years >= 0.25 | years < 0) %>%
-  mutate(years = round(years)) %>%
+  mutate(years = round(years,1)) %>%
   group_by(Patient.ID,years) %>%
   fill(all_of(nutrition_vars),.direction = "downup") %>%
-  drop_na(any_of(c("VitaminA_Retinol","FEV1...pred"))) %>%
+  drop_na(any_of(c("X25OH.Vitamin.D"))) %>%
   group_by(Patient.ID,Before_After) %>%
-  slice_min(abs(years)) %>% distinct() %>% filter(row_number()==1) 
+  slice_min(abs(years)) %>% distinct() %>% 
+  arrange(Patient.ID,abs(years)) %>%filter(row_number()==1) 
 paired_df$Before_After = relevel(paired_df$Before_After,ref = "Before")
 
 f = as.formula(paste0("Before_After ~ ",paste0(nutrition_vars,collapse = "+")))
-p = paired(f,data = paired_df,id = Patient.ID,strata = first_mod)
+p = paired(f,data = paired_df,id = Patient.ID)
 summary(p,
         labelTranslations = list(VitaminA_Retinol = "Vitamin A Retinol",
                                  X25OH.Vitamin.D = "25OH-Vitamin D",
@@ -121,16 +124,87 @@ summary(p,
 ```{r}
 # Set up data again
 df = read.csv("~/Dropbox/Work/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_dataset.csv")
-df$years = df$Age.at.Test..Years. - df$Age.at.Start..years.
-t = df %>% group_by(Patient.ID) %>% summarise(n = sum(!is.na(VitaminA_Retinol)))
+df$Age.at.Start..years. = NULL
+# New age at start
+mods = read_excel("~/Dropbox/Work/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
+mods = mods[mods$Modulator %in% c('Kalydeco','Trikafta'),]
+colnames(mods) = make.names(colnames(mods))
+mods = mods %>% select(Patient.ID,Modulator,Age.at.Start..years.) %>% 
+  pivot_wider(id_cols = Patient.ID,names_from = Modulator,
+              values_from = Age.at.Start..years.)
+colnames(mods)[2:ncol(mods)] = paste0("age_at_start_",colnames(mods)[2:ncol(mods)])
+# Age at first and second modulator
+mods$age_first = pmin(mods$age_at_start_Trikafta,mods$age_at_start_Kalydeco,na.rm = T)
+mods$age_second = pmax(mods$age_at_start_Trikafta,mods$age_at_start_Kalydeco)
+# Merge back in
+df = left_join(df,mods,by = "Patient.ID")
+df = df %>% group_by(Patient.ID) %>% 
+  fill(age_at_start_Trikafta,age_at_start_Kalydeco,.direction = "downup")
+# Time relative to first mod
+df$time = df$Age.at.Test..Years. - df$age_first
+# Calculate spline things
+df$c1 = 
+  (df$time-0)*(df$time>=0)
+df$c2 = 
+  (df$Age.at.Test..Years.-df$age_second)*(df$Age.at.Test..Years.>=df$age_second)
 ```
 
 ```{r}
-outcome = "VitaminA_Retinol"
 piecewise_mod = function(outcome,data){
-  data = data %>% select(Patient.ID,years,all_of(outcome)) %>% drop_na()
-  plot = ggplot(data,aes_string(x = "years",y = outcome,group = "Patient.ID")) + 
-    geom_point() + geom_line()
+  data = data %>% select(Patient.ID,all_of(outcome),time,c1,c2) %>% drop_na()
+  # Base plot
+  plot = ggplot(data,aes_string(x = "time",y = outcome)) + 
+    geom_point(alpha = 0.2) + geom_line(alpha = 0.2) +
+    theme_bw() + theme(legend.position = "none") + xlab("Age at Test")
+  # Model
+  f = as.formula(paste0(outcome,"~ time + c1 + c2 + (1|Patient.ID)"))
+  m = lmer(f,data = data)
+  # Predicted values for plotting
+  pred = predict(m)
+  
+  plot + geom_line(data=data, 
+            aes(y = pred, x=Age.at.Test..Years.), size = 1, col="blue") 
+  ggplotly(plot)
 }
 ```
 
+## Vitamin A
+
+```{r}
+mod_df = df %>% select(Patient.ID,VitaminA_Retinol,Age.at.Test..Years.,
+                       age_first,age_second) %>% drop_na()
+mod_df$c1 = 
+  (mod_df$Age.at.Test..Years.-mod_df$age_first)*(mod_df$Age.at.Test..Years.>=mod_df$age_first)
+mod_df$c2 = 
+  (mod_df$Age.at.Test..Years.-mod_df$age_second)*(mod_df$Age.at.Test..Years.>=mod_df$age_second)
+
+m = lmer(VitaminA_Retinol ~ c1+c2+(1|Patient.ID),data = mod_df)
+```
+
+```{r cache=TRUE}
+mod_df = df %>% select(Patient.ID,time,VitaminA_Retinol) %>% drop_na()
+model = list(
+  VitaminA_Retinol ~ 1,  # Plateau in the first segment (int_1)
+  1 + (1|Patient.ID) ~ 0 + time,    # Joined slope (time_2) at cp_1
+  1 + (1|Patient.ID) ~ 0 + time     # Joined slope (int_3, time_3) at cp_2
+)
+fit = mcp(model, data = mod_df)
+plot(fit) + theme_bw()
+```
+
+```{r eval=FALSE}
+library(MultiKink)
+data("triceps")
+pred7 <- lm(triceps~ age + I((age-5)*(age>=5)) +
+                                   I((age-10)*(age >= 10)),
+                    data = triceps)
+triceps$c1 = (triceps$age-5)*(triceps$age>=5)
+triceps$c2 = (triceps$age-10)*(triceps$age>=10)
+
+tri.age.plot <- ggplot(triceps, aes(x=age, y=triceps)) +
+                 geom_point(alpha=0.55, color="black") + 
+                 theme_minimal()
+tri.age.plot +
+  geom_line(data=triceps, 
+            aes(y = pred7, x=age), size = 1, col="blue") 
+```
