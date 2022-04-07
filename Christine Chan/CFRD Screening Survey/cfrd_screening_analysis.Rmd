@@ -325,6 +325,19 @@ non_endo_alt$type = "Directors"
 plot_df = data.frame(rbind(endo_alt,non_endo_alt))
 t = plot_df %>% pivot_wider(id_cols = name,values_from = n,names_from = type) %>%
   column_to_rownames(.,var = "name")
+
+```
+
+### Percentages by responder type
+
+```{r}
+# Table
+kable(proportions(data.matrix(t),margin = 2)*100,digits = 2)
+```
+
+### Figure
+
+```{r}
 # Plot
 ggplot(plot_df,aes(x = name,y = n,group = type,fill = type)) + 
   geom_bar(stat="identity",position=position_dodge()) +
