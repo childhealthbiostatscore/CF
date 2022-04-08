@@ -20,12 +20,21 @@ library(lmerTest)
 library(plotly)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
+if(Sys.info()["sysname"] == "Windows"){
+  home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
+} else if (Sys.info()["sysname"] == "Linux"){
+  home_dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
+} else if (Sys.info()["sysname"] == "Darwin"){
+  home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
+}
+knitr::opts_knit$set(root.dir = home_dir)
+rm(home_dir)
 source("~/GitHub/CF/get_genotype_class_severity.R")
 ```
 
 ```{r data cleaning}
 # Import
-df = read.csv("~/Dropbox/Work/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_dataset.csv",na.strings = "")
+df = read.csv("./Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_dataset.csv",na.strings = "")
 # Only those on effective modulators
 on_effective = unique(df$Patient.ID[which(df[,'Modulator'] %in% c('Kalydeco','Trikafta'))])
 df = df %>% filter(Patient.ID %in% on_effective)
@@ -52,7 +61,7 @@ df = df %>% filter(Patient.ID %in% intersect(two_measures,time_after)) %>%
   group_by(Patient.ID) %>% 
   mutate(first_mod = head(Modulator[Modulator != "None"],1)) %>% ungroup()
 # Genotype group
-geno = read_excel("/Users/timvigers/Dropbox/Work/CF/CF Info/Sweat Tests from Internal Database_genotype class.xlsx")
+geno = read_excel("./CF Info/Sweat Tests from Internal Database_genotype class.xlsx")
 geno = geno[,c('PatientID','genoRisk')]
 df = left_join(df,geno,by = c('Patient.ID' = 'PatientID'))
 # Time prior to first modulator
