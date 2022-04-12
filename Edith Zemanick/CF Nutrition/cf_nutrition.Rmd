@@ -17,6 +17,7 @@ library(readxl)
 library(performance)
 library(mcp)
 library(lmerTest)
+library(broom.mixed)
 library(plotly)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
@@ -113,7 +114,7 @@ paired_df = df %>%
   mutate(years = round(years,1)) %>%
   group_by(Patient.ID,years) %>%
   fill(all_of(nutrition_vars),.direction = "downup") %>%
-  drop_na(any_of(c("X25OH.Vitamin.D"))) %>%
+  drop_na(any_of(c("VitaminA_Retinol"))) %>%
   group_by(Patient.ID,Before_After) %>%
   slice_min(abs(years)) %>% distinct() %>% 
   arrange(Patient.ID,abs(years)) %>%filter(row_number()==1) 
@@ -124,7 +125,7 @@ p = paired(f,data = paired_df,id = Patient.ID)
 summary(p,
         labelTranslations = list(VitaminA_Retinol = "Vitamin A Retinol",
                                  X25OH.Vitamin.D = "25OH-Vitamin D",
-                                 Vitamin.E.Alpha = "FEV1 % Predicted",
+                                 Vitamin.E.Alpha = "Vitamin E Alpha",
                                  first_mod = "First Modulator"))
 ```
 
@@ -132,10 +133,10 @@ summary(p,
 
 ```{r}
 # Set up data again
-df = read.csv("~/Dropbox/Work/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_dataset.csv")
+df = read.csv("./Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_dataset.csv")
 df$Age.at.Start..years. = NULL
 # New age at start
-mods = read_excel("~/Dropbox/Work/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
+mods = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
 mods = mods[mods$Modulator %in% c('Kalydeco','Trikafta'),]
 colnames(mods) = make.names(colnames(mods))
 mods = mods %>% select(Patient.ID,Modulator,Age.at.Start..years.) %>% 
@@ -156,64 +157,110 @@ df$c1 =
   (df$time-0)*(df$time>=0)
 df$c2 = 
   (df$Age.at.Test..Years.-df$age_second)*(df$Age.at.Test..Years.>=df$age_second)
+# Limit to 3 years prior, select columns
+df = df %>% filter(!is.na(time) & time >= -3) %>% 
+  select(Patient.ID,Age.at.Test..Years.,age_first,age_second,time,c1,c2,
+         all_of(nutrition_vars))
+df$c2[is.na(df$c2)] = 0
 ```
 
 ```{r}
-piecewise_mod = function(outcome,data){
-  data = data %>% select(Patient.ID,all_of(outcome),time,c1,c2) %>% drop_na()
-  # Base plot
-  plot = ggplot(data,aes_string(x = "time",y = outcome)) + 
-    geom_point(alpha = 0.2) + geom_line(alpha = 0.2) +
-    theme_bw() + theme(legend.position = "none") + xlab("Age at Test")
-  # Model
-  f = as.formula(paste0(outcome,"~ time + c1 + c2 + (1|Patient.ID)"))
-  m = lmer(f,data = data)
-  # Predicted values for plotting
-  pred = predict(m)
+piecewise_mod = function(outcome,data,diagnostics = F){
+  data$Patient.ID = as.factor(data$Patient.ID)
+  data = data %>% select(Patient.ID,time,c1,c2,age_first,age_second,
+                         all_of(outcome)) %>% drop_na(all_of(outcome))
+  # Separate data for single and double mods
+  single = data %>% filter(is.na(age_second))
+  double = data %>% filter(!is.na(age_second))
+  # Models
+  f_single = as.formula(paste0(outcome,"~ time + c1 + (1|Patient.ID)"))
+  m_single = lmer(f_single,data = single)
+  f_double = as.formula(paste0(outcome,"~ time + c1 +c2 + (1|Patient.ID)"))
+  m_double = lmer(f_double,data = double)
   
-  plot + geom_line(data=data, 
-            aes(y = pred, x=Age.at.Test..Years.), size = 1, col="blue") 
-  ggplotly(plot)
+  # Diagnostics if required
+  if(diagnostics){
+    check_single = check_model(m_single)
+    check_double = check_model(m_double)
+  } else {
+    check_single = NULL
+    check_double = NULL
+  }
+  # Results
+  res_single = tidy(m_single,"fixed")
+  res_double = tidy(m_double,"fixed")
+  # Plots
+  single_plot_df = m_single@frame
+  single_plot_df$pred = predict(m_single)
+  single_plot = ggplot(single_plot_df,aes_string(x = "time",y = outcome,color = "Patient.ID")) + 
+    geom_line(aes(y = pred)) + 
+    theme_bw() + theme(legend.position = "none") + xlab("Time (years)")
+  
+  double_plot_df = m_double@frame
+  double_plot_df$pred = predict(m_double)
+  double_plot = ggplot(double_plot_df,aes_string(x = "time",y = outcome,color = "Patient.ID")) + 
+    geom_line(aes(y = pred)) + 
+    theme_bw() + theme(legend.position = "none") + xlab("Time (years)")
+  # Return
+  return(list("results_single" = res_single,"results_double" = res_double,
+              "diagnostics_single" = check_single,"diagnostics_double" = check_double,
+              "plot_single" = single_plot,"plot_double" = double_plot))
 }
 ```
 
 ## Vitamin A
 
 ```{r}
-mod_df = df %>% select(Patient.ID,VitaminA_Retinol,Age.at.Test..Years.,
-                       age_first,age_second) %>% drop_na()
-mod_df$c1 = 
-  (mod_df$Age.at.Test..Years.-mod_df$age_first)*(mod_df$Age.at.Test..Years.>=mod_df$age_first)
-mod_df$c2 = 
-  (mod_df$Age.at.Test..Years.-mod_df$age_second)*(mod_df$Age.at.Test..Years.>=mod_df$age_second)
-
-m = lmer(VitaminA_Retinol ~ c1+c2+(1|Patient.ID),data = mod_df)
+vita = piecewise_mod(outcome = "VitaminA_Retinol",data = df,diagnostics = T)
 ```
 
-```{r cache=TRUE}
+### Single modulator
+
+```{r results='asis'}
+vita$plot_single
+kable(vita$results_single,digits = 3)
+```
+
+### Double modulator
+
+```{r results='asis'}
+vita$plot_double
+kable(vita$results_double,digits = 3)
+```
+
+## BMI
+
+```{r}
+bmi = piecewise_mod(outcome = "BMI",data = df,diagnostics = T)
+```
+
+### Single modulator
+
+```{r results='asis'}
+bmi$plot_single
+kable(bmi$results_single,digits = 3)
+```
+
+### Double modulator
+
+```{r results='asis'}
+bmi$plot_double
+kable(bmi$results_double,digits = 3)
+```
+
+# Bayesian?
+
+```{r cache=TRUE,echo=TRUE}
 mod_df = df %>% select(Patient.ID,time,VitaminA_Retinol) %>% drop_na()
 model = list(
-  VitaminA_Retinol ~ 1,  # Plateau in the first segment (int_1)
-  1 + (1|Patient.ID) ~ 0 + time,    # Joined slope (time_2) at cp_1
-  1 + (1|Patient.ID) ~ 0 + time     # Joined slope (int_3, time_3) at cp_2
+  VitaminA_Retinol ~ 1, # Plateau 
+  1 + (1|Patient.ID) ~ 0 + time, # Joined slope
+  1 + (1|Patient.ID) ~ 0 + time, # Joined slope
+  1 + (1|Patient.ID) ~ 0 + time # Joined slope
 )
 fit = mcp(model, data = mod_df)
-plot(fit) + theme_bw()
 ```
 
-```{r eval=FALSE}
-library(MultiKink)
-data("triceps")
-pred7 <- lm(triceps~ age + I((age-5)*(age>=5)) +
-                                   I((age-10)*(age >= 10)),
-                    data = triceps)
-triceps$c1 = (triceps$age-5)*(triceps$age>=5)
-triceps$c2 = (triceps$age-10)*(triceps$age>=10)
-
-tri.age.plot <- ggplot(triceps, aes(x=age, y=triceps)) +
-                 geom_point(alpha=0.55, color="black") + 
-                 theme_minimal()
-tri.age.plot +
-  geom_line(data=triceps, 
-            aes(y = pred7, x=age), size = 1, col="blue") 
+```{r}
+plot(fit) + theme_bw()
 ```
