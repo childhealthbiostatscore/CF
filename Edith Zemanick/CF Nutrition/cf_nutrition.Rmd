@@ -133,51 +133,57 @@ summary(p,
 
 ```{r}
 # Set up data again
-df = read.csv("./Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_dataset.csv")
-df$Age.at.Start..years. = NULL
+vit = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021.xlsx")
+vit = vit %>% select(`Patient ID`,Date,VitaminA_Retinol:`Vitamin E Gamma`)
 # New age at start
 mods = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
 mods = mods[mods$Modulator %in% c('Kalydeco','Trikafta'),]
-colnames(mods) = make.names(colnames(mods))
-mods = mods %>% select(Patient.ID,Modulator,Age.at.Start..years.) %>% 
-  pivot_wider(id_cols = Patient.ID,names_from = Modulator,
-              values_from = Age.at.Start..years.)
-colnames(mods)[2:ncol(mods)] = paste0("age_at_start_",colnames(mods)[2:ncol(mods)])
-# Age at first and second modulator
-mods$age_first = pmin(mods$age_at_start_Trikafta,mods$age_at_start_Kalydeco,na.rm = T)
-mods$age_second = pmax(mods$age_at_start_Trikafta,mods$age_at_start_Kalydeco)
-# Merge back in
-df = left_join(df,mods,by = "Patient.ID")
-df = df %>% group_by(Patient.ID) %>% 
-  fill(age_at_start_Trikafta,age_at_start_Kalydeco,.direction = "downup")
+mods = mods %>% select(`Patient ID`,Modulator,`Earliest Date in Registry`) %>% 
+  pivot_wider(id_cols = `Patient ID`,names_from = Modulator,
+              values_from = `Earliest Date in Registry`)
+colnames(mods)[2:ncol(mods)] = paste0(colnames(mods)[2:ncol(mods)]," Date")
+mods$`First Mod Date` = pmin(mods$`Trikafta Date`,mods$`Kalydeco Date`,na.rm = T)
+mods$`Second Mod Date` = pmax(mods$`Trikafta Date`,mods$`Kalydeco Date`)
+# Add pancreatic status
+pancreatic = read_excel("./CF Info/Sweat Tests from Internal Database_genotype class_withPancStatus.xlsx")
+pancreatic = pancreatic %>% rename(`Patient ID` = PatientID) %>% select(`Patient ID`,PancreaticStatus)
+# FEV1 and BMI
+fev = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report_PFTs_ThroughDecember2021.xlsx")
+fev = fev %>% select(PatientID,Date,BMI,`FEV1 % pred`) %>% rename(`Patient ID` = PatientID)
+# Merge
+df = full_join(vit,fev) %>% filter(`Patient ID` %in% mods$`Patient ID`,)
+df = left_join(df,mods)
+df = left_join(df,pancreatic)
 # Time relative to first mod
-df$time = df$Age.at.Test..Years. - df$age_first
+df$time = as.numeric(difftime(df$Date,df$`First Mod Date`,units = "days"))/365.25
 # Calculate spline things
 df$c1 = 
   (df$time-0)*(df$time>=0)
 df$c2 = 
-  (df$Age.at.Test..Years.-df$age_second)*(df$Age.at.Test..Years.>=df$age_second)
+  (as.numeric(difftime(df$Date,df$`Second Mod Date`,units = "days"))/365.25)*(df$Date >= df$`Second Mod Date`)
 # Limit to 3 years prior, select columns
-df = df %>% filter(!is.na(time) & time >= -3) %>% 
-  select(Patient.ID,Age.at.Test..Years.,age_first,age_second,time,c1,c2,
-         all_of(nutrition_vars))
-df$c2[is.na(df$c2)] = 0
+df = df %>% filter(!is.na(time) & time >= -3) %>% distinct()
+# Vitamin A to numeric
+df$VitaminA_Retinol = suppressWarnings(as.numeric(df$VitaminA_Retinol))
 ```
 
 ```{r}
 piecewise_mod = function(outcome,data,diagnostics = F){
-  data$Patient.ID = as.factor(data$Patient.ID)
-  data = data %>% select(Patient.ID,time,c1,c2,age_first,age_second,
+  data$`Patient ID` = as.factor(data$`Patient ID`)
+  data = data %>% select(`Patient ID`,Date,`First Mod Date`,`Second Mod Date`,PancreaticStatus,BMI,
                          all_of(outcome)) %>% drop_na(all_of(outcome))
   # Separate data for single and double mods
-  single = data %>% filter(is.na(age_second))
-  double = data %>% filter(!is.na(age_second))
+  single = data %>% filter(c2 <= 0 | is.na(c2))
+  double = data %>% filter(!is.na(c2))
   # Models
-  f_single = as.formula(paste0(outcome,"~ time + c1 + (1|Patient.ID)"))
+  f_single = as.formula(paste0(outcome,"~ BMI + PancreaticStatus + time + c1 + (1|`Patient ID`)"))
+  f_double = as.formula(paste0(outcome,"~ BMI + PancreaticStatus + time + c1 +c2 + (1|`Patient ID`)"))
+  if(outcome == "BMI"){
+    f_single = update(f_single,.~.-BMI)
+    f_double = update(f_double,.~.-BMI)
+  }
   m_single = lmer(f_single,data = single)
-  f_double = as.formula(paste0(outcome,"~ time + c1 +c2 + (1|Patient.ID)"))
   m_double = lmer(f_double,data = double)
-  
   # Diagnostics if required
   if(diagnostics){
     check_single = check_model(m_single)
@@ -192,13 +198,12 @@ piecewise_mod = function(outcome,data,diagnostics = F){
   # Plots
   single_plot_df = m_single@frame
   single_plot_df$pred = predict(m_single)
-  single_plot = ggplot(single_plot_df,aes_string(x = "time",y = outcome,color = "Patient.ID")) + 
+  single_plot = ggplot(single_plot_df,aes_string(x = "time",y = outcome,color = "`Patient ID`")) + 
     geom_line(aes(y = pred)) + 
     theme_bw() + theme(legend.position = "none") + xlab("Time (years)")
-  
   double_plot_df = m_double@frame
   double_plot_df$pred = predict(m_double)
-  double_plot = ggplot(double_plot_df,aes_string(x = "time",y = outcome,color = "Patient.ID")) + 
+  double_plot = ggplot(double_plot_df,aes_string(x = "time",y = outcome,color = "`Patient ID`")) + 
     geom_line(aes(y = pred)) + 
     theme_bw() + theme(legend.position = "none") + xlab("Time (years)")
   # Return
@@ -207,6 +212,8 @@ piecewise_mod = function(outcome,data,diagnostics = F){
               "plot_single" = single_plot,"plot_double" = double_plot))
 }
 ```
+
+In the following models, the "time" estimate represents the slope prior to first modulator start, "c1" is the change in slope after first modulator start, and "c2" is the change in slope from first modulator to second. All models were adjusted for BMI and pancreatic status (except the BMI model, which was only adjusted for pancreatic status).
 
 ## Vitamin A
 
@@ -250,17 +257,39 @@ kable(bmi$results_double,digits = 3)
 
 # Bayesian?
 
+## BMI
+
 ```{r cache=TRUE,echo=TRUE}
-mod_df = df %>% select(Patient.ID,time,VitaminA_Retinol) %>% drop_na()
+mod_df = df %>% filter(!is.na(age_second)) %>% select(Patient.ID,time,BMI) %>% drop_na()
 model = list(
-  VitaminA_Retinol ~ 1, # Plateau 
+  BMI ~ 1, # Plateau 
   1 + (1|Patient.ID) ~ 0 + time, # Joined slope
   1 + (1|Patient.ID) ~ 0 + time, # Joined slope
   1 + (1|Patient.ID) ~ 0 + time # Joined slope
 )
-fit = mcp(model, data = mod_df)
+fit = mcp(model, data = mod_df,sample = "both")
 ```
 
+### Posterior means
+
 ```{r}
-plot(fit) + theme_bw()
+summary(fit)
+```
+
+### Posterior fit
+
+```{r}
+plot(fit,q_fit = TRUE) + theme_bw()
+```
+
+### Parameter plot
+
+```{r}
+plot_pars(fit)
+```
+
+### Hypothesis tests
+
+```{r}
+hypothesis(fit,c("cp_1 = 0","cp_2 = 0","cp_3 = 0"))
 ```
