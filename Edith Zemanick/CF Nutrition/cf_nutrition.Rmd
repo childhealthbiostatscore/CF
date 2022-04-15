@@ -20,6 +20,8 @@ library(lmerTest)
 library(broom.mixed)
 library(plotly)
 library(knitr)
+library(DiagrammeR)
+library(lubridate)
 knitr::opts_chunk$set(echo = FALSE)
 if(Sys.info()["sysname"] == "Windows"){
   home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
@@ -33,48 +35,102 @@ rm(home_dir)
 source("~/GitHub/CF/get_genotype_class_severity.R")
 ```
 
-```{r data cleaning}
-# Import
-df = read.csv("./Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_dataset.csv",na.strings = "")
-# Only those on effective modulators
-on_effective = unique(df$Patient.ID[which(df[,'Modulator'] %in% c('Kalydeco','Trikafta'))])
-df = df %>% filter(Patient.ID %in% on_effective)
-# Non-highy efective to "None
-df$Modulator[!df$Modulator %in% c('Kalydeco','Trikafta')] = "None"
-# Before or after
-df$Before_After = df$Age.at.Test..Years. < df$Age.at.Start..years.
-df$Before_After = factor(df$Before_After,levels = c(FALSE,TRUE),labels = c("After","Before"))
-# Count number of measures 
-num_values = df %>% group_by(Patient.ID,Before_After) %>% 
-  summarise(n = sum(!is.na(X25OH.Vitamin.D)),.groups = "drop") %>%
-  pivot_wider(id_cols = Patient.ID,names_from = Before_After,values_from = n)
-num_values$`NA` = NULL
-colnames(num_values)[2:3] = c("vit_measures_after","vit_measures_before")
-df = left_join(df,num_values,by = "Patient.ID")
-# At least two annual nutritional measurements prior to first modulator start date
-two_measures = num_values$Patient.ID[which(num_values$`vit_measures_before` >= 2)]
-# At least one measurement of nutritional markers and one weight/height measurement >= three months post-modulator
-time_after = df %>% 
-  filter(Age.at.Test..Years. >= (Age.at.Start..years. + 0.25),!is.na(X25OH.Vitamin.D)) %>%
-  pull(Patient.ID) %>% unique(.)
-# Filter out those without above criteria, get first modulator
-df = df %>% filter(Patient.ID %in% intersect(two_measures,time_after)) %>%
-  group_by(Patient.ID) %>% 
-  mutate(first_mod = head(Modulator[Modulator != "None"],1)) %>% ungroup()
-# Genotype group
-geno = read_excel("./CF Info/Sweat Tests from Internal Database_genotype class.xlsx")
-geno = geno[,c('PatientID','genoRisk')]
-df = left_join(df,geno,by = c('Patient.ID' = 'PatientID'))
-# Time prior to first modulator
-years = df %>% group_by(Patient.ID,Before_After) %>% 
-  mutate(years_to_start_max = max(abs(Age.at.Test..Years. - Age.at.Start..years.))) %>% 
-  select(Patient.ID,Before_After,years_to_start_max) %>% 
-  ungroup() %>% distinct(.) %>%
-  pivot_wider(id_cols = Patient.ID,names_from = Before_After,values_from = years_to_start_max)
-years$`NA` = NULL
-colnames(years)[2:3] = c('max_years_to_start','max_years_from_start')
-df = left_join(df,years,by = "Patient.ID")
-df$years = df$Age.at.Test..Years. - df$Age.at.Start..years.
+# Data cleaning
+
+```{r}
+# Vitamins
+vit = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021.xlsx")
+vit = vit %>% select(`Patient ID`,Date,VitaminA_Retinol:`Vitamin E Gamma`)
+# New age at start
+mods = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
+mods = mods[mods$Modulator %in% c('Kalydeco','Trikafta'),]
+mods = mods %>% select(`Patient ID`,Modulator,`Earliest Date in Registry`) %>% 
+  pivot_wider(id_cols = `Patient ID`,names_from = Modulator,
+              values_from = `Earliest Date in Registry`)
+colnames(mods)[2:ncol(mods)] = paste0(colnames(mods)[2:ncol(mods)]," Date")
+mods$`First Mod Date` = pmin(mods$`Trikafta Date`,mods$`Kalydeco Date`,na.rm = T)
+mods$`Second Mod Date` = pmax(mods$`Trikafta Date`,mods$`Kalydeco Date`)
+# Add pancreatic status
+pancreatic = read_excel("./CF Info/Sweat Tests from Internal Database_genotype class_withPancStatus.xlsx")
+pancreatic = pancreatic %>% rename(`Patient ID` = PatientID) %>% select(`Patient ID`,PancreaticStatus)
+# FEV1 and BMI
+fev = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report_PFTs_ThroughDecember2021.xlsx")
+fev = fev %>% select(PatientID,Date,BMI,`FEV1 % pred`) %>% rename(`Patient ID` = PatientID)
+# Merge
+df = full_join(vit,fev,by = c("Patient ID", "Date")) %>% filter(`Patient ID` %in% mods$`Patient ID`)
+df = left_join(df,mods,by = "Patient ID")
+df = left_join(df,pancreatic,by = "Patient ID")
+```
+
+```{r}
+# Counts from Elin
+# patients with CF in our clinical database from 2008- December 2021: 740 total, 474 in our dataset
+ncdb = 740
+# of patients treated with ivacaftor from 2008-2021: 58 total, 47 in dataset
+# of patients treated with trikafta (ETI) from 2008-2021: 228 total, 150 in dataset 
+# of patients treated with ivacaftor followed by ETI – these patients may be counted in both groups: 22 total, 17 in dataset
+# Tim counts
+df$Group = apply(df,1,function(r){
+  if(!is.na(r["Kalydeco Date"]) & is.na(r["Trikafta Date"])){
+    g = "Kalydeco"
+  } else if (is.na(r["Kalydeco Date"]) & !is.na(r["Trikafta Date"])){
+    g = "Trikafta"
+  } else if (!is.na(r["Kalydeco Date"]) & !is.na(r["Trikafta Date"])){
+    g = "Both"
+  }
+  return(g)
+})
+# Two nutrition measures before first mod start
+two_measures = df %>% 
+  mutate(before_first = Date < `First Mod Date` & !is.na(VitaminA_Retinol)) %>% 
+  group_by(`Patient ID`,Group) %>% count(before_first) %>% 
+  filter(before_first == T,n >= 2)
+# At least one nutritional measure and one weight/height measure >= 3 months after first
+after_measure = df %>% 
+  mutate(after_first = (Date >= `First Mod Date` %m+% months(3)) & 
+           !is.na(BMI) & 
+           !is.na(VitaminA_Retinol)) %>%
+  group_by(`Patient ID`,Group) %>% count(after_first) %>%
+  filter(after_first == T,n >= 1)
+# Filter 
+df = df %>% filter(`Patient ID` %in% two_measures & `Patient ID` %in% after_measure)
+```
+
+```{r}
+# Flowchart
+grViz("
+digraph graph2 {
+
+graph [layout = dot]
+
+# node definitions with substituted label text
+node [shape = rectangle, width = 4, fillcolor = Biege]
+a [label = '@@1']
+b [label = '@@2']
+c [label = '@@3']
+d [label = '@@4']
+e [label = '@@5']
+f [label = '@@6']
+g [label = '@@7']
+h [label = '@@8']
+
+a -> b
+b -> c
+c -> d
+c -> e
+c -> f
+}
+
+[1]: paste0('Clinical Database (n = ', ncdb, ')')
+[2]: paste0('Treated with ivacaftor or ETI (or both) from 2008-2021 (n = ', length(unique(mods$`Patient ID`)),')')
+[3]: paste0('In our dataset (n = ',length(unique(df$`Patient ID`)),')')
+[4]: paste0('Treated with ivacaftor alone from 2008-2021 (n = ', n_kaly,')')
+[5]: paste0('Treated with ETI alone from 2008-2021 (n = ', n_tri,')')
+[6]: paste0('Treated with ivacaftor AND ETI from 2008-2021 (n = ',')')
+[7]: paste0('At least two Vitamin A measures (n = ',')')
+[8]: paste0('At least two Vitamin A measures (n = ',')')
+[9]: paste0('At least two Vitamin A measures (n = ',')')
+")
 ```
 
 # Participant Characteristics
@@ -100,60 +156,9 @@ summary(t1,test = F,
                max_years_to_start = "Years to start",max_years_from_start = "Years From start"))
 ```
 
-# Vitamin measures before and after modulator initiation
-
-For each participant, we selected the pre and post visit closest to modulator start (and at least 3 months after start) with both a vitamin A and FEV1 % predicted value measure. Some visits were on different days and had different measures, so some missing values were filled in with the closest value (within 1 month). 
-
-```{r results='asis'}
-nutrition_vars = c("VitaminA_Retinol","X25OH.Vitamin.D","Vitamin.E.Alpha",
-                   "BMI","FEV1...pred")
-# Get the most recent 
-paired_df = df %>% 
-  select(Patient.ID,Before_After,years,first_mod,all_of(nutrition_vars)) %>% 
-  filter(years >= 0.25 | years < 0) %>%
-  mutate(years = round(years,1)) %>%
-  group_by(Patient.ID,years) %>%
-  fill(all_of(nutrition_vars),.direction = "downup") %>%
-  drop_na(any_of(c("VitaminA_Retinol"))) %>%
-  group_by(Patient.ID,Before_After) %>%
-  slice_min(abs(years)) %>% distinct() %>% 
-  arrange(Patient.ID,abs(years)) %>%filter(row_number()==1) 
-paired_df$Before_After = relevel(paired_df$Before_After,ref = "Before")
-
-f = as.formula(paste0("Before_After ~ ",paste0(nutrition_vars,collapse = "+")))
-p = paired(f,data = paired_df,id = Patient.ID)
-summary(p,
-        labelTranslations = list(VitaminA_Retinol = "Vitamin A Retinol",
-                                 X25OH.Vitamin.D = "25OH-Vitamin D",
-                                 Vitamin.E.Alpha = "Vitamin E Alpha",
-                                 first_mod = "First Modulator"))
-```
-
 # Piecewise longitudinal models
 
 ```{r}
-# Set up data again
-vit = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021.xlsx")
-vit = vit %>% select(`Patient ID`,Date,VitaminA_Retinol:`Vitamin E Gamma`)
-# New age at start
-mods = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
-mods = mods[mods$Modulator %in% c('Kalydeco','Trikafta'),]
-mods = mods %>% select(`Patient ID`,Modulator,`Earliest Date in Registry`) %>% 
-  pivot_wider(id_cols = `Patient ID`,names_from = Modulator,
-              values_from = `Earliest Date in Registry`)
-colnames(mods)[2:ncol(mods)] = paste0(colnames(mods)[2:ncol(mods)]," Date")
-mods$`First Mod Date` = pmin(mods$`Trikafta Date`,mods$`Kalydeco Date`,na.rm = T)
-mods$`Second Mod Date` = pmax(mods$`Trikafta Date`,mods$`Kalydeco Date`)
-# Add pancreatic status
-pancreatic = read_excel("./CF Info/Sweat Tests from Internal Database_genotype class_withPancStatus.xlsx")
-pancreatic = pancreatic %>% rename(`Patient ID` = PatientID) %>% select(`Patient ID`,PancreaticStatus)
-# FEV1 and BMI
-fev = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report_PFTs_ThroughDecember2021.xlsx")
-fev = fev %>% select(PatientID,Date,BMI,`FEV1 % pred`) %>% rename(`Patient ID` = PatientID)
-# Merge
-df = full_join(vit,fev) %>% filter(`Patient ID` %in% mods$`Patient ID`,)
-df = left_join(df,mods)
-df = left_join(df,pancreatic)
 # Time relative to first mod
 df$time = as.numeric(difftime(df$Date,df$`First Mod Date`,units = "days"))/365.25
 # Calculate spline things
@@ -163,8 +168,6 @@ df$c2 =
   (as.numeric(difftime(df$Date,df$`Second Mod Date`,units = "days"))/365.25)*(df$Date >= df$`Second Mod Date`)
 # Limit to 3 years prior, select columns
 df = df %>% filter(!is.na(time) & time >= -3) %>% distinct()
-# Vitamin A to numeric
-df$VitaminA_Retinol = suppressWarnings(as.numeric(df$VitaminA_Retinol))
 ```
 
 ```{r}
