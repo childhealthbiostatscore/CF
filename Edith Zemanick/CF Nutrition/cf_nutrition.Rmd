@@ -80,6 +80,7 @@ df$Group = apply(df,1,function(r){
   }
   return(g)
 })
+groups = df %>% group_by(`Patient ID`) %>% filter(row_number()==1)
 # Two nutrition measures before first mod start
 two_measures = df %>% 
   mutate(before_first = Date < `First Mod Date` & !is.na(VitaminA_Retinol)) %>% 
@@ -92,19 +93,20 @@ after_measure = df %>%
            !is.na(VitaminA_Retinol)) %>%
   group_by(`Patient ID`,Group) %>% count(after_first) %>%
   filter(after_first == T,n >= 1,`Patient ID` %in% two_measures$`Patient ID`)
-# Filter
-df = df %>% filter(`Patient ID` %in% after_measure$`Patient ID`)
+# Write merged df
+write.csv(df,file = "./Edith Zemanick/CF Nutrition/Data_Cleaned/merged_data.csv",
+          row.names = F,na="")
+write.csv(mods,file = "./Edith Zemanick/CF Nutrition/Data_Cleaned/modulators.csv",
+          row.names = F,na="")
 ```
 
 ```{r}
 # Flowchart
-grViz("
+g = grViz("
 digraph graph2 {
-
 graph [layout = dot]
-
 # node definitions with substituted label text
-node [shape = rectangle, width = 4, fillcolor = Biege]
+node [shape = rectangle]
 a [label = '@@1']
 b [label = '@@2']
 c [label = '@@3']
@@ -149,6 +151,7 @@ l -> m
 [12]: paste0('At Least One Vitamin A and One BMI Measure >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Both']), ')')
 [13]: paste0('Final (n = ',length(unique(after_measure$`Patient ID`)), ')')
 ")
+g
 ```
 
 # Participant Characteristics
@@ -157,16 +160,16 @@ For each person, we calculated the maximum amount of time from the earliest nutr
 
 ```{r results='asis'}
 df$Sex[df$Sex == ""] = NA
-demo = df %>% group_by(Patient.ID) %>% fill(Sex,.direction = "downup") %>% 
+demo = df %>% group_by(Patient.ID) %>% fill(Sex,.direction = "downup") %>%
   filter(row_number() == 1)
-t1 = tableby(first_mod ~ Age.at.Start..years. + Sex + genoRisk + 
+t1 = tableby(first_mod ~ Age.at.Start..years. + Sex + genoRisk +
                vit_measures_after + vit_measures_before +
-               notest(max_years_to_start,"min","max") + 
+               notest(max_years_to_start,"min","max") +
                notest(max_years_from_start,"min","max"),
              data = demo,
              control = tableby.control(numeric.stats=c("Nmiss", "median", "q1q3"),))
 summary(t1,test = F,
-        labelTranslations = 
+        labelTranslations =
           list(Age.at.Start..years. = "Age at Start (years)",
                genoRisk = "Genotype risk group",
                vit_measures_after = "No. of vitamin measures post",
@@ -180,9 +183,9 @@ summary(t1,test = F,
 # Time relative to first mod
 df$time = as.numeric(difftime(df$Date,df$`First Mod Date`,units = "days"))/365.25
 # Calculate spline things
-df$c1 = 
+df$c1 =
   (df$time-0)*(df$time>=0)
-df$c2 = 
+df$c2 =
   (as.numeric(difftime(df$Date,df$`Second Mod Date`,units = "days"))/365.25)*(df$Date >= df$`Second Mod Date`)
 # Limit to 3 years prior, select columns
 df = df %>% filter(!is.na(time) & time >= -3) %>% distinct()
@@ -219,13 +222,13 @@ piecewise_mod = function(outcome,data,diagnostics = F){
   # Plots
   single_plot_df = m_single@frame
   single_plot_df$pred = predict(m_single)
-  single_plot = ggplot(single_plot_df,aes_string(x = "time",y = outcome,color = "`Patient ID`")) + 
-    geom_line(aes(y = pred)) + 
+  single_plot = ggplot(single_plot_df,aes_string(x = "time",y = outcome,color = "`Patient ID`")) +
+    geom_line(aes(y = pred)) +
     theme_bw() + theme(legend.position = "none") + xlab("Time (years)")
   double_plot_df = m_double@frame
   double_plot_df$pred = predict(m_double)
-  double_plot = ggplot(double_plot_df,aes_string(x = "time",y = outcome,color = "`Patient ID`")) + 
-    geom_line(aes(y = pred)) + 
+  double_plot = ggplot(double_plot_df,aes_string(x = "time",y = outcome,color = "`Patient ID`")) +
+    geom_line(aes(y = pred)) +
     theme_bw() + theme(legend.position = "none") + xlab("Time (years)")
   # Return
   return(list("results_single" = res_single,"results_double" = res_double,
@@ -283,7 +286,7 @@ kable(bmi$results_double,digits = 3)
 ```{r cache=TRUE,echo=TRUE}
 mod_df = df %>% filter(!is.na(age_second)) %>% select(Patient.ID,time,BMI) %>% drop_na()
 model = list(
-  BMI ~ 1, # Plateau 
+  BMI ~ 1, # Plateau
   1 + (1|Patient.ID) ~ 0 + time, # Joined slope
   1 + (1|Patient.ID) ~ 0 + time, # Joined slope
   1 + (1|Patient.ID) ~ 0 + time # Joined slope
