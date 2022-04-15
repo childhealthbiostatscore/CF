@@ -91,9 +91,9 @@ after_measure = df %>%
            !is.na(BMI) & 
            !is.na(VitaminA_Retinol)) %>%
   group_by(`Patient ID`,Group) %>% count(after_first) %>%
-  filter(after_first == T,n >= 1)
-# Filter 
-df = df %>% filter(`Patient ID` %in% two_measures & `Patient ID` %in% after_measure)
+  filter(after_first == T,n >= 1,`Patient ID` %in% two_measures$`Patient ID`)
+# Filter
+df = df %>% filter(`Patient ID` %in% after_measure$`Patient ID`)
 ```
 
 ```{r}
@@ -113,23 +113,41 @@ e [label = '@@5']
 f [label = '@@6']
 g [label = '@@7']
 h [label = '@@8']
+i [label = '@@9']
+j [label = '@@10']
+k [label = '@@11']
+l [label = '@@12']
+m [label = '@@13']
 
 a -> b
 b -> c
 c -> d
 c -> e
 c -> f
+d -> g
+e -> h
+f -> i
+g -> j
+h -> k
+i -> l
+j -> m
+k -> m
+l -> m
 }
 
 [1]: paste0('Clinical Database (n = ', ncdb, ')')
-[2]: paste0('Treated with ivacaftor or ETI (or both) from 2008-2021 (n = ', length(unique(mods$`Patient ID`)),')')
-[3]: paste0('In our dataset (n = ',length(unique(df$`Patient ID`)),')')
-[4]: paste0('Treated with ivacaftor alone from 2008-2021 (n = ', n_kaly,')')
-[5]: paste0('Treated with ETI alone from 2008-2021 (n = ', n_tri,')')
-[6]: paste0('Treated with ivacaftor AND ETI from 2008-2021 (n = ',')')
-[7]: paste0('At least two Vitamin A measures (n = ',')')
-[8]: paste0('At least two Vitamin A measures (n = ',')')
-[9]: paste0('At least two Vitamin A measures (n = ',')')
+[2]: paste0('Treated With Ivacaftor or Trikafta From 2008-2021 (n = ',length(unique(mods$`Patient ID`)), ')')
+[3]: paste0('In Our Dataset (n = ',length(unique(df$`Patient ID`)), ')')
+[4]: paste0('Treated With Ivacaftor Alone From 2008-2021 (n = ',as.numeric(table(groups$Group)['Kalydeco']), ')')
+[5]: paste0('Treated With Trikafta Alone From 2008-2021 (n = ',as.numeric(table(groups$Group)['Trikafta']), ')')
+[6]: paste0('Treated With Ivacaftor followed by Trikafta From 2008-2021 (n = ',as.numeric(table(groups$Group)['Both']), ')')
+[7]: paste0('At Least Two Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Kalydeco']), ')')
+[8]: paste0('At Least Two Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Trikafta']), ')')
+[9]: paste0('At Least Two Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Both']), ')')
+[10]: paste0('At Least One Vitamin A and One BMI Measure >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Kalydeco']), ')')
+[11]: paste0('At Least One Vitamin A and One BMI Measure >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Trikafta']), ')')
+[12]: paste0('At Least One Vitamin A and One BMI Measure >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Both']), ')')
+[13]: paste0('Final (n = ',length(unique(after_measure$`Patient ID`)), ')')
 ")
 ```
 
