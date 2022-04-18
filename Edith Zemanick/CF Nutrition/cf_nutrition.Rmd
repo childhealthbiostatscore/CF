@@ -60,37 +60,6 @@ fev = fev %>% select(PatientID,Date,BMI,`FEV1 % pred`) %>% rename(`Patient ID` =
 df = full_join(vit,fev,by = c("Patient ID", "Date")) %>% filter(`Patient ID` %in% mods$`Patient ID`)
 df = left_join(df,mods,by = "Patient ID")
 df = left_join(df,pancreatic,by = "Patient ID")
-# Match close dates 
-df_list = split.data.frame(df,df$`Patient ID`)
-t = df_list[[1]]
-lapply(df_list, function(d){
-  d = d %>% arrange(Date)
-  # Calculate difference between all dates (in seconds)
-  dis = as.matrix(dist(d$Date))
-  # Which within 3 months
-  pairs = as.data.frame(which(dis <= 24*60*60*90 & lower.tri(dis),arr.ind = T))
-  # Groups
-  group = NA
-  length(group) = nrow(pairs)
-  g = 1
-  for (i in 1:length(group)) {
-    if (i == 1){
-      group[i] = 1 
-      next
-    } else {
-      k = j
-      j = as.numeric(pairs[i,])
-      if(length(intersect(j,k)) == 0){
-        g = g + 1
-      }
-      group[i] = g
-    }
-  }
-  pairs$group = group
-  # Add to d
-  d$group = seq(from = max(pairs$group)+1,by = 1,length.out = nrow(d))
-  d$group[pairs$row] = pairs$group
-})
 ```
 
 ```{r}
@@ -120,10 +89,9 @@ two_measures = df %>%
 # At least one nutritional measure and one weight/height measure >= 3 months after first
 after_measure = df %>% 
   mutate(after_first = (Date >= `First Mod Date` %m+% months(3)) & 
-           !is.na(BMI) & 
            !is.na(VitaminA_Retinol)) %>%
   group_by(`Patient ID`,Group) %>% count(after_first) %>%
-  filter(after_first == T,n >= 1,`Patient ID` %in% two_measures$`Patient ID`)
+  filter(after_first == T,n >= 1)
 # Write merged df
 write.csv(df,file = "./Edith Zemanick/CF Nutrition/Data_Cleaned/merged_data.csv",
           row.names = F,na="")
@@ -177,174 +145,176 @@ l -> m
 [7]: paste0('At Least Two Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Kalydeco']), ')')
 [8]: paste0('At Least Two Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Trikafta']), ')')
 [9]: paste0('At Least Two Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Both']), ')')
-[10]: paste0('At Least One Vitamin A and One BMI Measure >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Kalydeco']), ')')
-[11]: paste0('At Least One Vitamin A and One BMI Measure >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Trikafta']), ')')
-[12]: paste0('At Least One Vitamin A and One BMI Measure >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Both']), ')')
+[10]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Kalydeco']), ')')
+[11]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Trikafta']), ')')
+[12]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Both']), ')')
 [13]: paste0('Final (n = ',length(unique(after_measure$`Patient ID`)), ')')
 ")
 g
 ```
 
-# Participant Characteristics
+<!-- # Participant Characteristics -->
 
-For each person, we calculated the maximum amount of time from the earliest nutrition measure before modulator start to start date, and the amount of time from modulator start date to most recent nutrition measure. The ranges of these values are presented below ("Years to start" and "Years From start," respectively).
+<!-- For each person, we calculated the maximum amount of time from the earliest nutrition measure before modulator start to start date, and the amount of time from modulator start date to most recent nutrition measure. The ranges of these values are presented below ("Years to start" and "Years From start," respectively). -->
 
-```{r results='asis'}
-df$Sex[df$Sex == ""] = NA
-demo = df %>% group_by(Patient.ID) %>% fill(Sex,.direction = "downup") %>%
-  filter(row_number() == 1)
-t1 = tableby(first_mod ~ Age.at.Start..years. + Sex + genoRisk +
-               vit_measures_after + vit_measures_before +
-               notest(max_years_to_start,"min","max") +
-               notest(max_years_from_start,"min","max"),
-             data = demo,
-             control = tableby.control(numeric.stats=c("Nmiss", "median", "q1q3"),))
-summary(t1,test = F,
-        labelTranslations =
-          list(Age.at.Start..years. = "Age at Start (years)",
-               genoRisk = "Genotype risk group",
-               vit_measures_after = "No. of vitamin measures post",
-               vit_measures_before = "No. of vitamin measures pre",
-               max_years_to_start = "Years to start",max_years_from_start = "Years From start"))
-```
+<!-- ```{r results='asis'} -->
+<!-- df$Sex[df$Sex == ""] = NA -->
+<!-- demo = df %>% group_by(Patient.ID) %>% fill(Sex,.direction = "downup") %>% -->
+<!--   filter(row_number() == 1) -->
+<!-- t1 = tableby(first_mod ~ Age.at.Start..years. + Sex + genoRisk + -->
+<!--                vit_measures_after + vit_measures_before + -->
+<!--                notest(max_years_to_start,"min","max") + -->
+<!--                notest(max_years_from_start,"min","max"), -->
+<!--              data = demo, -->
+<!--              control = tableby.control(numeric.stats=c("Nmiss", "median", "q1q3"),)) -->
+<!-- summary(t1,test = F, -->
+<!--         labelTranslations = -->
+<!--           list(Age.at.Start..years. = "Age at Start (years)", -->
+<!--                genoRisk = "Genotype risk group", -->
+<!--                vit_measures_after = "No. of vitamin measures post", -->
+<!--                vit_measures_before = "No. of vitamin measures pre", -->
+<!--                max_years_to_start = "Years to start",max_years_from_start = "Years From start")) -->
+<!-- ``` -->
 
-# Piecewise longitudinal models
+<!-- # Piecewise longitudinal models -->
 
-```{r}
-# Time relative to first mod
-df$time = as.numeric(difftime(df$Date,df$`First Mod Date`,units = "days"))/365.25
-# Calculate spline things
-df$c1 =
-  (df$time-0)*(df$time>=0)
-df$c2 =
-  (as.numeric(difftime(df$Date,df$`Second Mod Date`,units = "days"))/365.25)*(df$Date >= df$`Second Mod Date`)
-# Limit to 3 years prior, select columns
-df = df %>% filter(!is.na(time) & time >= -3) %>% distinct()
-```
+<!-- ```{r} -->
+<!-- # Time relative to first mod -->
+<!-- df$time = as.numeric(difftime(df$Date,df$`First Mod Date`,units = "days"))/365.25 -->
+<!-- # Calculate spline things -->
+<!-- df$c1 = -->
+<!--   (df$time-0)*(df$time>=0) -->
+<!-- df$c2 = -->
+<!--   (as.numeric(difftime(df$Date,df$`Second Mod Date`,units = "days"))/365.25)*(df$Date >= df$`Second Mod Date`) -->
+<!-- # Limit to 3 years prior, select columns -->
+<!-- df = df %>% filter(!is.na(time) & time >= -3) %>% distinct() -->
+<!-- ``` -->
 
-```{r}
-piecewise_mod = function(outcome,data,diagnostics = F){
-  data$`Patient ID` = as.factor(data$`Patient ID`)
-  data = data %>% select(`Patient ID`,Date,`First Mod Date`,`Second Mod Date`,PancreaticStatus,BMI,
-                         all_of(outcome)) %>% drop_na(all_of(outcome))
-  # Separate data for single and double mods
-  single = data %>% filter(c2 <= 0 | is.na(c2))
-  double = data %>% filter(!is.na(c2))
-  # Models
-  f_single = as.formula(paste0(outcome,"~ BMI + PancreaticStatus + time + c1 + (1|`Patient ID`)"))
-  f_double = as.formula(paste0(outcome,"~ BMI + PancreaticStatus + time + c1 +c2 + (1|`Patient ID`)"))
-  if(outcome == "BMI"){
-    f_single = update(f_single,.~.-BMI)
-    f_double = update(f_double,.~.-BMI)
-  }
-  m_single = lmer(f_single,data = single)
-  m_double = lmer(f_double,data = double)
-  # Diagnostics if required
-  if(diagnostics){
-    check_single = check_model(m_single)
-    check_double = check_model(m_double)
-  } else {
-    check_single = NULL
-    check_double = NULL
-  }
-  # Results
-  res_single = tidy(m_single,"fixed")
-  res_double = tidy(m_double,"fixed")
-  # Plots
-  single_plot_df = m_single@frame
-  single_plot_df$pred = predict(m_single)
-  single_plot = ggplot(single_plot_df,aes_string(x = "time",y = outcome,color = "`Patient ID`")) +
-    geom_line(aes(y = pred)) +
-    theme_bw() + theme(legend.position = "none") + xlab("Time (years)")
-  double_plot_df = m_double@frame
-  double_plot_df$pred = predict(m_double)
-  double_plot = ggplot(double_plot_df,aes_string(x = "time",y = outcome,color = "`Patient ID`")) +
-    geom_line(aes(y = pred)) +
-    theme_bw() + theme(legend.position = "none") + xlab("Time (years)")
-  # Return
-  return(list("results_single" = res_single,"results_double" = res_double,
-              "diagnostics_single" = check_single,"diagnostics_double" = check_double,
-              "plot_single" = single_plot,"plot_double" = double_plot))
-}
-```
+<!-- ```{r} -->
+<!-- piecewise_mod = function(outcome,data,diagnostics = F){ -->
+<!--   data$`Patient ID` = as.factor(data$`Patient ID`) -->
+<!--   data = data %>% select(`Patient ID`,Date,`First Mod Date`,`Second Mod Date`,PancreaticStatus,BMI, -->
+<!--                          all_of(outcome)) %>% drop_na(all_of(outcome)) -->
+<!--   # Separate data for single and double mods -->
+<!--   single = data %>% filter(c2 <= 0 | is.na(c2)) -->
+<!--   double = data %>% filter(!is.na(c2)) -->
+<!--   # Models -->
+<!--   f_single = as.formula(paste0(outcome,"~ BMI + PancreaticStatus + time + c1 + (1|`Patient ID`)")) -->
+<!--   f_double = as.formula(paste0(outcome,"~ BMI + PancreaticStatus + time + c1 +c2 + (1|`Patient ID`)")) -->
+<!--   if(outcome == "BMI"){ -->
+<!--     f_single = update(f_single,.~.-BMI) -->
+<!--     f_double = update(f_double,.~.-BMI) -->
+<!--   } -->
+<!--   m_single = lmer(f_single,data = single) -->
+<!--   m_double = lmer(f_double,data = double) -->
+<!--   # Diagnostics if required -->
+<!--   if(diagnostics){ -->
+<!--     check_single = check_model(m_single) -->
+<!--     check_double = check_model(m_double) -->
+<!--   } else { -->
+<!--     check_single = NULL -->
+<!--     check_double = NULL -->
+<!--   } -->
+<!--   # Results -->
+<!--   res_single = tidy(m_single,"fixed") -->
+<!--   res_double = tidy(m_double,"fixed") -->
+<!--   # Plots -->
+<!--   single_plot_df = m_single@frame -->
+<!--   single_plot_df$pred = predict(m_single) -->
+<!--   single_plot = ggplot(single_plot_df,aes_string(x = "time",y = outcome,color = "`Patient ID`")) + -->
+<!--     geom_line(aes(y = pred)) + -->
+<!--     theme_bw() + theme(legend.position = "none") + xlab("Time (years)") -->
+<!--   double_plot_df = m_double@frame -->
+<!--   double_plot_df$pred = predict(m_double) -->
+<!--   double_plot = ggplot(double_plot_df,aes_string(x = "time",y = outcome,color = "`Patient ID`")) + -->
+<!--     geom_line(aes(y = pred)) + -->
+<!--     theme_bw() + theme(legend.position = "none") + xlab("Time (years)") -->
+<!--   # Return -->
+<!--   return(list("results_single" = res_single,"results_double" = res_double, -->
+<!--               "diagnostics_single" = check_single,"diagnostics_double" = check_double, -->
+<!--               "plot_single" = single_plot,"plot_double" = double_plot)) -->
+<!-- } -->
+<!-- ``` -->
 
-In the following models, the "time" estimate represents the slope prior to first modulator start, "c1" is the change in slope after first modulator start, and "c2" is the change in slope from first modulator to second. All models were adjusted for BMI and pancreatic status (except the BMI model, which was only adjusted for pancreatic status).
+<!-- In the following models, the "time" estimate represents the slope prior to first modulator start, "c1" is the change in slope after first modulator start, and "c2" is the change in slope from first modulator to second. All models were adjusted for BMI and pancreatic status (except the BMI model, which was only adjusted for pancreatic status). -->
 
-## Vitamin A
+<!-- ## Vitamin A -->
 
-```{r}
-vita = piecewise_mod(outcome = "VitaminA_Retinol",data = df,diagnostics = T)
-```
+<!-- ```{r} -->
+<!-- vita = piecewise_mod(outcome = "VitaminA_Retinol",data = df,diagnostics = T) -->
+<!-- ``` -->
 
-### Single modulator
+<!-- ### Single modulator -->
 
-```{r results='asis'}
-vita$plot_single
-kable(vita$results_single,digits = 3)
-```
+<!-- ```{r results='asis'} -->
+<!-- vita$plot_single -->
+<!-- kable(vita$results_single,digits = 3) -->
+<!-- ``` -->
 
-### Double modulator
+<!-- ### Double modulator -->
 
-```{r results='asis'}
-vita$plot_double
-kable(vita$results_double,digits = 3)
-```
+<!-- ```{r results='asis'} -->
+<!-- vita$plot_double -->
+<!-- kable(vita$results_double,digits = 3) -->
+<!-- ``` -->
 
-## BMI
+<!-- ## BMI -->
 
-```{r}
-bmi = piecewise_mod(outcome = "BMI",data = df,diagnostics = T)
-```
+<!-- ```{r} -->
+<!-- bmi = piecewise_mod(outcome = "BMI",data = df,diagnostics = T) -->
+<!-- ``` -->
 
-### Single modulator
+<!-- ### Single modulator -->
 
-```{r results='asis'}
-bmi$plot_single
-kable(bmi$results_single,digits = 3)
-```
+<!-- ```{r results='asis'} -->
+<!-- bmi$plot_single -->
+<!-- kable(bmi$results_single,digits = 3) -->
+<!-- ``` -->
 
-### Double modulator
+<!-- ### Double modulator -->
 
-```{r results='asis'}
-bmi$plot_double
-kable(bmi$results_double,digits = 3)
-```
+<!-- ```{r results='asis'} -->
+<!-- bmi$plot_double -->
+<!-- kable(bmi$results_double,digits = 3) -->
+<!-- ``` -->
 
-# Bayesian?
+<!-- # Bayesian? -->
 
-## BMI
+<!-- ## BMI -->
 
-```{r cache=TRUE,echo=TRUE}
-mod_df = df %>% filter(!is.na(age_second)) %>% select(Patient.ID,time,BMI) %>% drop_na()
-model = list(
-  BMI ~ 1, # Plateau
-  1 + (1|Patient.ID) ~ 0 + time, # Joined slope
-  1 + (1|Patient.ID) ~ 0 + time, # Joined slope
-  1 + (1|Patient.ID) ~ 0 + time # Joined slope
-)
-fit = mcp(model, data = mod_df,sample = "both")
-```
+<!-- ```{r cache=TRUE,echo=TRUE} -->
+<!-- mod_df = df %>% filter(!is.na(age_second)) %>% select(Patient.ID,time,BMI) %>% drop_na() -->
+<!-- model = list( -->
+<!--   BMI ~ 1, # Plateau -->
+<!--   1 + (1|Patient.ID) ~ 0 + time, # Joined slope -->
+<!--   1 + (1|Patient.ID) ~ 0 + time, # Joined slope -->
+<!--   1 + (1|Patient.ID) ~ 0 + time # Joined slope -->
+<!-- ) -->
+<!-- fit = mcp(model, data = mod_df,sample = "both") -->
+<!-- ``` -->
 
-### Posterior means
+<!-- ### Posterior means -->
 
-```{r}
-summary(fit)
-```
+<!-- ```{r} -->
+<!-- summary(fit) -->
+<!-- ``` -->
 
-### Posterior fit
+<!-- ### Posterior fit -->
 
-```{r}
-plot(fit,q_fit = TRUE) + theme_bw()
-```
+<!-- ```{r} -->
+<!-- plot(fit,q_fit = TRUE) + theme_bw() -->
+<!-- ``` -->
 
-### Parameter plot
+<!-- ### Parameter plot -->
 
-```{r}
-plot_pars(fit)
-```
+<!-- ```{r} -->
+<!-- plot_pars(fit) -->
+<!-- ``` -->
 
-### Hypothesis tests
+<!-- ### Hypothesis tests -->
 
-```{r}
-hypothesis(fit,c("cp_1 = 0","cp_2 = 0","cp_3 = 0"))
-```
+<!-- ```{r} -->
+<!-- hypothesis(fit,c("cp_1 = 0","cp_2 = 0","cp_3 = 0")) -->
+<!-- ``` -->
+
+<!-- t -->
