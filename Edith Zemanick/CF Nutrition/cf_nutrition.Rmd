@@ -60,6 +60,37 @@ fev = fev %>% select(PatientID,Date,BMI,`FEV1 % pred`) %>% rename(`Patient ID` =
 df = full_join(vit,fev,by = c("Patient ID", "Date")) %>% filter(`Patient ID` %in% mods$`Patient ID`)
 df = left_join(df,mods,by = "Patient ID")
 df = left_join(df,pancreatic,by = "Patient ID")
+# Match close dates 
+df_list = split.data.frame(df,df$`Patient ID`)
+t = df_list[[1]]
+lapply(df_list, function(d){
+  d = d %>% arrange(Date)
+  # Calculate difference between all dates (in seconds)
+  dis = as.matrix(dist(d$Date))
+  # Which within 3 months
+  pairs = as.data.frame(which(dis <= 24*60*60*90 & lower.tri(dis),arr.ind = T))
+  # Groups
+  group = NA
+  length(group) = nrow(pairs)
+  g = 1
+  for (i in 1:length(group)) {
+    if (i == 1){
+      group[i] = 1 
+      next
+    } else {
+      k = j
+      j = as.numeric(pairs[i,])
+      if(length(intersect(j,k)) == 0){
+        g = g + 1
+      }
+      group[i] = g
+    }
+  }
+  pairs$group = group
+  # Add to d
+  d$group = seq(from = max(pairs$group)+1,by = 1,length.out = nrow(d))
+  d$group[pairs$row] = pairs$group
+})
 ```
 
 ```{r}
