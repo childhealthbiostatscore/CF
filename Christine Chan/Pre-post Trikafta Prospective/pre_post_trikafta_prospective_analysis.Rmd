@@ -17,6 +17,7 @@ library(performance)
 library(cgmanalysis)
 library(AGD)
 library(pracma)
+library(corrplot)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE,warning = FALSE)
 if(Sys.info()["sysname"] == "Windows"){
@@ -292,7 +293,31 @@ summary(p,pfootnote = T,labelTranslations = newlabels)
 
 Unable to perform statistical tests due to too many missing values.
 
-# Figures
+# Correlations
+
+White text indicates the correlation coefficient $R$, and results are only shown for correlations significant at the p < 0.05 level.
+
+```{r fig.width=10,fig.height=10}
+change_df = df %>% group_by(Study.ID) %>% 
+  summarise_at(vars(Weight..kg.,c.peptide.0.minute,`C Peptide Index`,
+                    `Adapted Matsuda`,`C Peptide ODI`,iAUC_ratio,homa2B:homa2IR),
+               .funs = diff) %>%
+  rename("Change in Weight (kg)" = Weight..kg.,
+         "Change in Fasting C-Peptide (pmol/L)" = c.peptide.0.minute,
+         "Change in C Peptide Index" = `C Peptide Index`,
+         "Change in Adapted Matsuda" = `Adapted Matsuda`,
+         "Change in C Peptide ODI" = `C Peptide ODI`,
+         "Change in C pep iAUC:Glucose iAUC" = iAUC_ratio,
+         "Change in HOMA2 %B" = homa2B, "Change in HOMA2 %S" = homa2S,
+         "Change in HOMA2 IR" = homa2IR)
+
+M = cor(change_df[,2:ncol(change_df)])
+testRes = cor.mtest(change_df[,2:ncol(change_df)])
+corrplot(M, p.mat = testRes$p, method = 'circle', type = 'lower', insig='blank',
+         addCoef.col ='white', number.cex = 0.8, order = 'AOE', diag=FALSE)
+```
+
+# Other Figures
 
 ## HbA1c
 
@@ -346,6 +371,8 @@ ggplot(plot_df,aes(x = name,y = m,color = Event.Name)) +
   xlab("Time (minutes)") + ylab("Insulin (mcU/mL)") + 
   theme_bw()
 ```
+
+
 
 # Notes
 
