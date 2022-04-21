@@ -80,20 +80,26 @@ df$Group = apply(df,1,function(r){
   }
   return(g)
 })
+# "Our dataset"
+sweat = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report Electrolytes_throughDecember2021.xlsx")
+df = df %>% filter(`Patient ID` %in% sweat$`Patient ID`)
 groups = df %>% group_by(`Patient ID`) %>% filter(row_number()==1)
 # Two nutrition measures before first mod start
 two_measures = df %>% 
   mutate(before_first = Date < `First Mod Date` & !is.na(VitaminA_Retinol)) %>% 
   group_by(`Patient ID`,Group) %>% count(before_first) %>% 
-  filter(before_first == T,n >= 2)
+  filter(before_first == T,n >= 1)
 # At least one nutritional measure and one weight/height measure >= 3 months after first
 after_measure = df %>% 
   mutate(after_first = (Date >= `First Mod Date` %m+% months(3)) & 
            !is.na(VitaminA_Retinol)) %>%
   group_by(`Patient ID`,Group) %>% count(after_first) %>%
   filter(after_first == T,n >= 1)
-# Write merged df
-write.csv(df,file = "./Edith Zemanick/CF Nutrition/Data_Cleaned/merged_data.csv",
+# Write merged df - filter to just Vitamin A values
+t = df %>% 
+  mutate(`Pre/Post First Mod` = ifelse(Date > `First Mod Date`,"Post","Pre")) %>%
+  filter(!is.na(VitaminA_Retinol)) 
+write.csv(t,file = "./Edith Zemanick/CF Nutrition/Data_Cleaned/merged_data.csv",
           row.names = F,na="")
 write.csv(mods,file = "./Edith Zemanick/CF Nutrition/Data_Cleaned/modulators.csv",
           row.names = F,na="")
@@ -138,13 +144,13 @@ l -> m
 
 [1]: paste0('Clinical Database (n = ', ncdb, ')')
 [2]: paste0('Treated With Ivacaftor or Trikafta From 2008-2021 (n = ',length(unique(mods$`Patient ID`)), ')')
-[3]: paste0('In Our Dataset (n = ',length(unique(df$`Patient ID`)), ')')
+[3]: paste0('In Our Dataset (n = ',length(intersect(mods$`Patient ID`,sweat$`Patient ID`)), ')')
 [4]: paste0('Treated With Ivacaftor Alone From 2008-2021 (n = ',as.numeric(table(groups$Group)['Kalydeco']), ')')
 [5]: paste0('Treated With Trikafta Alone From 2008-2021 (n = ',as.numeric(table(groups$Group)['Trikafta']), ')')
 [6]: paste0('Treated With Ivacaftor followed by Trikafta From 2008-2021 (n = ',as.numeric(table(groups$Group)['Both']), ')')
-[7]: paste0('At Least Two Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Kalydeco']), ')')
-[8]: paste0('At Least Two Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Trikafta']), ')')
-[9]: paste0('At Least Two Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Both']), ')')
+[7]: paste0('At Least One Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Kalydeco']), ')')
+[8]: paste0('At Least One Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Trikafta']), ')')
+[9]: paste0('At Least One Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Both']), ')')
 [10]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Kalydeco']), ')')
 [11]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Trikafta']), ')')
 [12]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Both']), ')')
