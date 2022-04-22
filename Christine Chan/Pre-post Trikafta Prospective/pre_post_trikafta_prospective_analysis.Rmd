@@ -72,9 +72,6 @@ cgm$Event.Name =
   str_extract(tolower(cgm$subject_id),"visit\\d{1}|visit \\d{1}|yr\\d{1}|year\\d{1}|year \\d{1}")
 cgm$Event.Name = paste("Visit",gsub("[[:alpha:]]|\\s","",cgm$Event.Name))
 df = left_join(df,cgm,by = c("Study.ID", "Event.Name"))
-keep_a1c = df %>% group_by(Study.ID) %>% 
-  summarise(n = sum(!is.na(A1C.result))) %>%
-  filter(n == 2) %>% pull(Study.ID)
 # Update DXA variables
 dxa_vars = c("Tissue..g.","Total.Fat.Mass....","Fat.Body.Mass..g.","Fat.Free.Mass..g.",
             "Lean.Body.Mass..g.","Total.Mass..kg.","Fat.Free.Mass..",
@@ -137,7 +134,7 @@ t1 = tableby(~Age.at.visit.+Weight..kg.+weightz+trikafta_duration+
                Sex..Male.1.+BMIz+FEV1..+FVC....+trikafta_duration+
                Genotype+Pancreatic.Status+Kalydeco+Orkambi+Symdeko,
              control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),
-             data = df[df$Event.Name == "Visit 1" & df$Study.ID %in% keep_a1c,])
+             data = df[df$Event.Name == "Visit 1",])
 summary(t1,digits = 2,labelTranslations = newlabels)
 ```
 
@@ -258,7 +255,7 @@ t2_vars = c("A1C.result","Weight..kg.","weightz","BMIz","FEV1..","FVC....",
             "percent_time_over_140","percent_time_over_180","percent_time_over_250",
             "percent_time_under_70","percent_time_under_54","standard_deviation","cv","r_mage")
 f = as.formula(paste0("Event.Name ~ ",paste0(t2_vars,collapse = "+")))
-p <- paired(f,data = df[df$Study.ID %in% keep_a1c,], id = Study.ID,numeric.test = "signed.rank",signed.rank.exact = F,
+p <- paired(f,data = df, id = Study.ID,numeric.test = "signed.rank",signed.rank.exact = F,
             control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),)
 summary(p,pfootnote = T,labelTranslations = newlabels)
 ```
@@ -283,7 +280,7 @@ The following table includes `r as.numeric(table(df[df$Event.Name == "Visit 1","
 
 ```{r results='asis'}
 f = as.formula(paste0("Event.Name ~ ",paste0(t2_vars,collapse = "+")))
-p <- paired(f,data = df[df$Study.ID %in% keep_a1c,], id = Study.ID,numeric.test = "signed.rank",signed.rank.exact = F,
+p <- paired(f,data = df, id = Study.ID,numeric.test = "signed.rank",signed.rank.exact = F,
             control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),
             strata = `Age Group`)
 summary(p,pfootnote = T,labelTranslations = newlabels)

@@ -68,7 +68,7 @@ um = um %>% filter(!is.na(CFRD.Status))
 df = full_join(df,um)
 # Filter and fill constants
 df = df %>% group_by(CFF.ID) %>% fill(DOB,Start:CFRD.Diagnosis.Date,.direction = "downup") %>%
-  ungroup() %>% filter(!is.na(Time),abs(Time) <= 365,!is.na(CFF.ID),
+  ungroup() %>% filter(!is.na(Time),abs(Time) <= 730,!is.na(CFF.ID),
                        (!is.na(CFRD.Diagnosis.Date) | !is.na(CFRD.Status) | site == "UW")) %>%
   select(-MRN) %>% select(CFF.ID,site,DOB,Start,everything()) %>% rename(Site = "site")
 df$Sex = as.factor(df$Sex)
@@ -107,10 +107,30 @@ df$ppFVC = pctpred_GLI(df$Age,df$Height/100,gender = as.numeric(df$Sex),
             ethnicity = new[match(df$Race, old)],
             FEV1 = df$FVC)
 # Before or after start
-df$Before_After = cut(df$Time,c(-Inf,0,Inf),labels = c("Before","After"),right = F)
-# Most recent before/after
-most_recent = df %>% group_by(CFF.ID,Before_After) %>% slice_min(abs(Time))
+df$Before_After = cut(df$Time,c(-Inf,0,Inf),labels = c("Before","After"),right = T)
+# Sort
+df = df %>% arrange(Site,CFF.ID,Date)
+# Write sorted DF
+write.csv(df, file = "./Colleen Wood/Prepost Triakfta/Data_Cleaned/analysis_data_with_UM.csv",
+          row.names = F,na = "")
+# Most recent before/after - limit to 2 years before start
+# Want the value closest to start date before start, and most recent with respect to now from start
+# (i.e. the longest time after start)
+most_recent = df %>% group_by(CFF.ID,Site,Before_After) %>%
+  mutate(time_new = max(Time) - Time) %>%
+  arrange(time_new) %>% 
+  summarise(BMIz = first(na.omit(BMIz)),ppFEV = first(na.omit(ppFEV)),
+            ppFVC = first(na.omit(ppFVC))) %>%
+  arrange(Site,CFF.ID,Before_After)
+t = df %>% select(CFF.ID,Site,Date,Time,Before_After,BMIz,ppFEV,ppFVC) %>%
+  group_by(CFF.ID,Site,Before_After) %>%
+  arrange(Site,CFF.ID,Before_After)
+keep = most_recent %>% group_by(CFF.ID) %>% count() %>% filter(n == 2)
 ```
+
+# Participant Characteristics
+
+
 
 # Pre-post
 
