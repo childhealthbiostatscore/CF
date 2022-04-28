@@ -51,6 +51,9 @@ date_vars = c("DOB","Start","Date")
 df[,date_vars] = lapply(df[,date_vars], function(d){
   parse_date_time(d,orders = c("mdy","ymd","dmy"),quiet = T)
 })
+# Fix incorrect century (WHY LUBRIDATE WHY?!)
+df$DOB[which(df$DOB > lubridate::mdy("1/1/2022"))] = 
+  df$DOB[which(df$DOB > lubridate::mdy("1/1/2022"))] - years(100)
 # Time from start and filtering
 df = df %>% group_by(CFF.ID) %>% fill(Start,.direction = "downup")
 df = df %>% mutate(Time = as.numeric(difftime(Date,Start,units = "days"))) 
@@ -65,6 +68,7 @@ um = full_join(um,um_ogtt)
 um = full_join(um,um_pfts)
 um = left_join(um,um_demo)
 um = um %>% filter(!is.na(CFRD.Status))
+um$Age = um$Age / 365.25
 df = full_join(df,um)
 # Filter and fill constants
 df = df %>% group_by(CFF.ID) %>% fill(DOB,Start:CFRD.Diagnosis.Date,.direction = "downup") %>%
@@ -74,7 +78,7 @@ df = df %>% group_by(CFF.ID) %>% fill(DOB,Start:CFRD.Diagnosis.Date,.direction =
 df$Sex = as.factor(df$Sex)
 levels(df$Sex) = c("F","M")
 # BMI category
-df$Age = pmax(as.numeric(difftime(df$Date,df$DOB,units = "days")),df$Age,na.rm = T)/365.25
+df$Age = pmax(as.numeric(difftime(df$Date,df$DOB,units = "days"))/365.25,df$Age,na.rm = T)
 # Treat adults as age = 20
 df$Age_for_BMI = ifelse(df$Age > 20,20,df$Age)
 df$BMIz = y2z(df$BMI,x = df$Age_for_BMI,sex = df$Sex,ref=nl4.bmi)
@@ -109,10 +113,13 @@ df$ppFVC = pctpred_GLI(df$Age,df$Height/100,gender = as.numeric(df$Sex),
 # Before or after start
 df$Before_After = cut(df$Time,c(-Inf,0,Inf),labels = c("Before","After"),right = T)
 # Sort
-df = df %>% arrange(Site,CFF.ID,Date)
+df = df %>% arrange(Site,CFF.ID,Date) %>% distinct()
 # Write sorted DF
 write.csv(df, file = "./Colleen Wood/Prepost Triakfta/Data_Cleaned/analysis_data_with_UM.csv",
           row.names = F,na = "")
+```
+
+```{r}
 # Most recent before/after - limit to 2 years before start
 # Want the value closest to start date before start, and most recent with respect to now from start
 # (i.e. the longest time after start)
