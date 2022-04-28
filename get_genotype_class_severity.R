@@ -40,9 +40,6 @@ get_cf_genotype_class_severity = function(genotypes,out = "severity",na_unknown 
                            "Q1209P","Unknown","Unknown","S492F","Unknown","Mild",
                            "R1066H","Unknown","Unknown","M1101K","Unknown","Severe",
                            "CFTRdele1","Unknown","Severe"),ncol = 3,byrow = T)
-  
-  
-  
   colnames(severity_only) = c("Genotype","Class","Severity")
   severity_only[,1] = tolower(gsub("[[:punct:]]|\\s","",severity_only[,1]))
   geno = rbind(geno,severity_only)

@@ -31,6 +31,7 @@ if(Sys.info()["sysname"] == "Windows"){
 } else if (Sys.info()["sysname"] == "Darwin"){
   home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
 }
+source("~/GitHub/CF/get_genotype_class_severity.R")
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
@@ -83,6 +84,8 @@ df$Age = pmax(as.numeric(difftime(df$Date,df$DOB,units = "days"))/365.25,df$Age,
 df$Age_for_BMI = ifelse(df$Age > 20,20,df$Age)
 df$BMIz = y2z(df$BMI,x = df$Age_for_BMI,sex = df$Sex,ref=nl4.bmi)
 df$BMIz[is.infinite(df$BMIz)] = NA
+df$BMI.Percentile = pnorm(df$BMIz)*100
+df$Weightz = y2z(df$Weight,x = df$Age_for_BMI,sex = df$Sex,ref=nl4.wgt)
 df$BMI_group = apply(df,1,function(r){
   age = as.numeric(r["Age"])
   if(!is.na(age) & age > 19){
@@ -101,6 +104,9 @@ df$BMI_group = apply(df,1,function(r){
 df$BMI_group = as.factor(df$BMI_group)
 df$BMI_group = ordered(df$BMI_group,c("Under Weight","Normal Weight","Overweight",
                                       "Obese (Class I)","Obese (Class II)","Obese (Class III+)"))
+# Get genotype severity
+df$Genotype1_sev = get_cf_genotype_class_severity(df$Genotypes1)
+df$Genotype2_sev = get_cf_genotype_class_severity(df$Genotypes2)
 # PFTs
 old <- c("Caucasian","Black","Other")
 new <- c(1,2,5)
@@ -110,6 +116,9 @@ df$ppFEV = pctpred_GLI(df$Age,df$Height/100,gender = as.numeric(df$Sex),
 df$ppFVC = pctpred_GLI(df$Age,df$Height/100,gender = as.numeric(df$Sex),
             ethnicity = new[match(df$Race, old)],
             FEV1 = df$FVC)
+# T1D duration
+df$CFRD.Diagnosis.Date = mdy(df$CFRD.Diagnosis.Date)
+df$T1D.Duration = as.numeric(difftime(df$Date,df$CFRD.Diagnosis.Date,units = "days"))/365.25
 # Before or after start
 df$Before_After = cut(df$Time,c(-Inf,0,Inf),labels = c("Before","After"),right = T)
 # Sort
@@ -124,15 +133,31 @@ write.csv(df, file = "./Colleen Wood/Prepost Triakfta/Data_Cleaned/analysis_data
 # Want the value closest to start date before start, and most recent with respect to now from start
 # (i.e. the longest time after start)
 most_recent = df %>% group_by(CFF.ID,Site,Before_After) %>%
+  filter(Time > -2*365) %>%
   mutate(time_new = max(Time) - Time) %>%
   arrange(time_new) %>% 
-  summarise(BMIz = first(na.omit(BMIz)),ppFEV = first(na.omit(ppFEV)),
-            ppFVC = first(na.omit(ppFVC))) %>%
+  summarise(Age = first(na.omit(Age)),BMI.Percentile = first(na.omit(BMI.Percentile)),
+            Weight = first(na.omit(Weight)),Sex = first(na.omit(Sex)),
+            T1D.Duration = first(na.omit(T1D.Duration)),
+            G.tube.in.past.12.months = first(na.omit(G.tube.in.past.12.months)),
+            Pancreatic.Status = first(na.omit(Pancreatic.Status)),
+            Genotype1_sev = first(na.omit(Genotype1_sev)),
+            Genotype2_sev = first(na.omit(Genotype2_sev)),
+            BMIz = first(na.omit(BMIz)),Weightz = first(na.omit(Weightz)),
+            FEV1 = first(na.omit(FEV1)),FVC = first(na.omit(FVC)),
+            HbA1c = first(na.omit(HbA1c)),.groups = "keep") %>%
   arrange(Site,CFF.ID,Before_After)
-t = df %>% select(CFF.ID,Site,Date,Time,Before_After,BMIz,ppFEV,ppFVC) %>%
-  group_by(CFF.ID,Site,Before_After) %>%
-  arrange(Site,CFF.ID,Before_After)
-keep = most_recent %>% group_by(CFF.ID) %>% count() %>% filter(n == 2)
+# # Check
+# t = df %>% select(CFF.ID,Site,Date,Time,Before_After,BMIz,ppFEV,ppFVC) %>%
+#   group_by(CFF.ID,Site,Before_After) %>%
+#   arrange(Site,CFF.ID,Before_After)
+# Filter those without CFRD, and those without pre AND post
+keep = most_recent %>% filter(!is.na(HbA1c)) %>%
+  group_by(CFF.ID) %>% summarise(n = n()) %>%
+  filter(n == 2) %>% pull(CFF.ID)
+cfrd = unique(df$CFF.ID[!is.na(df$CFRD.Status) | !is.na(df$CFRD.Diagnosis.Date)])
+keep = unique(keep,cfrd)
+most_recent = most_recent %>% filter(CFF.ID %in% keep)
 ```
 
 # Participant Characteristics
