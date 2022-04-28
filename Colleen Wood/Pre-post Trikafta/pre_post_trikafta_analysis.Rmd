@@ -136,17 +136,30 @@ most_recent = df %>% group_by(CFF.ID,Site,Before_After) %>%
   filter(Time > -2*365) %>%
   mutate(time_new = max(Time) - Time) %>%
   arrange(time_new) %>% 
-  summarise(Age = first(na.omit(Age)),BMI.Percentile = first(na.omit(BMI.Percentile)),
-            Weight = first(na.omit(Weight)),Sex = first(na.omit(Sex)),
-            T1D.Duration = first(na.omit(T1D.Duration)),
+  summarise(Age = paste0(Date[which(Age == first(na.omit(Age)))],": ",round(first(na.omit(Age)),1)),
+            BMI.Percentile = paste0(Date[which(BMI.Percentile == first(na.omit(BMI.Percentile)))],
+                                    ": ",round(first(na.omit(BMI.Percentile)),1)),
+            Weight = paste0(Date[which(Weight == round(first(na.omit(Weight)),1))],
+                            ": ",first(na.omit(Weight))),
+            T1D.Duration = paste0(Date[which(T1D.Duration == first(na.omit(T1D.Duration)))],
+                                  ": ",round(first(na.omit(T1D.Duration)),1)),
             G.tube.in.past.12.months = first(na.omit(G.tube.in.past.12.months)),
             Pancreatic.Status = first(na.omit(Pancreatic.Status)),
             Genotype1_sev = first(na.omit(Genotype1_sev)),
             Genotype2_sev = first(na.omit(Genotype2_sev)),
-            BMIz = first(na.omit(BMIz)),Weightz = first(na.omit(Weightz)),
-            FEV1 = first(na.omit(FEV1)),FVC = first(na.omit(FVC)),
-            HbA1c = first(na.omit(HbA1c)),.groups = "keep") %>%
+            BMIz = paste0(Date[which(BMIz == first(na.omit(BMIz)))],
+                          ": ",round(first(na.omit(BMIz)),1)),
+            FEV1 = paste0(Date[which(FEV1 == first(na.omit(FEV1)))[1]],
+                          ": ",round(first(na.omit(FEV1)),1)),
+            FVC = paste0(Date[which(FVC == first(na.omit(FVC)))],
+                         ": ",round(first(na.omit(FVC)),1)),
+            HbA1c = paste0(Date[which(HbA1c == first(na.omit(HbA1c)))],
+                           ": ",round(first(na.omit(HbA1c)),1)),
+            .groups = "keep") %>%
   arrange(Site,CFF.ID,Before_After)
+most_recent[most_recent == ": NA"] = NA
+most_recent[most_recent == "NA: NA"] = NA
+
 # # Check
 # t = df %>% select(CFF.ID,Site,Date,Time,Before_After,BMIz,ppFEV,ppFVC) %>%
 #   group_by(CFF.ID,Site,Before_After) %>%
