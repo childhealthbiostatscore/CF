@@ -133,10 +133,11 @@ write.csv(df, file = "./Colleen Wood/Prepost Triakfta/Data_Cleaned/analysis_data
 # Want the value closest to start date before start, and most recent with respect to now from start
 # (i.e. the longest time after start)
 most_recent = df %>% group_by(CFF.ID,Site,Before_After) %>%
-  filter(Time > -2*365) %>%
+  filter(Time >= (-2*365)) %>%
   mutate(time_new = max(Time) - Time) %>%
   arrange(time_new) %>% 
-  summarise(Age = paste0(Date[which(Age == first(na.omit(Age)))],": ",round(first(na.omit(Age)),1)),
+  summarise(Start = first(na.omit(Start)),
+            Age = paste0(Date[which(Age == first(na.omit(Age)))],": ",round(first(na.omit(Age)),1)),
             BMI.Percentile = paste0(Date[which(BMI.Percentile == first(na.omit(BMI.Percentile)))],
                                     ": ",round(first(na.omit(BMI.Percentile)),1)),
             Weight = paste0(Date[which(Weight == round(first(na.omit(Weight)),1))],
@@ -157,6 +158,7 @@ most_recent = df %>% group_by(CFF.ID,Site,Before_After) %>%
                            ": ",round(first(na.omit(HbA1c)),1)),
             .groups = "keep") %>%
   arrange(Site,CFF.ID,Before_After)
+most_recent$Start = as.character(most_recent$Start)
 most_recent[most_recent == ": NA"] = NA
 most_recent[most_recent == "NA: NA"] = NA
 
@@ -168,9 +170,14 @@ most_recent[most_recent == "NA: NA"] = NA
 keep = most_recent %>% filter(!is.na(HbA1c)) %>%
   group_by(CFF.ID) %>% summarise(n = n()) %>%
   filter(n == 2) %>% pull(CFF.ID)
-cfrd = unique(df$CFF.ID[!is.na(df$CFRD.Status) | !is.na(df$CFRD.Diagnosis.Date)])
+cfrd = unique(df$CFF.ID[!is.na(df$CFRD.Status) | 
+                          df$CFRD.Status != "Impaired Glucose Tolerance (FBG < 126, 2-h PG 140-199)" | 
+                          !is.na(df$CFRD.Diagnosis.Date)])
 keep = unique(keep,cfrd)
 most_recent = most_recent %>% filter(CFF.ID %in% keep)
+# Write 
+write.csv(most_recent,file = "./Colleen Wood/Prepost Triakfta/Data_Cleaned/pre_post.csv",
+          na = "",row.names = F)
 ```
 
 # Participant Characteristics
