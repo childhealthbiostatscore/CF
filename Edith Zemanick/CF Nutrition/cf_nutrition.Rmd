@@ -67,6 +67,21 @@ fev = fev %>% select(PatientID,Date,BMI,`FEV1 % pred`) %>% rename(`Patient ID` =
 df = full_join(vit,fev,by = c("Patient ID", "Date")) %>% filter(`Patient ID` %in% mods$`Patient ID`)
 df = left_join(df,mods,by = "Patient ID")
 df = left_join(df,pancreatic,by = "Patient ID")
+# Time relative to first mod
+df$Time = as.numeric(difftime(df$Date,df$`First Mod Date`,units = "days"))/365.25
+# Calculate spline things
+df$c1 = (df$Time-0)*(df$Time>=0)
+df$c2 = as.numeric(difftime(df$Date,df$`Second Mod Date`,units = "days"))/365.25
+df$c2 = df$c2*(df$Date >= df$`Second Mod Date`)
+# Convert to numeric
+df$VitaminA_Retinol = suppressWarnings(as.numeric(df$VitaminA_Retinol))
+# Select columns
+df = df %>% filter(!is.na(VitaminA_Retinol)) %>%
+  select(`Patient ID`,`First Mod Date`,`Second Mod Date`,
+         Date,Time,c1,c2,VitaminA_Retinol) %>%
+  rename(`Vitamin A` = VitaminA_Retinol)
+# Write for presentation
+write.csv(df,file = "~/GitHub/CF/StatNet/data.csv",row.names = F,na = "")
 ```
 
 ```{r}
@@ -199,7 +214,7 @@ g
 <!--   (df$time-0)*(df$time>=0) -->
 <!-- df$c2 = -->
 <!--   (as.numeric(difftime(df$Date,df$`Second Mod Date`,units = "days"))/365.25)*(df$Date >= df$`Second Mod Date`) -->
-<!-- # Limit to 3 years prior, select columns -->
+<!-- # Limit to 3 years prior -->
 <!-- df = df %>% filter(!is.na(time) & time >= -3) %>% distinct() -->
 <!-- ``` -->
 
