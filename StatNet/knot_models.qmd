@@ -5,6 +5,7 @@ format: revealjs
 editor: visual
 bibliography: /Users/timvigers/Dropbox/Miscellaneous/references.bib
 csl: /Users/timvigers/GitHub/styles/american-medical-association-alphabetical.csl
+cache: false
 ---
 
 ```{r}
@@ -14,6 +15,8 @@ library(DiagrammeR)
 library(MultiKink)
 library(ggplot2)
 library(broom)
+library(lmerTest)
+library(mcp)
 library(knitr)
 data("triceps")
 cf = read.csv("/Users/timvigers/GitHub/CF/StatNet/data.csv",
@@ -148,48 +151,7 @@ The estimates of c5, c10, and c20 indicate change in slope at each respective kn
 
 ## Pre-/Post-CFTR Data
 
-```{r}
-#| eval: false
-grViz("
-g [label = '@@7']
-h [label = '@@8']
-i [label = '@@9']
-j [label = '@@10']
-k [label = '@@11']
-l [label = '@@12']
-m [label = '@@13']
-
-a -> b
-b -> c
-c -> d
-c -> e
-c -> f
-d -> g
-e -> h
-f -> i
-g -> j
-h -> k
-i -> l
-j -> m
-k -> m
-l -> m
-}
-
-[1]: paste0('Clinical Database (n = ', ncdb, ')')
-[2]: paste0('Treated With Ivacaftor or Trikafta From 2008-2021 (n = ',length(unique(mods$`Patient ID`)), ')')
-[3]: paste0('In Our Dataset (n = ',length(intersect(mods$`Patient ID`,sweat$`Patient ID`)), ')')
-[4]: paste0('Treated With Ivacaftor Alone From 2008-2021 (n = ',as.numeric(table(groups$Group)['Kalydeco']), ')')
-[5]: paste0('Treated With Trikafta Alone From 2008-2021 (n = ',as.numeric(table(groups$Group)['Trikafta']), ')')
-[6]: paste0('Treated With Ivacaftor followed by Trikafta From 2008-2021 (n = ',as.numeric(table(groups$Group)['Both']), ')')
-[7]: paste0('At Least One Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Kalydeco']), ')')
-[8]: paste0('At Least One Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Trikafta']), ')')
-[9]: paste0('At Least One Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Both']), ')')
-[10]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Kalydeco']), ')')
-[11]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Trikafta']), ')')
-[12]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Both']), ')')
-[13]: paste0('Final (n = ',length(unique(after_measure$`Patient ID`)), ')')
-")
-```
+-   Limited to 3 years pre/post
 
 ## Vitamin A Plot
 
@@ -212,5 +174,69 @@ mod = lmer(Vitamin.A ~ Time + c1 + c2 + (1|Patient.ID),data = cf)
 -   Summarize results
 
 ## A Bayesian Approach
+
+-   The `mcp` package provides an easy interface for fitting Bayesian regression models with multiple change points.
+
+## On the triceps data
+
+```{r}
+# Define the model
+model = list(
+  triceps ~ 1 + age,          # intercept + slope
+  ~ 0 + age,  # joined slope with 3 change points
+  ~ 0 + age,
+  ~ 0 + age
+)
+bayes_fit = mcp(model, data = triceps, sample = "both")
+plot(bayes_fit)
+```
+
+-   Visually, this approach seems to generally confirm the knots we used earlier.
+
+-   The model results bear this out as well:
+
+```{r}
+s = summary(bayes_fit)
+kable(s,digits = 3)
+```
+
+---
+
+-   `mcp` also allows us to test hypotheses about the location of these knots:
+
+```{r}
+hypothesis(bayes_fit, "cp_1 = 5")
+hypothesis(bayes_fit, "cp_2 = 10")
+hypothesis(bayes_fit, "cp_3 = 20")
+```
+
+- None of the hypothesis tests are significant, indicating that the knots found with `mcp` are reasonably close to the ones we pre-specified (the CI on cp_1 is fairly wide though).
+
+---
+
+```{r}
+# Define the model
+model = list(
+  Vitamin.A ~ 1 + Time, # intercept + slope
+  ~ 0 + Time  # joined slope
+)
+fit = mcp(model, data = cf)
+plot(fit)
+```
+
+-   What does this mean? Why is the change point estimated to be before 0?
+
+---
+
+```{r}
+# Dirichlet prior on change point
+d_prior = list(
+  cp_1 = "dnorm(0,1)"
+)
+fit_cp_prior = mcp(model, prior = d_prior,data = cf)
+plot(fit_cp_prior)
+```
+
+---
 
 # References
