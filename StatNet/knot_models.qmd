@@ -16,6 +16,8 @@ library(ggplot2)
 library(broom)
 library(knitr)
 data("triceps")
+cf = read.csv("/Users/timvigers/GitHub/CF/StatNet/data.csv",
+              stringsAsFactors = F,na.strings = "")
 ```
 
 ## Study Overview
@@ -47,17 +49,17 @@ data("triceps")
 
     -   Interested in modeling changes with age.
 
----
+------------------------------------------------------------------------
 
 Triceps data:
 
 ```{r}
-tri.age.plot = ggplot(triceps,aes(x = age,y = triceps)) + geom_point(alpha = 0.5) +
+tri.age.plot = ggplot(triceps,aes(x = age,y = triceps)) + geom_point(alpha = 0.6) +
   xlab("Age") + ylab("Triceps") + theme_bw()
 tri.age.plot
 ```
 
----
+------------------------------------------------------------------------
 
 Add knots at ages 5, 10, and 20:
 
@@ -103,6 +105,8 @@ $$
 
 ## Manual coding
 
+-   Can add these values by hand easily (using the difference \* an indicator):
+
 ```{r}
 #| echo: true
 # Make new variables
@@ -111,14 +115,15 @@ triceps$c10 = (triceps$age-10)*(triceps$age>=10)
 triceps$c20 = (triceps$age-20)*(triceps$age>=20)
 ```
 
- 
+-   Examples of what the new variables should look like:
 
 ```{r}
 kable(triceps[c(which(triceps$age<5)[1],which(triceps$age<10&triceps$age>5)[1],
-          which(triceps$age>20&triceps$age>10)[1]),],row.names = F)
+          which(triceps$age<20&triceps$age>10)[1],
+          which(triceps$age>=20)[1]),c("age","c5","c10","c20")],row.names = F)
 ```
 
----
+------------------------------------------------------------------------
 
 Plot predicted values:
 
@@ -138,7 +143,10 @@ tri.age.plot +
 kable(tidy(mod),digits = 3)
 ```
 
-The estimates of c5, c10, and c20 indicate change in slope at the respective knot.
+\
+The estimates of c5, c10, and c20 indicate change in slope at each respective knot.
+
+## Pre-/Post-CFTR Data
 
 ```{r}
 #| eval: false
@@ -182,5 +190,27 @@ l -> m
 [13]: paste0('Final (n = ',length(unique(after_measure$`Patient ID`)), ')')
 ")
 ```
+
+## Vitamin A Plot
+
+```{r}
+vita_plot = ggplot(cf,aes(x = Time,y = Vitamin.A,color = factor(Patient.ID))) + 
+  geom_point(alpha = 0.6) +
+  ylab("Vitamin A") + theme_bw() + theme(legend.position = "none")
+```
+
+```{r}
+mod = lmer(Vitamin.A ~ Time + c1 + c2 + (1|Patient.ID),data = cf)
+```
+
+### To Do
+
+-   Change missing c2 values to 0
+
+-   Write out mixed model with two knots
+
+-   Summarize results
+
+## A Bayesian Approach
 
 # References
