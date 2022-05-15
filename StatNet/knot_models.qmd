@@ -13,6 +13,8 @@ csl: /Users/timvigers/GitHub/styles/american-medical-association-alphabetical.cs
 library(DiagrammeR)
 library(MultiKink)
 library(ggplot2)
+library(broom)
+library(knitr)
 data("triceps")
 ```
 
@@ -57,7 +59,7 @@ tri.age.plot
 
 ---
 
-Add knots at ages 5, 10, 20, 30, and 40:
+Add knots at ages 5, 10, and 20:
 
 ```{r}
 pred1 <- predict(lm(triceps~age, 
@@ -67,11 +69,7 @@ pred2 <- predict(lm(triceps~age,
 pred3 <- predict(lm(triceps~age, 
                     data = triceps[triceps$age>=10 & triceps$age<20,]))
 pred4 <- predict(lm(triceps~age, 
-                    data = triceps[triceps$age>=20 & triceps$age<30,]))
-pred5 <- predict(lm(triceps~age, 
-                    data = triceps[triceps$age>=30 & triceps$age<40,]))
-pred6 <- predict(lm(triceps~age, 
-                    data = triceps[triceps$age>=40,]))
+                    data = triceps[triceps$age>=20,]))
 tri.age.plot + 
   geom_line(data=triceps[triceps$age<5,], 
             aes(y = pred1, x=age), size = 1, col="blue") +
@@ -79,12 +77,8 @@ tri.age.plot +
             aes(y = pred2, x=age), size = 1, col="blue") +
   geom_line(data=triceps[triceps$age>=10 & triceps$age<20,], 
             aes(y = pred3, x=age), size = 1, col="blue") +
-  geom_line(data=triceps[triceps$age>=20 & triceps$age<30,], 
-            aes(y = pred4, x=age), size = 1, col="blue") +
-  geom_line(data=triceps[triceps$age>=30 & triceps$age<40,], 
-            aes(y = pred5, x=age), size = 1, col="blue") +
-  geom_line(data=triceps[triceps$age>=40,], 
-            aes(y = pred6, x=age), size = 1, col="blue") 
+  geom_line(data=triceps[triceps$age>=20,], 
+            aes(y = pred4, x=age), size = 1, col="blue") 
 ```
 
 ## Continuity restriction
@@ -107,19 +101,48 @@ $$
 \right.
 $$
 
+## Manual coding
+
+```{r}
+#| echo: true
+# Make new variables
+triceps$c5 = (triceps$age-5)*(triceps$age>=5)
+triceps$c10 = (triceps$age-10)*(triceps$age>=10)
+triceps$c20 = (triceps$age-20)*(triceps$age>=20)
+```
+
+ 
+
+```{r}
+kable(triceps[c(which(triceps$age<5)[1],which(triceps$age<10&triceps$age>5)[1],
+          which(triceps$age>20&triceps$age>10)[1]),],row.names = F)
+```
+
+---
+
+Plot predicted values:
+
+```{r}
+# Linear model
+mod = lm(triceps ~ age + c5 + c10 + c20,data = triceps)
+# Plot
+pred = predict(mod)
+tri.age.plot +
+  geom_line(data=triceps, 
+            aes(y = pred, x=age), size = 1, col="blue") 
+```
+
+## Model interpretation
+
+```{r}
+kable(tidy(mod),digits = 3)
+```
+
+The estimates of c5, c10, and c20 indicate change in slope at the respective knot.
+
 ```{r}
 #| eval: false
 grViz("
-digraph graph2 {
-graph [layout = dot]
-# node definitions with substituted label text
-node [shape = rectangle]
-a [label = '@@1']
-b [label = '@@2']
-c [label = '@@3']
-d [label = '@@4']
-e [label = '@@5']
-f [label = '@@6']
 g [label = '@@7']
 h [label = '@@8']
 i [label = '@@9']
