@@ -1,0 +1,163 @@
+---
+title: "Piecewise Regression for Nutritional Outcomes Pre- and Post-CFTR Modulator"
+author: "Tim Vigers"
+format: revealjs
+editor: visual
+bibliography: /Users/timvigers/Dropbox/Miscellaneous/references.bib
+csl: /Users/timvigers/GitHub/styles/american-medical-association-alphabetical.csl
+---
+
+```{r}
+#| include: false
+# Load libraries, data, etc.
+library(DiagrammeR)
+library(MultiKink)
+library(ggplot2)
+data("triceps")
+```
+
+## Study Overview
+
+-   Do vitamin levels change after CFTR modulator start?
+
+-   Registry data through 2021:
+
+    -   Most patients have multiple nutrition measures before and after CFTR modulator start.
+    -   A subset of patients were on ivacaftor followed by elexacaftor/tezacaftor/ivacaftor (ETI).
+
+## Study Overview
+
+-   The first approach was to limit the analysis dataset to those with two measures prior to modulator start, and at least one measure after.
+
+    -   Then we did a t test on the differences between measures closest to modulator start.
+
+-   However, this results in a lot of excluded data and it was unclear how to treat those on two different modulators.
+
+-   Piecewise models allow us to use all the data and include all the participants in the same model.
+
+## Piecewise Linear Regression Basics
+
+-   See [module and presentation](https://bookdown.org/tpinto_home/Beyond-Linearity) by Jaroslaw Harezlak & Armando Teixeira-Pinto for the Biostatistics Collaboration of Australia for additional detail.
+
+-   Will use the "triceps" data included in the `MultiKink` R package [@wanMultiKinkEstimationInference2020] because it's a little easier to see the trends.
+
+-   892 measurements of the triceps skin fold.
+
+    -   Interested in modeling changes with age.
+
+---
+
+Triceps data:
+
+```{r}
+tri.age.plot = ggplot(triceps,aes(x = age,y = triceps)) + geom_point(alpha = 0.5) +
+  xlab("Age") + ylab("Triceps") + theme_bw()
+tri.age.plot
+```
+
+---
+
+Add knots at ages 5, 10, 20, 30, and 40:
+
+```{r}
+pred1 <- predict(lm(triceps~age, 
+                    data = triceps[triceps$age<5,]))
+pred2 <- predict(lm(triceps~age, 
+                    data = triceps[triceps$age >=5 & triceps$age<10,]))
+pred3 <- predict(lm(triceps~age, 
+                    data = triceps[triceps$age>=10 & triceps$age<20,]))
+pred4 <- predict(lm(triceps~age, 
+                    data = triceps[triceps$age>=20 & triceps$age<30,]))
+pred5 <- predict(lm(triceps~age, 
+                    data = triceps[triceps$age>=30 & triceps$age<40,]))
+pred6 <- predict(lm(triceps~age, 
+                    data = triceps[triceps$age>=40,]))
+tri.age.plot + 
+  geom_line(data=triceps[triceps$age<5,], 
+            aes(y = pred1, x=age), size = 1, col="blue") +
+  geom_line(data=triceps[triceps$age >=5 & triceps$age<10,], 
+            aes(y = pred2, x=age), size = 1, col="blue") +
+  geom_line(data=triceps[triceps$age>=10 & triceps$age<20,], 
+            aes(y = pred3, x=age), size = 1, col="blue") +
+  geom_line(data=triceps[triceps$age>=20 & triceps$age<30,], 
+            aes(y = pred4, x=age), size = 1, col="blue") +
+  geom_line(data=triceps[triceps$age>=30 & triceps$age<40,], 
+            aes(y = pred5, x=age), size = 1, col="blue") +
+  geom_line(data=triceps[triceps$age>=40,], 
+            aes(y = pred6, x=age), size = 1, col="blue") 
+```
+
+## Continuity restriction
+
+-   We can adapt the previous model to make sure that the regressions "join up" at each knot:
+
+$$
+y = \beta_0 + \beta_1 x+\beta_2(x-k_1)_+\beta_3(x-k_2)_+ +...+ \epsilon
+$$
+
+with
+
+$$
+(x-k)_+=
+\left\{ 
+  \begin{array}{ c l }
+    0, & \quad \textrm{if } x < k \\
+    x-k,                 & \quad \textrm{if } x \geq k 
+  \end{array}
+\right.
+$$
+
+```{r}
+#| eval: false
+grViz("
+digraph graph2 {
+graph [layout = dot]
+# node definitions with substituted label text
+node [shape = rectangle]
+a [label = '@@1']
+b [label = '@@2']
+c [label = '@@3']
+d [label = '@@4']
+e [label = '@@5']
+f [label = '@@6']
+g [label = '@@7']
+h [label = '@@8']
+i [label = '@@9']
+j [label = '@@10']
+k [label = '@@11']
+l [label = '@@12']
+m [label = '@@13']
+
+a -> b
+b -> c
+c -> d
+c -> e
+c -> f
+d -> g
+e -> h
+f -> i
+g -> j
+h -> k
+i -> l
+j -> m
+k -> m
+l -> m
+}
+
+[1]: paste0('Clinical Database (n = ', ncdb, ')')
+[2]: paste0('Treated With Ivacaftor or Trikafta From 2008-2021 (n = ',length(unique(mods$`Patient ID`)), ')')
+[3]: paste0('In Our Dataset (n = ',length(intersect(mods$`Patient ID`,sweat$`Patient ID`)), ')')
+[4]: paste0('Treated With Ivacaftor Alone From 2008-2021 (n = ',as.numeric(table(groups$Group)['Kalydeco']), ')')
+[5]: paste0('Treated With Trikafta Alone From 2008-2021 (n = ',as.numeric(table(groups$Group)['Trikafta']), ')')
+[6]: paste0('Treated With Ivacaftor followed by Trikafta From 2008-2021 (n = ',as.numeric(table(groups$Group)['Both']), ')')
+[7]: paste0('At Least One Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Kalydeco']), ')')
+[8]: paste0('At Least One Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Trikafta']), ')')
+[9]: paste0('At Least One Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Both']), ')')
+[10]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Kalydeco']), ')')
+[11]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Trikafta']), ')')
+[12]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Both']), ')')
+[13]: paste0('Final (n = ',length(unique(after_measure$`Patient ID`)), ')')
+")
+```
+
+# References
