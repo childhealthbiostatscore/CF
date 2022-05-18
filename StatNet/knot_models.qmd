@@ -5,7 +5,7 @@ format: revealjs
 editor: visual
 bibliography: /Users/timvigers/Dropbox/Miscellaneous/references.bib
 csl: /Users/timvigers/GitHub/styles/american-medical-association-alphabetical.csl
-cache: false
+cache: true
 ---
 
 ```{r}
@@ -149,94 +149,222 @@ kable(tidy(mod),digits = 3)
 \
 The estimates of c5, c10, and c20 indicate change in slope at each respective knot.
 
-## Pre-/Post-CFTR Data
+## Pre-/Post-CFTR Modulator Data
 
--   Limited to 3 years pre/post
+-   Vitamin D measures at annual visits from CF registry and our site.
 
-## Vitamin A Plot
+-   Some patients started on ivacaftor who then transitioned to ETI.
 
-```{r}
-vita_plot = ggplot(cf,aes(x = Time,y = Vitamin.A,color = factor(Patient.ID))) + 
-  geom_point(alpha = 0.6) +
-  ylab("Vitamin A") + theme_bw() + theme(legend.position = "none")
-```
+## Pre-/Post-CFTR Modulator Data
 
 ```{r}
-mod = lmer(Vitamin.A ~ Time + c1 + c2 + (1|Patient.ID),data = cf)
+vita_plot = ggplot(cf,aes(x = Time,y = Vitamin.D,color = factor(Patient.ID))) + 
+  geom_point() + geom_line(alpha = 0.2) +
+  ylab("Vitamin D") + theme_bw() + theme(legend.position = "none")
+vita_plot
 ```
 
-### To Do
+## Pre-/Post-CFTR Modulator Model
 
--   Change missing c2 values to 0
+-   The model is similar to triceps data example, but the second knot varies by patient and we include a random intercept to account for repeated measures:
 
--   Write out mixed model with two knots
+$$
+\text{Vitamin D}_{ij} = \beta_0 + \beta_1 \text{Time}_{ij} +\\ \beta_2(\text{Time}_{ij}-k_1)_+ + \beta_3(\text{Time}_{ij}-k_{2i})_+ + b_i + \epsilon_i
+$$
 
--   Summarize results
+## Pre-/Post-CFTR Modulator Model
+
+with
+
+$$
+(x-k_1)_+=
+\left\{ 
+  \begin{array}{ c l }
+    0, & \quad \textrm{if } \text{Time} < 0 \\
+    x-k_1,                 & \quad \textrm{if } \text{Time} \geq 0 
+  \end{array}
+\right.
+$$
+
+and
+
+$$
+(x-k_2)_+=
+\left\{ 
+  \begin{array}{ c l }
+    0, & \quad \textrm{if } \text{time before }2^{nd}\text{ mod}  \\
+    \text{time after }2^{nd}\text{ mod},                 & \quad \textrm{if } \text{time after }2^{nd}\text{ mod}
+  \end{array}
+\right.
+$$
+
+and
+
+$$
+\epsilon \sim N(0,\sigma^2_{\epsilon})\text{ and } b\sim N(0,\sigma^2_b)
+$$
+
+## Pre-/Post-CFTR Modulator Results
+
+```{r}
+mod = lmer(Vitamin.D ~ Time + c1 + c2 + (1|Patient.ID),data = cf)
+plot_df = mod@frame
+plot_df$pred = predict(mod)
+ggplot(plot_df,aes(x = Time,y = Vitamin.D,group = factor(Patient.ID))) +
+    geom_line(aes(y = pred),alpha = 0.5) + geom_point(aes(y = pred),alpha = 0.5) +
+    theme_bw() + theme(legend.position = "none") + xlab("Time (years)")
+```
+
+## Pre-/Post-CFTR Modulator Results
+
+```{r}
+kable(broom.mixed::tidy(mod,"fixed")[,-1],digits = 3)
+```
 
 ## A Bayesian Approach
 
 -   The `mcp` package provides an easy interface for fitting Bayesian regression models with multiple change points.
+    -   Essentially it translates `lme4` syntax into JAGS.
+-   Uninformative "t-tail" priors are used unless the user specifies something else.
+    -   "The default priors should be suitable for estimation in the absence of strong prior knowledge."[@lindelovMcpPackageRegression2020a]
 
-## On the triceps data
+## On the Triceps Data
 
 ```{r}
+#| echo: true
 # Define the model
 model = list(
   triceps ~ 1 + age,          # intercept + slope
-  ~ 0 + age,  # joined slope with 3 change points
-  ~ 0 + age,
-  ~ 0 + age
+  ~ 0 + age,  # joined slope 
+  ~ 0 + age,  # joined slope 
+  ~ 0 + age   # joined slope 
 )
+```
+
+## On the Triceps Data
+
+```{r}
+#| include: false
 bayes_fit = mcp(model, data = triceps, sample = "both")
-plot(bayes_fit)
+s = summary(bayes_fit)
+p = plot(bayes_fit)
+```
+
+```{r}
+print(p)
 ```
 
 -   Visually, this approach seems to generally confirm the knots we used earlier.
 
+## On the Triceps Data
+
 -   The model results bear this out as well:
 
 ```{r}
-s = summary(bayes_fit)
 kable(s,digits = 3)
 ```
 
----
+------------------------------------------------------------------------
+
+## On the Triceps Data
 
 -   `mcp` also allows us to test hypotheses about the location of these knots:
 
 ```{r}
+#| echo: true
 hypothesis(bayes_fit, "cp_1 = 5")
 hypothesis(bayes_fit, "cp_2 = 10")
 hypothesis(bayes_fit, "cp_3 = 20")
 ```
 
-- None of the hypothesis tests are significant, indicating that the knots found with `mcp` are reasonably close to the ones we pre-specified (the CI on cp_1 is fairly wide though).
+-   None of the hypothesis tests are significant, indicating that the knots found with `mcp` are reasonably close to the ones we pre-specified (the CI on cp_1 is fairly wide though).
 
----
+## A Bayesian Model for Pre-/Post-CFTR Modulator
+
+-   `mcp` can model joined slopes with varying change points:
 
 ```{r}
+#| echo: true
 # Define the model
 model = list(
-  Vitamin.A ~ 1 + Time, # intercept + slope
-  ~ 0 + Time  # joined slope
+  Vitamin.D ~ 1 + Time, # intercept + slope
+  ~ 0 + Time,  # joined slope
+  1 + (1|Patient.ID) ~ 0 + Time
 )
-fit = mcp(model, data = cf)
-plot(fit)
 ```
 
--   What does this mean? Why is the change point estimated to be before 0?
-
----
+## A Bayesian Model for Pre-/Post-CFTR Modulator
 
 ```{r}
-# Dirichlet prior on change point
-d_prior = list(
-  cp_1 = "dnorm(0,1)"
-)
-fit_cp_prior = mcp(model, prior = d_prior,data = cf)
-plot(fit_cp_prior)
+#| include: false
+fit = mcp(model, data = cf)
+s = summary(fit)
+p = plot(fit)
 ```
 
----
+```{r}
+kable(s,digits = 3)
+```
+
+## A Bayesian Model for Pre-/Post-CFTR Modulator
+
+```{r}
+print(p)
+```
+
+-   This looks terrible!
+
+## A Bayesian Model for Pre-/Post-First CFTR Modulator
+
+-   Try fitting on just those with one modulator, with a N(0,1) prior on a change at 0:
+
+```{r}
+#| echo: true
+# Define the model
+model = list(
+  Vitamin.D ~ 1 + Time, # intercept + slope
+  ~ 0 + Time  # joined slope
+)
+priors = list(
+  cp_1 = "dnorm(0,1)"
+)
+```
+
+```{r}
+#| include: false
+fit = mcp(model,prior = priors,data = cf)
+s = summary(fit)
+p = plot(fit)
+```
+
+## A Bayesian Model for Pre-/Post-First CFTR Modulator
+
+```{r}
+kable(s,digits = 3)
+```
+
+## A Bayesian Model for Pre-/Post-First CFTR Modulator
+
+```{r}
+print(p)
+```
+
+## Limitations
+
+-   Only 20 two-modulator participants with vitamin D values after starting ETI (21 measures among them).
+
+    -   Large change in slope after second modulator start is likely driven by a few influential observations.
+
+-   Somewhat arbitrarily limited pre-modulator values to \< 5 years from modulator start.
+
+-   General data quality issues that we are in the process of resolving.
+
+## Questions
+
+-   How to handle truncated data (e.g. a value of "\< 0.1")?
+
+-   Should I model the two-modulator and one-modulator groups separately, but still use piecewise models?
+
+-   Any general advice (particularly for Bayesian methods)?
 
 # References
