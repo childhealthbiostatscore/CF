@@ -23,6 +23,18 @@ cf = read.csv("/Users/timvigers/GitHub/CF/StatNet/data.csv",
               stringsAsFactors = F,na.strings = "")
 ```
 
+## Introduction
+
+-   Exocrine pancreatic insufficiency (PI) is present from birth in up to two thirds of patients with CF
+-   85% of patients with CF ultimately have PI with associated fat malabsorption by one year of age
+-   Malabsorption puts persons with CF at risk for fat-soluble vitamin deficiencies.
+
+## Introduction
+
+-   People with CF rely on supplemental pancreatic enzyme replacement therapy (PERT) in addition to a diet high in protein, calories, fat-soluble vitamins, and salt.
+-   Highly effective CFTR modulators, ivacaftor and elexacaftor/tezacaftor/ivacaftor (ETI), substantially improve CFTR activity, lung function and nutritional status.
+-   Their impact on other markers of nutrition, particularly fat-soluble vitamin absorption, are still unclear.
+
 ## Study Overview
 
 -   Do vitamin levels change after CFTR modulator start?
@@ -30,9 +42,15 @@ cf = read.csv("/Users/timvigers/GitHub/CF/StatNet/data.csv",
 -   Registry data through 2021:
 
     -   Most patients have multiple nutrition measures before and after CFTR modulator start.
-    -   A subset of patients were on ivacaftor followed by elexacaftor/tezacaftor/ivacaftor (ETI).
+    -   A subset of patients were on ivacaftor followed by ETI.
 
 ## Study Overview
+
+-   Retrospective study of children with CF included individuals ages 4-21 followed at Children's Hospital Colorado (CHCO) from January 1982 to July 2021.
+
+-   Criteria were a diagnosis of CF based on sweat chloride $\geq$ 60mmol/L or two CFTR gene mutations.
+
+## First Analysis
 
 -   The first approach was to limit the analysis dataset to those with two measures prior to modulator start, and at least one measure after.
 
