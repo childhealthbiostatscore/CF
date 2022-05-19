@@ -259,9 +259,23 @@ kable(broom.mixed::tidy(mod,"fixed")[,-1],digits = 3)
 ## A Bayesian Approach
 
 -   The `mcp` package provides an easy interface for fitting Bayesian regression models with multiple change points.
+
     -   Essentially it translates `lme4` syntax into JAGS.
+
 -   Uninformative "t-tail" priors are used unless the user specifies something else.
+
     -   "The default priors should be suitable for estimation in the absence of strong prior knowledge."[@lindelovMcpPackageRegression2020a]
+    -   "Based on data to ensure that they remain uninformative across any order of magnitude." [@lindelovMcpPackageRegression2020a]
+
+## A Bayesian Approach
+
+-   Intercept priors are t(0, 3\*sd(y), 3)
+
+-   Slope priors are t(0, sd(y)/(max(x) − min(x)), 3).
+
+-   The prior $\sigma$ is N(0, sd(y)).
+
+-   U(−1, 1) prior is used on autoregressive coefficients.
 
 ## On the Triceps Data
 
@@ -316,7 +330,12 @@ hypothesis(bayes_fit, "cp_3 = 20")
 
 ## A Bayesian Model for Pre-/Post-CFTR Modulator
 
--   `mcp` can model joined slopes with varying change points:
+-   `mcp` can model joined slopes with varying change points.
+-   Package documentation recommends Dirichlet priors, but they sample slowly.
+    -   A multivariate generalization of the beta distribution, indexed by $\alpha$ ($\alpha$ = 1 is flat).
+    -   The conjugate prior of the categorical distribution and multinomial distribution.
+
+## A Bayesian Model for Pre-/Post-CFTR Modulator
 
 ```{r}
 #| echo: true
@@ -325,6 +344,9 @@ model = list(
   Vitamin.D ~ 1 + Time, # intercept + slope
   ~ 0 + Time,  # joined slope
   1 + (1|Patient.ID) ~ 0 + Time
+)
+priors = list(
+  cp_1 = "dirichlet(1)"
 )
 ```
 
@@ -347,7 +369,7 @@ kable(s,digits = 3)
 print(p)
 ```
 
--   This looks terrible!
+-   This looks terrible! `mcp` does seem to find a change point at time 0, but the change point at -3 doesn't make much sense.
 
 ## A Bayesian Model for Pre-/Post-First CFTR Modulator
 
@@ -386,14 +408,18 @@ print(p)
 
 ## Future Plans
 
--   Try a random slope
 -   Apply similar models to other outcomes like sweat electrolytes, etc.
+-   Look into frequentist approaches for automatic detection (`segmented` package, etc.)
 
 ## Limitations
 
 -   Only 20 two-modulator participants with vitamin D values after starting ETI (21 measures among them).
 
     -   Large change in slope after second modulator start is likely driven by a few influential observations.
+    -   Posteriors may shrink towards priors too much if the data set is not large enough.
+        -   The likelihood does not overwhelm the prior.
+
+## Limitations
 
 -   Somewhat arbitrarily limited pre-modulator values to \< 5 years from modulator start.
 
