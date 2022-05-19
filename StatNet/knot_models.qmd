@@ -239,6 +239,23 @@ ggplot(plot_df,aes(x = Time,y = Vitamin.D,group = factor(Patient.ID))) +
 kable(broom.mixed::tidy(mod,"fixed")[,-1],digits = 3)
 ```
 
+## Pre-/Post-CFTR Modulator Results With Random Slope
+
+```{r}
+mod = lmer(Vitamin.D ~ Time + c1 + c2 + (Time|Patient.ID),data = cf)
+plot_df = mod@frame
+plot_df$pred = predict(mod)
+ggplot(plot_df,aes(x = Time,y = Vitamin.D,group = factor(Patient.ID))) +
+    geom_line(aes(y = pred),alpha = 0.5) + geom_point(aes(y = pred),alpha = 0.5) +
+    theme_bw() + theme(legend.position = "none") + xlab("Time (years)")
+```
+
+## Pre-/Post-CFTR Modulator Results With Random Slope
+
+```{r}
+kable(broom.mixed::tidy(mod,"fixed")[,-1],digits = 3)
+```
+
 ## A Bayesian Approach
 
 -   The `mcp` package provides an easy interface for fitting Bayesian regression models with multiple change points.
@@ -367,6 +384,11 @@ kable(s,digits = 3)
 print(p)
 ```
 
+## Future Plans
+
+-   Try a random slope
+-   Apply similar models to other outcomes like sweat electrolytes, etc.
+
 ## Limitations
 
 -   Only 20 two-modulator participants with vitamin D values after starting ETI (21 measures among them).
@@ -379,10 +401,14 @@ print(p)
 
 ## Questions
 
--   How to handle truncated data (e.g. a value of "\< 0.1")?
+-   Other ways handle truncated data (e.g. a value of "\< 0.1")?
+
+    -   Tobit extension to the existing model?
 
 -   Should I model the two-modulator and one-modulator groups separately, but still use piecewise models?
 
 -   Any general advice (particularly for Bayesian methods)?
+
+    -   How informative can we make these priors?
 
 # References
