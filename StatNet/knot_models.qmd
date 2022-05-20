@@ -410,6 +410,7 @@ print(p)
 
 -   Apply similar models to other outcomes like sweat electrolytes, etc.
 -   Look into frequentist approaches for automatic detection (`segmented` package, etc.)
+-   Check for covariates that improve the model (age, sex, BMI, etc.)
 
 ## Limitations
 
