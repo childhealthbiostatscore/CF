@@ -39,16 +39,8 @@ source("~/GitHub/CF/get_genotype_class_severity.R")
 
 ```{r}
 # Vitamins
-vit = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021_revised20220429.xlsx")
-vit$Date = date(ymd_hms(vit$Date))
-vit2 = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021.xlsx")
-vit2$Date = date(ymd_hms(vit2$Date))
-diff = setdiff(vit[,c("Patient ID","Date")],vit2[,c("Patient ID","Date")])
-t = vit[vit$`Patient ID` %in% diff$`Patient ID`,]
-t2 = vit2[vit2$`Patient ID` %in% diff$`Patient ID`,]
-
-vit = vit %>% select(`Patient ID`,Date,VitaminA_Retinol:`Vitamin E Gamma`)
-# New age at start
+vit = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021_revised20220712.xlsx")
+# Determine which modulator they were on
 mods = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
 mods = mods[mods$Modulator %in% c('Kalydeco','Trikafta'),]
 mods = mods %>% select(`Patient ID`,Modulator,`Earliest Date in Registry`) %>% 
@@ -63,6 +55,8 @@ pancreatic = pancreatic %>% rename(`Patient ID` = PatientID) %>% select(`Patient
 # FEV1 and BMI
 fev = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report_PFTs_ThroughDecember2021.xlsx")
 fev = fev %>% select(PatientID,Date,BMI,`FEV1 % pred`) %>% rename(`Patient ID` = PatientID)
+# Merge
+df = left_join()
 # Merge
 df = full_join(vit,fev,by = c("Patient ID", "Date")) %>% filter(`Patient ID` %in% mods$`Patient ID`)
 df = left_join(df,mods,by = "Patient ID")
