@@ -37,9 +37,10 @@ source("~/GitHub/CF/get_genotype_class_severity.R")
 
 # Data cleaning
 
-```{r}
+```{r warning=FALSE}
 # Vitamins
 vit = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021_revised20220712.xlsx")
+vit$VitaminA_Retinol = as.numeric(vit$VitaminA_Retinol)
 # Determine which modulator they were on
 mods = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
 mods = mods %>% filter(Modulator %in% c('Kalydeco','Trikafta')) %>%
@@ -49,12 +50,15 @@ mods = mods %>% filter(Modulator %in% c('Kalydeco','Trikafta')) %>%
 colnames(mods)[2:ncol(mods)] = paste0(colnames(mods)[2:ncol(mods)]," Date")
 mods$`First Mod Date` = pmin(mods$`Trikafta Date`,mods$`Kalydeco Date`,na.rm = T)
 mods$`Second Mod Date` = pmax(mods$`Trikafta Date`,mods$`Kalydeco Date`)
+mods$`First Mod` = NA
+mods$`First Mod`[mods$`First Mod Date` == mods$`Trikafta Date`] = "Trikafta"
+mods$`First Mod`[mods$`First Mod Date` == mods$`Kalydeco Date`] = "Kalydeco"
 # Add pancreatic status
 pancreatic = read_excel("./CF Info/Sweat Tests from Internal Database_genotype class_withPancStatus.xlsx")
 pancreatic = pancreatic %>% rename(`Patient ID` = PatientID) %>% select(`Patient ID`,PancreaticStatus)
 # FEV1 and BMI
 fev = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report_PFTs_ThroughDecember2021.xlsx")
-fev = fev %>% select(PatientID,Date,BMI,`FEV1 % pred`) %>% rename(`Patient ID` = PatientID)
+fev = fev %>% select(PatientID,Sex,Date,BMI,`FEV1 % pred`) %>% rename(`Patient ID` = PatientID)
 # Merge
 df = full_join(vit,fev,by = c("Patient ID", "Date")) %>% filter(`Patient ID` %in% mods$`Patient ID`)
 df = left_join(df,mods,by = "Patient ID")
@@ -108,17 +112,21 @@ df = df %>% filter(`Patient ID` %in% two_measures$`Patient ID` &
 df$Time = as.numeric(difftime(df$Date,df$`First Mod Date`,units = "days"))
 # Before or after start
 df$Before_After = cut(df$Time,c(-Inf,0,Inf),labels = c("Before","After"),right = T)
-t = df %>% filter(abs(Time) <= (3*365)) %>% # Within 3 years of start
-  group_by(`Patient ID`,Before_After) %>% 
+before_after = df %>% filter(abs(Time) <= (3*365)) %>% # Within 3 years of start
+  group_by(`Patient ID`,Before_After) %>% fill(Sex) %>%
   arrange(abs(Time),.by_group = T) %>% # Sort so that the the first non-NA value is the closest to modulator start
-  summarise(`Vitamin A` = first(na.omit(VitaminA_Retinol)),
+  summarise(Sex = first(na.omit(Sex)),Age = first(na.omit(`Age at Test (years)`)),
+            `First Mod` = first(na.omit(`First Mod`)),
+            `Vitamin A` = first(na.omit(VitaminA_Retinol)),
             `Vitamin D` = first(na.omit(`25OH-Vitamin D`)),
             `Vitamin E Alpha` = first(na.omit(`Vitamin E Alpha`)),
             `Vitamin E Gamma` = first(na.omit(`Vitamin E Gamma`)),
-            BMI = first(na.omit(BMI)),.groups = "drop")
+            BMI = first(na.omit(BMI)),
+            `FEV1 % pred` = first(na.omit(`FEV1 % pred`)),
+            .groups = "drop")
 ```
 
-```{r}
+```{r eval=FALSE}
 # Flowchart
 g = grViz("
 digraph graph2 {
@@ -161,12 +169,12 @@ l -> m
 [4]: paste0('Treated With Ivacaftor Alone From 2008-2021 (n = ',as.numeric(table(groups$Group)['Kalydeco']), ')')
 [5]: paste0('Treated With Trikafta Alone From 2008-2021 (n = ',as.numeric(table(groups$Group)['Trikafta']), ')')
 [6]: paste0('Treated With Ivacaftor followed by Trikafta From 2008-2021 (n = ',as.numeric(table(groups$Group)['Both']), ')')
-[7]: paste0('At Least One Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Kalydeco']), ')')
-[8]: paste0('At Least One Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Trikafta']), ')')
-[9]: paste0('At Least One Vitamin A Measures Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Both']), ')')
-[10]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Kalydeco']), ')')
-[11]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Trikafta']), ')')
-[12]: paste0('At Least One Vitamin A >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Both']), ')')
+[7]: paste0('At Least One Vitamin Measure Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Kalydeco']), ')')
+[8]: paste0('At Least One Vitamin Measure Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Trikafta']), ')')
+[9]: paste0('At Least One Vitamin Measure Prior to First Modulator (n = ',as.numeric(table(two_measures$Group)['Both']), ')')
+[10]: paste0('At Least One Vitamin Measure >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Kalydeco']), ')')
+[11]: paste0('At Least One Vitamin Measure >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Trikafta']), ')')
+[12]: paste0('At Least One Vitamin Measure >= 3 Months After First Modulator (n = ',as.numeric(table(after_measure$Group)['Both']), ')')
 [13]: paste0('Final (n = ',length(unique(after_measure$`Patient ID`)), ')')
 ")
 g
@@ -174,31 +182,27 @@ g
 
 # Participant Characteristics
 
-For each person, we calculated the maximum amount of time from the earliest nutrition measure before modulator start to start date, and the amount of time from modulator start date to most recent nutrition measure. The ranges of these values are presented below ("Years to start" and "Years From start," respectively).
-
 ```{r results='asis'}
 # Import demo info and add
-
-
-df$Sex[df$Sex == ""] = NA
-demo = df %>% group_by(Patient.ID) %>% fill(Sex,.direction = "downup") %>%
-  filter(row_number() == 1)
-t1 = tableby(first_mod ~ Age.at.Start..years. + Sex + genoRisk +
-               vit_measures_after + vit_measures_before +
-               notest(max_years_to_start,"min","max") +
-               notest(max_years_from_start,"min","max"),
+demo = before_after %>% group_by(`Patient ID`) %>% filter(row_number() == 1)
+t1 = tableby(`First Mod` ~ Age + Sex + `Vitamin A` + `Vitamin D` + 
+               `Vitamin E Alpha` + `Vitamin E Gamma` + BMI + `FEV1 % pred`,
              data = demo,
-             control = tableby.control(numeric.stats=c("Nmiss", "median", "q1q3"),))
-summary(t1,test = F,
-        labelTranslations =
-          list(Age.at.Start..years. = "Age at Start (years)",
-               genoRisk = "Genotype risk group",
-               vit_measures_after = "No. of vitamin measures post",
-               vit_measures_before = "No. of vitamin measures pre",
-               max_years_to_start = "Years to start",max_years_from_start = "Years From start"))
+             control = tableby.control(numeric.stats=c("Nmiss", "median", "q1q3")))
+summary(t1)
 ```
 
+# Pre-Post Copmparisons
 
+Continuous variables were compared using a Wilcoxon signed rank test and categorical variables were compared using McNemar’s test.
+
+```{r results='asis'}
+t2 = paired(Before_After ~ `Vitamin A` + `Vitamin D` + 
+               `Vitamin E Alpha` + `Vitamin E Gamma` + BMI + `FEV1 % pred`,
+             data = before_after, id = `Patient ID`, 
+            numeric.test = "signed.rank",signed.rank.exact = FALSE)
+summary(t2)
+```
 
 <!-- # Piecewise longitudinal models -->
 
