@@ -35,8 +35,6 @@ rm(home_dir)
 source("~/GitHub/CF/get_genotype_class_severity.R")
 ```
 
-# Data cleaning
-
 ```{r warning=FALSE}
 # Vitamins
 vit = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021_revised20220712.xlsx")
@@ -58,7 +56,7 @@ pancreatic = read_excel("./CF Info/Sweat Tests from Internal Database_genotype c
 pancreatic = pancreatic %>% rename(`Patient ID` = PatientID) %>% select(`Patient ID`,PancreaticStatus)
 # FEV1 and BMI
 fev = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report_PFTs_ThroughDecember2021.xlsx")
-fev = fev %>% select(PatientID,Sex,Date,BMI,`FEV1 % pred`) %>% rename(`Patient ID` = PatientID)
+fev = fev %>% select(PatientID,Sex,Date,`BMI percentile (CDC)`,`FEV1 % pred`) %>% rename(`Patient ID` = PatientID)
 # Merge
 df = full_join(vit,fev,by = c("Patient ID", "Date")) %>% filter(`Patient ID` %in% mods$`Patient ID`)
 df = left_join(df,mods,by = "Patient ID")
@@ -121,7 +119,7 @@ before_after = df %>% filter(abs(Time) <= (3*365)) %>% # Within 3 years of start
             `Vitamin D` = first(na.omit(`25OH-Vitamin D`)),
             `Vitamin E Alpha` = first(na.omit(`Vitamin E Alpha`)),
             `Vitamin E Gamma` = first(na.omit(`Vitamin E Gamma`)),
-            BMI = first(na.omit(BMI)),
+            BMI = first(na.omit(`BMI percentile (CDC)`)),
             `FEV1 % pred` = first(na.omit(`FEV1 % pred`)),
             .groups = "drop")
 ```
@@ -192,7 +190,7 @@ t1 = tableby(`First Mod` ~ Age + Sex + `Vitamin A` + `Vitamin D` +
 summary(t1)
 ```
 
-# Pre-Post Copmparisons
+# Pre-Post Comparisons
 
 Continuous variables were compared using a Wilcoxon signed rank test and categorical variables were compared using McNemar’s test.
 
@@ -200,7 +198,8 @@ Continuous variables were compared using a Wilcoxon signed rank test and categor
 t2 = paired(Before_After ~ `Vitamin A` + `Vitamin D` + 
                `Vitamin E Alpha` + `Vitamin E Gamma` + BMI + `FEV1 % pred`,
              data = before_after, id = `Patient ID`, 
-            numeric.test = "signed.rank",signed.rank.exact = FALSE)
+            numeric.test = "signed.rank",signed.rank.exact = FALSE,
+            control = paired.control(numeric.stats=c("Nmiss", "median", "q1q3")))
 summary(t2)
 ```
 
