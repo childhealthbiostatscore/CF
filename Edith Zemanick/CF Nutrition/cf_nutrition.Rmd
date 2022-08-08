@@ -42,8 +42,8 @@ source("~/GitHub/CF/get_genotype_class_severity.R")
 vit = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021_revised20220712.xlsx")
 # Determine which modulator they were on
 mods = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
-mods = mods[mods$Modulator %in% c('Kalydeco','Trikafta'),]
-mods = mods %>% select(`Patient ID`,Modulator,`Earliest Date in Registry`) %>% 
+mods = mods %>% filter(Modulator %in% c('Kalydeco','Trikafta')) %>%
+  select(`Patient ID`,Modulator,`Earliest Date in Registry`) %>% 
   pivot_wider(id_cols = `Patient ID`,names_from = Modulator,
               values_from = `Earliest Date in Registry`)
 colnames(mods)[2:ncol(mods)] = paste0(colnames(mods)[2:ncol(mods)]," Date")
@@ -56,26 +56,9 @@ pancreatic = pancreatic %>% rename(`Patient ID` = PatientID) %>% select(`Patient
 fev = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report_PFTs_ThroughDecember2021.xlsx")
 fev = fev %>% select(PatientID,Date,BMI,`FEV1 % pred`) %>% rename(`Patient ID` = PatientID)
 # Merge
-df = left_join()
-# Merge
 df = full_join(vit,fev,by = c("Patient ID", "Date")) %>% filter(`Patient ID` %in% mods$`Patient ID`)
 df = left_join(df,mods,by = "Patient ID")
 df = left_join(df,pancreatic,by = "Patient ID")
-# Time relative to first mod
-df$Time = as.numeric(difftime(df$Date,df$`First Mod Date`,units = "days"))/365.25
-# Calculate spline things
-df$c1 = (df$Time-0)*(df$Time>=0)
-df$c2 = as.numeric(difftime(df$Date,df$`Second Mod Date`,units = "days"))/365.25
-df$c2 = df$c2*(df$Date >= df$`Second Mod Date`)
-# Convert to numeric
-df$VitaminA_Retinol = suppressWarnings(as.numeric(df$VitaminA_Retinol))
-# Select columns
-df = df %>% filter(!is.na(VitaminA_Retinol)) %>%
-  select(`Patient ID`,`First Mod Date`,`Second Mod Date`,
-         Date,Time,c1,c2,VitaminA_Retinol) %>%
-  rename(`Vitamin A` = VitaminA_Retinol)
-# Write for presentation
-write.csv(df,file = "~/GitHub/CF/StatNet/data.csv",row.names = F,na = "")
 ```
 
 ```{r}
@@ -100,25 +83,39 @@ df$Group = apply(df,1,function(r){
 sweat = read_excel("./Edith Zemanick/CF Nutrition/Data_Raw/Report Electrolytes_throughDecember2021.xlsx")
 df = df %>% filter(`Patient ID` %in% sweat$`Patient ID`)
 groups = df %>% group_by(`Patient ID`) %>% filter(row_number()==1)
+# Filter any measures within 3 months of modulator start
+df = df %>% 
+  filter(Date < `First Mod Date` - days(90) | 
+           ((Date > `First Mod Date` + days(90)) & (Date < `Second Mod Date` - days(90))) |
+           (Date > `Second Mod Date` + days(90) | is.na(`Second Mod Date`)))
 # Two nutrition measures before first mod start
 two_measures = df %>% 
-  mutate(before_first = Date < `First Mod Date` & !is.na(VitaminA_Retinol)) %>% 
+  mutate(before_first = Date < `First Mod Date` & 
+           (!is.na(VitaminA_Retinol) | !is.na(`25OH-Vitamin D`) | !is.na(`Vitamin E Alpha`))) %>% 
   group_by(`Patient ID`,Group) %>% count(before_first) %>% 
   filter(before_first == T,n >= 1)
 # At least one nutritional measure and one weight/height measure >= 3 months after first
 after_measure = df %>% 
   mutate(after_first = (Date >= `First Mod Date` %m+% months(3)) & 
-           !is.na(VitaminA_Retinol)) %>%
+           (!is.na(VitaminA_Retinol) | !is.na(`25OH-Vitamin D`) | !is.na(`Vitamin E Alpha`))) %>%
   group_by(`Patient ID`,Group) %>% count(after_first) %>%
   filter(after_first == T,n >= 1)
-# Write merged df - filter to just Vitamin A values
-t = df %>% 
-  mutate(`Pre/Post First Mod` = ifelse(Date > `First Mod Date`,"Post","Pre")) %>%
-  filter(!is.na(VitaminA_Retinol)) 
-write.csv(t,file = "./Edith Zemanick/CF Nutrition/Data_Cleaned/merged_data.csv",
-          row.names = F,na="")
-write.csv(mods,file = "./Edith Zemanick/CF Nutrition/Data_Cleaned/modulators.csv",
-          row.names = F,na="")
+# Filter
+df = df %>% filter(`Patient ID` %in% two_measures$`Patient ID` & 
+                     `Patient ID` %in% after_measure$`Patient ID`)
+# Get most recent pre-/post-first modulator values
+# Time from first mod
+df$Time = as.numeric(difftime(df$Date,df$`First Mod Date`,units = "days"))
+# Before or after start
+df$Before_After = cut(df$Time,c(-Inf,0,Inf),labels = c("Before","After"),right = T)
+t = df %>% filter(abs(Time) <= (3*365)) %>% # Within 3 years of start
+  group_by(`Patient ID`,Before_After) %>% 
+  arrange(abs(Time),.by_group = T) %>% # Sort so that the the first non-NA value is the closest to modulator start
+  summarise(`Vitamin A` = first(na.omit(VitaminA_Retinol)),
+            `Vitamin D` = first(na.omit(`25OH-Vitamin D`)),
+            `Vitamin E Alpha` = first(na.omit(`Vitamin E Alpha`)),
+            `Vitamin E Gamma` = first(na.omit(`Vitamin E Gamma`)),
+            BMI = first(na.omit(BMI)),.groups = "drop")
 ```
 
 ```{r}
@@ -175,28 +172,33 @@ l -> m
 g
 ```
 
-<!-- # Participant Characteristics -->
+# Participant Characteristics
 
-<!-- For each person, we calculated the maximum amount of time from the earliest nutrition measure before modulator start to start date, and the amount of time from modulator start date to most recent nutrition measure. The ranges of these values are presented below ("Years to start" and "Years From start," respectively). -->
+For each person, we calculated the maximum amount of time from the earliest nutrition measure before modulator start to start date, and the amount of time from modulator start date to most recent nutrition measure. The ranges of these values are presented below ("Years to start" and "Years From start," respectively).
 
-<!-- ```{r results='asis'} -->
-<!-- df$Sex[df$Sex == ""] = NA -->
-<!-- demo = df %>% group_by(Patient.ID) %>% fill(Sex,.direction = "downup") %>% -->
-<!--   filter(row_number() == 1) -->
-<!-- t1 = tableby(first_mod ~ Age.at.Start..years. + Sex + genoRisk + -->
-<!--                vit_measures_after + vit_measures_before + -->
-<!--                notest(max_years_to_start,"min","max") + -->
-<!--                notest(max_years_from_start,"min","max"), -->
-<!--              data = demo, -->
-<!--              control = tableby.control(numeric.stats=c("Nmiss", "median", "q1q3"),)) -->
-<!-- summary(t1,test = F, -->
-<!--         labelTranslations = -->
-<!--           list(Age.at.Start..years. = "Age at Start (years)", -->
-<!--                genoRisk = "Genotype risk group", -->
-<!--                vit_measures_after = "No. of vitamin measures post", -->
-<!--                vit_measures_before = "No. of vitamin measures pre", -->
-<!--                max_years_to_start = "Years to start",max_years_from_start = "Years From start")) -->
-<!-- ``` -->
+```{r results='asis'}
+# Import demo info and add
+
+
+df$Sex[df$Sex == ""] = NA
+demo = df %>% group_by(Patient.ID) %>% fill(Sex,.direction = "downup") %>%
+  filter(row_number() == 1)
+t1 = tableby(first_mod ~ Age.at.Start..years. + Sex + genoRisk +
+               vit_measures_after + vit_measures_before +
+               notest(max_years_to_start,"min","max") +
+               notest(max_years_from_start,"min","max"),
+             data = demo,
+             control = tableby.control(numeric.stats=c("Nmiss", "median", "q1q3"),))
+summary(t1,test = F,
+        labelTranslations =
+          list(Age.at.Start..years. = "Age at Start (years)",
+               genoRisk = "Genotype risk group",
+               vit_measures_after = "No. of vitamin measures post",
+               vit_measures_before = "No. of vitamin measures pre",
+               max_years_to_start = "Years to start",max_years_from_start = "Years From start"))
+```
+
+
 
 <!-- # Piecewise longitudinal models -->
 
