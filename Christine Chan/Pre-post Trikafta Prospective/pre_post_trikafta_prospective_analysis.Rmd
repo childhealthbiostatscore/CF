@@ -20,15 +20,7 @@ library(pracma)
 library(corrplot)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE,warning = FALSE)
-if(Sys.info()["sysname"] == "Windows"){
-  home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
-} else if (Sys.info()["sysname"] == "Linux"){
-  home_dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
-} else if (Sys.info()["sysname"] == "Darwin"){
-  home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
-}
-knitr::opts_knit$set(root.dir = home_dir)
-rm(home_dir)
+knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/CF")
 ```
 
 ```{r}
@@ -106,6 +98,7 @@ newlabels["iAUC_ratio"] = "C pep iAUC:Glucose iAUC"
 newlabels["homa2B"] = "HOMA2 %B"
 newlabels["homa2S"] = "HOMA2 %S"
 newlabels["homa2IR"] = "HOMA2 IR"
+newlabels["total_sensor_readings"] = "Total Sensor Readings"
 newlabels["mean_sensor"] = "Mean SG (mg/dL)"
 newlabels["max_sensor"] = "Max. SG (mg/dL)"
 newlabels["min_sensor"] = "Min SG (mg/dL)"
@@ -135,7 +128,7 @@ t1 = tableby(~Age.at.visit.+Weight..kg.+weightz+trikafta_duration+
                Genotype+Pancreatic.Status+Kalydeco+Orkambi+Symdeko,
              control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),
              data = df[df$Event.Name == "Visit 1",])
-summary(t1,digits = 2,labelTranslations = newlabels)
+summary(t1,digits = 2,labelTranslations = newlabels,pfootnote=TRUE)
 ```
 
 ## Reduced Cohort
@@ -146,7 +139,7 @@ t1 = tableby(~Age.at.visit.+Weight..kg.+weightz+trikafta_duration+
                Genotype+Pancreatic.Status+Kalydeco+Orkambi+Symdeko,
              control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),
              data = df[df$Event.Name == "Visit 1" & df$Study.ID %in% keep_dxa,])
-summary(t1,digits = 2,labelTranslations = newlabels)
+summary(t1,digits = 2,labelTranslations = newlabels,pfootnote=TRUE)
 ```
 
 # Table 2: Pre-/Post-Trikafta Comparisons
@@ -250,7 +243,7 @@ t2_vars = c("A1C.result","Weight..kg.","weightz","BMIz","FEV1..","FVC....",
             "Fat.Mass.Index..FMI...","Lean.body.mass.fat.mass..LBM.FM.",
             "Fat.Free.Mass.Index...FFMI.","Lean.Body.Mass.Index..LBMI.",
             "BMD.Total.z.score","BMD.Subtotal.z.score",
-            "DXA.FMI.calculated.z.score","DXA.LBMI.calculated.z.score",
+            "DXA.FMI.calculated.z.score","DXA.LBMI.calculated.z.score","total_sensor_readings",
             "mean_sensor","max_sensor","min_sensor","percent_time_70_180",
             "percent_time_over_140","percent_time_over_180","percent_time_over_250",
             "percent_time_under_70","percent_time_under_54","standard_deviation","cv","r_mage")
@@ -316,12 +309,16 @@ corrplot(M, p.mat = testRes$p, method = 'circle', type = 'lower', insig='blank',
 
 # Other Figures
 
+Line plots below indicate median with IQR represented by the error bars.
+
 ## HbA1c
 
 ```{r}
 ggplot(df,aes(x = Event.Name, y = A1C.result,fill = Event.Name)) + 
-  geom_boxplot() + geom_jitter(width = 0.25) + 
-  xlab("Visit") + ylab("HbA1c (%)") + theme_bw() + theme(legend.position = "none")
+  geom_boxplot(coef=0,alpha = 0.5,outlier.shape = NA) + geom_jitter(width = 0.15) + 
+  xlab("Visit") + ylab("HbA1c (%)") + 
+  theme_bw() + theme(legend.position = "none") +
+  scale_fill_grey()
 ```
 
 ## Glucose
@@ -330,13 +327,16 @@ ggplot(df,aes(x = Event.Name, y = A1C.result,fill = Event.Name)) +
 plot_df = df %>% pivot_longer(all_of(glu_cols)) %>% select(Study.ID,Event.Name,name,value)
 plot_df$name = as.numeric(gsub("Glucose|\\.|min|minute","",plot_df$name))
 plot_df = plot_df %>% group_by(name,Event.Name) %>% 
-  summarise(m = mean(value,na.rm = T),
-            se = sd(value)/sqrt(n()),.groups = "drop")
+  summarise(m = median(value,na.rm = T),
+            low = as.numeric(quantile(value,0.25)),
+            high = as.numeric(quantile(value,0.75)),
+            .groups = "drop")
 ggplot(plot_df,aes(x = name,y = m,color = Event.Name)) + 
   geom_line() + geom_point() + 
-  geom_errorbar(aes(ymin=m-(1.96*se), ymax=m+(1.96*se)), width=2) +
+  geom_errorbar(aes(ymin=low, ymax=high), width=2) +
   xlab("Time (minutes)") + ylab("Glucose (mg/dL)") + ylim(0,200) + 
-  theme_bw()
+  theme_bw() +
+  theme(legend.title=element_blank()) + scale_color_grey()
 ```
 
 ## Glucose
@@ -345,13 +345,16 @@ ggplot(plot_df,aes(x = name,y = m,color = Event.Name)) +
 plot_df = df %>% pivot_longer(all_of(cpep_cols)) %>% select(Study.ID,Event.Name,name,value)
 plot_df$name = as.numeric(gsub("c.peptide|\\.|min|minute","",plot_df$name))
 plot_df = plot_df %>% group_by(name,Event.Name) %>% 
-  summarise(m = mean(value,na.rm = T),
-            se = sd(value)/sqrt(n()),.groups = "drop")
+  summarise(m = median(value,na.rm = T),
+            low = as.numeric(quantile(value,0.25)),
+            high = as.numeric(quantile(value,0.75)),
+            .groups = "drop")
 ggplot(plot_df,aes(x = name,y = m,color = Event.Name)) + 
   geom_line() + geom_point() + 
-  geom_errorbar(aes(ymin=m-(1.96*se), ymax=m+(1.96*se)), width=2) +
+  geom_errorbar(aes(ymin=low, ymax=high), width=2) +
   xlab("Time (minutes)") + ylab("C Peptide (pmol/L)") + 
-  theme_bw()
+  theme_bw() +
+  theme(legend.title=element_blank()) + scale_color_grey()
 ```
 
 ## Insulin
@@ -361,15 +364,16 @@ plot_df = df %>% pivot_longer(all_of(ins_cols)) %>% select(Study.ID,Event.Name,n
 plot_df$name = as.numeric(gsub("Insulin|insulin|\\.|min|minute","",plot_df$name))
 plot_df = plot_df %>% group_by(name,Event.Name) %>% 
   summarise(m = mean(value,na.rm = T),
-            se = sd(value)/sqrt(n()),.groups = "drop")
+            low = as.numeric(quantile(value,0.25)),
+            high = as.numeric(quantile(value,0.75)),
+            .groups = "drop")
 ggplot(plot_df,aes(x = name,y = m,color = Event.Name)) + 
   geom_line() + geom_point() + 
-  geom_errorbar(aes(ymin=m-(1.96*se), ymax=m+(1.96*se)), width=2) +
+  geom_errorbar(aes(ymin=low, ymax=high), width=2) +
   xlab("Time (minutes)") + ylab("Insulin (mcU/mL)") + 
-  theme_bw()
+  theme_bw() + 
+  theme(legend.title=element_blank()) + scale_color_grey()
 ```
-
-
 
 # Notes
 
