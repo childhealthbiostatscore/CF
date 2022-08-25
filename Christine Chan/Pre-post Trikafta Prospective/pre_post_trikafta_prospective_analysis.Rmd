@@ -167,7 +167,7 @@ df$Group = apply(df[,glu_cols],1,function(r){
     return("AGT")
   }
 })
-df$Group = factor(df$Group,levels = c("NGT","AGT","CFRD"),ordered = T)
+df$Group = factor(df$Group,levels = c("NGT","AGT","CFRD"))
 # convert Insulin to mcU/mL
 ins_cols = colnames(df)[head(grep("insulin",tolower(colnames(df))),-1)]
 df[,ins_cols] = lapply(df[,ins_cols], function(c){
@@ -248,8 +248,8 @@ t2_vars = c("A1C.result","Weight..kg.","weightz","BMIz","FEV1..","FVC....",
             "percent_time_over_140","percent_time_over_180","percent_time_over_250",
             "percent_time_under_70","percent_time_under_54","standard_deviation","cv","r_mage")
 f = as.formula(paste0("Event.Name ~ ",paste0(t2_vars,collapse = "+")))
-p <- paired(f,data = df, id = Study.ID,numeric.test = "signed.rank",signed.rank.exact = F,
-            control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),)
+p <- paired(f,data = df, id = Study.ID,numeric.test = "signed.rank",signed.rank.exact = F,cat.test = "mcnemar",
+            control = tableby.control(numeric.stats = c("Nmiss", "medianq1q3", "range")),)
 summary(p,pfootnote = T,labelTranslations = newlabels)
 ```
 
@@ -258,7 +258,7 @@ summary(p,pfootnote = T,labelTranslations = newlabels)
 ```{r results='asis'}
 f = as.formula(paste0("Event.Name ~ ",paste0(t2_vars,collapse = "+")))
 p = paired(f,data = df[df$Study.ID %in% keep_dxa,], 
-           control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),
+           control = tableby.control(numeric.stats = c("Nmiss", "medianq1q3", "range")),
            id = Study.ID,numeric.test = "signed.rank",signed.rank.exact = F)
 summary(p,pfootnote = T,labelTranslations = newlabels)
 ```
@@ -267,14 +267,15 @@ summary(p,pfootnote = T,labelTranslations = newlabels)
 
 ```{r}
 df$`Age Group` = cut(df$Age.at.visit.,c(-Inf,18,Inf),labels = c("Child","Adult"))
+df = df %>% arrange(Study.ID,Event.Name) %>% group_by(Study.ID) %>% fill(`Age Group`,.direction = "down")
 ```
 
 The following table includes `r as.numeric(table(df[df$Event.Name == "Visit 1","Age Group"])["Child"])` children and `r as.numeric(table(df[df$Event.Name == "Visit 1","Age Group"])["Adult"])` adults.
 
 ```{r results='asis'}
 f = as.formula(paste0("Event.Name ~ ",paste0(t2_vars,collapse = "+")))
-p <- paired(f,data = df, id = Study.ID,numeric.test = "signed.rank",signed.rank.exact = F,
-            control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),
+p <- paired(f,data = df, id = Study.ID,numeric.test = "signed.rank",cat.test = "mcnemar",signed.rank.exact = F,
+            control = tableby.control(numeric.stats = c("Nmiss", "medianq1q3", "range")),
             strata = `Age Group`)
 summary(p,pfootnote = T,labelTranslations = newlabels)
 ```
@@ -373,6 +374,30 @@ ggplot(plot_df,aes(x = name,y = m,color = Event.Name)) +
   xlab("Time (minutes)") + ylab("Insulin (mcU/mL)") + 
   theme_bw() + 
   theme(legend.title=element_blank()) + scale_color_grey()
+```
+
+# Group change tests
+
+## All
+
+```{r}
+groups = df %>% select(Study.ID,Event.Name,Group) %>%
+  pivot_wider(id_cols = Study.ID,names_from = Event.Name,values_from = Group) %>%
+  left_join(.,df[df$Event.Name == "Visit 1",c("Study.ID","Age Group")],by = "Study.ID")
+groups$Change = factor(as.numeric(groups$`Visit 2`) - as.numeric(groups$`Visit 1`),
+                       levels = c(-1:1),labels = c("Improved","Stayed Same or Got Worse",
+                                                   "Stayed Same or Got Worse"))
+p = prop.test(sum(groups$Change == "Improved"),n = nrow(groups))
+kable(table(groups$Change),col.names = c("Change","n"))
+```
+
+`r as.numeric(p$estimate*100)`% of all participants improved from visit 1 to visit 2 (95% CI: `r round(p$conf.int[1],3)*100` - `r round(p$conf.int[2],3)*100`).
+
+## Adults vs. Children
+
+```{r results='asis'}
+t = tableby(`Age Group`~Change,groups,cat.test="fe")
+summary(t,pfootnote = T)
 ```
 
 # Notes
