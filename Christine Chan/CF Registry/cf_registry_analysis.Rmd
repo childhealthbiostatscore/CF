@@ -18,7 +18,7 @@ library(knitr)
 knitr::opts_knit$set(root.dir = "/Users/timvigers/Documents/Work/CF/Christine Chan/CF Registry")
 ```
 
-```{r}
+```{r cache=TRUE}
 # Read in CSVs
 df = read.csv("./Data_Raw/CFF19_encountersMerged_Del1.csv")
 annual = read.csv("./Data_Raw/CFF19_Annualized_Del1.csv")
@@ -69,11 +69,11 @@ df$spouse_education = factor(df$spouse_education,levels = c(1:5),
                              labels = ed_levels)
 df$pregnant = factor(df$pregnant,levels = 0:1,labels = c("No","Yes"),ordered = T)
 # Combine education checkboxes
-df = df[1:1000,]
-df$employment = apply(df,1,function(r){
+cl = makeCluster(detectCores()*0.5,type = "FORK")
+df$employment = parApply(cl,df,1,function(r){
   emp = r[paste0("employment",1:7)]
   emp = as.numeric(emp)
-  if(all(is.na(emp))){
+  if(all(is.na(emp) | emp == 0)){
     return(NA)
   } else {
     emp = as.numeric(emp)
@@ -82,13 +82,15 @@ df$employment = apply(df,1,function(r){
     return(emp)
   }
 })
-df$employment = sub(sub("1","Part Time",df$employment))
-df$employment = sub(sub("2","Full time homemaker",df$employment))
-df$employment = sub(sub("3","Full time employment",df$employment))
-df$employment = sub(sub("4","Unemployed",df$employment))
-df$employment = sub(sub("5","Student",df$employment))
-df$employment = sub(sub("6","Disabled",df$employment))
-df$employment = sub(sub("7","Retired",df$employment))
+stopC
+df$employment = sub("1","Part Time",df$employment)
+df$employment = sub("2","Full time homemaker",df$employment)
+df$employment = sub("3","Full time employment",df$employment)
+df$employment = sub("4","Unemployed",df$employment)
+df$employment = sub("5","Student",df$employment)
+df$employment = sub("6","Disabled",df$employment)
+df$employment = sub("7","Retired",df$employment)
+df$employment = as.factor(df$employment)
 # Small dataframe for checking
 test = df[1:1000,]
 write.csv(test,"~/test.csv",row.names = F)
@@ -98,7 +100,7 @@ write.csv(test,"~/test.csv",row.names = F)
 
 ```{r warning=FALSE}
 t1_df = df %>% group_by(eDWID,Period) %>% 
-  summarise(Age = max(Age_YrEnd,na.rm = T),Race = last(na.omit(Race)),
+  summarise(Age = max(Age_YrEnd[is.finite(Age_YrEnd)]),Race = last(na.omit(Race)),
             Hispanic = last(na.omit(Hispanicrace)),Gender = last(na.omit(Gender)),
             `Patient Education` = last(na.omit(patient_education)),
             `Father Education` = last(na.omit(father_education)),
