@@ -23,11 +23,98 @@ knitr::opts_knit$set(root.dir = "/Users/timvigers/Documents/Work/CF/Christine Ch
 df = read.csv("./Data_Raw/CFF19_encountersMerged_Del1.csv")
 annual = read.csv("./Data_Raw/CFF19_Annualized_Del1.csv")
 colnames(annual)[colnames(annual)=="ReviewYear"] = "reviewyear"
-# # Merge
-# df = df.join(annual, on=['eDWID', 'reviewyear'],how="left")
-# # Group years by 2003-2009, 2010-2013, and 2014-2018
-# df["Period"] = pd.cut(df["reviewyear"], [2003, 2009, 2013, 2018])
-# # Small dataframe for checking
-# test = df.iloc[0:1000,:]
-# test.to_csv("~/test.csv",index=False)
+demo = read.csv("./Data_Raw/CFF19_DemogCFDiag_Del1.csv")
+# Combine and format demographics columns 
+demo$Race = apply(demo,1,function(r){
+  race = r[paste0("Race",1:6)]
+  race = as.numeric(which(race == 1))
+  race = paste(race,collapse = ", ")
+})
+demo$Race[grep(", ",demo$Race)] = "More Than One"
+demo$Race = factor(demo$Race,levels = c(1:6,"More Than One"),
+                   labels = c("White","Black or African American",
+                              "American Indian or Alaska Native","Asian",
+                              "Native Hawaiian or Other Pacific Islander",
+                              "Some other race","More Than One"))
+demo$Hispanicrace = factor(demo$Hispanicrace,levels = 1:2,
+                           labels = c("Yes","No"))
+# Merge
+df = left_join(df,annual, by=c('eDWID', 'reviewyear'))
+df = left_join(df,demo,by = "eDWID")
+# Group years by 2003-2009, 2010-2013, and 2014-2018
+df$Period = cut(df$reviewyear,
+                breaks =c(2002, 2009, 2013, 2018),
+                labels = c("2003 - 2009","2010 - 2013","2014 - 2018"))
+df$smoking = factor(df$smoking,levels = 1:4,labels = c("No",
+                                                       "Occasionally",
+                                                       "Yes, Regularly, less than 1 ppd",
+                                                       "Yes, Regularly, 1 ppd or more"),ordered = T)
+df$second_smoke = factor(df$smoking,levels = 1:4,labels = c("No",
+                                                            "Occasionally",
+                                                            "Yes, Regularly, less than 1 ppd",
+                                                            "Yes, Regularly, 1 ppd or more"),ordered = T)
+# Factors
+ed_levels = c("Less than High School",
+              "High School diploma or equivalent",
+              "Some College",
+              "College Graduate",
+              "Masters/Doctoral level degree")
+df$patient_education = factor(df$patient_education,levels = c(1:5),
+                              labels = ed_levels)
+df$father_education = factor(df$father_education,levels = c(1:5),
+                             labels = ed_levels)
+df$mother_education = factor(df$mother_education,levels = c(1:5),
+                             labels = ed_levels)
+df$spouse_education = factor(df$spouse_education,levels = c(1:5),
+                             labels = ed_levels)
+df$pregnant = factor(df$pregnant,levels = 0:1,labels = c("No","Yes"),ordered = T)
+# Combine education checkboxes
+df = df[1:1000,]
+df$employment = apply(df,1,function(r){
+  emp = r[paste0("employment",1:7)]
+  emp = as.numeric(emp)
+  if(all(is.na(emp))){
+    return(NA)
+  } else {
+    emp = as.numeric(emp)
+    emp = which(emp == 1)
+    emp = paste(emp,collapse = ", ")
+    return(emp)
+  }
+})
+df$employment = sub(sub("1","Part Time",df$employment))
+df$employment = sub(sub("2","Full time homemaker",df$employment))
+df$employment = sub(sub("3","Full time employment",df$employment))
+df$employment = sub(sub("4","Unemployed",df$employment))
+df$employment = sub(sub("5","Student",df$employment))
+df$employment = sub(sub("6","Disabled",df$employment))
+df$employment = sub(sub("7","Retired",df$employment))
+# Small dataframe for checking
+test = df[1:1000,]
+write.csv(test,"~/test.csv",row.names = F)
+```
+
+# Table 1: Participant characteristics at last visit in time period
+
+```{r warning=FALSE}
+t1_df = df %>% group_by(eDWID,Period) %>% 
+  summarise(Age = max(Age_YrEnd,na.rm = T),Race = last(na.omit(Race)),
+            Hispanic = last(na.omit(Hispanicrace)),Gender = last(na.omit(Gender)),
+            `Patient Education` = last(na.omit(patient_education)),
+            `Father Education` = last(na.omit(father_education)),
+            `Mother Education` = last(na.omit(mother_education)),
+            `Spouse Education` = last(na.omit(spouse_education)),
+            `Marital Status` = last(na.omit(marital_status)),
+            Employment = last(na.omit(employment)),
+            Pregnancy = max(pregnant,na.rm = T)
+  )
+# Replace infinite values with missing
+t1_df = data.frame(lapply(t1_df, function(c){
+  c[is.infinite(c)] = NA
+  return(c)
+}))
+
+cols = colnames(t1_df)[3:ncol(t1_df)]
+t1 = tableby(as.formula(paste0("Period~",paste0("`",cols,"`",collapse = "+"))),
+             data = t1_df)
 ```
