@@ -1,0 +1,33 @@
+---
+title: "CF Registry Analysis"
+author: "Tim Vigers"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r setup, include=FALSE}
+library(arsenal)
+library(tidyverse)
+library(performance)
+library(knitr)
+knitr::opts_knit$set(root.dir = "/Users/timvigers/Documents/Work/CF/Christine Chan/CF Registry")
+```
+
+```{r}
+# Read in CSVs
+df = read.csv("./Data_Raw/CFF19_encountersMerged_Del1.csv")
+annual = read.csv("./Data_Raw/CFF19_Annualized_Del1.csv")
+colnames(annual)[colnames(annual)=="ReviewYear"] = "reviewyear"
+# # Merge
+# df = df.join(annual, on=['eDWID', 'reviewyear'],how="left")
+# # Group years by 2003-2009, 2010-2013, and 2014-2018
+# df["Period"] = pd.cut(df["reviewyear"], [2003, 2009, 2013, 2018])
+# # Small dataframe for checking
+# test = df.iloc[0:1000,:]
+# test.to_csv("~/test.csv",index=False)
+```
