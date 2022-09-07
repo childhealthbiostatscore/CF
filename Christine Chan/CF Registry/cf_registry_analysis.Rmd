@@ -15,10 +15,11 @@ library(arsenal)
 library(tidyverse)
 library(performance)
 library(knitr)
+library(parallel)
 knitr::opts_knit$set(root.dir = "/Users/timvigers/Documents/Work/CF/Christine Chan/CF Registry")
 ```
 
-```{r cache=TRUE}
+```{r}
 # Read in CSVs
 df = read.csv("./Data_Raw/CFF19_encountersMerged_Del1.csv")
 annual = read.csv("./Data_Raw/CFF19_Annualized_Del1.csv")
@@ -82,7 +83,7 @@ df$employment = parApply(cl,df,1,function(r){
     return(emp)
   }
 })
-stopC
+stopCluster(cl)
 df$employment = sub("1","Part Time",df$employment)
 df$employment = sub("2","Full time homemaker",df$employment)
 df$employment = sub("3","Full time employment",df$employment)
@@ -93,14 +94,15 @@ df$employment = sub("7","Retired",df$employment)
 df$employment = as.factor(df$employment)
 # Small dataframe for checking
 test = df[1:1000,]
-write.csv(test,"~/test.csv",row.names = F)
+write.csv(test,"~/test.csv",row.names = F,na = "")
 ```
 
 # Table 1: Participant characteristics at last visit in time period
 
-```{r warning=FALSE}
+```{r warning=FALSE,results='asis'}
+# Summarize by ID and period
 t1_df = df %>% group_by(eDWID,Period) %>% 
-  summarise(Age = max(Age_YrEnd[is.finite(Age_YrEnd)]),Race = last(na.omit(Race)),
+  summarise(Age = max(Age_YrEnd),Race = last(na.omit(Race)),
             Hispanic = last(na.omit(Hispanicrace)),Gender = last(na.omit(Gender)),
             `Patient Education` = last(na.omit(patient_education)),
             `Father Education` = last(na.omit(father_education)),
@@ -115,8 +117,9 @@ t1_df = data.frame(lapply(t1_df, function(c){
   c[is.infinite(c)] = NA
   return(c)
 }))
-
+# Print table 1
 cols = colnames(t1_df)[3:ncol(t1_df)]
 t1 = tableby(as.formula(paste0("Period~",paste0("`",cols,"`",collapse = "+"))),
              data = t1_df)
+summary(t1)
 ```
