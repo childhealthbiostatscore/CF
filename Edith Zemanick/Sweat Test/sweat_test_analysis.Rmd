@@ -11,78 +11,85 @@ output:
 ---
 
 ```{r setup, include=FALSE}
+library(readxl)
 library(arsenal)
 library(tidyverse)
 library(performance)
 library(knitr)
-knitr::opts_chunk$set(echo = FALSE,warning = FALSE)
-if(Sys.info()["sysname"] == "Windows"){
-  home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Edith Zemanick/Sweat Test"
-} else if (Sys.info()["sysname"] == "Linux"){
-  home_dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Edith Zemanick/Sweat Test"
-} else if (Sys.info()["sysname"] == "Darwin"){
-  home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Edith Zemanick/Sweat Test"
-}
-knitr::opts_knit$set(root.dir = home_dir)
-rm(home_dir)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+knitr::opts_knit$set(root.dir = "/Users/timvigers/Documents/Work/CF/Edith Zemanick/Sweat Test")
 source("~/GitHub/CF/get_genotype_class_severity.R")
 ```
 
 ```{r}
+# Import exclusion data from Excel
+diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with CF or Non-CF.xlsx")
+exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude)]
 # Import data
-df = read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv",na.strings = "")
-df$Diagnosis = factor(df$Diagnosis,
-                      levels = c("CFTR-related disorder","CRMS","Cystic Fibrosis","Non-CF","Normal"),
-                      labels = c("CFTR-related disorder","CRMS","Cystic Fibrosis","Non-CF","Non-CF"))
+df <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv", na.strings = "")
+# Remove exclusions from Angela
+df <- df[!(df$PatientID %in% exclude), ]
+df$Diagnosis <- diagnoses$Diagnosis[match(df$PatientID, diagnoses$PatientID)]
 # Filter per Maxie's code
-df = df %>% 
-  filter(Age.at.Test.in.Years < 50,
-         !(Diagnosis == "Non-CF" & PatientID %in% 
-             c(22,23,24,29,31,474,483,484,485,505,510,785,791,792,793))) %>% 
-  distinct(.) %>% filter(Sex != "",Demographics.Available == "TRUE") %>%
-  mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks*7)
+df <- df %>%
+  filter(
+    Age.at.Test.in.Years < 50,
+    !(Diagnosis == "Non-CF" & PatientID %in%
+      c(22, 23, 24, 29, 31, 474, 483, 484, 485, 505, 510, 785, 791, 792, 793))
+  ) %>%
+  distinct(.) %>%
+  filter(Sex != "", Demographics.Available == "TRUE") %>%
+  mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks * 7)
 # Add modulator info
-cftr = read.csv("./Data_Raw/Copy of Report CFTR Modulators.csv")
-df$Modulator = apply(df,1,function(r){
-  mod = cftr[cftr$Patient.ID == as.numeric(r["PatientID"]),]
-  if (any(duplicated(mod$Age.at.Start..years.))){
-    mod = mod[-which(duplicated(mod$Age.at.Start..years.)),]
+cftr <- read.csv("./Data_Raw/Copy of Report CFTR Modulators.csv")
+df$Modulator <- apply(df, 1, function(r) {
+  mod <- cftr[cftr$Patient.ID == as.numeric(r["PatientID"]), ]
+  if (any(duplicated(mod$Age.at.Start..years.))) {
+    mod <- mod[-which(duplicated(mod$Age.at.Start..years.)), ]
   }
-  mod = mod[order(mod$Age.at.Start..years.),]
-  age = as.numeric(r["Age.at.Test.in.Years"])
-  as.character(cut(age,c(-Inf,mod$Age.at.Start..years.,Inf),
-                   labels = c("None",mod$Modulator),right = F))
+  mod <- mod[order(mod$Age.at.Start..years.), ]
+  age <- as.numeric(r["Age.at.Test.in.Years"])
+  as.character(cut(age, c(-Inf, mod$Age.at.Start..years., Inf),
+    labels = c("None", mod$Modulator), right = F
+  ))
 })
 # Genotype info
-df$geno1 = get_cf_genotype_class_severity(df$Genotypes1)
-df$geno2 = get_cf_genotype_class_severity(df$Genotypes2)
-df$geno1[df$Diagnosis == "Non-CF"] = "Not CF"
-df$geno2[df$Diagnosis == "Non-CF"] = "Not CF"
-df$geno_risk = paste(df$geno1,df$geno2,sep = "_")
-df$geno_risk = factor(df$geno_risk,
-                      levels = c("Mild_Severe","Mild_Unknown","Not CF_Not CF",
-                                 "Severe_Mild","Mild_Mild",
-                                 "Severe_Severe","Severe_Unknown","Unknown_Severe",
-                                 "Unknown_Unknown"),
-                      labels = c("Low","Low","Not CF","Low","Low","High","Unknown",
-                                 "Unknown","Unknown"))
+df$geno1 <- get_cf_genotype_class_severity(df$Genotypes1)
+df$geno2 <- get_cf_genotype_class_severity(df$Genotypes2)
+df$geno1[df$Diagnosis == "Non-CF"] <- "Not CF"
+df$geno2[df$Diagnosis == "Non-CF"] <- "Not CF"
+df$geno_risk <- paste(df$geno1, df$geno2, sep = "_")
+df$geno_risk <- factor(df$geno_risk,
+  levels = c(
+    "Mild_Severe", "Mild_Unknown", "Not CF_Not CF",
+    "Severe_Mild", "Mild_Mild",
+    "Severe_Severe", "Severe_Unknown", "Unknown_Severe",
+    "Unknown_Unknown"
+  ),
+  labels = c(
+    "Low", "Low", "Not CF", "Low", "Low", "High", "Unknown",
+    "Unknown", "Unknown"
+  )
+)
 # Merge left and right values
-df$Amount = apply(df[,c("Amount","Amount_Left","Amount_Right")],1,function(r){
-  amt = suppressWarnings(as.numeric(as.character(r)))
-  mean(amt,na.rm = T)
+df$Amount <- apply(df[, c("Amount", "Amount_Left", "Amount_Right")], 1, function(r) {
+  amt <- suppressWarnings(as.numeric(as.character(r)))
+  mean(amt, na.rm = T)
 })
-df$Cl = apply(df[,c("Cl","Cl_Left","Cl_Right")],1,function(r){
-  cl = suppressWarnings(as.numeric(as.character(r)))
-  mean(cl,na.rm = T)
+df$Cl <- apply(df[, c("Cl", "Cl_Left", "Cl_Right")], 1, function(r) {
+  cl <- suppressWarnings(as.numeric(as.character(r)))
+  mean(cl, na.rm = T)
 })
-df$Na = apply(df[,c("Na","Na_Left","Na_Right")],1,function(r){
-  na = suppressWarnings(as.numeric(as.character(r)))
-  mean(na,na.rm = T)
+df$Na <- apply(df[, c("Na", "Na_Left", "Na_Right")], 1, function(r) {
+  na <- suppressWarnings(as.numeric(as.character(r)))
+  mean(na, na.rm = T)
 })
-df$K = apply(df[,c("K","K_Left","K_Right")],1,function(r){
-  k = suppressWarnings(as.numeric(as.character(r)))
-  mean(k,na.rm = T)
+df$K <- apply(df[, c("K", "K_Left", "K_Right")], 1, function(r) {
+  k <- suppressWarnings(as.numeric(as.character(r)))
+  mean(k, na.rm = T)
 })
+# Sort
+df <- df %>% arrange(PatientID, Age.at.Test.in.Weeks)
 ```
 
 # Table 1: Patient Demographics and Sample Characteristics
@@ -90,12 +97,18 @@ df$K = apply(df[,c("K","K_Left","K_Right")],1,function(r){
 For those with two sweat electrolyte measures (left and right), the average of the two was used.
 
 ```{r results='asis'}
-t1_df = df %>% filter(Age.at.Test.in.Days >= 2) %>%
-  group_by(PatientID) %>% arrange(Age.at.Test.in.Weeks) %>%  filter(row_number()==1)
-t1 = tableby(Diagnosis ~ Sex+Age.at.Test.in.Years+geno_risk+Amount+Cl+Na+K,
-             data = t1_df)
-summary(t1,labelTranslations = 
-          list(Age.at.Test.in.Years = "Age (Years)",geno_risk = "Genotype Severity"))
+t1_df <- df %>%
+  filter(Age.at.Test.in.Days >= 2) %>%
+  group_by(PatientID) %>%
+  arrange(Age.at.Test.in.Weeks) %>%
+  filter(row_number() == 1)
+t1 <- tableby(Diagnosis ~ Sex + Age.at.Test.in.Years + geno_risk + Amount + Cl + Na + K,
+  data = t1_df
+)
+summary(t1,
+  labelTranslations =
+    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+)
 ```
 
 # Chloride and Diagnosis
@@ -103,27 +116,24 @@ summary(t1,labelTranslations =
 ## Table
 
 ```{r}
-df$Cl_group = cut(df$Cl,c(0,30,60,Inf),right = F)
-t = table(df$Cl_group,df$Diagnosis)
-t = rownames_to_column(as.data.frame.matrix(t))
-colnames(t)[1] = "Chloride Range"
-kable(t,row.names = F)
+df$Cl_group <- cut(df$Cl, c(0, 30, 60, Inf), right = F)
+t <- table(df$Cl_group, df$Diagnosis)
+t <- rownames_to_column(as.data.frame.matrix(t))
+colnames(t)[1] <- "Chloride Range"
+kable(t, row.names = F)
 ```
 
 ## Plot
 
 ```{r}
-ggplot(df,aes(x = Diagnosis,y = Cl)) + geom_boxplot() + theme_bw()
+ggplot(df, aes(x = Diagnosis, y = Cl)) +
+  geom_boxplot() +
+  theme_bw()
 ```
 
 ```{r}
-# Write groups of interest
-write.csv(df %>% filter(Diagnosis == "Non-CF",Cl >= 60),na = "",
-          file = "./Data_Cleaned/non_cf_cl_over_60.csv",row.names = F)
-write.csv(df %>% filter(Diagnosis == "Non-CF",Cl >= 30 & Cl < 60),na = "",
-          file = "./Data_Cleaned/non_cf_cl_30_59.csv",row.names = F)
-write.csv(df %>% filter(Diagnosis == "Cystic Fibrosis",Cl < 60),na = "",
-          file = "./Data_Cleaned/cf_cl_under_60.csv",row.names = F)
-write.csv(df %>% filter(Diagnosis == "Cystic Fibrosis",Cl >= 30 & Cl < 60),na = "",
-          file = "./Data_Cleaned/cf_cl_30_59.csv",row.names = F)
+# Write only those with multiple values
+mult <- unique(df$PatientID[which(duplicated(df$PatientID))])
+multiples <- df[df$PatientID %in% mult, ]
+write.csv(multiples, file = "./Data_Cleaned/multiple_values.csv", na = "", row.names = F)
 ```
