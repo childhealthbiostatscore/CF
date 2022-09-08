@@ -16,7 +16,7 @@ library(arsenal)
 library(tidyverse)
 library(performance)
 library(knitr)
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_knit$set(root.dir = "/Users/timvigers/Documents/Work/CF/Edith Zemanick/Sweat Test")
 source("~/GitHub/CF/get_genotype_class_severity.R")
 ```
@@ -32,14 +32,14 @@ df <- df[!(df$PatientID %in% exclude), ]
 df$Diagnosis <- diagnoses$Diagnosis[match(df$PatientID, diagnoses$PatientID)]
 # Filter per Maxie's code
 df <- df %>%
+  mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks * 7) %>%
   filter(
-    Age.at.Test.in.Years < 50,
+    Age.at.Test.in.Years < 50 & Age.at.Test.in.Days >= 2,
     !(Diagnosis == "Non-CF" & PatientID %in%
       c(22, 23, 24, 29, 31, 474, 483, 484, 485, 505, 510, 785, 791, 792, 793))
   ) %>%
   distinct(.) %>%
-  filter(Sex != "", Demographics.Available == "TRUE") %>%
-  mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks * 7)
+  filter(Sex != "", Demographics.Available == "TRUE")
 # Add modulator info
 cftr <- read.csv("./Data_Raw/Copy of Report CFTR Modulators.csv")
 df$Modulator <- apply(df, 1, function(r) {
@@ -71,6 +71,17 @@ df$geno_risk <- factor(df$geno_risk,
     "Unknown", "Unknown"
   )
 )
+# Which arm
+df$Arm <- apply(df[, c("Cl", "Cl_Left", "Cl_Right", "Na", "Na_Left", "Na_Right", "K", "K_Left", "K_Right")], 1, function(r) {
+  k <- sum(!is.na(r))
+  if (k == 6) {
+    return("Both")
+  } else if (k == 3) {
+    return("Arm Not Noted")
+  } else {
+    return(NA)
+  }
+})
 # Merge left and right values
 df$Amount <- apply(df[, c("Amount", "Amount_Left", "Amount_Right")], 1, function(r) {
   amt <- suppressWarnings(as.numeric(as.character(r)))
@@ -90,18 +101,21 @@ df$K <- apply(df[, c("K", "K_Left", "K_Right")], 1, function(r) {
 })
 # Sort
 df <- df %>% arrange(PatientID, Age.at.Test.in.Weeks)
+# Get list of those multiple values
+mult <- unique(df$PatientID[which(duplicated(df$PatientID))])
 ```
 
-# Table 1: Patient Demographics and Sample Characteristics
+# Patient Demographics and Sample Characteristics
 
 For those with two sweat electrolyte measures (left and right), the average of the two was used.
 
+## By group
+
 ```{r results='asis'}
 t1_df <- df %>%
-  filter(Age.at.Test.in.Days >= 2) %>%
   group_by(PatientID) %>%
   arrange(Age.at.Test.in.Weeks) %>%
-  filter(row_number() == 1)
+  filter(row_number() == 1) # First measure for everyone
 t1 <- tableby(Diagnosis ~ Sex + Age.at.Test.in.Years + geno_risk + Amount + Cl + Na + K,
   data = t1_df
 )
@@ -111,9 +125,33 @@ summary(t1,
 )
 ```
 
-# Chloride and Diagnosis
+## By Method
 
-## Table
+### All participants
+
+```{r results='asis'}
+t1 <- tableby(Method ~ Sex + Age.at.Test.in.Years + Diagnosis + geno_risk + Amount + Cl + Na + K + Arm,
+  data = t1_df
+)
+summary(t1,
+  labelTranslations =
+    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+)
+```
+
+### Participants with more than one measure
+
+```{r results='asis'}
+t1 <- tableby(Method ~ Sex + Age.at.Test.in.Years + Diagnosis + geno_risk + Amount + Cl + Na + K + Arm,
+  data = t1_df[t1_df$PatientID %in% mult, ]
+)
+summary(t1,
+  labelTranslations =
+    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+)
+```
+
+# Chloride and Diagnosis
 
 ```{r}
 df$Cl_group <- cut(df$Cl, c(0, 30, 60, Inf), right = F)
@@ -123,17 +161,27 @@ colnames(t)[1] <- "Chloride Range"
 kable(t, row.names = F)
 ```
 
-## Plot
+# Plots
 
-```{r}
+```{r warning=FALSE}
+ggplot(df, aes(x = Diagnosis, y = Na)) +
+  geom_boxplot() +
+  theme_bw() +
+  ggtitle("Sweat Sodium")
+
+ggplot(df, aes(x = Diagnosis, y = K)) +
+  geom_boxplot() +
+  theme_bw() +
+  ggtitle("Sweat Potassium")
+
 ggplot(df, aes(x = Diagnosis, y = Cl)) +
   geom_boxplot() +
-  theme_bw()
+  theme_bw() +
+  ggtitle("Sweat Chloride")
 ```
 
 ```{r}
 # Write only those with multiple values
-mult <- unique(df$PatientID[which(duplicated(df$PatientID))])
 multiples <- df[df$PatientID %in% mult, ]
 write.csv(multiples, file = "./Data_Cleaned/multiple_values.csv", na = "", row.names = F)
 ```
