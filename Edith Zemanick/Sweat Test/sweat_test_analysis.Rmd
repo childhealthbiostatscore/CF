@@ -6,7 +6,7 @@ output:
   html_document:
     number_sections: yes
     toc: yes
-    toc_depth: 2
+    toc_depth: 5
     toc_float: yes
 ---
 
@@ -30,16 +30,6 @@ df <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv
 # Remove exclusions from Angela
 df <- df[!(df$PatientID %in% exclude), ]
 df$Diagnosis <- diagnoses$Diagnosis[match(df$PatientID, diagnoses$PatientID)]
-# Filter per Maxie's code
-df <- df %>%
-  mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks * 7) %>%
-  filter(
-    Age.at.Test.in.Years < 50 & Age.at.Test.in.Days >= 2,
-    !(Diagnosis == "Non-CF" & PatientID %in%
-      c(22, 23, 24, 29, 31, 474, 483, 484, 485, 505, 510, 785, 791, 792, 793))
-  ) %>%
-  distinct(.) %>%
-  filter(Sex != "", Demographics.Available == "TRUE")
 # Add modulator info
 cftr <- read.csv("./Data_Raw/Copy of Report CFTR Modulators.csv")
 df$Modulator <- apply(df, 1, function(r) {
@@ -53,6 +43,17 @@ df$Modulator <- apply(df, 1, function(r) {
     labels = c("None", mod$Modulator), right = F
   ))
 })
+# Filter per Maxie's code
+df <- df %>%
+  mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks * 7) %>%
+  filter(
+    Age.at.Test.in.Years < 50 & Age.at.Test.in.Days >= 2,
+    !(Diagnosis == "Non-CF" & PatientID %in%
+      c(22, 23, 24, 29, 31, 474, 483, 484, 485, 505, 510, 785, 791, 792, 793)),
+    Modulator == "None"
+  ) %>%
+  distinct(.) %>%
+  filter(Sex != "", Demographics.Available == "TRUE")
 # Genotype info
 df$geno1 <- get_cf_genotype_class_severity(df$Genotypes1)
 df$geno2 <- get_cf_genotype_class_severity(df$Genotypes2)
@@ -61,13 +62,13 @@ df$geno2[df$Diagnosis == "Non-CF"] <- "Not CF"
 df$geno_risk <- paste(df$geno1, df$geno2, sep = "_")
 df$geno_risk <- factor(df$geno_risk,
   levels = c(
-    "Mild_Severe", "Mild_Unknown", "Not CF_Not CF",
-    "Severe_Mild", "Mild_Mild",
-    "Severe_Severe", "Severe_Unknown", "Unknown_Severe",
+    "Severe_Severe","Mild_Severe", "Mild_Unknown", "Severe_Mild", "Mild_Mild","Not CF_Not CF",
+    
+     "Severe_Unknown", "Unknown_Severe",
     "Unknown_Unknown"
   ),
   labels = c(
-    "Low", "Low", "Not CF", "Low", "Low", "High", "Unknown",
+    "High","Low", "Low", "Low", "Low", "Not CF",  "Unknown",
     "Unknown", "Unknown"
   )
 )
@@ -99,10 +100,14 @@ df$K <- apply(df[, c("K", "K_Left", "K_Right")], 1, function(r) {
   k <- suppressWarnings(as.numeric(as.character(r)))
   mean(k, na.rm = T)
 })
+# Sodium to chloride ratio
+df$`Na/Cl Ratio` = df$Na /df$Cl
 # Sort
 df <- df %>% arrange(PatientID, Age.at.Test.in.Weeks)
 # Get list of those multiple values
 mult <- unique(df$PatientID[which(duplicated(df$PatientID))])
+# Testing options (most variables are not normally distributed)
+mycontrols  <- tableby.control(numeric.test="kwt",numeric.stats=c("Nmiss", "median", "q1q3"))
 ```
 
 # Patient Demographics and Sample Characteristics
@@ -116,10 +121,10 @@ t1_df <- df %>%
   group_by(PatientID) %>%
   arrange(Age.at.Test.in.Weeks) %>%
   filter(row_number() == 1) # First measure for everyone
-t1 <- tableby(Diagnosis ~ Sex + Age.at.Test.in.Years + geno_risk + Amount + Cl + Na + K,
-  data = t1_df
+t1 <- tableby(Diagnosis ~ Sex + Age.at.Test.in.Years + fe(geno_risk) + Amount + Cl + Na + K + `Na/Cl Ratio`,
+  data = t1_df,control = mycontrols,simulate.p.value=T
 )
-summary(t1,
+summary(t1,pfootnote = T,
   labelTranslations =
     list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
 )
@@ -127,41 +132,117 @@ summary(t1,
 
 ## By Method
 
-### All participants
-
 ```{r results='asis'}
-t1 <- tableby(Method ~ Sex + Age.at.Test.in.Years + Diagnosis + geno_risk + Amount + Cl + Na + K + Arm,
-  data = t1_df
+t1 <- tableby(Method ~ Sex + Age.at.Test.in.Years + Diagnosis + geno_risk + Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+  data = t1_df,control = mycontrols,
 )
-summary(t1,
+summary(t1,pfootnote = T,
   labelTranslations =
     list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
 )
 ```
 
-### Participants with more than one measure
+# Electrolyte comparisons
+
+## By group
 
 ```{r results='asis'}
-t1 <- tableby(Method ~ Sex + Age.at.Test.in.Years + Diagnosis + geno_risk + Amount + Cl + Na + K + Arm,
-  data = t1_df[t1_df$PatientID %in% mult, ]
+t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+  data = t1_df,control = mycontrols,
 )
-summary(t1,
+summary(t1,pfootnote = T,
   labelTranslations =
     list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
 )
 ```
 
-# Chloride and Diagnosis
+### Gibson-Cooke only
 
-```{r}
-df$Cl_group <- cut(df$Cl, c(0, 30, 60, Inf), right = F)
-t <- table(df$Cl_group, df$Diagnosis)
-t <- rownames_to_column(as.data.frame.matrix(t))
-colnames(t)[1] <- "Chloride Range"
-kable(t, row.names = F)
+```{r results='asis'}
+t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+  data = t1_df[t1_df$Method == "Gibson-Cooke",],control = mycontrols,
+)
+summary(t1,pfootnote = T,
+  labelTranslations =
+    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+)
 ```
 
-# Plots
+### Macroduct only
+
+```{r results='asis'}
+t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+  data = t1_df[t1_df$Method == "Macroduct",],control = mycontrols,
+)
+summary(t1,pfootnote = T,
+  labelTranslations =
+    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+)
+```
+
+## By genotype risk
+
+```{r results='asis'}
+t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+  data = t1_df,control = mycontrols,
+)
+summary(t1,pfootnote = T,
+  labelTranslations =
+    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+)
+```
+
+## By genotype risk and diagnosis
+
+### Cystic fibrosis
+
+```{r results='asis'}
+t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+  data = t1_df[t1_df$Diagnosis == "Cystic Fibrosis",],control = mycontrols
+)
+summary(t1,pfootnote = T,
+  labelTranslations =
+    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+)
+```
+
+### CFTR-related disorder
+
+```{r results='asis'}
+t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+  data = t1_df[t1_df$Diagnosis == "CFTR-related disorder",],control = mycontrols
+)
+summary(t1,pfootnote = T,
+  labelTranslations =
+    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+)
+```
+
+### CRMS
+
+```{r results='asis'}
+t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+  data = t1_df[t1_df$Diagnosis == "CRMS",],control = mycontrols
+)
+summary(t1,pfootnote = T,
+  labelTranslations =
+    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+)
+```
+
+### Non-CF
+
+```{r results='asis'}
+t1 <- tableby( ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+  data = t1_df[t1_df$Diagnosis == "Non-CF",],control = mycontrols
+)
+summary(t1,pfootnote = T,
+  labelTranslations =
+    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+)
+```
+
+# Electrolyte plots
 
 ```{r warning=FALSE}
 ggplot(df, aes(x = Diagnosis, y = Na)) +
@@ -178,10 +259,13 @@ ggplot(df, aes(x = Diagnosis, y = Cl)) +
   geom_boxplot() +
   theme_bw() +
   ggtitle("Sweat Chloride")
+
+ggplot(df, aes(x = Diagnosis, y = `Na/Cl Ratio`)) +
+  geom_boxplot() +
+  theme_bw() +
+  ggtitle("Na/Cl Ratio")
 ```
 
-```{r}
-# Write only those with multiple values
-multiples <- df[df$PatientID %in% mult, ]
-write.csv(multiples, file = "./Data_Cleaned/multiple_values.csv", na = "", row.names = F)
-```
+# Questions 
+
+1. What are "CL diff" and "NA diff" (e.g. in Table 4)? If it's one sweat collection per patient, is is the average difference between people?
