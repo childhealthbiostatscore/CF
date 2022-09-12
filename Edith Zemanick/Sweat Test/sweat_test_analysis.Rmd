@@ -14,7 +14,7 @@ output:
 library(readxl)
 library(arsenal)
 library(tidyverse)
-library(performance)
+library(pROC)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_knit$set(root.dir = "/Users/timvigers/Documents/Work/CF/Edith Zemanick/Sweat Test")
@@ -43,6 +43,10 @@ df$Modulator <- apply(df, 1, function(r) {
     labels = c("None", mod$Modulator), right = F
   ))
 })
+# Numeric variables
+num_vars = c("Amount","Na","K","Cl")
+num_vars = c(paste0(num_vars,"_Left"),paste0(num_vars,"_Right"))
+df[,num_vars] = suppressWarnings(lapply(df[,num_vars],as.numeric))
 # Filter per Maxie's code
 df <- df %>%
   mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks * 7) %>%
@@ -72,7 +76,7 @@ df$geno_risk <- factor(df$geno_risk,
     "Unknown", "Unknown"
   )
 )
-# Which arm
+# Which arm?
 df$Arm <- apply(df[, c("Cl", "Cl_Left", "Cl_Right", "Na", "Na_Left", "Na_Right", "K", "K_Left", "K_Right")], 1, function(r) {
   k <- sum(!is.na(r))
   if (k == 6) {
@@ -83,6 +87,10 @@ df$Arm <- apply(df[, c("Cl", "Cl_Left", "Cl_Right", "Na", "Na_Left", "Na_Right",
     return(NA)
   }
 })
+
+# Difference between arms
+df$`Cl Diff. Between Left and Right Arm` = as.numeric(df$Cl_Left) - as.numeric(df$Cl_Right)
+df$`Na Diff. Between Left and Right Arm` = as.numeric(df$Na_Left) - as.numeric(df$Na_Right)
 # Merge left and right values
 df$Amount <- apply(df[, c("Amount", "Amount_Left", "Amount_Right")], 1, function(r) {
   amt <- suppressWarnings(as.numeric(as.character(r)))
@@ -104,91 +112,83 @@ df$K <- apply(df[, c("K", "K_Left", "K_Right")], 1, function(r) {
 df$`Na/Cl Ratio` = df$Na /df$Cl
 # Sort
 df <- df %>% arrange(PatientID, Age.at.Test.in.Weeks)
-# Get list of those multiple values
-mult <- unique(df$PatientID[which(duplicated(df$PatientID))])
-# Testing options (most variables are not normally distributed)
+# Table options (most variables are not normally distributed)
 mycontrols  <- tableby.control(numeric.test="kwt",numeric.stats=c("Nmiss", "median", "q1q3"))
+labels = list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
 ```
 
 # Patient Demographics and Sample Characteristics
 
-For those with two sweat electrolyte measures (left and right), the average of the two was used.
+For those with two sweat electrolyte measures (left and right), the average of the two was used. Each participants' first sweat test value was used for the following tables
 
-## By group
+## By diagnosis
 
 ```{r results='asis'}
 t1_df <- df %>%
   group_by(PatientID) %>%
-  arrange(Age.at.Test.in.Weeks) %>%
   filter(row_number() == 1) # First measure for everyone
 t1 <- tableby(Diagnosis ~ Sex + Age.at.Test.in.Years + fe(geno_risk) + Amount + Cl + Na + K + `Na/Cl Ratio`,
   data = t1_df,control = mycontrols,simulate.p.value=T
 )
 summary(t1,pfootnote = T,
-  labelTranslations =
-    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+  labelTranslations = labels
 )
 ```
 
-## By Method
+## By method
 
 ```{r results='asis'}
-t1 <- tableby(Method ~ Sex + Age.at.Test.in.Years + Diagnosis + geno_risk + Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+t1 <- tableby(Method ~ Sex + Age.at.Test.in.Years + Diagnosis + geno_risk + Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
   data = t1_df,control = mycontrols,
 )
 summary(t1,pfootnote = T,
-  labelTranslations =
-    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+  labelTranslations = labels
 )
 ```
 
 # Electrolyte comparisons
 
-## By group
+## By diagnosis
 
 ```{r results='asis'}
-t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
   data = t1_df,control = mycontrols,
 )
 summary(t1,pfootnote = T,
-  labelTranslations =
-    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+  labelTranslations = labels
 )
 ```
 
 ### Gibson-Cooke only
 
 ```{r results='asis'}
-t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
   data = t1_df[t1_df$Method == "Gibson-Cooke",],control = mycontrols,
 )
 summary(t1,pfootnote = T,
-  labelTranslations =
-    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+  labelTranslations = labels
 )
 ```
 
 ### Macroduct only
 
 ```{r results='asis'}
-t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
   data = t1_df[t1_df$Method == "Macroduct",],control = mycontrols,
 )
 summary(t1,pfootnote = T,
-  labelTranslations =
-    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+  labelTranslations = labels
 )
 ```
 
 ## By genotype risk
 
 ```{r results='asis'}
-t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
   data = t1_df,control = mycontrols,
 )
 summary(t1,pfootnote = T,
-  labelTranslations =
-    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+  labelTranslations = labels
 )
 ```
 
@@ -197,52 +197,48 @@ summary(t1,pfootnote = T,
 ### Cystic fibrosis
 
 ```{r results='asis'}
-t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
   data = t1_df[t1_df$Diagnosis == "Cystic Fibrosis",],control = mycontrols
 )
 summary(t1,pfootnote = T,
-  labelTranslations =
-    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+  labelTranslations = labels
 )
 ```
 
 ### CFTR-related disorder
 
 ```{r results='asis'}
-t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
   data = t1_df[t1_df$Diagnosis == "CFTR-related disorder",],control = mycontrols
 )
 summary(t1,pfootnote = T,
-  labelTranslations =
-    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+  labelTranslations = labels
 )
 ```
 
 ### CRMS
 
 ```{r results='asis'}
-t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
   data = t1_df[t1_df$Diagnosis == "CRMS",],control = mycontrols
 )
 summary(t1,pfootnote = T,
-  labelTranslations =
-    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+  labelTranslations = labels
 )
 ```
 
 ### Non-CF
 
 ```{r results='asis'}
-t1 <- tableby( ~ Amount + Cl + Na + K + `Na/Cl Ratio` + Arm,
+t1 <- tableby( ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
   data = t1_df[t1_df$Diagnosis == "Non-CF",],control = mycontrols
 )
 summary(t1,pfootnote = T,
-  labelTranslations =
-    list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+  labelTranslations = labels
 )
 ```
 
-# Electrolyte plots
+## Plots
 
 ```{r warning=FALSE}
 ggplot(df, aes(x = Diagnosis, y = Na)) +
@@ -266,6 +262,113 @@ ggplot(df, aes(x = Diagnosis, y = `Na/Cl Ratio`)) +
   ggtitle("Na/Cl Ratio")
 ```
 
-# Questions 
+# Between occasion
 
-1. What are "CL diff" and "NA diff" (e.g. in Table 4)? If it's one sweat collection per patient, is is the average difference between people?
+For all participants with more than one sweat test, we compared their first and last values.
+
+```{r results='asis'}
+# Get first and last values for everyone with more than 1
+multiples = df %>% group_by(PatientID) %>% 
+  filter(n() > 1) %>% # Multiple values only
+  filter(row_number()==1 | row_number()==n()) %>% # First and last
+  mutate(time = row_number())
+multiples$time = factor(multiples$time,levels = 1:2,labels = c("First","Last"))
+# Paired testing options
+mycontrols  <- tableby.control(numeric.test="signed.rank",cat.test = "mcnemar",
+                               numeric.stats=c("Nmiss", "median", "q1q3"))
+```
+
+## Overall
+
+```{r results='asis'}
+p <- paired(time ~ Diagnosis +Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,signed.rank.exact = F,
+            data = multiples, id = PatientID,control = mycontrols)
+summary(p,pfootnote = T,labelTranslations = labels)
+```
+
+## By diagnosis
+
+Not enough observations in CRMS or CFTR-related disorder groups to calculate p values. Also not enough observations to further break down the table by sweat collection method. 
+
+```{r results='asis'}
+p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,signed.rank.exact = F,strata = Diagnosis,
+            data = multiples %>% filter(Diagnosis %in% c("Cystic Fibrosis","Non-CF")), 
+            id = PatientID,control = mycontrols)
+summary(p,pfootnote = T,labelTranslations = labels)
+```
+
+## By genotype risk
+
+```{r results='asis'}
+p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,signed.rank.exact = F,strata = geno_risk,
+            data = multiples, 
+            id = PatientID,control = mycontrols)
+summary(p,pfootnote = T,labelTranslations = labels)
+```
+
+## By genotype risk and diagnosis
+
+Not enough paired observations in the CRMS or CFTR-related disorder groups.
+
+### Cystic fibrosis
+
+```{r results='asis'}
+p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio`,signed.rank.exact = F,strata = geno_risk,
+            data = multiples %>% filter(Diagnosis == "Cystic Fibrosis"), 
+            id = PatientID,control = mycontrols)
+summary(p,pfootnote = T,labelTranslations = labels)
+```
+
+### Non-CF
+
+```{r results='asis'}
+p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio`,signed.rank.exact = F,strata = geno_risk,
+            data = multiples %>% filter(Diagnosis == "Non-CF"), 
+            id = PatientID,control = mycontrols)
+summary(p,pfootnote = T,labelTranslations = labels)
+```
+
+# Chloride groups
+
+We performed receiver operating characteristic (ROC) analysis to find a sweat sodium cutoff that distinguishes between chloride groups. Only the first sweat test from each participant was used. Because the groups are based on chloride value, Na/Cl ratio is correlated with the outcome so Na alone was used instead. Also, ROC analyses generally assume a binary outcome (i.e. looking for a cutoff to distinguish between two groups), so 
+
+In the following results, "Low" indicates a sweat chloride under 30, "Medium" indicates a sweat chloride of 30 - 59, and "High" indicates a sweat chloride greater than or equal to 60.
+
+```{r}
+# Three groups
+t1_df$Group = cut(t1_df$Cl,breaks = c(0,30,60,Inf),right = F,labels = c("Low","Medium","High"))
+# Low vs. medium or high
+t1_df$Low = t1_df$Group
+levels(t1_df$Low) = c("Low","Medium or High","Medium or High")
+t1_df$Low = relevel(t1_df$Low,ref = "Medium or High")
+# High vs. medium or low
+t1_df$High = t1_df$Group
+levels(t1_df$High) = c("Low or Medium","Low or Medium","High")
+t1_df$High = relevel(t1_df$High,ref = "Low or Medium")
+```
+
+## ROC analysis
+
+```{r}
+roc_low <- roc(response = t1_df$Low,predictor = t1_df$Na,quiet = T)
+coords_low = round(coords(roc_low,"best",best.method="youden"),3)
+roc_high <- roc(response = t1_df$High,predictor = t1_df$Na,quiet = T)
+coords_high = round(coords(roc_high,"best",best.method="youden"),3)
+ 
+plot(roc_low,print.auc = TRUE, col = "blue") 
+plot(roc_high, print.auc = TRUE, col = "green", print.auc.y = .4, add = TRUE)
+```
+
+The blue curve shows the ROC for distinguishing between low vs. medium or high, and the green is the ROC curve for distinguishing between low or medium vs. high. The optimal threshold for distinguishing between low vs. medium or high was `r coords_low$threshold` (sensitivity = `r coords_low$sensitivity`, specificity = `r coords_low$specificity`) based on the Youden index. The optimal threshold for distinguishing between high vs. low or medium was `r coords_high$threshold` (sensitivity = `r coords_high$sensitivity`, specificity = `r coords_high$specificity`) based on the Youden index. The mean AUC for the two curves is `r round(mean(c(roc_low$auc,roc_high$auc)),3)`.
+
+## Histogram by group
+
+Vertical red lines indicate the thresholds identified above.
+
+```{r warning=FALSE}
+ggplot(t1_df[!is.na(t1_df$Group),],aes(Na,fill = Group)) + 
+  geom_histogram(alpha=0.3, position="identity",binwidth = 1) + 
+  geom_vline(xintercept = coords_low$threshold,color = "red") +
+  geom_vline(xintercept = coords_high$threshold,color = "red") +
+  ylab("Count") + theme_bw()
+```
