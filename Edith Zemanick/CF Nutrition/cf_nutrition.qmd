@@ -1,0 +1,36 @@
+---
+title: "CF Nutrition Pre- and Post-CFTR Modulator"
+author: "Tim Vigers"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    self-contained: true
+editor: visual
+---
+
+```{r include=FALSE}
+library(readxl)
+library(tidyverse)
+```
+
+```{r}
+# Import
+# Modulator dates
+mods = read_excel("/Users/timvigers/Documents/Work/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
+# Sort and remove those where start and end date are the same
+mods = mods %>% 
+  arrange(`Patient ID`,`Earliest Date in Registry`) %>%
+  filter(`Earliest Date in Registry` != `Last Date in Registry`)
+# Import vitamin data
+vit = read_excel("/Users/timvigers/Documents/Work/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021_revised20220712.xlsx")
+# Add FEV information
+fev = read_excel("/Users/timvigers/Documents/Work/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report_PFTs_ThroughDecember2021.xlsx")
+fev = fev %>% 
+
+
+fev = fev.rename(columns={'PatientID': 'Patient ID'})
+df = pd.merge(vit, fev, how="outer", on=["Patient ID", "Date"])
+```
