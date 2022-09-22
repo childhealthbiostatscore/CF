@@ -14,23 +14,30 @@ editor: visual
 ```{r include=FALSE}
 library(readxl)
 library(tidyverse)
+library(arsenal)
 ```
 
 ```{r}
-# Import
-# Modulator dates
-mods = read_excel("/Users/timvigers/Documents/Work/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
-# Sort and remove those where start and end date are the same
-mods = mods %>% 
-  arrange(`Patient ID`,`Earliest Date in Registry`) %>%
-  filter(`Earliest Date in Registry` != `Last Date in Registry`)
-# Import vitamin data
-vit = read_excel("/Users/timvigers/Documents/Work/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021_revised20220712.xlsx")
-# Add FEV information
-fev = read_excel("/Users/timvigers/Documents/Work/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report_PFTs_ThroughDecember2021.xlsx")
-fev = fev %>% 
+# 
 
+```
 
-fev = fev.rename(columns={'PatientID': 'Patient ID'})
-df = pd.merge(vit, fev, how="outer", on=["Patient ID", "Date"])
+# Data Cleaning
+
+-   All vitamin, PFT, and BMI percentile values were converted to numeric, so values such as "LESS THAN 0.4" were marked as missing.
+
+-   We excluded visits more than 3 years prior to effective modulator start and within 90 after effective modulator start.
+
+-   All values prior to effective modulator start were averaged to calculate the "pre" value. We selected the most recent vitamin values as the "post" value, and included any BMI percentile and FEV1 % predicted measures within a month of that visit.
+
+-   Sex was only included in the PFT datasheet, so those without PFT data were missing this variable.
+
+# Grouped by First Modulator
+
+# Pre/post comparison
+
+```{r results='asis'}
+p = paired(Timepoint~Vitamin.A+Vitamin.D+Vitamin.E.Alpha+
+           ppFEV1+BMI.Percentile,data = df,id=ID,control = list(numeric.test = "signed.rank"))
+summary(p,pfootnote = T)
 ```
