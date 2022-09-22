@@ -18,8 +18,9 @@ library(arsenal)
 ```
 
 ```{r}
-# 
-
+# Import - see cf_nutrition_clean_data.py
+df = read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis.csv")
+df$Timepoint = factor(df$Timepoint,levels = c("Pre","Post"))
 ```
 
 # Data Cleaning
@@ -32,7 +33,13 @@ library(arsenal)
 
 -   Sex was only included in the PFT datasheet, so those without PFT data were missing this variable.
 
-# Grouped by First Modulator
+# Baseline value grouped by first modulator
+
+```{r}
+t1 = tableby(First.Modulator~Vitamin.A+Vitamin.D+Vitamin.E.Alpha+
+           ppFEV1+BMI.Percentile,data = df[df$Timepoint == "Pre",])
+summary(t1,pfootnote = T)
+```
 
 # Pre/post comparison
 

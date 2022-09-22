@@ -9,7 +9,7 @@ mods = pd.read_excel(
 mods.sort_values(by=["Patient ID", "Earliest Date in Registry"],
                  ascending=True, inplace=True)
 mods = mods[mods['Earliest Date in Registry'] != mods['Last Date in Registry']]
-# vitemins
+# Vitamins
 vit = pd.read_excel(
     wd+"Data_Raw/Report Vitamins_throughDecember2021_revised20220712.xlsx")
 # Add FEV information
