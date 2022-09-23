@@ -16,6 +16,10 @@ vit = pd.read_excel(
 fev = pd.read_excel(wd+"Data_Raw/Report_PFTs_ThroughDecember2021.xlsx")
 fev = fev.rename(columns={'PatientID': 'Patient ID'})
 df = pd.merge(vit, fev, how="outer", on=["Patient ID", "Date"])
+# Add LFT info
+lft = pd.read_excel(wd+"Data_Raw/Report_LFTs_ThroughDecember2021.xlsx")
+lft = lft[["Patient ID", "Date", "ALT", "AST", "GGTP"]]
+df = pd.merge(df, lft, how="outer", on=["Patient ID", "Date"])
 # Data cleaning
 df.sort_values(by=["Patient ID", "Date"], ascending=True, inplace=True)
 # Get modulator at each vitamin measure, pre-/post- information, and start date
@@ -68,7 +72,7 @@ df["First Modulator"] = f
 # Replace missing ages with info from PFT visit
 df["Age at Test (years)"].fillna(df["Age At PFT (years)"], inplace=True)
 # Fill sex info
-df["Sex"] = df.groupby(["Patient ID"], sort=False,group_keys=False)[
+df["Sex"] = df.groupby(["Patient ID"], sort=False, group_keys=False)[
     'Sex'].apply(lambda x: x.ffill().bfill())
 # Drop those without modulator info
 df.dropna(subset="Modulator", inplace=True)
@@ -81,7 +85,7 @@ df.to_csv(wd+"Data_Cleaned/all.csv", index=False)
 # Analysis dataset
 # Convert to numeric
 cols = ["VitaminA_Retinol", "25OH-Vitamin D", "Vitamin E Alpha",
-        "Vitamin E Gamma", "FEV1 % pred", "BMI percentile (CDC)"]
+        "Vitamin E Gamma", "FEV1 % pred", "BMI percentile (CDC)", "ALT", "AST", "GGTP"]
 df[cols] = df[cols].apply(pd.to_numeric, errors='coerce')
 # For each person, average all their pre-effective mod values
 # but only use the most recent vitamin measure.
@@ -89,7 +93,7 @@ df[cols] = df[cols].apply(pd.to_numeric, errors='coerce')
 # use that otherwise missing
 # Place to store results
 analysis = {"ID": [], "Timepoint": [], "Vitamin A": [], "Vitamin D": [], "Vitamin E Alpha": [], "Vitamin E Gamma": [], "ppFEV1": [], "BMI Percentile": [],
-            "First Modulator": [], "Age Nearest Modulator Start": [], "Sex": []}
+            "First Modulator": [], "Age Nearest Modulator Start": [], "Sex": [], "ALT": [], "AST": [], "GGTP": []}
 # Iterate through by ID
 ids = df["Patient ID"].unique().tolist()
 for id in ids:
@@ -128,6 +132,9 @@ for id in ids:
     analysis["ppFEV1"].append(pre["FEV1 % pred"].mean(skipna=True))
     analysis["BMI Percentile"].append(
         pre["BMI percentile (CDC)"].mean(skipna=True))
+    analysis["ALT"].append(pre["ALT"].mean(skipna=True))
+    analysis["AST"].append(pre["AST"].mean(skipna=True))
+    analysis["GGTP"].append(pre["GGTP"].mean(skipna=True))
     # Post
     analysis["ID"].append(id)
     analysis["Timepoint"].append("Post")
@@ -172,6 +179,9 @@ for id in ids:
         analysis["Vitamin E Gamma"].append(np.nan)
         analysis["ppFEV1"].append(np.nan)
         analysis["BMI Percentile"].append(np.nan)
+        analysis["ALT"].append(np.nan)
+        analysis["AST"].append(np.nan)
+        analysis["GGTP"].append(np.nan)
         continue
     else:
         vita_date = pd.to_datetime(vita_date, errors="coerce")
@@ -207,6 +217,51 @@ for id in ids:
     else:
         fev_value = np.nan
         fev_date = np.nan
+    # Check if there is a ALT value within 1 month
+    alt = post.dropna(subset='ALT')
+    if alt.shape[0] > 0:
+        alt = alt[(abs((alt["Date"] - vita_date).dt.days) <= 30) | (abs((alt["Date"] -
+                                                                         vitd_date).dt.days) <= 30) | (abs((alt["Date"] - vitea_date).dt.days) <= 30)]
+        if alt.shape[0] > 0:
+            alt_ind = alt['ALT'].last_valid_index()
+            alt_value = post['ALT'].loc[alt_ind]
+            alt_date = post["Date"].loc[alt_ind]
+        else:
+            alt_value = np.nan
+            alt_date = np.nan
+    else:
+        alt_value = np.nan
+        alt_date = np.nan
+    # Check if there is a AST value within 1 month
+    ast = post.dropna(subset='AST')
+    if ast.shape[0] > 0:
+        ast = ast[(abs((ast["Date"] - vita_date).dt.days) <= 30) | (abs((ast["Date"] -
+                                                                         vitd_date).dt.days) <= 30) | (abs((ast["Date"] - vitea_date).dt.days) <= 30)]
+        if ast.shape[0] > 0:
+            ast_ind = ast['AST'].last_valid_index()
+            ast_value = post['AST'].loc[ast_ind]
+            ast_date = post["Date"].loc[ast_ind]
+        else:
+            ast_value = np.nan
+            ast_date = np.nan
+    else:
+        ast_value = np.nan
+        ast_date = np.nan
+    # Check if there is a GGTP value within 1 month
+    ggtp = post.dropna(subset='GGTP')
+    if ggtp.shape[0] > 0:
+        ggtp = ggtp[(abs((ggtp["Date"] - vita_date).dt.days) <= 30) | (abs((ggtp["Date"] -
+                                                                            vitd_date).dt.days) <= 30) | (abs((ggtp["Date"] - vitea_date).dt.days) <= 30)]
+        if ggtp.shape[0] > 0:
+            ggtp_ind = ggtp['GGTP'].last_valid_index()
+            ggtp_value = post['GGTP'].loc[ggtp_ind]
+            ggtp_date = post["Date"].loc[ggtp_ind]
+        else:
+            ggtp_value = np.nan
+            ggtp_date = np.nan
+    else:
+        ggtp_value = np.nan
+        ggtp_date = np.nan
     # Add to results
     analysis["Vitamin A"].append(vita_value)
     analysis["Vitamin D"].append(vitd_value)
@@ -214,6 +269,9 @@ for id in ids:
     analysis["Vitamin E Gamma"].append(viteg_value)
     analysis["ppFEV1"].append(fev_value)
     analysis["BMI Percentile"].append(bmi_value)
+    analysis["ALT"].append(alt_value)
+    analysis["AST"].append(ast_value)
+    analysis["GGTP"].append(ggtp_value)
 # Convert to DF
 analysis = pd.DataFrame(analysis)
 analysis.to_csv(wd+"Data_Cleaned/analysis.csv", index=False)

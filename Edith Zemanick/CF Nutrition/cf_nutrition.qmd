@@ -14,11 +14,12 @@ editor: visual
 ```{r include=FALSE}
 library(readxl)
 library(tidyverse)
+library(parsedate)
 library(arsenal)
 ```
 
 ```{r}
-# Import - see cf_nutrition_clean_data.py
+# Import all data
 df = read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis.csv")
 df$Timepoint = factor(df$Timepoint,levels = c("Pre","Post"))
 ```
@@ -29,7 +30,7 @@ df$Timepoint = factor(df$Timepoint,levels = c("Pre","Post"))
 
 -   We excluded visits more than 3 years prior to effective modulator start and within 90 after effective modulator start.
 
--   All values prior to effective modulator start were averaged to calculate the "pre" value. We selected the most recent vitamin values as the "post" value, and included any BMI percentile and FEV1 % predicted measures within a month of that visit.
+-   All values prior to effective modulator start were averaged to calculate the "pre" value. We selected the most recent vitamin values as the "post" value, and included any BMI percentile, FEV1 % predicted, ALT, AST, and GGTP measures within a month of that visit.
 
 -   Sex was only included in the PFT datasheet, so those without PFT data were missing this variable.
 
@@ -37,7 +38,7 @@ df$Timepoint = factor(df$Timepoint,levels = c("Pre","Post"))
 
 ```{r}
 t1 = tableby(First.Modulator~Vitamin.A+Vitamin.D+Vitamin.E.Alpha+
-           ppFEV1+BMI.Percentile,data = df[df$Timepoint == "Pre",])
+           ppFEV1+BMI.Percentile+ALT+AST+GGTP,data = df[df$Timepoint == "Pre",])
 summary(t1,pfootnote = T)
 ```
 
@@ -45,6 +46,6 @@ summary(t1,pfootnote = T)
 
 ```{r results='asis'}
 p = paired(Timepoint~Vitamin.A+Vitamin.D+Vitamin.E.Alpha+
-           ppFEV1+BMI.Percentile,data = df,id=ID,control = list(numeric.test = "signed.rank"))
+           ppFEV1+BMI.Percentile+ALT+AST+GGTP,data = df,id=ID,control = list(numeric.test = "signed.rank"))
 summary(p,pfootnote = T)
 ```
