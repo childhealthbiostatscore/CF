@@ -92,8 +92,12 @@ df[cols] = df[cols].apply(pd.to_numeric, errors='coerce')
 # If they have FEV1 or BMI within a month of the vitamin measure,
 # use that otherwise missing
 # Place to store results
-analysis = {"ID": [], "Timepoint": [], "Vitamin A": [], "Vitamin D": [], "Vitamin E Alpha": [], "Vitamin E Gamma": [], "ppFEV1": [], "BMI Percentile": [],
-            "First Modulator": [], "Age Nearest Modulator Start": [], "Sex": [], "ALT": [], "AST": [], "GGTP": []}
+analysis = {"ID": [], "Timepoint": [], "Vitamin A": [], "Vitamin D": [], "Vitamin E Alpha": [], "Vitamin E Gamma": [], "ppFEV1": [], "BMI Percentile": [], "First Modulator": [], "Age Nearest Modulator Start": [
+], "Sex": [], "ALT": [], "High ALT (3x)": [], "High ALT (5x)": [], "AST": [], "High AST (3x)": [], "High AST (5x)": [], "GGTP": [], "High GGTP (3x)": [], "High GGTP (5x)": []}
+
+analysis = {"ID": [], "Timepoint": [], "Vitamin A": [], "Vitamin D": [], "Vitamin E Alpha": [], "Vitamin E Gamma": [], "ppFEV1": [
+], "BMI Percentile": [], "First Modulator": [], "Age Nearest Modulator Start": [], "Sex": [], "ALT": [], "High ALT (3x)": [],  "AST": [],  "GGTP": []}
+
 # Iterate through by ID
 ids = df["Patient ID"].unique().tolist()
 for id in ids:
@@ -132,9 +136,49 @@ for id in ids:
     analysis["ppFEV1"].append(pre["FEV1 % pred"].mean(skipna=True))
     analysis["BMI Percentile"].append(
         pre["BMI percentile (CDC)"].mean(skipna=True))
-    analysis["ALT"].append(pre["ALT"].mean(skipna=True))
-    analysis["AST"].append(pre["AST"].mean(skipna=True))
-    analysis["GGTP"].append(pre["GGTP"].mean(skipna=True))
+    # Check liver labs
+    alt_lim = 55
+    alt_value = pre["ALT"].mean(skipna=True)
+    analysis["ALT"].append(alt_value)
+    # if pd.isnull(alt_value):
+    #     analysis["High ALT (3x)"].append(np.nan)
+    #     analysis["High ALT (5x)"].append(np.nan)
+    # elif alt_value >= alt_lim*3:
+    #     analysis["High ALT (3x)"].append("Yes")
+    # elif alt_value < alt_lim*3:
+    #     analysis["High ALT (3x)"].append("No")
+    # elif alt_value >= alt_lim*5:
+    #     analysis["High ALT (5x)"].append("Yes")
+    # elif alt_value < alt_lim*5:
+    #     analysis["High ALT (5x)"].append("No")
+    ast_lim = 48
+    ast_value = pre["AST"].mean(skipna=True)
+    analysis["AST"].append(ast_value)
+    # if pd.isnull(ast_value):
+    #     analysis["High AST (3x)"].append(np.nan)
+    #     analysis["High AST (5x)"].append(np.nan)
+    # elif ast_value >= ast_lim*3:
+    #     analysis["High AST (3x)"].append("Yes")
+    # elif ast_value < ast_lim*3:
+    #     analysis["High AST (3x)"].append("No")
+    # elif ast_value >= ast_lim*5:
+    #     analysis["High AST (5x)"].append("Yes")
+    # elif ast_value < ast_lim*5:
+    #     analysis["High AST (5x)"].append("No")
+    ggtp_lim = 61
+    ggtp_value = pre["GGTP"].mean(skipna=True)
+    analysis["GGTP"].append(ggtp_value)
+    # if pd.isnull(ggtp_value):
+    #     analysis["High GGTP (3x)"].append(np.nan)
+    #     analysis["High GGTP (5x)"].append(np.nan)
+    # elif ggtp_value >= ggtp_lim*3:
+    #     analysis["High GGTP (3x)"].append("Yes")
+    # elif ggtp_value < ggtp_lim*3:
+    #     analysis["High GGTP (3x)"].append("No")
+    # elif ggtp_value >= ggtp_lim*5:
+    #     analysis["High GGTP (5x)"].append("Yes")
+    # elif ggtp_value < ggtp_lim*5:
+    #     analysis["High GGTP (5x)"].append("No")
     # Post
     analysis["ID"].append(id)
     analysis["Timepoint"].append("Post")
@@ -269,9 +313,44 @@ for id in ids:
     analysis["Vitamin E Gamma"].append(viteg_value)
     analysis["ppFEV1"].append(fev_value)
     analysis["BMI Percentile"].append(bmi_value)
+    # Check liver labs
+    print(alt_value)
     analysis["ALT"].append(alt_value)
+    # if pd.isnull(alt_value):
+    #     analysis["High ALT (3x)"].append(np.nan)
+    #     analysis["High ALT (5x)"].append(np.nan)
+    # elif alt_value >= alt_lim*3:
+    #     analysis["High ALT (3x)"].append("Yes")
+    # elif alt_value < alt_lim*3:
+    #     analysis["High ALT (3x)"].append("No")
+    # elif alt_value >= alt_lim*5:
+    #     analysis["High ALT (5x)"].append("Yes")
+    # elif alt_value < alt_lim*5:
+    #     analysis["High ALT (5x)"].append("No")
     analysis["AST"].append(ast_value)
+    # if pd.isnull(ast_value):
+    #     analysis["High AST (3x)"].append(np.nan)
+    #     analysis["High AST (5x)"].append(np.nan)
+    # elif ast_value >= ast_lim*3:
+    #     analysis["High AST (3x)"].append("Yes")
+    # elif ast_value < ast_lim*3:
+    #     analysis["High AST (3x)"].append("No")
+    # elif ast_value >= ast_lim*5:
+    #     analysis["High AST (5x)"].append("Yes")
+    # elif ast_value < ast_lim*5:
+    #     analysis["High AST (5x)"].append("No")
     analysis["GGTP"].append(ggtp_value)
+    # if pd.isnull(ggtp_value):
+    #     analysis["High GGTP (3x)"].append(np.nan)
+    #     analysis["High GGTP (5x)"].append(np.nan)
+    # elif ggtp_value >= ggtp_lim*3:
+    #     analysis["High GGTP (3x)"].append("Yes")
+    # elif ggtp_value < ggtp_lim*3:
+    #     analysis["High GGTP (3x)"].append("No")
+    # elif ggtp_value >= ggtp_lim*5:
+    #     analysis["High GGTP (5x)"].append("Yes")
+    # elif ggtp_value < ggtp_lim*5:
+    #     analysis["High GGTP (5x)"].append("No")
 # Convert to DF
 analysis = pd.DataFrame(analysis)
 analysis.to_csv(wd+"Data_Cleaned/analysis.csv", index=False)
