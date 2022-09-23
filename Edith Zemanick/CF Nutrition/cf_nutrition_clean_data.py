@@ -352,10 +352,6 @@ for id in ids:
         analysis["High GGTP (5x)"].append("Yes")
     if ggtp_value < ggtp_lim*5:
         analysis["High GGTP (5x)"].append("No")
-    # # Checks
-    # if len(analysis["ALT"]) != len(analysis["High ALT (3x)"]):
-    #     print(id)
-    #     break
 # Convert to DF
 analysis = pd.DataFrame(analysis)
 analysis.to_csv(wd+"Data_Cleaned/analysis.csv", index=False)

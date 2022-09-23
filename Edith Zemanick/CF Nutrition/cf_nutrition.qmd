@@ -20,53 +20,8 @@ library(arsenal)
 
 ```{r}
 # Import all data
-vit = read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021_revised20220712.xlsx") %>%
-  select(`Patient ID`,Date,VitaminA_Retinol:`Vitamin E Gamma`)
-fev = read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report_PFTs_ThroughDecember2021.xlsx") %>% 
-  rename(`Patient ID` = PatientID) %>%
-  select(`Patient ID`,Date,BMI:`FEF25-75 % pred`)
-lft = read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report_LFTs_ThroughDecember2021.xlsx") %>%
-  select(`Patient ID`,Date,ALT:GGTP)
-# Format dates
-vit$Date = as.Date(parse_date(vit$Date,approx = F))
-fev$Date = as.Date(parse_date(fev$Date,approx = F))
-lft$Date = as.Date(parse_date(lft$Date,approx = F))
-# Merge and sort
-df = full_join(vit,fev,by = c("Patient ID", "Date"))
-df = full_join(df,lft,by = c("Patient ID", "Date"))
-df = df %>% arrange(`Patient ID`,Date)
-# Conver to numeric
-df[,3:ncol(df)] = lapply(df[,3:ncol(df)],as.numeric)
-# Format modulator info
-mods = read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
-mods$`Age at Start (years)` = NULL
-mods = mods %>% filter(Modulator %in% c("Kalydeco","Trikafta"))
-mods$`Earliest Date in Registry` = as.Date(parse_date(mods$`Earliest Date in Registry`,
-                                                      approx = T))
-mods$`Last Date in Registry` = as.Date(parse_date(mods$`Last Date in Registry`,
-                                                      approx = T))
-mods = mods %>% pivot_wider(id_cols = `Patient ID`,names_from = Modulator,
-                     values_from = `Earliest Date in Registry`)
-mods$`Effective Modulator Start` = pmin(mods$Trikafta,mods$Kalydeco,na.rm = T)
-mods$fmt = mods$`Effective Modulator Start` == mods$Trikafta
-mods$fmk = mods$`Effective Modulator Start` == mods$Kalydeco
-mods[,c("fmt","fmk")][is.na(mods[,c("fmt","fmk")])]=0
-mods$`First Modulator` = c("Trikafta","Kalydeco")[max.col(mods[,c("fmt","fmk")])]
-mods[,c("fmt","fmk")] = NULL
-# Put together
-df = df %>% filter(`Patient ID` %in% mods$`Patient ID`)
-df = left_join(df,mods,by = "Patient ID")
-df$`Pre or Post` = factor(df$Date <= df$`Effective Modulator Start`,
-                          levels = c("TRUE","FALSE"),labels = c("Pre","Post"))
-# Filter and sort again, just in case
-df$`Days from Start` = as.numeric(difftime(df$Date,df$`Effective Modulator Start`,units = "days"))
-df = df %>% filter(`Days from Start` >= -365*3,
-                   `Days from Start` < 0 | `Days from Start` >=90) %>% 
-  arrange(`Patient ID`,Date)
-# Average pre-modulator values
-pre = df %>% group_by(`Patient ID`,`Pre or Post`) %>% summarise_at(vars(BMI:GGTP),mean, na.rm = T) %>% filter(`Pre or Post` == "Pre")
-# Find most recent vitamin measure, get any other measures within 30 days
-post = df[df$`Pre or Post`=="Post",]
+df = read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis.csv",na.strings = "",check.names = F)
+df$Timepoint = factor(df$Timepoint,levels = c("Pre","Post"))
 ```
 
 # Data Cleaning
@@ -81,16 +36,26 @@ post = df[df$`Pre or Post`=="Post",]
 
 # Baseline value grouped by first modulator
 
-```{r}
-t1 = tableby(First.Modulator~Vitamin.A+Vitamin.D+Vitamin.E.Alpha+
-           ppFEV1+BMI.Percentile+ALT+AST+GGTP,data = df[df$Timepoint == "Pre",])
-summary(t1,pfootnote = T)
+```{r results='asis'}
+t1 <- tableby(`First Modulator` ~ `Vitamin A` + `Vitamin D` + `Vitamin E Alpha` +
+  `ppFEV1` + `BMI Percentile` +
+  `ALT` + `High ALT (3x)` + `High ALT (5x)` +
+  `AST` + `High AST (3x)` + `High AST (5x)` +
+  `GGTP` + `High GGTP (3x)` + `High GGTP (5x)`,
+data = df[df$Timepoint == "Pre", ]
+)
+summary(t1, pfootnote = T)
 ```
 
 # Pre/post comparison
 
 ```{r results='asis'}
-p = paired(Timepoint~Vitamin.A+Vitamin.D+Vitamin.E.Alpha+
-           ppFEV1+BMI.Percentile+ALT+AST+GGTP,data = df,id=ID,control = list(numeric.test = "signed.rank"))
-summary(p,pfootnote = T)
+p <- paired(Timepoint ~ `Vitamin A` + signed.rank(`Vitamin D`) + `Vitamin E Alpha` +
+  `ppFEV1` + `BMI Percentile` +
+  signed.rank(`ALT`) + `High ALT (3x)` + notest(`High ALT (5x)`) +
+  signed.rank(`AST`) + `High AST (3x)` + notest(`High AST (5x)`) +
+  signed.rank(`GGTP`) + notest(`High GGTP (3x)`) + notest(`High GGTP (5x)`),
+data = df, id = ID
+)
+summary(p, pfootnote = T)
 ```
