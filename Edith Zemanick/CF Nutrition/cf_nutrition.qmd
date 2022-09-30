@@ -7,6 +7,7 @@ format:
     toc: true
     toc-depth: 5
     toc-float: true
+    code-fold: true
     self-contained: true
 editor: visual
 ---
@@ -18,13 +19,13 @@ library(parsedate)
 library(arsenal)
 ```
 
-```{r}
+```{r warning=FALSE}
 # Import datasets
-vit <- read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021_revised20220712.xlsx")
-mods <- read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
-pfts <- read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report_PFTs_ThroughDecember2021.xlsx")
-lfts <- read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report_LFTs_ThroughDecember2021.xlsx")
-pi = read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report Fecal Elastase_throughDecember2021.xlsx")
+vit <- read_excel("/Users/timvigers/Dropbox/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021_revised20220712.xlsx")
+mods <- read_excel("/Users/timvigers/Dropbox/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
+pfts <- read_excel("/Users/timvigers/Dropbox/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report_PFTs_ThroughDecember2021.xlsx")
+lfts <- read_excel("/Users/timvigers/Dropbox/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report_LFTs_ThroughDecember2021.xlsx")
+geno = read_excel("/Users/timvigers/Dropbox/Work/Vigers/CF/CF Info/Sweat Tests from Internal Database_genotype class_withPancStatus.xlsx",na = ".")
 # Format
 vit$VitaminA_Retinol = as.numeric(vit$VitaminA_Retinol)
 vit$`Age at Test (years)` <- NULL
@@ -37,9 +38,9 @@ pfts <- pfts %>%
 pfts$Date = as.Date(pfts$Date)
 lfts <- lfts %>% select(`Patient ID`, Date:GGTP)
 lfts$Date = as.Date(lfts$Date)
-pi = pi %>% select(`Patient ID`,Date,`Fecal Elastase`)
-pi$`Fecal Elastase` = as.numeric(pi$`Fecal Elastase`)
-pi$Date = as.Date(pi$Date)
+geno = geno %>% select(PatientID,genoRisk,PancreaticStatus) %>% distinct() %>% 
+  rename(`Patient ID`=PatientID,`Genotype Risk` = genoRisk,
+         `Pancreatic Status`=PancreaticStatus)
 # Get first modulator and start date
 mods$`Earliest Date in Registry` <- parse_date(mods$`Earliest Date in Registry`, approx = F)
 mods <- mods %>%
@@ -61,7 +62,6 @@ mods$First <- factor(mods$First,
 # Combine
 vit = full_join(vit,pfts, by = c("Patient ID", "Date"))
 vit = full_join(vit,lfts, by = c("Patient ID", "Date"))
-vit = full_join(vit,pi,by = c("Patient ID", "Date"))
 vit <- left_join(vit, mods %>% select(`Patient ID`, Start, First,`Age at Start`), 
                  by = "Patient ID")
 # Get pre vs. post info, time from start
@@ -85,7 +85,7 @@ pre = vit %>% group_by(`Patient ID`) %>%
   mutate(n=n()) %>% filter(n>=2) %>% # At least two pre measures
   summarise(`First Modulator` = as.character(First[1]),Timepoint = "Pre",
             `Age at Start` = `Age at Start`[1],Sex = Sex[1],
-            across(`Days from Start`:`Fecal Elastase`, ~ mean(.x, na.rm = TRUE)))
+            across(`Days from Start`:GGTP, ~ mean(.x, na.rm = TRUE)))
 post = vit %>% group_by(`Patient ID`) %>% 
   filter(`Pre-/Post-` == "Post",
          !is.na(VitaminA_Retinol) | !is.na(`25OH-Vitamin D`) | !is.na(`Vitamin E Alpha`)) %>%
@@ -94,22 +94,30 @@ post = vit %>% group_by(`Patient ID`) %>%
   arrange(`Patient ID`,Date) %>%
   summarise(`First Modulator` = as.character(First[1]),Timepoint = "Post",
             `Age at Start` = `Age at Start`[1],Sex = Sex[1],
-            across(`Days from Start`:`Fecal Elastase`,
+            across(`Days from Start`:GGTP,
                    ~if(all(is.na(.))) NA else last(na.omit(.))))
 df = bind_rows(pre,post) %>%
   mutate_all(~ifelse(is.nan(.), NA, .))
 df$Timepoint = factor(df$Timepoint,levels = c("Pre","Post"))
 # Pancreatic status and LFTs
-df$`Pancreatic Insufficient` = factor(df$`Fecal Elastase` < 128,
-                       levels = c("TRUE","FALSE"),labels = c("Yes","No"))
 df$`Elevated LFTs (3X)` = factor((!is.na(df$ALT) & df$ALT > 3*55) | 
                                    !is.na(df$AST) & df$AST > 3*48 | 
                                    !is.na(df$GGTP) & df$GGTP > 3*61,
                                  levels = c("TRUE","FALSE"),labels = c("Yes","No"))
+df$`Elevated LFTs (3X)`[rowSums(is.na(df[,c("ALT","AST","GGTP")]))==3]=NA
 df$`Elevated LFTs (5X)` = factor((!is.na(df$ALT) & df$ALT > 5*55) | 
                                    !is.na(df$AST) & df$AST > 5*48 | 
                                    !is.na(df$GGTP) & df$GGTP > 5*61,
                                  levels = c("TRUE","FALSE"),labels = c("Yes","No"))
+df$`Elevated LFTs (5X)`[rowSums(is.na(df[,c("ALT","AST","GGTP")]))==3]=NA
+# Add genetic info
+df = left_join(df,geno,by = "Patient ID")
+# Delete those without paired obs.
+df = df %>%  group_by(`Patient ID`) %>% filter(n() == 2) %>% 
+  arrange(`Patient ID`,Timepoint)
+# Write data so Edith can check
+write.csv(df,file = "/Users/timvigers/Dropbox/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_data.csv",row.names = F,na="")
+write.csv(df[df$`First Modulator`=="Trikafta",],file = "/Users/timvigers/Dropbox/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_data_eti_only.csv",row.names = F,na="")
 ```
 
 # Data Cleaning
@@ -121,8 +129,6 @@ df$`Elevated LFTs (5X)` = factor((!is.na(df$ALT) & df$ALT > 5*55) |
 -   All values prior to effective modulator start were averaged to calculate the "pre" value. We selected the most recent vitamin values as the "post" value, and included any BMI percentile, FEV1 % predicted, ALT, AST, and GGTP measures within 30 days of that visit.
 
 -   Sex was only included in the PFT datasheet, so those without PFT data were missing this variable.
-
--   Pancreatic insufficiency was determined based on a fecal elastase cutoff of \< 128 $\mu g/g$.
 
 -   Elevated liver labs were considered at two levels:
 
@@ -138,16 +144,38 @@ df$`Elevated LFTs (5X)` = factor((!is.na(df$ALT) & df$ALT > 5*55) |
 
     -   GGTP: 61 U/L
 
-# Baseline value grouped by first modulator
+# Ivacaftor and ETI
+
+## Baseline value grouped by first modulator
 
 ```{r results='asis'}
-t1 <- tableby(`First Modulator` ~ `Age at Start` + Sex + `VitaminA_Retinol` + `25OH-Vitamin D` + `Vitamin E Alpha` + `FEV1 % pred` + `BMI percentile (CDC)` + `ALT` + `AST` + `GGTP` + `Elevated LFTs (3X)` + `Elevated LFTs (5X)` + `Fecal Elastase` + `Pancreatic Insufficient`,data = df[df$Timepoint == "Pre", ],numeric.stats = c("Nmiss","medianrange"))
+t1 <- tableby(`First Modulator` ~ `Age at Start` + Sex + `ALT` + `AST` + `GGTP` + `Elevated LFTs (3X)` + `Elevated LFTs (5X)`+`Pancreatic Status`,data = df[df$Timepoint == "Pre", ],numeric.stats = c("Nmiss","medianrange"),numeric.test="kwt")
 summary(t1, pfootnote = T)
 ```
 
-# Pre/post comparison
+## Pre/post comparison
 
 ```{r results='asis'}
-p <- paired(Timepoint ~ `VitaminA_Retinol` + signed.rank(`25OH-Vitamin D`,"Nmiss","median","q1q3") + `Vitamin E Alpha` + `FEV1 % pred` + `BMI percentile (CDC)` + `ALT` + `AST` + `GGTP` + `Elevated LFTs (3X)` + `Elevated LFTs (5X)` + `Pancreatic Insufficient`,data = df, id = `Patient ID`)
+p <- paired(Timepoint ~ `VitaminA_Retinol` + `25OH-Vitamin D` + `Vitamin E Alpha` + `FEV1 % pred` + `BMI percentile (CDC)` + `ALT` + `AST` + `GGTP` + `Elevated LFTs (3X)` + `Elevated LFTs (5X)`,data = df, id = `Patient ID`,numeric.stats = c("Nmiss","medianrange"),numeric.test="signed.rank",signed.rank.exact = FALSE)
+summary(p, pfootnote = T)
+```
+
+## Pre/post comparison by pancreatic status
+
+One participant with unknown pancreatic status was removed in order to calculate p values.
+
+```{r results='asis'}
+panc_df = df %>% filter(`Pancreatic Status`!= "Unknown")
+
+p <- paired(Timepoint ~ `VitaminA_Retinol` + `25OH-Vitamin D` + `Vitamin E Alpha` + `FEV1 % pred` + `BMI percentile (CDC)` + `ALT` + `AST` + `Elevated LFTs (3X)` + `Elevated LFTs (5X)`,data = panc_df, id = `Patient ID`,strata = `Pancreatic Status`,numeric.stats = c("Nmiss","medianrange"),numeric.test="signed.rank",signed.rank.exact = FALSE)
+summary(p, pfootnote = T)
+```
+
+# ETI only
+
+## Pre/post comparison
+
+```{r results='asis'}
+p <- paired(Timepoint ~ `VitaminA_Retinol` + `25OH-Vitamin D` + `Vitamin E Alpha` + `FEV1 % pred` + `BMI percentile (CDC)` + `ALT` + `AST` + `GGTP` + `Elevated LFTs (3X)` + `Elevated LFTs (5X)` + `Pancreatic Status`,data = df[df$`First Modulator`=="Trikafta",], id = `Patient ID`,numeric.stats = c("Nmiss","medianrange"),numeric.test="signed.rank",signed.rank.exact = FALSE)
 summary(p, pfootnote = T)
 ```
