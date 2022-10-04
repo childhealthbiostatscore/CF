@@ -13,6 +13,7 @@ output:
 ```{r setup, include=FALSE}
 library(arsenal)
 library(tidyverse)
+library(readxl)
 library(lmerTest)
 library(nlme)
 library(broom.mixed)
@@ -23,13 +24,13 @@ library(rspiro)
 library(lubridate)
 library(plotly)
 library(knitr)
-knitr::opts_chunk$set(echo = FALSE,fig.height = 8,fig.width = 10)
-if(Sys.info()["sysname"] == "Windows"){
-  home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
-} else if (Sys.info()["sysname"] == "Linux"){
-  home_dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
-} else if (Sys.info()["sysname"] == "Darwin"){
-  home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
+knitr::opts_chunk$set(echo = FALSE, fig.height = 8, fig.width = 10)
+if (Sys.info()["sysname"] == "Windows") {
+  home_dir <- "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
+} else if (Sys.info()["sysname"] == "Linux") {
+  home_dir <- "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF"
+} else if (Sys.info()["sysname"] == "Darwin") {
+  home_dir <- "/Volumes/Documents/Work/Vigers/CF"
 }
 source("~/GitHub/CF/get_genotype_class_severity.R")
 knitr::opts_knit$set(root.dir = home_dir)
@@ -37,191 +38,240 @@ knitr::opts_knit$set(root.dir = home_dir)
 
 ```{r include=FALSE}
 # Import cleaned data from Casey
-df = read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/analysis_data.csv",na.strings = "NA")
-df$X = NULL
+df <- read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/analysis_data.csv",
+  na.strings = "NA"
+)
+df$X <- NULL
 # Fill in MRN and CFF ID for everyone
-df = df %>% 
-  group_by(CFF.ID) %>% fill(MRN,.direction = "downup") %>% 
-  group_by(MRN) %>% fill(CFF.ID,.direction = "downup")
+df <- df %>%
+  group_by(CFF.ID) %>%
+  fill(MRN, .direction = "downup") %>%
+  group_by(MRN) %>%
+  fill(CFF.ID, .direction = "downup")
 # Assume that blanks for pancreatic and G tube indicate "no"
-df$Hispanic.Latinx[is.na(df$Hispanic.Latinx)] = FALSE
-df$Pancreatic.Status[is.na(df$Pancreatic.Status)] = "Sufficient"
-df$G.tube.in.past.12.months[is.na(df$G.tube.in.past.12.months)] = "No"
+df$Hispanic.Latinx[is.na(df$Hispanic.Latinx)] <- FALSE
+df$Pancreatic.Status[is.na(df$Pancreatic.Status)] <- "Sufficient"
+df$G.tube.in.past.12.months[is.na(df$G.tube.in.past.12.months)] <- "No"
 # Convert dates
-date_vars = c("DOB","Start","Date")
-df[,date_vars] = lapply(df[,date_vars], function(d){
-  parse_date_time(d,orders = c("mdy","ymd","dmy"),quiet = T)
+date_vars <- c("DOB", "Start", "Date")
+df[, date_vars] <- lapply(df[, date_vars], function(d) {
+  parse_date_time(d, orders = c("mdy", "ymd", "dmy"), quiet = T)
 })
 # Fix incorrect century (WHY LUBRIDATE WHY?!)
-df$DOB[which(df$DOB > lubridate::mdy("1/1/2022"))] = 
+df$DOB[which(df$DOB > lubridate::mdy("1/1/2022"))] <-
   df$DOB[which(df$DOB > lubridate::mdy("1/1/2022"))] - years(100)
-# Time from start and filtering
-df = df %>% group_by(CFF.ID) %>% fill(Start,.direction = "downup")
-df = df %>% mutate(Time = as.numeric(difftime(Date,Start,units = "days"))) 
 # Add UM (they did not provide dates, so need Time column)
-um_a1cs = read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_a1cs.csv",na.strings = "")
-um_bmi = read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_bmi.csv",na.strings = "")
-um_demo = read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_demo.csv",na.strings = "")
-um_ogtt = read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_ogtt.csv",na.strings = "")
-um_pfts = read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_pfts.csv",na.strings = "")
-um = full_join(um_a1cs,um_bmi)
-um = full_join(um,um_ogtt)
-um = full_join(um,um_pfts)
-um = left_join(um,um_demo)
-um = um %>% filter(!is.na(CFRD.Status))
-um$Age = um$Age / 365.25
-df = full_join(df,um)
+df <- df %>%
+  group_by(CFF.ID) %>%
+  fill(Start, .direction = "downup")
+df <- df %>% mutate(Time = as.numeric(difftime(Date, Start, units = "days")))
+um_a1cs <- read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_a1cs.csv", na.strings = "")
+um_bmi <- read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_bmi.csv", na.strings = "")
+um_demo <- read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_demo.csv", na.strings = "")
+um_race <- read_excel("./Colleen Wood/Prepost Triakfta/Data_Raw/Data from UofM/CF_race_data.xlsx")
+um_race <- um_race %>%
+  select(`CFF ID`, Race) %>%
+  rename(CFF.ID = `CFF ID`)
+um_race$Race <- factor(um_race$Race,
+  levels = c(
+    "Black or African American", "Some other race",
+    "Two or more races", "White"
+  ),
+  labels = c("Black", "Other", "Other", "Caucasian")
+)
+um_ogtt <- read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_ogtt.csv", na.strings = "")
+um_pfts <- read.csv("./Colleen Wood/Prepost Triakfta/Data_Cleaned/um_pfts.csv", na.strings = "")
+um <- full_join(um_a1cs, um_bmi)
+um <- full_join(um, um_ogtt)
+um <- full_join(um, um_pfts)
+um <- left_join(um, um_demo)
+um <- left_join(um, um_race)
+um <- um %>% filter(!is.na(CFRD.Status),abs(Time) <= 365)
+um$Age <- um$Age / 365.25
+df <- full_join(df, um)
 # Filter and fill constants
-df = df %>% group_by(CFF.ID) %>% fill(DOB,Start:CFRD.Diagnosis.Date,.direction = "downup") %>%
-  ungroup() %>% filter(!is.na(Time),abs(Time) <= 730,!is.na(CFF.ID),
-                       (!is.na(CFRD.Diagnosis.Date) | !is.na(CFRD.Status) | site == "UW")) %>%
-  select(-MRN) %>% select(CFF.ID,site,DOB,Start,everything()) %>% rename(Site = "site")
-df$Sex = as.factor(df$Sex)
-levels(df$Sex) = c("F","M")
+df <- df %>%
+  group_by(CFF.ID) %>%
+  fill(DOB, Start:CFRD.Diagnosis.Date, .direction = "downup") %>%
+  ungroup() %>%
+  filter(
+    !is.na(Time), abs(Time) <= 730, !is.na(CFF.ID),
+    (!is.na(CFRD.Diagnosis.Date) | !is.na(CFRD.Status) | site == "UW")
+  ) %>%
+  select(-MRN) %>%
+  select(CFF.ID, site, DOB, Start, everything()) %>%
+  rename(Site = "site")
+df$Sex <- as.factor(df$Sex)
+levels(df$Sex) <- c("F", "M")
 # BMI category
-df$Age = pmax(as.numeric(difftime(df$Date,df$DOB,units = "days"))/365.25,df$Age,na.rm = T)
+df$Age <- pmax(as.numeric(difftime(df$Date, df$DOB, units = "days")) / 365.25, df$Age, na.rm = T)
 # Treat adults as age = 20
-df$Age_for_BMI = ifelse(df$Age > 20,20,df$Age)
-df$BMIz = y2z(df$BMI,x = df$Age_for_BMI,sex = df$Sex,ref=nl4.bmi)
-df$BMIz[is.infinite(df$BMIz)] = NA
-df$BMI.Percentile = pnorm(df$BMIz)*100
-df$Weightz = y2z(df$Weight,x = df$Age_for_BMI,sex = df$Sex,ref=nl4.wgt)
-df$BMI_group = apply(df,1,function(r){
-  age = as.numeric(r["Age"])
-  if(!is.na(age) & age > 19){
-    bmi = as.numeric(r["BMI"])
-    group = cut(bmi,c(-Inf,18.5,25,30,35,40,Inf),
-        labels = c("Under Weight","Normal Weight","Overweight","Obese (Class I)",
-                   "Obese (Class II)","Obese (Class III+)"),right = F)
-  } else if (!is.na(age) & age <= 19){
-    z = as.numeric(r["BMIz"])
-    perc = pnorm(z)
-    group = cut(perc,c(-Inf,5,85,95,Inf),
-        labels = c("Under Weight","Normal Weight","Overweight","Obese (Class I)"),right = F)
-  } else {group = NA}
+df$Age_for_BMI <- ifelse(df$Age > 20, 20, df$Age)
+df$BMIz <- y2z(df$BMI, x = df$Age_for_BMI, sex = df$Sex, ref = nl4.bmi)
+df$BMIz[is.infinite(df$BMIz)] <- NA
+df$BMI.Percentile <- pnorm(df$BMIz) * 100
+df$Weightz <- y2z(df$Weight, x = df$Age_for_BMI, sex = df$Sex, ref = nl4.wgt)
+df$BMI_group <- apply(df, 1, function(r) {
+  age <- as.numeric(r["Age"])
+  if (!is.na(age) & age > 19) {
+    bmi <- as.numeric(r["BMI"])
+    group <- cut(bmi, c(-Inf, 18.5, 25, 30, 35, 40, Inf),
+      labels = c(
+        "Under Weight", "Normal Weight", "Overweight", "Obese (Class I)",
+        "Obese (Class II)", "Obese (Class III+)"
+      ), right = F
+    )
+  } else if (!is.na(age) & age <= 19) {
+    z <- as.numeric(r["BMIz"])
+    perc <- pnorm(z)
+    group <- cut(perc, c(-Inf, 5, 85, 95, Inf),
+      labels = c("Under Weight", "Normal Weight", "Overweight", "Obese (Class I)"), right = F
+    )
+  } else {
+    group <- NA
+  }
   return(as.character(group))
 })
-df$BMI_group = as.factor(df$BMI_group)
-df$BMI_group = ordered(df$BMI_group,c("Under Weight","Normal Weight","Overweight",
-                                      "Obese (Class I)","Obese (Class II)","Obese (Class III+)"))
+df$BMI_group <- as.factor(df$BMI_group)
+df$BMI_group <- ordered(df$BMI_group, c(
+  "Under Weight", "Normal Weight", "Overweight",
+  "Obese (Class I)", "Obese (Class II)", "Obese (Class III+)"
+))
 # Get genotype severity
-df$Genotype1_sev = get_cf_genotype_class_severity(df$Genotypes1)
-df$Genotype2_sev = get_cf_genotype_class_severity(df$Genotypes2)
+df$Genotype1_sev <- get_cf_genotype_class_severity(df$Genotypes1)
+df$Genotype2_sev <- get_cf_genotype_class_severity(df$Genotypes2)
 # PFTs
-old <- c("Caucasian","Black","Other")
-new <- c(1,2,5)
-df$ppFEV = pctpred_GLI(df$Age,df$Height/100,gender = as.numeric(df$Sex),
-            ethnicity = new[match(df$Race, old)],
-            FEV1 = df$FEV1)
-df$ppFVC = pctpred_GLI(df$Age,df$Height/100,gender = as.numeric(df$Sex),
-            ethnicity = new[match(df$Race, old)],
-            FEV1 = df$FVC)
-# T1D duration
-df$CFRD.Diagnosis.Date = mdy(df$CFRD.Diagnosis.Date)
-df$T1D.Duration = as.numeric(difftime(df$Date,df$CFRD.Diagnosis.Date,units = "days"))/365.25
+old <- c("Caucasian", "Black", "Other")
+new <- c(1, 2, 5)
+df$ppFEV <- pctpred_GLI(df$Age, df$Height / 100,
+  gender = as.numeric(df$Sex),
+  ethnicity = new[match(df$Race, old)],
+  FEV1 = df$FEV1
+)
+df$ppFVC <- pctpred_GLI(df$Age, df$Height / 100,
+  gender = as.numeric(df$Sex),
+  ethnicity = new[match(df$Race, old)],
+  FEV1 = df$FVC
+)
+# uration
+df$CFRD.Diagnosis.Date <- mdy(df$CFRD.Diagnosis.Date)
+df$CFRD.Duration <- as.numeric(difftime(df$Date, df$CFRD.Diagnosis.Date, units = "days")) / 365.25
+df$Age_group <- cut(df$Age, c(-Inf, 18, Inf), right = F, labels = c("Peds", "Adult"))
 # Before or after start
-df$Before_After = cut(df$Time,c(-Inf,0,Inf),labels = c("Before","After"),right = T)
+df$Before_After <- cut(df$Time, c(-Inf, 0, Inf), labels = c("Before", "After"), right = T)
 # Sort
-df = df %>% arrange(Site,CFF.ID,Date) %>% distinct()
+df <- df %>%
+  arrange(Site, CFF.ID, Date) %>%
+  distinct()
 # Write sorted DF
-write.csv(df, file = "./Colleen Wood/Prepost Triakfta/Data_Cleaned/analysis_data_with_UM.csv",
-          row.names = F,na = "")
+write.csv(df,
+  file = "./Colleen Wood/Prepost Triakfta/Data_Cleaned/analysis_data_with_UM.csv",
+  row.names = F, na = ""
+)
 ```
 
 ```{r}
 # Most recent before/after - limit to 2 years before start
 # Want the value closest to start date before start, and most recent with respect to now from start
 # (i.e. the longest time after start)
-most_recent = df %>% group_by(CFF.ID,Site,Before_After) %>%
-  filter(Time >= (-2*365)) %>%
-  mutate(time_new = max(Time) - Time) %>%
-  arrange(time_new) %>% 
-  summarise(Start = first(na.omit(Start)),
-            Age = paste0(Date[which(Age == first(na.omit(Age)))],": ",round(first(na.omit(Age)),1)),
-            BMI.Percentile = paste0(Date[which(BMI.Percentile == first(na.omit(BMI.Percentile)))],
-                                    ": ",round(first(na.omit(BMI.Percentile)),1)),
-            Weight = paste0(Date[which(Weight == round(first(na.omit(Weight)),1))],
-                            ": ",first(na.omit(Weight))),
-            T1D.Duration = paste0(Date[which(T1D.Duration == first(na.omit(T1D.Duration)))],
-                                  ": ",round(first(na.omit(T1D.Duration)),1)),
-            G.tube.in.past.12.months = first(na.omit(G.tube.in.past.12.months)),
-            Pancreatic.Status = first(na.omit(Pancreatic.Status)),
-            Genotype1_sev = first(na.omit(Genotype1_sev)),
-            Genotype2_sev = first(na.omit(Genotype2_sev)),
-            BMIz = paste0(Date[which(BMIz == first(na.omit(BMIz)))],
-                          ": ",round(first(na.omit(BMIz)),1)),
-            FEV1 = paste0(Date[which(FEV1 == first(na.omit(FEV1)))[1]],
-                          ": ",round(first(na.omit(FEV1)),1)),
-            FVC = paste0(Date[which(FVC == first(na.omit(FVC)))],
-                         ": ",round(first(na.omit(FVC)),1)),
-            HbA1c = paste0(Date[which(HbA1c == first(na.omit(HbA1c)))],
-                           ": ",round(first(na.omit(HbA1c)),1)),
-            .groups = "keep") %>%
-  arrange(Site,CFF.ID,Before_After)
-most_recent$Start = as.character(most_recent$Start)
-most_recent[most_recent == ": NA"] = NA
-most_recent[most_recent == "NA: NA"] = NA
-
-# # Check
-# t = df %>% select(CFF.ID,Site,Date,Time,Before_After,BMIz,ppFEV,ppFVC) %>%
-#   group_by(CFF.ID,Site,Before_After) %>%
-#   arrange(Site,CFF.ID,Before_After)
+pre_post <- df %>%
+  group_by(CFF.ID, Before_After) %>%
+  arrange(CFF.ID, Date) %>%
+  summarise(
+    Start = last(na.omit(Start)),
+    Age = last(na.omit(Age)),
+    BMI.Percentile = last(na.omit(BMI.Percentile)),
+    Weight = last(na.omit(Weight)),
+    CFRD.Duration = last(na.omit(CFRD.Duration)),
+    Age_group = last(na.omit(Age_group)),
+    Sex = last(na.omit(Sex)),
+    G.tube.in.past.12.months = last(na.omit(G.tube.in.past.12.months)),
+    Pancreatic.Status = last(na.omit(Pancreatic.Status)),
+    Genotype1_sev = last(na.omit(Genotype1_sev)),
+    Genotype2_sev = last(na.omit(Genotype2_sev)),
+    BMIz = last(na.omit(BMIz)),
+    ppFEV1 = last(na.omit(ppFEV)),
+    ppFVC = last(na.omit(ppFVC)),
+    HbA1c = last(na.omit(HbA1c)),
+    Site = last(na.omit(Site)),
+    .groups = "keep"
+  )
 # Filter those without CFRD, and those without pre AND post
-keep = most_recent %>% filter(!is.na(HbA1c)) %>%
-  group_by(CFF.ID) %>% summarise(n = n()) %>%
-  filter(n == 2) %>% pull(CFF.ID)
-cfrd = unique(df$CFF.ID[!is.na(df$CFRD.Status) | 
-                          df$CFRD.Status != "Impaired Glucose Tolerance (FBG < 126, 2-h PG 140-199)" | 
-                          !is.na(df$CFRD.Diagnosis.Date)])
-keep = unique(keep,cfrd)
-most_recent = most_recent %>% filter(CFF.ID %in% keep)
-# Write 
-write.csv(most_recent,file = "./Colleen Wood/Prepost Triakfta/Data_Cleaned/pre_post.csv",
-          na = "",row.names = F)
+keep <- df %>%
+  filter(!is.na(HbA1c)) %>%
+  group_by(CFF.ID) %>%
+  summarise(n = n()) %>%
+  filter(n == 2) %>%
+  pull(CFF.ID)
+cfrd <- unique(df$CFF.ID[!is.na(df$CFRD.Status) |
+  df$CFRD.Status != "Impaired Glucose Tolerance (FBG < 126, 2-h PG 140-199)" |
+  !is.na(df$CFRD.Diagnosis.Date)])
+keep <- unique(keep, cfrd)
+pre_post <- pre_post %>% filter(CFF.ID %in% keep)
+two_obs <- pre_post %>%
+  group_by(CFF.ID) %>%
+  summarise(n = n()) %>%
+  filter(n == 2) %>%
+  pull(CFF.ID)
+pre_post <- pre_post %>% filter(CFF.ID %in% two_obs)
+# Write
+write.csv(pre_post,
+  file = "./Colleen Wood/Prepost Triakfta/Data_Cleaned/pre_post.csv",
+  na = "", row.names = F
+)
 ```
 
 # Participant Characteristics
 
-
+```{r results='asis'}
+t1 <- tableby(
+  ~ Age + BMI.Percentile + Weight + ppFEV1 + ppFVC + CFRD.Duration + Sex + G.tube.in.past.12.months +
+    Pancreatic.Status + Genotype1_sev + Genotype2_sev + Site,
+  pre_post[pre_post$Before_After == "Before", ]
+)
+summary(t1)
+```
 
 # Pre-post
 
 ```{r}
-summary(tableby( ~ ppFEV + ppFVC + BMIz,data = df[!is.na(df$average_sensor),]))
+summary(tableby(~ ppFEV + ppFVC + BMIz, data = df[!is.na(df$average_sensor), ]))
 ```
 
 # Piecewise Models
 
 ```{r}
 # Piecewise model function
-piecewise = function(outcome = "HbA1c",data = df,simple = F){
+piecewise <- function(outcome = "HbA1c", data = df, simple = F) {
   # Add spline column
-  data$Change = ifelse(data$Time < 0,0,1)
-  data$Change = data$Change * data$Time
+  data$Change <- ifelse(data$Time < 0, 0, 1)
+  data$Change <- data$Change * data$Time
   # Model
-  f = as.formula(paste0(outcome,"~Time + Change + (1|CFF.ID)"))
-  mod = lmer(f,data = data)
-  res = tidy(mod,"fixed")
-  res$effect = NULL
+  f <- as.formula(paste0(outcome, "~Time + Change + (1|CFF.ID)"))
+  mod <- lmer(f, data = data)
+  res <- tidy(mod, "fixed")
+  res$effect <- NULL
   # Model check if necessary
-  check = check_model(mod)
+  check <- check_model(mod)
   # Coordinates for model plotting
-  x1_start = -365
-  y1_start = res$estimate[1] + res$estimate[2]*x1_start
-  x1_end = 0
-  y1_end = res$estimate[1] 
-  x2_start = 0
-  y2_start = res$estimate[1] 
-  x2_end = 365
-  y2_end = res$estimate[1] + (res$estimate[2]+res$estimate[3])*x2_end
+  x1_start <- -365
+  y1_start <- res$estimate[1] + res$estimate[2] * x1_start
+  x1_end <- 0
+  y1_end <- res$estimate[1]
+  x2_start <- 0
+  y2_start <- res$estimate[1]
+  x2_end <- 365
+  y2_end <- res$estimate[1] + (res$estimate[2] + res$estimate[3]) * x2_end
   # Plot
-  p = ggplot(data,aes_string(x = "Time",y = outcome,group = "CFF.ID",color = "Site")) +
-    geom_point(alpha = 0.5) + geom_line(alpha = 0.2) +
-    annotate("segment",x=x1_start,y=y1_start,xend=x1_end,yend=y1_end,color = "blue",size = 1) +
-    annotate("segment",x=x2_start,y=y2_start,xend=x2_end,yend=y2_end,color = "blue",size = 1) +
-    xlab("Days from Trikafta Start") + theme_bw()
+  p <- ggplot(data, aes_string(x = "Time", y = outcome, group = "CFF.ID", color = "Site")) +
+    geom_point(alpha = 0.5) +
+    geom_line(alpha = 0.2) +
+    annotate("segment", x = x1_start, y = y1_start, xend = x1_end, yend = y1_end, color = "blue", size = 1) +
+    annotate("segment", x = x2_start, y = y2_start, xend = x2_end, yend = y2_end, color = "blue", size = 1) +
+    xlab("Days from Trikafta Start") +
+    theme_bw()
   # Interactive plot and model results
-  return(list(plot = ggplotly(p),table = res,check = check))
+  return(list(plot = ggplotly(p), table = res, check = check))
 }
 ```
 
@@ -234,9 +284,9 @@ The random intercept model was selected because it performed better (by AIC) tha
 # HbA1c
 
 ```{r results='asis'}
-a1c = piecewise(outcome = "HbA1c",data = df)
+a1c <- piecewise(outcome = "HbA1c", data = df)
 ggplotly(a1c$plot)
-kable(a1c$table,digits = 3)
+kable(a1c$table, digits = 3)
 ```
 
 `r if(class(a1c$seg)=="lme"){"Automated R package was not able to find a better breakpoint."}`
@@ -252,17 +302,17 @@ Most participants only have one observation of insulin dose, so these results wo
 # ppFEV
 
 ```{r results='asis'}
-ppFEV = piecewise(outcome = "ppFEV",data = df)
+ppFEV <- piecewise(outcome = "ppFEV", data = df)
 ggplotly(ppFEV$plot)
-kable(ppFEV$table,digits = 3)
+kable(ppFEV$table, digits = 3)
 ```
 
 # ppFVC
 
 ```{r results='asis'}
-ppFVC = piecewise(outcome = "ppFVC",data = df)
+ppFVC <- piecewise(outcome = "ppFVC", data = df)
 ggplotly(ppFVC$plot)
-kable(ppFVC$table,digits = 3)
+kable(ppFVC$table, digits = 3)
 ```
 
 # CGM Metrics
@@ -270,103 +320,103 @@ kable(ppFVC$table,digits = 3)
 ## Mean
 
 ```{r results='asis'}
-meansg = piecewise(outcome = "average_sensor",data = df)
+meansg <- piecewise(outcome = "average_sensor", data = df)
 ggplotly(meansg$plot)
-kable(meansg$table,digits = 3)
+kable(meansg$table, digits = 3)
 ```
 
 ## Min
 
 ```{r results='asis'}
-minsg = piecewise(outcome = "min_sensor",data = df)
+minsg <- piecewise(outcome = "min_sensor", data = df)
 ggplotly(minsg$plot)
-kable(minsg$table,digits = 3)
+kable(minsg$table, digits = 3)
 ```
 
 ## Max
 
 ```{r results='asis'}
-maxsg = piecewise(outcome = "max_sensor",data = df)
+maxsg <- piecewise(outcome = "max_sensor", data = df)
 ggplotly(maxsg$plot)
-kable(maxsg$table,digits = 3)
+kable(maxsg$table, digits = 3)
 ```
 
 ## % Time > 120
 
 ```{r results='asis'}
-over120 = piecewise(outcome = "percent_time_over_120",data = df)
+over120 <- piecewise(outcome = "percent_time_over_120", data = df)
 ggplotly(over120$plot)
-kable(over120$table,digits = 3)
+kable(over120$table, digits = 3)
 ```
 
 ## % Time > 140
 
 ```{r results='asis'}
-over140 = piecewise(outcome = "percent_time_over_140",data = df)
+over140 <- piecewise(outcome = "percent_time_over_140", data = df)
 ggplotly(over140$plot)
-kable(over140$table,digits = 3)
+kable(over140$table, digits = 3)
 ```
 
 ## % Time > 200
 
 ```{r results='asis'}
-over200 = piecewise(outcome = "percent_time_over_200",data = df)
+over200 <- piecewise(outcome = "percent_time_over_200", data = df)
 ggplotly(over200$plot)
-kable(over200$table,digits = 3)
+kable(over200$table, digits = 3)
 ```
 
 ## Mean excursions > 140
 
 ```{r results='asis'}
-numover140 = piecewise(outcome = "avg_excur_over_140_per_day",data = df)
+numover140 <- piecewise(outcome = "avg_excur_over_140_per_day", data = df)
 ggplotly(numover140$plot)
-kable(numover140$table,digits = 3)
+kable(numover140$table, digits = 3)
 ```
 
 ## Mean excursions > 200
 
 ```{r results='asis'}
-numover200 = piecewise(outcome = "avg_excur_over_200_per_day",data = df)
+numover200 <- piecewise(outcome = "avg_excur_over_200_per_day", data = df)
 ggplotly(numover200$plot)
-kable(numover200$table,digits = 3)
+kable(numover200$table, digits = 3)
 ```
 
 ## % Time < 70
 
 ```{r results='asis'}
-under70 = piecewise(outcome = "percent_time_under_70",data = df)
+under70 <- piecewise(outcome = "percent_time_under_70", data = df)
 ggplotly(under70$plot)
-kable(under70$table,digits = 3)
+kable(under70$table, digits = 3)
 ```
 
 ## % Time < 60
 
 ```{r results='asis'}
-under60 = piecewise(outcome = "percent_time_under_60",data = df)
+under60 <- piecewise(outcome = "percent_time_under_60", data = df)
 ggplotly(under60$plot)
-kable(under60$table,digits = 3)
+kable(under60$table, digits = 3)
 ```
 
 ## Average AUC per day
 
 ```{r results='asis'}
-auc = piecewise(outcome = "average_auc_per_day",data = df)
+auc <- piecewise(outcome = "average_auc_per_day", data = df)
 ggplotly(auc$plot)
-kable(auc$table,digits = 3)
+kable(auc$table, digits = 3)
 ```
 
 ## SD
 
 ```{r results='asis'}
-sd = piecewise(outcome = "standard_deviation",data = df)
+sd <- piecewise(outcome = "standard_deviation", data = df)
 ggplotly(sd$plot)
-kable(sd$table,digits = 3)
+kable(sd$table, digits = 3)
 ```
 
 ## MAGE
 
 ```{r results='asis'}
-mage = piecewise(outcome = "r_mage",data = df)
+mage <- piecewise(outcome = "r_mage", data = df)
 ggplotly(mage$plot)
-kable(mage$table,digits = 3)
+kable(mage$table, digits = 3)
 ```
