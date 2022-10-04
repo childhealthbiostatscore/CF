@@ -21,103 +21,193 @@ library(arsenal)
 
 ```{r warning=FALSE}
 # Import datasets
-vit <- read_excel("/Users/timvigers/Dropbox/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021_revised20220712.xlsx")
-mods <- read_excel("/Users/timvigers/Dropbox/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
-pfts <- read_excel("/Users/timvigers/Dropbox/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report_PFTs_ThroughDecember2021.xlsx")
-lfts <- read_excel("/Users/timvigers/Dropbox/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report_LFTs_ThroughDecember2021.xlsx")
-geno = read_excel("/Users/timvigers/Dropbox/Work/Vigers/CF/CF Info/Sweat Tests from Internal Database_genotype class_withPancStatus.xlsx",na = ".")
+vit <- read_excel("/Volumes/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report Vitamins_throughDecember2021_revised20220712.xlsx")
+mods <- read_excel("/Volumes/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report CFTR Modulators_throughDecember2021.xlsx")
+pfts <- read_excel("/Volumes/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report_PFTs_ThroughDecember2021.xlsx")
+lfts <- read_excel("/Volumes/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Raw/Report_LFTs_ThroughDecember2021.xlsx")
+geno <- read_excel("/Volumes/Documents/Work/Vigers/CF/CF Info/Sweat Tests from Internal Database_genotype class_withPancStatus.xlsx", na = ".")
 # Format
-vit$VitaminA_Retinol = as.numeric(vit$VitaminA_Retinol)
+vit$VitaminA_Retinol <- as.numeric(vit$VitaminA_Retinol)
 vit$`Age at Test (years)` <- NULL
-vit$Date = as.Date(vit$Date)
-vit$`Vitamin E Gamma` = NULL
-mods$`Earliest Date in Registry` = as.Date(mods$`Earliest Date in Registry`)
+vit$Date <- as.Date(vit$Date)
+vit$`Vitamin E Gamma` <- NULL
+mods$`Earliest Date in Registry` <- as.Date(mods$`Earliest Date in Registry`)
 pfts <- pfts %>%
   select(PatientID, Sex, Date, `Height (cm)`:`FEV1 % pred`) %>%
   rename(`Patient ID` = PatientID)
-pfts$Date = as.Date(pfts$Date)
+pfts$Date <- as.Date(pfts$Date)
 lfts <- lfts %>% select(`Patient ID`, Date:GGTP)
-lfts$Date = as.Date(lfts$Date)
-geno = geno %>% select(PatientID,genoRisk,PancreaticStatus) %>% distinct() %>% 
-  rename(`Patient ID`=PatientID,`Genotype Risk` = genoRisk,
-         `Pancreatic Status`=PancreaticStatus)
+lfts$Date <- as.Date(lfts$Date)
+geno <- geno %>%
+  select(PatientID, genoRisk, PancreaticStatus) %>%
+  distinct() %>%
+  rename(
+    `Patient ID` = PatientID, `Genotype Risk` = genoRisk,
+    `Pancreatic Status` = PancreaticStatus
+  )
 # Get first modulator and start date
-mods$`Earliest Date in Registry` <- parse_date(mods$`Earliest Date in Registry`, approx = F)
 mods <- mods %>%
   filter(Modulator %in% c("Kalydeco", "Trikafta")) %>%
   pivot_wider(
     id_cols = `Patient ID`, names_from = Modulator,
-    values_from = c(`Earliest Date in Registry`,`Age at Start (years)`)
+    values_from = c(`Earliest Date in Registry`, `Age at Start (years)`)
   )
-mods$Start <- pmin(mods$`Earliest Date in Registry_Trikafta`, 
-                   mods$`Earliest Date in Registry_Kalydeco`, na.rm = T)
+mods$Start <- pmin(mods$`Earliest Date in Registry_Trikafta`,
+  mods$`Earliest Date in Registry_Kalydeco`,
+  na.rm = T
+)
 mods$tf <- mods$`Earliest Date in Registry_Trikafta` == mods$Start
 mods$kf <- mods$`Earliest Date in Registry_Kalydeco` == mods$Start
-mods <- mods %>% unite(First, tf, kf, na.rm = T)
-mods$`Age at Start` = pmin(mods$`Age at Start (years)_Trikafta`,mods$`Age at Start (years)_Kalydeco`,na.rm = T)
+mods <- mods %>% unite(First, tf, kf)
+mods$`Age at Start` <- pmin(mods$`Age at Start (years)_Trikafta`,
+  mods$`Age at Start (years)_Kalydeco`,
+  na.rm = T
+)
 mods$First <- factor(mods$First,
-  levels = c("FALSE_TRUE", "TRUE"),
-  labels = c("Kalydeco", "Trikafta")
+  levels = c("FALSE_TRUE", "NA_TRUE", "TRUE_NA"),
+  labels = c("Kalydeco", "Kalydeco", "Trikafta")
 )
 # Combine
-vit = full_join(vit,pfts, by = c("Patient ID", "Date"))
-vit = full_join(vit,lfts, by = c("Patient ID", "Date"))
-vit <- left_join(vit, mods %>% select(`Patient ID`, Start, First,`Age at Start`), 
-                 by = "Patient ID")
+vit <- full_join(vit, pfts, by = c("Patient ID", "Date"))
+vit <- full_join(vit, lfts, by = c("Patient ID", "Date"))
+vit <- left_join(vit, mods %>% select(`Patient ID`, Start, First, `Age at Start`),
+  by = "Patient ID"
+)
 # Get pre vs. post info, time from start
 vit$`Pre-/Post-` <- factor(vit$Date >= vit$Start,
   levels = c("FALSE", "TRUE"),
   labels = c("Pre", "Post")
 )
-vit$`Days from Start` = as.numeric(difftime(vit$Date,vit$Start,units = "days"))
-# Filter those more than 3 years before start, and within 90 days after start
-vit = vit %>% filter(`Days from Start` > -3*365,
-                     `Days from Start` < 0 | `Days from Start` >= 90)
+vit$`Days from Start` <- as.numeric(difftime(vit$Date, vit$Start, units = "days"))
+# Filter out those more than 3 years before start, and within 90 days after start
+vit <- vit %>% filter(
+  `Days from Start` > -3 * 365,
+  `Days from Start` < 0 | `Days from Start` >= 90
+)
 # Order variables, fill sex
-vit = vit %>% select(`Patient ID`,Sex,Date,Start,First,`Age at Start`,
-                     `Pre-/Post-`,`Days from Start`,everything()) %>% 
-  group_by(`Patient ID`) %>% 
-  fill(Sex,.direction = "downup")
+vit <- vit %>%
+  select(
+    `Patient ID`, Sex, Date, Start, First, `Age at Start`,
+    `Pre-/Post-`, `Days from Start`, everything()
+  ) %>%
+  group_by(`Patient ID`) %>%
+  fill(Sex, .direction = "downup")
 # Average pre-mod values, get most recent vitamin values and and any other variables within 30 days
-pre = vit %>% group_by(`Patient ID`) %>% 
-  filter(`Pre-/Post-` == "Pre",
-         !is.na(VitaminA_Retinol) | !is.na(`25OH-Vitamin D`) | !is.na(`Vitamin E Alpha`)) %>%
-  mutate(n=n()) %>% filter(n>=2) %>% # At least two pre measures
-  summarise(`First Modulator` = as.character(First[1]),Timepoint = "Pre",
-            `Age at Start` = `Age at Start`[1],Sex = Sex[1],
-            across(`Days from Start`:GGTP, ~ mean(.x, na.rm = TRUE)))
-post = vit %>% group_by(`Patient ID`) %>% 
-  filter(`Pre-/Post-` == "Post",
-         !is.na(VitaminA_Retinol) | !is.na(`25OH-Vitamin D`) | !is.na(`Vitamin E Alpha`)) %>%
-  mutate(latest = max(Date),date_cutoff= latest - lubridate::days(30)) %>%
-  filter(Date >= date_cutoff) %>% 
-  arrange(`Patient ID`,Date) %>%
-  summarise(`First Modulator` = as.character(First[1]),Timepoint = "Post",
-            `Age at Start` = `Age at Start`[1],Sex = Sex[1],
-            across(`Days from Start`:GGTP,
-                   ~if(all(is.na(.))) NA else last(na.omit(.))))
-df = bind_rows(pre,post) %>%
-  mutate_all(~ifelse(is.nan(.), NA, .))
-df$Timepoint = factor(df$Timepoint,levels = c("Pre","Post"))
+pre_ids <- vit %>%
+  group_by(`Patient ID`) %>%
+  filter(`Pre-/Post-` == "Pre", !is.na(VitaminA_Retinol)) %>%
+  mutate(n = n()) %>%
+  filter(n >= 2) %>%
+  .$`Patient ID` %>%
+  unique() # At least two pre measures
+pre <- vit %>%
+  filter(`Patient ID` %in% pre_ids) %>%
+  summarise(
+    `First Modulator` = as.character(First[1]), Timepoint = "Pre",
+    `Age at Start` = `Age at Start`[1], Sex = Sex[1],
+    Start = as.character(Start[1]), `Latest Visit` = NA,
+    across(`Days from Start`:GGTP, ~ mean(.x, na.rm = TRUE))
+  )
+# Get visits within 30 days prior to latest vitamin measure post-CFTR modulator
+post_cutoff <- vit %>%
+  group_by(`Patient ID`) %>%
+  filter(`Pre-/Post-` == "Post", !is.na(VitaminA_Retinol)) %>%
+  mutate(latest = max(Date), date_cutoff = latest - lubridate::days(90)) %>%
+  select(`Patient ID`, latest, date_cutoff) %>%
+  distinct()
+vit <- left_join(vit, post_cutoff, by = "Patient ID")
+# Summarise visits into one row
+post <- vit %>%
+  filter(Date >= date_cutoff & Date <= latest) %>%
+  arrange(`Patient ID`, Date) %>%
+  summarise(
+    `First Modulator` = as.character(First[1]), Timepoint = "Post",
+    `Age at Start` = `Age at Start`[1], Sex = Sex[1],
+    Start = as.character(Start[1]),
+    `Latest Visit` = as.character(latest[1]),
+    across(
+      `Days from Start`:GGTP,
+      ~ if (all(is.na(.))) NA else last(na.omit(.))
+    )
+  ) %>%
+  rename()
+df <- bind_rows(pre, post) %>%
+  mutate_all(~ ifelse(is.nan(.), NA, .))
+df$Timepoint <- factor(df$Timepoint, levels = c("Pre", "Post"))
 # Pancreatic status and LFTs
-df$`Elevated LFTs (3X)` = factor((!is.na(df$ALT) & df$ALT > 3*55) | 
-                                   !is.na(df$AST) & df$AST > 3*48 | 
-                                   !is.na(df$GGTP) & df$GGTP > 3*61,
-                                 levels = c("TRUE","FALSE"),labels = c("Yes","No"))
-df$`Elevated LFTs (3X)`[rowSums(is.na(df[,c("ALT","AST","GGTP")]))==3]=NA
-df$`Elevated LFTs (5X)` = factor((!is.na(df$ALT) & df$ALT > 5*55) | 
-                                   !is.na(df$AST) & df$AST > 5*48 | 
-                                   !is.na(df$GGTP) & df$GGTP > 5*61,
-                                 levels = c("TRUE","FALSE"),labels = c("Yes","No"))
-df$`Elevated LFTs (5X)`[rowSums(is.na(df[,c("ALT","AST","GGTP")]))==3]=NA
+df$`Elevated LFTs (2X)` <- factor((!is.na(df$ALT) & df$ALT > 2 * 30) |
+  !is.na(df$AST) & df$AST > 2 * 30 |
+  !is.na(df$GGTP) & df$GGTP > 2 * 20,
+levels = c("TRUE", "FALSE"), labels = c("Yes", "No")
+)
+df$`Elevated LFTs (2X)`[rowSums(is.na(df[, c("ALT", "AST", "GGTP")])) == 3] <- NA
+df$`Elevated LFTs (3X)` <- factor((!is.na(df$ALT) & df$ALT > 3 * 30) |
+  !is.na(df$AST) & df$AST > 3 * 30 |
+  !is.na(df$GGTP) & df$GGTP > 3 * 20,
+levels = c("TRUE", "FALSE"), labels = c("Yes", "No")
+)
+df$`Elevated LFTs (3X)`[rowSums(is.na(df[, c("ALT", "AST", "GGTP")])) == 3] <- NA
+df$`Elevated LFTs (5X)` <- factor((!is.na(df$ALT) & df$ALT > 5 * 30) |
+  !is.na(df$AST) & df$AST > 5 * 30 |
+  !is.na(df$GGTP) & df$GGTP > 5 * 20,
+levels = c("TRUE", "FALSE"), labels = c("Yes", "No")
+)
+df$`Elevated LFTs (5X)`[rowSums(is.na(df[, c("ALT", "AST", "GGTP")])) == 3] <- NA
 # Add genetic info
-df = left_join(df,geno,by = "Patient ID")
+df <- left_join(df, geno, by = "Patient ID")
 # Delete those without paired obs.
-df = df %>%  group_by(`Patient ID`) %>% filter(n() == 2) %>% 
-  arrange(`Patient ID`,Timepoint)
+df <- df %>%
+  group_by(`Patient ID`) %>%
+  filter(n() == 2) %>%
+  arrange(`Patient ID`, Timepoint)
 # Write data so Edith can check
-write.csv(df,file = "/Users/timvigers/Dropbox/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_data.csv",row.names = F,na="")
-write.csv(df[df$`First Modulator`=="Trikafta",],file = "/Users/timvigers/Dropbox/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_data_eti_only.csv",row.names = F,na="")
+write.csv(df, file = "/Volumes/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_data.csv", row.names = F, na = "")
+write.csv(df[df$`First Modulator` == "Trikafta", ], file = "/Volumes/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/analysis_data_eti_only.csv", row.names = F, na = "")
+# Write missing
+mrns <- read_excel("/Volumes/Documents/Work/Vigers/CF/CF Info/All Patients with CF or Non-CF_MRNs.xlsx")
+
+miss_post_pft <- df %>%
+  filter(Timepoint == "Post", is.na(`FEV1 % pred`)) %>%
+  mutate(
+    MRN = mrns$MRN[match(`Patient ID`, mrns$PatientID)],
+    `Start Plus 90` = parse_date(Start, approx = F) + lubridate::days(90),
+    `Latest Minus 30` = parse_date(`Latest Visit`, approx = F) - lubridate::days(30)
+  ) %>%
+  select(`Patient ID`, MRN, `First Modulator`, Start, `Start Plus 90`, `Latest Visit`, `Latest Minus 30`)
+
+write.csv(miss_post_pft, file = "/Volumes/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/missing_post_pft.csv", row.names = F, na = "")
+
+miss_post_lft <- df %>%
+  filter(Timepoint == "Post", is.na(ALT)) %>%
+  mutate(
+    MRN = mrns$MRN[match(`Patient ID`, mrns$PatientID)],
+    `Start Plus 90` = parse_date(Start, approx = F) + lubridate::days(90),
+    `Latest Minus 30` = parse_date(`Latest Visit`, approx = F) - lubridate::days(30)
+  ) %>%
+  select(`Patient ID`, MRN, `First Modulator`, Start, `Start Plus 90`, `Latest Visit`, `Latest Minus 30`)
+
+write.csv(miss_post_lft, file = "/Volumes/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/missing_post_lft.csv", row.names = F, na = "")
+
+
+
+
+miss_pre_pft <- df %>%
+  filter(Timepoint == "Pre", is.na(`FEV1 % pred`)) %>%
+  mutate(
+    MRN = mrns$MRN[match(`Patient ID`, mrns$PatientID)]
+  ) %>%
+  select(`Patient ID`, MRN, `First Modulator`, Start)
+
+write.csv(miss_pre_pft, file = "/Volumes/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/missing_pre_pft.csv", row.names = F, na = "")
+
+miss_pre_lft <- df %>%
+  filter(Timepoint == "Pre", is.na(ALT)) %>%
+  mutate(
+    MRN = mrns$MRN[match(`Patient ID`, mrns$PatientID)]
+  ) %>%
+  select(`Patient ID`, MRN, `First Modulator`, Start)
+
+write.csv(miss_pre_lft, file = "/Volumes/Documents/Work/Vigers/CF/Edith Zemanick/CF Nutrition/Data_Cleaned/missing_pre_lft.csv", row.names = F, na = "")
 ```
 
 # Data Cleaning
@@ -138,25 +228,25 @@ write.csv(df[df$`First Modulator`=="Trikafta",],file = "/Users/timvigers/Dropbox
 
 -   Normal liver labs were considered:
 
-    -   ALT: 55 U/L
+    -   ALT: 30 U/L
 
-    -   AST: 48 U/L
+    -   AST: 30 U/L
 
-    -   GGTP: 61 U/L
+    -   GGTP: 20 U/L
 
 # Ivacaftor and ETI
 
 ## Baseline value grouped by first modulator
 
 ```{r results='asis'}
-t1 <- tableby(`First Modulator` ~ `Age at Start` + Sex + `ALT` + `AST` + `GGTP` + `Elevated LFTs (3X)` + `Elevated LFTs (5X)`+`Pancreatic Status`,data = df[df$Timepoint == "Pre", ],numeric.stats = c("Nmiss","medianrange"),numeric.test="kwt")
+t1 <- tableby(`First Modulator` ~ `Age at Start` + Sex + `ALT` + `AST` + `GGTP` +`Elevated LFTs (2X)`+ `Elevated LFTs (3X)` + `Elevated LFTs (5X)`+`Pancreatic Status`,data = df[df$Timepoint == "Pre", ],numeric.stats = c("Nmiss","medianrange"),numeric.test="kwt")
 summary(t1, pfootnote = T)
 ```
 
 ## Pre/post comparison
 
 ```{r results='asis'}
-p <- paired(Timepoint ~ `VitaminA_Retinol` + `25OH-Vitamin D` + `Vitamin E Alpha` + `FEV1 % pred` + `BMI percentile (CDC)` + `ALT` + `AST` + `GGTP` + `Elevated LFTs (3X)` + `Elevated LFTs (5X)`,data = df, id = `Patient ID`,numeric.stats = c("Nmiss","medianrange"),numeric.test="signed.rank",signed.rank.exact = FALSE)
+p <- paired(Timepoint ~ `VitaminA_Retinol` + `25OH-Vitamin D` + `Vitamin E Alpha` + `FEV1 % pred` + `BMI percentile (CDC)` + `ALT` + `AST` + `GGTP` + `Elevated LFTs (2X)` + `Elevated LFTs (3X)`+`Elevated LFTs (5X)`,data = df, id = `Patient ID`,numeric.stats = c("Nmiss","medianrange"),numeric.test="signed.rank",signed.rank.exact = FALSE)
 summary(p, pfootnote = T)
 ```
 
