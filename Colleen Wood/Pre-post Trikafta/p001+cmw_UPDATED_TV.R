@@ -2,23 +2,23 @@
 # c. chan
 ##############################
 library(dplyr)
-setwd("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood/Prepost Triakfta/")
+setwd("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Raw")
 
 #cgm data
 # cgm_c <- read.csv("REDCap Upload.csv")
-cgm_c <- read.csv("./Data_Raw/Data From CHCO/REDCap Upload_chco.csv")
+cgm_c <- read.csv("Data From CHCO/REDCap Upload_chco.csv")
 cgm_c$date_cgm <- as.Date(cgm_c$date_cgm_placement, "%Y-%m-%d")
 
-cgm_m <- read.csv("./Data_Raw/Data From Montana/CGM_Montana/REDCap Upload_mt.csv")
+cgm_m <- read.csv("Data From Montana/CGM_Montana/REDCap Upload_mt.csv")
 cgm_m$date_cgm <- as.Date(cgm_m$date_cgm_placement, "%m/%d/%Y")
 
-cgm_w <- read.csv("./Data_Raw/Data From Washington/REDCap Upload_Washington.csv")
+cgm_w <- read.csv("Data From Washington/REDCap Upload_Washington.csv")
 cgm_w$date_cgm <- as.Date(cgm_w$date_cgm_placement, "%Y-%m-%d")
 
 cgm <- rbind(cgm_c, cgm_m,cgm_w )
 
 `%!in%` = Negate(`%in%`)
-reg0 <- read.csv("./Data_Raw/Data From CHCO/Registry/Copy of Earliest Trikafta Dates in Registry_updated 2.2.21 cc modified_cfrdyn.csv")
+reg0 <- read.csv("Data From CHCO/Registry/Copy of Earliest Trikafta Dates in Registry_updated 2.2.21 cc modified_cfrdyn.csv")
 #need to get rid of those two
 reg <- subset(reg0, reg0$MRN %!in% c("1714343", "787372") )
 
@@ -28,10 +28,10 @@ reg$Earliest.Trikafta.Date.in.PortCF <- ifelse(reg$MRN =="1053930", "12/1/2019",
                                                              ifelse(reg$MRN =="1078408",   "3/9/2020",
                                        ifelse(reg$MRN =="899717", "2/14/2020", as.character(reg$Earliest.Trikafta.Date.in.PortCF))))))
 
-a1c <- read.csv("./Data_Raw/Data From CHCO/Copy of A1C and OGTTs Before and After Trikafta_cc modified 8.25.20.csv")
+a1c <- read.csv("Data From CHCO/Copy of A1C and OGTTs Before and After Trikafta_cc modified 8.25.20.csv")
 
 
-weight <- read.csv("./Data_Raw/Data From CHCO/Registry/weightdata.csv")
+weight <- read.csv("Data From CHCO/Registry/weightdata.csv")
 
 weight$Earliest.Trikafta.Date.in.PCF <- ifelse(weight$MRN =="1053930", "12/1/2019", 
                                                ifelse(weight$MRN =="1695512", "12/12/2019", 
@@ -45,10 +45,10 @@ weight$Earliest.Trikafta.Date.in.PCF <- ifelse(weight$MRN =="1053930", "12/1/201
 
 library("readxl")
 
-reg_montana <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Raw/Data From Montana/Copy of Paper patient population glycemic (+hofer).csv")
+reg_montana <- read.csv("./Data From Montana/Copy of Paper patient population glycemic (+hofer).csv")
 
-demo_adult <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Raw/Data From Montana/demo_adults.csv")
-demo_kids <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Raw/Data From Montana/demo_kids.csv")
+demo_adult <- read.csv("./Data From Montana/demo_adults.csv")
+demo_kids <- read.csv("./Data From Montana/demo_kids.csv")
 
 reg_montana$age <- ifelse(reg_montana$CFF.ID %in% demo_adult$CFF.ID, "Adult", 
                           ifelse(reg_montana$CFF.ID %in% demo_kids$CFF.ID, "Kids", "Check"))
@@ -71,8 +71,8 @@ reg_montana4 <- reg_montana3 %>% group_by(CFF.ID) %>% count()
 
 #weight/fev
 
-pft_adult <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Raw/Data From Montana/Copy of PFTs growth adult (+hofer).csv")
-pft_kids <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Raw/Data From Montana/PFTs kids.csv")
+pft_adult <- read.csv("./Data From Montana/Copy of PFTs growth adult (+hofer).csv")
+pft_kids <- read.csv("./Data From Montana/PFTs kids.csv")
 
 
 pft_montana <- rbind(pft_adult, pft_kids)
@@ -114,8 +114,8 @@ analytic_montana <- merge(pft_montana_5, demo_montana ,by = "CFF.ID", all.x=T)
 
 #gtube status
 
-gt_adult <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Raw/Data From Montana/gtubes_adult.csv")
-gt_kids <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Raw/Data From Montana/GT users kids.csv")
+gt_adult <- read.csv("./Data From Montana/gtubes_adult.csv")
+gt_kids <- read.csv("./Data From Montana/GT users kids.csv")
 
 
 gt_montana <- rbind(gt_adult, gt_kids)
@@ -129,15 +129,15 @@ analytic_montana$gtube <- ifelse(analytic_montana$CFF.ID %in% gt_montana_2$CFF.I
 
 #Insufficent
 
-is_adult <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Raw/Data From Montana/pancreatic insufficient adult.csv")
-is_kids <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Raw/Data From Montana/pancreatic insufficient kids.csv")
+is_adult <- read.csv("./Data From Montana/pancreatic insufficient adult.csv")
+is_kids <- read.csv("./Data From Montana/pancreatic insufficient kids.csv")
 
 analytic_montana$is <- ifelse(analytic_montana$CFF.ID %in% c(is_adult$CFF.ID, is_kids$CFF.ID), "Insufficient", "Not")
 
 #genotypes
 
-g_adult <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Raw/Data From Montana/genotypes_adult.csv")
-g_kids <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Raw/Data From Montana/genotypes kids.csv")[,1:3]
+g_adult <- read.csv("./Data From Montana/genotypes_adult.csv")
+g_kids <- read.csv("./Data From Montana/genotypes kids.csv")[,1:3]
 
 geno_montana <- rbind(g_adult,g_kids)
 
@@ -240,14 +240,14 @@ analytic_montana$genotype <- ifelse(analytic_montana$CFF.ID %in% geno_montana[ge
 
 #washingotn
 
-reg_washington <- read.csv("Data_Raw/Data From Washington/Copy of CFRD and trikafta Trikafta_on_Annual_Review-13-Apr-2021-0815.csv")
-reg_wash <- read.csv("Data_Raw/Data From Washington/Copy of CFRD and trikafta Trikafta_on_Annual_Review-13-Apr-2021-0815.csv")
+reg_washington <- read.csv("Data From Washington/Copy of CFRD and trikafta Trikafta_on_Annual_Review-13-Apr-2021-0815.csv")
+reg_wash <- read.csv("Data From Washington/Copy of CFRD and trikafta Trikafta_on_Annual_Review-13-Apr-2021-0815.csv")
 
 analytic_wash <- reg_washington %>% group_by(CFF.ID) %>% filter(row_number()==1) %>% filter(CFF.ID != "1499770")
 analytic_wash$trik <- as.Date(analytic_wash$Approximate.date.patient.started.taking.this.drug,  "%m/%d/%Y")
 
 #aic 
-a1c_wash <- read.csv("Data_Raw/Data From Washington/A1C_and_OGTT.csv")
+a1c_wash <- read.csv("Data From Washington/A1C_and_OGTT.csv")
 
 temp_wash <- reg_wash[,c("CFF.ID", "Approximate.date.patient.started.taking.this.drug")]
 temp_wash1 <- temp_wash %>% group_by(CFF.ID) %>% filter(row_number()==1)
@@ -260,7 +260,7 @@ a1c_wash2<- subset(a1c_wash1, abs(diff) <= 365 )
 
 
 #bmi
-bmi_wash <- read.csv("Data_Raw/Data From Washington/BMIandWeight.csv")
+bmi_wash <- read.csv("Data From Washington/BMIandWeight.csv")
 bmi_wash1 <- merge(bmi_wash, analytic_wash, by = "CFF.ID")
 bmi_wash1$Date <- as.Date(bmi_wash1$Date.of.Encounter.x,  "%m/%d/%Y")
 bmi_wash1$diff <-as.numeric(bmi_wash1$Date - bmi_wash1$trik)
@@ -275,13 +275,13 @@ bmi_wash3$first_encounter <- bmi_wash3$Date.of.Encounter.x
 analytic_wash <- merge(analytic_wash,bmi_wash3[,c("CFF.ID","BMI.Percentile" ,"Encounter.Age"  ,"Patients.height","BMI.Value","first_encounter")], by = "CFF.ID")
 
 #sex
-demo_wash <- read.csv("Data_Raw/Data From Washington/Demographics.csv")
+demo_wash <- read.csv("Data From Washington/Demographics.csv")
 
 analytic_wash$Sex <- ifelse(analytic_wash$CFF.ID %in% demo_wash[demo_wash$Gender== "Female",]$CFF.ID, "F", 
                             ifelse(analytic_wash$CFF.ID %in% demo_wash[demo_wash$Gender== "Male",]$CFF.ID, "M",  "Check"))
 
 #Insufficent
-is_wash <- read.csv("Data_Raw/Data From Washington/Pancreatic_Insufficient.csv")
+is_wash <- read.csv("Data From Washington/Pancreatic_Insufficient.csv")
 
 analytic_wash$is <- ifelse(analytic_wash$CFF.ID %in% is_wash$CFF.ID, "Insufficient", "Not")
 
@@ -289,14 +289,14 @@ analytic_wash$is <- ifelse(analytic_wash$CFF.ID %in% is_wash$CFF.ID, "Insufficie
 #gtube
 
 
-gt_wash <- read.csv("Data_Raw/Data From Washington/G-tube.csv")
+gt_wash <- read.csv("Data From Washington/G-tube.csv")
 
 analytic_wash$gt <- ifelse(analytic_wash$CFF.ID %in% gt_wash$CFF.ID, "GT", "Not")
 
 #genotypes
 
 
-geno_wash <- read.csv("Data_Raw/Data From Washington/Genotypes.csv")
+geno_wash <- read.csv("Data From Washington/Genotypes.csv")
 
 
 geno_wash$Genotypes1 <- geno_wash$Name.of.the.first.mutation
@@ -395,7 +395,7 @@ analytic_wash$genotype <- ifelse(analytic_wash$CFF.ID %in% geno_wash[geno_wash$g
 
 #pfts
 
-pfts_wash <- read.csv("Data_Raw/Data From Washington/PFTs.csv")
+pfts_wash <- read.csv("Data From Washington/PFTs.csv")
 
 pfts_wash1 <- merge(pfts_wash, analytic_wash, by = "CFF.ID")
 pfts_wash1$Date <- as.Date(pfts_wash1$Date.of.Encounter.x,  "%m/%d/%Y")
@@ -786,7 +786,7 @@ analytic_wash1 <- analytic_wash[,c("CFF.ID", "age", "bmipct", "Weight", "Sex", "
 
 #
 
-uofm <- read.csv("Data_Raw/Data From UofM/Moheet_Pre_Post_Trikafta_FinalData_20210914.csv")
+uofm <- read.csv("Data from UofM/Moheet_Pre_Post_Trikafta_FinalData_20210914.csv")
 analytic_uofm <- subset(uofm, uofm$CFRD.Status == "CFRD with or without fasting hyperglycemia")
 analytic_uofm$age <- analytic_uofm$age.at.Trikafta.start
 
@@ -1330,6 +1330,8 @@ cgm_temp <- merge(cgm, a1c6_big2, by.x="ID", by.y="CFF.ID", all.x=T)
 cgm1 <- cgm0 %>% group_by(ID, time) %>% count()
 cgm2 <- cgm1 %>% group_by(ID) %>% count()
 
+View(cgm0[,c("subject_id", "ID", "time")])
+
 #pull first post and then do an overall
 
 cgm0$date <- as.Date(cgm0$date_cgm_placement)
@@ -1347,6 +1349,8 @@ cgm0_time <- merge(cgm0_small, a1c6_big2_tim[,c("CFF.ID", "trik" )], by.y = "CFF
 
 cgm0_time$cgm_date <- as.Date(cgm0_time$date_cgm_placement, "%Y-%m-%d")
 cgm0_time$diff <- cgm0_time$date_cgm - as.Date(cgm0_time$trik, "%Y-%m-%d")
+
+View(cgm0_time[,c("date_cgm", "trik", "diff", "ID", "time")])
 
 tab3_extra <- tableby(time ~ diff, cgm0_time, control=mycontrols)
 
