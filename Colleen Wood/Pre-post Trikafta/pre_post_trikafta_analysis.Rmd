@@ -14,9 +14,10 @@ output:
 library(arsenal)
 library(tidyverse)
 library(lubridate)
+library(rspiro)
 source("~/GitHub/CF/get_genotype_class_severity.R")
-variables = c("CFF ID","Site","Sex","Race","Genotypes1","Genotypes2","Pancreatic Status",
-              "G-tube in past 12 months","Start","Date","Age")
+t1_variables = c("CFF ID","Site","Sex","Race","Genotypes1","Genotypes2","Pancreatic Status",
+              "G-tube in past 12 months","Time","Age","BMI","Height","Weight","FEV1","FVC")
 ```
 
 ```{r include=FALSE}
@@ -25,7 +26,7 @@ chco_a1c = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Tria
 chco_a1c$Date = parse_date_time(chco_a1c$Date,orders = "mdy")
 chco_bmi = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/chco_bmi_pft.csv",show_col_types = F)
 chco_bmi$Date = parse_date_time(chco_bmi$Date,orders = "mdy")
-chco = full_join(chco_a1c,chco_bmi,by = c("MRN", "Date"))
+chco = full_join(chco_a1c,chco_bmi)
 # Fill CFF ID by MRN
 chco= chco %>% group_by(MRN) %>% 
   fill(`CFF ID`,.direction = "downup") %>% ungroup() %>%
@@ -33,11 +34,18 @@ chco= chco %>% group_by(MRN) %>%
   select(-MRN)
 # Add demographics
 chco_reg = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/chco_registry.csv",show_col_types = F)
-chco_reg = chco_reg %>% select(-MRN)
 chco_reg$Start = parse_date_time(chco_reg$Start,orders = "mdy")
-chco = left_join(chco,chco_reg,by = "CFF ID")
-# Add Time
+chco_reg$DOB = parse_date_time(chco_reg$DOB,orders = "mdy")
+keep = chco_reg %>% filter(!is.na(`CFRD Diagnosis Date`)) %>% pull(`CFF ID`)
+exclude = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/chco_insulin.csv",show_col_types = F)
+exclude = exclude %>% filter(!is.na(`Remove (see notes)`)) %>% pull(MRN)
+exclude = chco_reg$`CFF ID`[match(exclude,chco_reg$MRN)]
+keep =setdiff(keep,exclude)
+chco = left_join(chco,chco_reg) %>% filter(`CFF ID` %in% keep)
+# Add missing variables
+chco$Age = round(as.numeric(difftime(chco$Date,chco$DOB,units = "days"))/365.25,1)
 chco$Time = as.numeric(difftime(chco$Date,chco$Start,units = "days"))
+chco$Site = "CHCO"
 ```
 
 ```{r include=FALSE}
@@ -46,18 +54,38 @@ mon_bmi = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triak
 mon_bmi$Date = parse_date_time(mon_bmi$Date,orders = "mdy")
 mon_a1c = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/montana_glycemic_registry.csv",show_col_types = F)
 mon_a1c$Date = parse_date_time(mon_a1c$Date,orders = "mdy")
+mon_a1c$DOB = parse_date_time(mon_a1c$DOB,orders = "mdy")
 # Get start date and CFRD status
 mon_starts = mon_a1c %>% select(`CFF ID`,`CFRD Status`,Start) %>% 
   distinct() %>% filter(`CFRD Status`=="CFRD with or without fasting hyperglycemia")
 mon_starts$Start = parse_date_time(mon_starts$Start,orders = "mdy")
 # Remove unnecessary columns
-mon_a1c = mon_a1c %>% select(`CFF ID`,Date,HbA1c,`OGTT Fasting`,`OGTT Two Hour`)
+mon_a1c = mon_a1c %>% select(`CFF ID`,DOB,Date,HbA1c,`OGTT Fasting`,`OGTT Two Hour`)
 # Merge and remove those without CFRD or start date
-mon = full_join(mon_bmi,mon_a1c,by = c("CFF ID", "Date"))
+mon = full_join(mon_bmi,mon_a1c)
 mon= mon %>% filter(`CFF ID` %in% mon_starts$`CFF ID`)
-mon = left_join(mon,mon_starts %>% select(`CFF ID`,Start), by = "CFF ID")
-# Add Time
+mon = left_join(mon,mon_starts %>% select(`CFF ID`,Start))
+# Add demographics
+mon_demo = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/montana_demo.csv",show_col_types = F)
+mon_demo = mon_demo %>% select(`CFF ID`,Race,Sex)
+mon = left_join(mon,mon_demo)
+# Add genotypes
+mon_geno = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/montana_genotypes.csv",show_col_types = F)
+mon = left_join(mon,mon_geno)
+# Add pancreatic and g tube status
+mon_pan = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/montana_pancreatic_insufficient.csv",show_col_types = F)
+mon_pan = mon_pan %>% select(-Date) %>% distinct()
+mon_pan$`Pancreatic Status` = "Insufficient"
+mon_gtube = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/montana_gtubes.csv",show_col_types = F)
+mon_gtube = mon_gtube %>% select(-Feeding,-Date) %>% distinct()
+mon_gtube$`G-tube in past 12 months` = "Yes"
+mon = left_join(mon,mon_pan)
+mon = left_join(mon,mon_gtube)
+# Add missing variables
+mon = mon %>% group_by(`CFF ID`) %>% fill(Start,DOB,.direction = "downup")
 mon$Time = as.numeric(difftime(mon$Date,mon$Start,units = "days"))
+mon$Age = round(as.numeric(difftime(mon$Date,mon$DOB))/365.25,1)
+mon$Site = "Montana"
 ```
 
 ```{r include=FALSE}
@@ -71,9 +99,17 @@ um_ogtt$Age = round(um_ogtt$Age / 365.25,1)
 um_pft = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/um_pfts.csv",show_col_types = F)
 um_pft$Age = round(um_pft$Age / 365.25,1)
 um_race = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/um_race.csv",show_col_types = F)
+um_demo = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/um_demo.csv",show_col_types = F)
+keep = um_demo %>% 
+  filter(`CFRD Status` =="CFRD with or without fasting hyperglycemia") %>%
+  pull(`CFF ID`)
+um_demo = um_demo %>% select(-`CFRD Status`) %>% 
+  rename(`G-tube in past 12 months`=`G tube in past 12 months`)
 # Join
 um = reduce(list(um_a1c,um_bmi,um_ogtt,um_pft),full_join)
-um = left_join(um,um_race,by = "CFF ID")
+um = left_join(um,um_race)
+um = left_join(um,um_demo)
+um = um %>% filter(`CFF ID` %in% keep) %>% rename(Site = "site")
 ```
 
 ```{r include=FALSE}
@@ -84,20 +120,79 @@ uw_glyc = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triak
 uw_glyc$Date = parse_date_time(uw_glyc$Date,orders = "mdy")
 uw_pft = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/uw_pft.csv",show_col_types = F)
 uw_pft$Date = parse_date_time(uw_pft$Date,orders = "mdy")
-uw_reg = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/uw_registry.csv",show_col_types = F)
-uw_reg$Start = parse_date_time(uw_reg$Start,orders = "mdy")
+uw_demo = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/uw_demo.csv",show_col_types = F)
+uw_demo = uw_demo %>% select(`CFF ID`,Race,Sex)
+# Get CFRD status and start date
+uw_start = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/uw_mods.csv",show_col_types = F)
+uw_start$`Date of Encounter` = parse_date_time(uw_start$`Date of Encounter`,orders = "mdy")
+uw_start = uw_start %>% arrange(`CFF ID`,`Date of Encounter`) %>% 
+  group_by(`CFF ID`) %>% filter(row_number()==n()) %>%
+  select(`CFF ID`,`Date of Encounter`) %>% rename(Start = `Date of Encounter`)
+uw_cfrd = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/uw_cfrd.csv",show_col_types = F)
+uw_cfrd = uw_cfrd %>% 
+  filter(`CFRD Status`=="CFRD with or without fasting hyperglycemia") %>% 
+  select(`CFF ID`) %>% distinct() %>% pull(`CFF ID`)
+keep = unique(uw_cfrd,uw_start$`CFF ID`)
+# Add genotypes
+uw_geno = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/uw_genotypes.csv",show_col_types = F)
+# Pancreatic status
+uw_pan = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/uw_pancreatic.csv",show_col_types = F)
+uw_pan = uw_pan %>% select(-Date) %>% distinct() %>% mutate(`Pancreatic Status`="Insufficient")
+# G tubes
+uw_gtube = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/uw_gtubes.csv",show_col_types = F)
+uw_gtube = uw_gtube %>% select(`CFF ID`) %>% distinct() %>% mutate(`G-tube in past 12 months`="Yes")
 # Merge
-uw = reduce(list(uw_bmi,uw_glyc,uw_pft,uw_reg),full_join)
+uw = reduce(list(uw_bmi,uw_glyc,uw_pft),full_join)
+uw = left_join(uw,uw_demo)
+uw = left_join(uw,uw_geno)
+uw = left_join(uw,uw_pan)
+uw = left_join(uw,uw_gtube)
+uw = left_join(uw,uw_start) %>% filter(`CFF ID` %in% keep)
+# Other variables (no weight for this site)
+uw$Time = as.numeric(difftime(uw$Date,uw$Start,units = "days"))
+uw$Site = "UW"
+uw$Weight = NA
 ```
 
 ```{r include=FALSE}
 # Put everything together
-
+chco = chco %>% select(all_of(t1_variables))
+mon = mon %>% select(all_of(t1_variables))
+um = um %>% select(all_of(t1_variables))
+uw = uw %>% select(all_of(t1_variables))
+df = bind_rows(chco,mon,um,uw) %>% arrange(`CFF ID`,Time)
+# Age group
+df$`Age Group` = cut(df$Age,breaks = c(-Inf,20,Inf),labels = c("Pedatric","Adult"),right = F)
+# Race and sex
+df$Race = factor(df$Race,levels = c("Black or African American","Caucasian",
+                                    "Other","Some other race","Two or more races","White"),
+                 labels = c("Black","Caucasian",
+                                    "Other","Other","Other","Caucasian"))
+df$Sex = factor(df$Sex,levels = c("Male","Female"))
+# BMI and FEV calculations
+age = df$Age
+height = df$Height/100
+race = df$Race
+old <- c("Caucasian","Black","Other")
+new <- c(1,2,5)
+race = new[match(race, old)]
+gender = as.numeric(df$Sex)
+df$ppFEV1  = pctpred_GLI(age,height,gender = gender,ethnicity = race,FEV1 = df$FEV1)
+df$ppFVC  = pctpred_GLI(age,height,gender = gender,ethnicity = race,FVC = df$FVC)
+# Genotype severity
+df$Genotypes1 = get_cf_genotype_class_severity(df$Genotypes1)
+df$Genotypes2 = get_cf_genotype_class_severity(df$Genotypes2)
+df = df %>% unite(Genotype,Genotypes1,Genotypes2)
+df$Genotype = factor(df$Genotype,levels = c("Mild_Severe","Severe_Mild","Severe_Severe",
+                                            "Severe_Unknown","Unknown_Unknown"),
+                     labels = c("Low","Low","High","Unknown","Unknown"))
 ```
 
-# Participant Characteristics
+# Participant characteristics at date closest to CFTR modulator start
 
 ```{r results='asis'}
+t1_data = df %>% group_by(`CFF ID`) %>% slice_min(abs(Time))
+
 t1 = tableby(~Age+BMI.Percentile+Weight+Sex+,pre_post[pre_post$Before_After == "Before",])
 summary(t1)
 ```
