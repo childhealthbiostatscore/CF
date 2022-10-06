@@ -14,10 +14,12 @@ output:
 library(arsenal)
 library(tidyverse)
 library(lubridate)
+library(childsds)
 library(rspiro)
 source("~/GitHub/CF/get_genotype_class_severity.R")
 t1_variables = c("CFF ID","Site","Sex","Race","Genotypes1","Genotypes2","Pancreatic Status",
-              "G-tube in past 12 months","Time","Age","BMI","Height","Weight","FEV1","FVC")
+              "G-tube in past 12 months","Time","Age",
+              "BMI Percentile","Height","Weight","FEV1","FVC","HbA1c")
 ```
 
 ```{r include=FALSE}
@@ -46,6 +48,11 @@ chco = left_join(chco,chco_reg) %>% filter(`CFF ID` %in% keep)
 chco$Age = round(as.numeric(difftime(chco$Date,chco$DOB,units = "days"))/365.25,1)
 chco$Time = as.numeric(difftime(chco$Date,chco$Start,units = "days"))
 chco$Site = "CHCO"
+# BMI calculations
+chco$age_for_bmi = ifelse(chco$Age < 20,chco$Age,20)
+chco$`BMI Percentile` = round(sds(chco$BMI,age = chco$age_for_bmi,item = "bmi",type = "perc",
+                          sex = chco$Sex,male = "Male", female = "Female",
+                          ref = cdc.ref)*100,2)
 ```
 
 ```{r include=FALSE}
@@ -55,6 +62,7 @@ mon_bmi$Date = parse_date_time(mon_bmi$Date,orders = "mdy")
 mon_a1c = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/montana_glycemic_registry.csv",show_col_types = F)
 mon_a1c$Date = parse_date_time(mon_a1c$Date,orders = "mdy")
 mon_a1c$DOB = parse_date_time(mon_a1c$DOB,orders = "mdy")
+mon_a1c$HbA1c = as.numeric(mon_a1c$HbA1c)
 # Get start date and CFRD status
 mon_starts = mon_a1c %>% select(`CFF ID`,`CFRD Status`,Start) %>% 
   distinct() %>% filter(`CFRD Status`=="CFRD with or without fasting hyperglycemia")
@@ -86,6 +94,13 @@ mon = mon %>% group_by(`CFF ID`) %>% fill(Start,DOB,.direction = "downup")
 mon$Time = as.numeric(difftime(mon$Date,mon$Start,units = "days"))
 mon$Age = round(as.numeric(difftime(mon$Date,mon$DOB))/365.25,1)
 mon$Site = "Montana"
+# Fill in some missing 
+mon$`Pancreatic Status`[is.na(mon$`Pancreatic Status`)] = "Sufficient"
+# BMI calculations
+mon$age_for_bmi = ifelse(mon$Age < 20,mon$Age,20)
+mon$`BMI Percentile` = round(sds(mon$BMI,age = mon$age_for_bmi,item = "bmi",type = "perc",
+                          sex = mon$Sex,male = "Male", female = "Female",
+                          ref = cdc.ref)*100,2)
 ```
 
 ```{r include=FALSE}
@@ -109,7 +124,16 @@ um_demo = um_demo %>% select(-`CFRD Status`) %>%
 um = reduce(list(um_a1c,um_bmi,um_ogtt,um_pft),full_join)
 um = left_join(um,um_race)
 um = left_join(um,um_demo)
-um = um %>% filter(`CFF ID` %in% keep) %>% rename(Site = "site")
+um = um %>% filter(`CFF ID` %in% keep,!is.na(Time),abs(Time) <= 365) %>% 
+  rename(Site = "site") %>% arrange(`CFF ID`,Time)
+# Filter per Maxie's previous work (unclear exactly how they got to this subset)
+um_ids = read_csv("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/um_ids_from_maxie.csv",show_col_types = F)
+um = um %>% filter(`CFF ID` %in% um_ids$`CFF ID`)
+# BMI calculations
+um$age_for_bmi = ifelse(um$Age < 20,um$Age,20)
+um$`BMI Percentile` = round(sds(um$BMI,age = um$age_for_bmi,item = "bmi",type = "perc",
+                          sex = um$Sex,male = "Male", female = "Female",
+                          ref = cdc.ref)*100,2)
 ```
 
 ```{r include=FALSE}
@@ -152,6 +176,12 @@ uw = left_join(uw,uw_start) %>% filter(`CFF ID` %in% keep)
 uw$Time = as.numeric(difftime(uw$Date,uw$Start,units = "days"))
 uw$Site = "UW"
 uw$Weight = NA
+# BMI calculations
+uw$age_for_bmi = ifelse(uw$Age < 20,uw$Age,20)
+uw$`BMI Percentile 2` = round(sds(uw$BMI,age = uw$age_for_bmi,item = "bmi",type = "perc",
+                          sex = uw$Sex,male = "Male", female = "Female",
+                          ref = cdc.ref)*100,2)
+uw$`BMI Percentile` = coalesce(uw$`BMI Percentile`,uw$`BMI Percentile 2`)
 ```
 
 ```{r include=FALSE}
@@ -169,7 +199,7 @@ df$Race = factor(df$Race,levels = c("Black or African American","Caucasian",
                  labels = c("Black","Caucasian",
                                     "Other","Other","Other","Caucasian"))
 df$Sex = factor(df$Sex,levels = c("Male","Female"))
-# BMI and FEV calculations
+# FEV calculations
 age = df$Age
 height = df$Height/100
 race = df$Race
@@ -186,20 +216,30 @@ df = df %>% unite(Genotype,Genotypes1,Genotypes2)
 df$Genotype = factor(df$Genotype,levels = c("Mild_Severe","Severe_Mild","Severe_Severe",
                                             "Severe_Unknown","Unknown_Unknown"),
                      labels = c("Low","Low","High","Unknown","Unknown"))
+# Other little cleaning things
+df = df %>% filter(Age > 0,!is.na(Time))
+df$`G-tube in past 12 months`[is.na(df$`G-tube in past 12 months`)] = "No"
+# Pre-/post-modulator
+df$`Pre or Post` = factor(sign(df$Time),levels = -1:1,labels = c("Pre","Pre","Post"))
+# Get pre value closest to start, post value furthest from start
+df = df %>% arrange(`CFF ID`,Time) %>% group_by(`CFF ID`,`Pre or Post`) %>%
+  summarise(`A1c Values` = sum(!is.na(HbA1c)),
+            across(everything(),~ last(na.omit(.x))))
 ```
 
-# Participant characteristics at date closest to CFTR modulator start
+# Participant characteristics prior to CFTR modulator start 
 
 ```{r results='asis'}
-t1_data = df %>% group_by(`CFF ID`) %>% slice_min(abs(Time))
-
-t1 = tableby(~Age+BMI.Percentile+Weight+Sex+,pre_post[pre_post$Before_After == "Before",])
+# Table
+t1 = tableby(~Age+`BMI Percentile`+Weight+Sex+ppFEV1+ppFVC+`G-tube in past 12 months`+
+               `Pancreatic Status`+Site+Genotype+`Age Group`,
+             data = df %>% filter(`Pre or Post` == "Pre"))
 summary(t1)
 ```
 
 # Pre-post
 
 ```{r}
-summary(tableby( ~ ppFEV + ppFVC + BMIz,data = df[!is.na(df$average_sensor),]))
+
 ```
 
