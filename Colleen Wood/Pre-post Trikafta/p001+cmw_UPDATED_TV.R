@@ -2,6 +2,7 @@
 # c. chan
 ##############################
 library(dplyr)
+library(rspiro)
 setwd("/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Raw")
 
 #cgm data
@@ -929,7 +930,8 @@ analytic_uofm2$BMI.Value <- analytic_uofm2$bmi
 analytic_uofm2$age_category
 analytic_uofm2_2 <- subset(analytic_uofm2, analytic_uofm2$Encounter....of.Days.POST.Trikafta.start <= 365 &
                              analytic_uofm2$Encounter....of.Days.PRE.Trikafta.Start <= 365)
-
+analytic_uofm2_2 = analytic_uofm2_2 %>% select(CFF.ID) %>% rename(`CFF ID`=CFF.ID)
+write.csv(analytic_uofm2_2,file = "/Volumes/Documents/Work/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/um_ids_from_maxie.csv",row.names = F)
 
 
 analytic_uofm3 <- analytic_uofm2_2[,c("CFF.ID", "age", "bmipct", "Weight", "Sex", "ppFEV1", "ppFVC", "G.tube.in.past.12.months", 
