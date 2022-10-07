@@ -228,8 +228,10 @@ um <- um %>% select(all_of(t1_variables))
 uw <- uw %>% select(all_of(t1_variables))
 df <- bind_rows(chco, mon, um, uw) %>% arrange(`CFF ID`, Time)
 # Age group
-df$`Age Group` <- cut(df$Age, breaks = c(-Inf, 20, Inf), 
-                      labels = c("Pedatric", "Adult"), right = F)
+df$`Age Group` <- cut(df$Age,
+  breaks = c(-Inf, 20, Inf),
+  labels = c("Pedatric", "Adult"), right = F
+)
 # Race and sex
 df$Race <- factor(df$Race,
   levels = c(
@@ -288,18 +290,23 @@ insulin <- bind_rows(chco_ins, mon_ins, uw_ins)
 df <- left_join(df, insulin)
 df$`Pre or Post` <- factor(df$`Pre or Post`, levels = c("Pre", "Post"))
 # Get pre value closest to start, post value closest to 1 year from start
-df$select_time = df$Time
-df$select_time[df$`Pre or Post`=="Post"] = 365 - df$select_time[df$`Pre or Post`=="Post"]
+df$select_time <- df$Time
+df$select_time[df$`Pre or Post` == "Post"] <- 365 - df$select_time[df$`Pre or Post` == "Post"]
 df <- df %>%
-  arrange(`CFF ID`,`Pre or Post`, select_time) %>%
+  arrange(`CFF ID`, `Pre or Post`, select_time) %>%
   group_by(`CFF ID`, `Pre or Post`) %>%
   summarise(
     `Num. A1c Values` = sum(!is.na(HbA1c)),
     across(everything(), ~ last(na.omit(.x))),
-  .groups = "keep") %>%
+    .groups = "keep"
+  ) %>%
   filter(!is.na(HbA1c))
-keep = df %>% group_by(`CFF ID`) %>% summarise(n=n()) %>% filter(n==2) %>% pull(`CFF ID`)
-df = df %>% filter(`CFF ID` %in% keep)
+keep <- df %>%
+  group_by(`CFF ID`) %>%
+  summarise(n = n()) %>%
+  filter(n == 2) %>%
+  pull(`CFF ID`)
+df <- df %>% filter(`CFF ID` %in% keep)
 ```
 
 ```{r include=FALSE}
@@ -331,8 +338,8 @@ uw_cgm <- uw_cgm %>% select(`CFF ID`, `Pre or Post`, all_of(cgm_vars))
 # Put together
 cgm <- bind_rows(chco_cgm, mon_cgm, uw_cgm)
 # Add to DF
-cgm$`CFF ID` = as.numeric(cgm$`CFF ID`)
-df = left_join(df,cgm)
+cgm$`CFF ID` <- as.numeric(cgm$`CFF ID`)
+df <- left_join(df, cgm)
 ```
 
 # Participant characteristics prior to CFTR modulator start 
@@ -374,6 +381,3 @@ p <- paired(cgm_formula,
 )
 summary(p, pfootnote = T, digits = 1)
 ```
-
-
-
