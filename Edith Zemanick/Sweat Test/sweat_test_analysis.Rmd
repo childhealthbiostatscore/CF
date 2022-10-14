@@ -17,8 +17,19 @@ library(tidyverse)
 library(pROC)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
-knitr::opts_knit$set(root.dir = "/Users/timvigers/Documents/Work/CF/Edith Zemanick/Sweat Test")
-source("~/GitHub/CF/get_genotype_class_severity.R")
+if(Sys.info()["sysname"] == "Windows"){
+  home_dir = "C:/Users/timvigers/Dropbox/Work/Vigers/CF/Edith Zemanick/Sweat Test"
+  source("C:/Users/timvigers/Documents/GitHub/CF/get_genotype_class_severity.R")
+} else if (Sys.info()["sysname"] == "Linux"){
+  home_dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Edith Zemanick/Sweat Test"
+  source("~/GitHub/CF/get_genotype_class_severity.R")
+} else if (Sys.info()["sysname"] == "Darwin"){
+  home_dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Edith Zemanick/Sweat Test"
+  source("~/GitHub/CF/get_genotype_class_severity.R")
+}
+knitr::opts_knit$set(root.dir = home_dir)
+rm(home_dir)
+
 ```
 
 ```{r}
