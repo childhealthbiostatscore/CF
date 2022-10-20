@@ -18,7 +18,7 @@ library(pROC)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE)
 if(Sys.info()["sysname"] == "Windows"){
-  home_dir = "C:/Users/timvigers/Dropbox/Work/Vigers/CF/Edith Zemanick/Sweat Test"
+  home_dir = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Edith Zemanick/Sweat Test"
   source("C:/Users/timvigers/Documents/GitHub/CF/get_genotype_class_severity.R")
 } else if (Sys.info()["sysname"] == "Linux"){
   home_dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Edith Zemanick/Sweat Test"
@@ -29,7 +29,6 @@ if(Sys.info()["sysname"] == "Windows"){
 }
 knitr::opts_knit$set(root.dir = home_dir)
 rm(home_dir)
-
 ```
 
 ```{r}
@@ -70,6 +69,7 @@ df <- df %>%
   distinct(.) %>%
   filter(Sex != "", Demographics.Available == "TRUE")
 # Genotype info
+## By severity
 df$geno1 <- get_cf_genotype_class_severity(df$Genotypes1)
 df$geno2 <- get_cf_genotype_class_severity(df$Genotypes2)
 df$geno1[df$Diagnosis == "Non-CF"] <- "Not CF"
@@ -77,16 +77,28 @@ df$geno2[df$Diagnosis == "Non-CF"] <- "Not CF"
 df$geno_risk <- paste(df$geno1, df$geno2, sep = "_")
 df$geno_risk <- factor(df$geno_risk,
   levels = c(
-    "Severe_Severe","Mild_Severe", "Mild_Unknown", "Severe_Mild", "Mild_Mild","Not CF_Not CF",
-    
-     "Severe_Unknown", "Unknown_Severe",
-    "Unknown_Unknown"
+    "Severe_Severe","Mild_Severe", "Mild_Unknown", "Severe_Mild", "Mild_Mild",
+    "Not CF_Not CF","Severe_Unknown", "Unknown_Severe","Unknown_Unknown"
   ),
   labels = c(
     "High","Low", "Low", "Low", "Low", "Not CF",  "Unknown",
     "Unknown", "Unknown"
   )
 )
+## By function
+df$geno1_class <- get_cf_genotype_class_severity(df$Genotypes1,out = "class")
+df$geno1_class[grep("508",df$Genotypes1)] = "F508del"
+df$geno1_class = replace(df$geno1_class,df$geno1_class %in% c("I","II","III"),"MF")
+df$geno1_class = replace(df$geno1_class,df$geno1_class %in% c("IV","V"),"RF")
+
+df$geno2_class <- get_cf_genotype_class_severity(df$Genotypes2,out = "class")
+df$geno2_class[grep("508",df$Genotypes2)] = "F508del"
+df$geno2_class = replace(df$geno2_class,df$geno2_class %in% c("I","II","III"),"MF")
+df$geno2_class = replace(df$geno2_class,df$geno2_class %in% c("IV","V"),"RF")
+
+
+df$geno_class = factor(paste0(pmin(df$geno1_class,df$geno2_class),"/",
+                       pmax(df$geno1_class,df$geno2_class)))
 # Which arm?
 df$Arm <- apply(df[, c("Cl", "Cl_Left", "Cl_Right", "Na", "Na_Left", "Na_Right", "K", "K_Left", "K_Right")], 1, function(r) {
   k <- sum(!is.na(r))
@@ -125,12 +137,13 @@ df$`Na/Cl Ratio` = df$Na /df$Cl
 df <- df %>% arrange(PatientID, Age.at.Test.in.Weeks)
 # Table options (most variables are not normally distributed)
 mycontrols  <- tableby.control(numeric.test="kwt",numeric.stats=c("Nmiss", "median", "q1q3"))
-labels = list(Age.at.Test.in.Years = "Age (Years)", geno_risk = "Genotype Severity")
+labels = list(Age.at.Test.in.Years = "Age (Years)", 
+              geno_risk = "Genotype Severity",geno_class = "Specific Genotype")
 ```
 
 # Patient Demographics and Sample Characteristics
 
-For those with two sweat electrolyte measures (left and right), the average of the two was used. Each participants' first sweat test value was used for the following tables
+For those with two sweat electrolyte measures (left and right), the average of the two was used. Each participants' first sweat test value was used for the following tables.
 
 ## By diagnosis
 
@@ -138,8 +151,9 @@ For those with two sweat electrolyte measures (left and right), the average of t
 t1_df <- df %>%
   group_by(PatientID) %>%
   filter(row_number() == 1) # First measure for everyone
-t1 <- tableby(Diagnosis ~ Sex + Age.at.Test.in.Years + fe(geno_risk) + Amount + Cl + Na + K + `Na/Cl Ratio`,
-  data = t1_df,control = mycontrols,simulate.p.value=T
+t1 <- tableby(Diagnosis ~ Sex + Age.at.Test.in.Years + fe(geno_risk) + fe(geno_class) + 
+                Amount + Cl + Na + K + `Na/Cl Ratio`,
+  data = t1_df,control = mycontrols,simulate.p.value = T
 )
 summary(t1,pfootnote = T,
   labelTranslations = labels
@@ -149,8 +163,10 @@ summary(t1,pfootnote = T,
 ## By method
 
 ```{r results='asis'}
-t1 <- tableby(Method ~ Sex + Age.at.Test.in.Years + Diagnosis + geno_risk + Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
-  data = t1_df,control = mycontrols,
+t1 <- tableby(Method ~ Sex + Age.at.Test.in.Years + Diagnosis + fe(geno_risk) + fe(geno_class) +
+                Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + 
+                `Na Diff. Between Left and Right Arm`,
+  data = t1_df,control = mycontrols,simulate.p.value = T
 )
 summary(t1,pfootnote = T,
   labelTranslations = labels
@@ -162,7 +178,9 @@ summary(t1,pfootnote = T,
 ## By diagnosis
 
 ```{r results='asis'}
-t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
+t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + 
+                `Cl Diff. Between Left and Right Arm` + 
+                `Na Diff. Between Left and Right Arm`,
   data = t1_df,control = mycontrols,
 )
 summary(t1,pfootnote = T,
@@ -173,7 +191,9 @@ summary(t1,pfootnote = T,
 ### Gibson-Cooke only
 
 ```{r results='asis'}
-t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
+t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + 
+                `Cl Diff. Between Left and Right Arm` + 
+                `Na Diff. Between Left and Right Arm`,
   data = t1_df[t1_df$Method == "Gibson-Cooke",],control = mycontrols,
 )
 summary(t1,pfootnote = T,
@@ -184,7 +204,9 @@ summary(t1,pfootnote = T,
 ### Macroduct only
 
 ```{r results='asis'}
-t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
+t1 <- tableby(Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` + 
+                `Cl Diff. Between Left and Right Arm` + 
+                `Na Diff. Between Left and Right Arm`,
   data = t1_df[t1_df$Method == "Macroduct",],control = mycontrols,
 )
 summary(t1,pfootnote = T,
@@ -195,7 +217,9 @@ summary(t1,pfootnote = T,
 ## By genotype risk
 
 ```{r results='asis'}
-t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
+t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + 
+                `Cl Diff. Between Left and Right Arm` + 
+                `Na Diff. Between Left and Right Arm`,
   data = t1_df,control = mycontrols,
 )
 summary(t1,pfootnote = T,
@@ -249,7 +273,7 @@ summary(t1,pfootnote = T,
 )
 ```
 
-## Plots
+### Plots
 
 ```{r warning=FALSE}
 ggplot(df, aes(x = Diagnosis, y = Na)) +
@@ -273,6 +297,89 @@ ggplot(df, aes(x = Diagnosis, y = `Na/Cl Ratio`)) +
   ggtitle("Na/Cl Ratio")
 ```
 
+## By specific genotype
+
+```{r results='asis'}
+t1 <- tableby(geno_class ~ Amount + Cl + Na + K + `Na/Cl Ratio` + 
+                `Cl Diff. Between Left and Right Arm` + 
+                `Na Diff. Between Left and Right Arm`,
+  data = t1_df,control = mycontrols,
+)
+summary(t1,pfootnote = T,
+  labelTranslations = labels
+)
+```
+
+## By specific genotype and diagnosis
+
+### Cystic fibrosis
+
+```{r results='asis'}
+t1 <- tableby(geno_class ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
+  data = t1_df[t1_df$Diagnosis == "Cystic Fibrosis",],control = mycontrols
+)
+summary(t1,pfootnote = T,
+  labelTranslations = labels
+)
+```
+
+### CFTR-related disorder
+
+```{r results='asis'}
+t1 <- tableby(geno_class ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
+  data = t1_df[t1_df$Diagnosis == "CFTR-related disorder",],control = mycontrols
+)
+summary(t1,pfootnote = T,
+  labelTranslations = labels
+)
+```
+
+### CRMS
+
+```{r results='asis'}
+t1 <- tableby(geno_class ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
+  data = t1_df[t1_df$Diagnosis == "CRMS",],control = mycontrols
+)
+summary(t1,pfootnote = T,
+  labelTranslations = labels
+)
+```
+
+### Non-CF
+
+```{r results='asis'}
+t1 <- tableby( ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
+  data = t1_df[t1_df$Diagnosis == "Non-CF",],control = mycontrols
+)
+summary(t1,pfootnote = T,
+  labelTranslations = labels
+)
+```
+
+### Plots
+
+```{r warning=FALSE}
+ggplot(df, aes(x = geno_class, y = Na)) +
+  geom_boxplot() +
+  theme_bw() + xlab("Specific Genotype") +
+  ggtitle("Sweat Sodium")
+
+ggplot(df, aes(x = geno_class, y = K)) +
+  geom_boxplot() +
+  theme_bw() +
+  ggtitle("Sweat Potassium")
+
+ggplot(df, aes(x = geno_class, y = Cl)) +
+  geom_boxplot() +
+  theme_bw() + xlab("Specific Genotype") +
+  ggtitle("Sweat Chloride")
+
+ggplot(df, aes(x = geno_class, y = `Na/Cl Ratio`)) +
+  geom_boxplot() +
+  theme_bw() + xlab("Specific Genotype") +
+  ggtitle("Na/Cl Ratio")
+```
+
 # Between occasion
 
 For all participants with more than one sweat test, we compared their first and last values.
@@ -292,8 +399,11 @@ mycontrols  <- tableby.control(numeric.test="signed.rank",cat.test = "mcnemar",
 ## Overall
 
 ```{r results='asis'}
-p <- paired(time ~ Diagnosis +Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,signed.rank.exact = F,
-            data = multiples, id = PatientID,control = mycontrols)
+p <- paired(time ~ Diagnosis + Cl + Na + K + `Na/Cl Ratio` + 
+              `Cl Diff. Between Left and Right Arm` + 
+              `Na Diff. Between Left and Right Arm`,
+            signed.rank.exact = F,data = multiples, 
+            id = PatientID,control = mycontrols)
 summary(p,pfootnote = T,labelTranslations = labels)
 ```
 
@@ -334,6 +444,40 @@ summary(p,pfootnote = T,labelTranslations = labels)
 
 ```{r results='asis'}
 p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio`,signed.rank.exact = F,strata = geno_risk,
+            data = multiples %>% filter(Diagnosis == "Non-CF"), 
+            id = PatientID,control = mycontrols)
+summary(p,pfootnote = T,labelTranslations = labels)
+```
+
+## By specific genotype
+
+```{r results='asis'}
+p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio` + 
+              `Cl Diff. Between Left and Right Arm` + 
+              `Na Diff. Between Left and Right Arm`,
+            signed.rank.exact = F,strata = geno_class,numeric.test = "notest",
+            data = multiples, id = PatientID,control = mycontrols)
+summary(p,pfootnote = T,labelTranslations = labels)
+```
+
+## By genotype class and diagnosis
+
+Not enough paired observations in the CRMS or CFTR-related disorder groups.
+
+### Cystic fibrosis
+
+```{r results='asis'}
+p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio`,
+            signed.rank.exact = F,strata = geno_class,
+            data = multiples %>% filter(Diagnosis == "Cystic Fibrosis"), 
+            id = PatientID,control = mycontrols)
+summary(p,pfootnote = T,labelTranslations = labels)
+```
+
+### Non-CF
+
+```{r results='asis'}
+p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio`,signed.rank.exact = F,strata = geno_class,
             data = multiples %>% filter(Diagnosis == "Non-CF"), 
             id = PatientID,control = mycontrols)
 summary(p,pfootnote = T,labelTranslations = labels)
