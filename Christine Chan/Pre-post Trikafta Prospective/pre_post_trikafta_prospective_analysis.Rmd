@@ -6,7 +6,7 @@ output:
   html_document:
     number_sections: yes
     toc: yes
-    toc_depth: 2
+    toc_depth: 5
     toc_float: yes
 ---
 
@@ -20,7 +20,7 @@ library(pracma)
 library(corrplot)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE,warning = FALSE)
-knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/CF")
+knitr::opts_knit$set(root.dir = "~/Dropbox/Work/Vigers/CF")
 ```
 
 ```{r}
@@ -66,11 +66,11 @@ cgm$Event.Name = paste("Visit",gsub("[[:alpha:]]|\\s","",cgm$Event.Name))
 df = left_join(df,cgm,by = c("Study.ID", "Event.Name"))
 # Update DXA variables
 dxa_vars = c("Tissue..g.","Total.Fat.Mass....","Fat.Body.Mass..g.","Fat.Free.Mass..g.",
-            "Lean.Body.Mass..g.","Total.Mass..kg.","Fat.Free.Mass..",
-            "Fat.Mass.Index..FMI...","Lean.body.mass.fat.mass..LBM.FM.",
-            "Fat.Free.Mass.Index...FFMI.","Lean.Body.Mass.Index..LBMI.",
-            "BMD.Total.z.score","BMD.Subtotal.z.score",
-            "DXA.FMI.calculated.z.score","DXA.LBMI.calculated.z.score")
+             "Lean.Body.Mass..g.","Total.Mass..kg.","Fat.Free.Mass..",
+             "Fat.Mass.Index..FMI...","Lean.body.mass.fat.mass..LBM.FM.",
+             "Fat.Free.Mass.Index...FFMI.","Lean.Body.Mass.Index..LBMI.",
+             "BMD.Total.z.score","BMD.Subtotal.z.score",
+             "DXA.FMI.calculated.z.score","DXA.LBMI.calculated.z.score")
 dxa = read.csv("./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/dxa_data.csv")
 dxa = dxa %>% select(Study.ID,all_of(dxa_vars))
 df = left_join(df,dxa)
@@ -231,8 +231,8 @@ df$iAUC_ratio = df$`C Peptide iAUC`/df$`Glucose iAUC`
 ## Full cohort
 
 ```{r results='asis'}
-t2_vars = c("A1C.result","Weight..kg.","weightz","BMIz","FEV1..","FVC....",
-            "trikafta_duration","Group","Glucose.0.minute",
+t2_vars = c("Age.at.visit.","A1C.result","Weight..kg.","weightz","BMI","BMIz",
+            "FEV1..","FVC....","trikafta_duration","Group","Glucose.0.minute",
             "Glucose.60.min","Glucose.120.min","c.peptide.0.minute",
             "`Glucose iAUC`","`C Peptide iAUC`","`Insulin iAUC`",
             "`C Peptide Index`","Matsuda",
@@ -280,9 +280,46 @@ p <- paired(f,data = df, id = Study.ID,numeric.test = "signed.rank",cat.test = "
 summary(p,pfootnote = T,labelTranslations = newlabels)
 ```
 
-# Table 4: Prior Modulator Use
+# Prior Modulator Use
 
-Unable to perform statistical tests due to too many missing values.
+The following tables include 11 people previously on modulators and 9 not previously on modulators.
+
+## Table 4a: Pre-/Post-ETI Stratified by Previous Use
+
+```{r results='asis'}
+df$prev = 
+  factor(paste(df$Kalydeco,df$Symdeko, df$Orkambi),
+         levels = c("No No No","No No Yes","No Yes No","Yes No No"),
+         labels = c("No","Yes","Yes","Yes")
+  )
+df = df %>% group_by(Study.ID) %>% mutate(`Previous Modulator` = prev[Event.Name == "Visit 1"])
+
+prior_mod_vars = t2_vars[as.numeric(which(colSums(is.na(df[,gsub("`","",t2_vars)]))==0))]
+f = as.formula(paste0("Event.Name ~ ",paste0(prior_mod_vars,collapse = "+")))
+
+p <- paired(f,data = df, id = Study.ID,numeric.test = "signed.rank",cat.test = "mcnemar",signed.rank.exact = F,
+            strata = `Previous Modulator`,control = tableby.control(numeric.stats = c("Nmiss", "medianq1q3", "range")))
+summary(p,pfootnote = T,labelTranslations = newlabels)
+```
+
+## Table 4b: Previous Use vs. Not - Baseline
+
+```{r results='asis'}
+baseline = df %>% filter(Event.Name == "Visit 1")
+f = as.formula(paste0("`Previous Modulator` ~ ",paste0(prior_mod_vars,collapse = "+")))
+t = tableby(f,numeric.test = "kwt",data = baseline,
+            control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))))
+summary(t,digits = 2,labelTranslations = newlabels,pfootnote=TRUE)
+```
+
+## Table 4c: Previous Use vs. Not - Follow Up
+
+```{r results='asis'}
+visit2 = df %>% filter(Event.Name == "Visit 2")
+t = tableby(f,numeric.test = "kwt",data = visit2,
+            control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))))
+summary(t,digits = 2,labelTranslations = newlabels,pfootnote=TRUE)
+```
 
 # Correlations
 
@@ -316,9 +353,12 @@ Line plots below indicate median with IQR represented by the error bars.
 
 ```{r}
 ggplot(df,aes(x = Event.Name, y = A1C.result,fill = Event.Name)) + 
-  geom_boxplot(coef=0,alpha = 0.5,outlier.shape = NA) + geom_jitter(width = 0.15) + 
+  geom_boxplot(coef=0,alpha = 0.5,outlier.shape = NA) + 
+  geom_point(alpha = 0.3) + 
+  geom_line(aes(group = Study.ID),alpha = 0.3) + 
   xlab("Visit") + ylab("HbA1c (%)") + 
-  theme_bw() + theme(legend.position = "none") +
+  theme_bw() + 
+  theme(legend.position = "none",axis.title.x=element_blank()) +
   scale_fill_grey()
 ```
 
@@ -405,11 +445,11 @@ summary(t,pfootnote = T)
 1. The A1C numbers look correct to me. The p value in Table 2 is calculated for only those people with a measure at V1 and V2, so in this case it was calculated based on n = 15. Similarly, for "HbA1c (%) for those with CGM," there are 12 values missing out of 20, so the p value is for 8 participants.
 
 2. The citation for the trapezoidal method R package is:
-  
-    Borchers, Hans W. Pracma: Practical Numerical Math Functions, 2022. https://CRAN.R-project.org/package=pracma.
+
+Borchers, Hans W. Pracma: Practical Numerical Math Functions, 2022. https://CRAN.R-project.org/package=pracma.
 
 3. Citation for R (version `r paste0(R.version$major,".","1.3")`):
 
-    R Core Team. R: A Language and Environment for Statistical Computing. Vienna, Austria: R Foundation for Statistical Computing, 2022. https://www.R-project.org/.
+R Core Team. R: A Language and Environment for Statistical Computing. Vienna, Austria: R Foundation for Statistical Computing, 2022. https://www.R-project.org/.
 
 
