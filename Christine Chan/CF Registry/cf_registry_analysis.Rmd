@@ -17,15 +17,15 @@ library(performance)
 library(knitr)
 library(parallel)
 knitr::opts_chunk$set(echo = FALSE)
-knitr::opts_knit$set(root.dir = "/Users/timvigers/Documents/Work/CF/Christine Chan/CF Registry")
+knitr::opts_knit$set(root.dir = "~/Dropbox/Work/CHCO/Christine Chan/CF registry data")
 ```
 
-```{r}
+```{r eval=FALSE}
 # Read in CSVs
-df <- read.csv("./Data_Raw/CFF19_encountersMerged_Del1.csv")
-annual <- read.csv("./Data_Raw/CFF19_Annualized_Del1.csv")
+df <- read.csv("CFF19_encountersMerged_Del1.csv")
+annual <- read.csv("CFF19_Annualized_Del1.csv")
 colnames(annual)[colnames(annual) == "ReviewYear"] <- "reviewyear"
-demo <- read.csv("./Data_Raw/CFF19_DemogCFDiag_Del1.csv")
+demo <- read.csv("CFF19_DemogCFDiag_Del1.csv")
 # Combine and format demographics columns
 demo$Race <- apply(demo, 1, function(r) {
   race <- r[paste0("Race", 1:6)]
@@ -114,9 +114,12 @@ df$employment <- sub("5", "Student", df$employment)
 df$employment <- sub("6", "Disabled", df$employment)
 df$employment <- sub("7", "Retired", df$employment)
 df$employment <- as.factor(df$employment)
-# Small dataframe for checking
-test <- df[1:1000, ]
-write.csv(test, "~/test.csv", row.names = F, na = "")
+# Save formatted data for re-import later
+save(df,file = "formatted_data.Rdata")
+```
+
+```{r}
+load("formatted_data.Rdata")
 ```
 
 # Table 1: Participant characteristics at last visit in time period
