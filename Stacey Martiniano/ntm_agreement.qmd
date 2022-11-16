@@ -1,0 +1,44 @@
+---
+title: "NTM CT Scoring - Initial Agreement"
+author: "Tim Vigers"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    self-contained: true
+editor: visual
+---
+
+```{r}
+#| include: false
+library(dplyr)
+library(irr)
+library(redcapAPI)
+# Import data
+api <- read.table("~/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt",header = F)
+rcon <- redcapConnection(url = "https://redcap.ucdenver.edu/api/",
+                         token = api[1,1])
+data = exportRecords(rcon)
+# Make scorer IDs by initial
+data$scorer = paste0(toupper(substr(data$reader_first_name,1,1)),
+                     toupper(substr(data$reader_last_name,1,1)))
+data = data %>% arrange(scan_id,scorer) %>% filter(scan_id>2) %>% 
+  select(scorer,scan_id,bronchiectasis_rul:atelectasis___6)
+```
+
+# Scan 3
+
+## Bronchiectasis
+
+```{r}
+# Get relevant columns and prepare for Fleiss' kappa calculation
+bronch = data %>% filter(scan_id==3) %>% 
+  select(scorer,bronchiectasis_rul:bronchiectasis_lll)
+rows = as.character(label(bronch)[-1])
+cols = bronch$scorer
+bronch = data.frame(t(bronch[,-1]))
+rownames(bronch) = rows
+colnames(bronch) = cols
+```
