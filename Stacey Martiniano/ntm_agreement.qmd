@@ -121,8 +121,193 @@ data %>% filter(scan_id == scan) %>%
   facet_wrap(~feature)
 ```
 
-# Fleiss' Kappa by Feature
+# Agreement by Feature
+
+## Atelectasis
 
 ```{r}
-
+feat = "Atelectasis"
+# Statistic
+k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
+ka= round(k$value,3)
+p = format.pval(k$p.value,eps=0.001,digits = 3)
+# Plot
+data %>% filter(feature==feat) %>%
+  select(scan_id,location,AF:JW) %>%
+  pivot_longer(AF:JW) %>%
+  ggplot(.,aes(x=name,y=location,fill=value))+
+  geom_tile(color = "black") + 
+  theme_bw() + labs(fill="",x="Scorer",y="Location") +
+  custom_colors+
+  facet_wrap(~scan_id)
 ```
+
+Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
+
+## Bronchiectasis
+
+```{r}
+feat = "Bronchiectasis"
+# Statistic
+k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
+ka= round(k$value,3)
+p = format.pval(k$p.value,eps=0.001,digits = 3)
+# Plot
+data %>% filter(feature==feat) %>%
+  select(scan_id,location,AF:JW) %>%
+  pivot_longer(AF:JW) %>%
+  ggplot(.,aes(x=name,y=location,fill=value))+
+  geom_tile(color = "black") + 
+  theme_bw() + labs(fill="",x="Scorer",y="Location") +
+  custom_colors+
+  facet_wrap(~scan_id)
+```
+
+Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
+
+## Cavity
+
+```{r}
+feat = "Cavity"
+# Statistic
+k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
+ka= round(k$value,3)
+p = format.pval(k$p.value,eps=0.001,digits = 3)
+# Plot
+data %>% filter(feature==feat) %>%
+  select(scan_id,location,AF:JW) %>%
+  pivot_longer(AF:JW) %>%
+  ggplot(.,aes(x=name,y=location,fill=value))+
+  geom_tile(color = "black") + 
+  theme_bw() + labs(fill="",x="Scorer",y="Location") +
+  custom_colors+
+  facet_wrap(~scan_id)
+```
+
+Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
+
+## Consolidation
+
+```{r}
+feat = "Consolidation"
+# Statistic
+k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
+ka= round(k$value,3)
+p = format.pval(k$p.value,eps=0.001,digits = 3)
+# Plot
+data %>% filter(feature==feat) %>%
+  select(scan_id,location,AF:JW) %>%
+  pivot_longer(AF:JW) %>%
+  ggplot(.,aes(x=name,y=location,fill=value))+
+  geom_tile(color = "black") + 
+  theme_bw() + labs(fill="",x="Scorer",y="Location") +
+  custom_colors+
+  facet_wrap(~scan_id)
+```
+
+Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
+
+## Cyst
+
+```{r}
+feat = "Cyst"
+# Statistic
+k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
+ka= round(k$value,3)
+p = format.pval(k$p.value,eps=0.001,digits = 3)
+# Plot
+data %>% filter(feature==feat) %>%
+  select(scan_id,location,AF:JW) %>%
+  pivot_longer(AF:JW) %>%
+  ggplot(.,aes(x=name,y=location,fill=value))+
+  geom_tile(color = "black") + 
+  theme_bw() + labs(fill="",x="Scorer",y="Location") +
+  custom_colors+
+  facet_wrap(~scan_id)
+```
+
+Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans. 
+
+## Ground Glass
+
+```{r}
+feat = "Ground Glass"
+# Statistic
+k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
+ka= round(k$value,3)
+p = format.pval(k$p.value,eps=0.001,digits = 3)
+# Plot
+data %>% filter(feature==feat) %>%
+  select(scan_id,location,AF:JW) %>%
+  pivot_longer(AF:JW) %>%
+  ggplot(.,aes(x=name,y=location,fill=value))+
+  geom_tile(color = "black") + 
+  theme_bw() + labs(fill="",x="Scorer",y="Location") +
+  custom_colors+
+  facet_wrap(~scan_id)
+```
+
+Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
+
+## Mucoid Impaction
+
+```{r}
+feat = "Mucoid Impaction"
+# Statistic
+k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
+ka= round(k$value,3)
+p = format.pval(k$p.value,eps=0.001,digits = 3)
+# Plot
+data %>% filter(feature==feat) %>%
+  select(scan_id,location,AF:JW) %>%
+  pivot_longer(AF:JW) %>%
+  ggplot(.,aes(x=name,y=location,fill=value))+
+  geom_tile(color = "black") + 
+  theme_bw() + labs(fill="",x="Scorer",y="Location") +
+  custom_colors+
+  facet_wrap(~scan_id)
+```
+
+Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
+
+## Nodule
+
+```{r}
+feat = "Nodule"
+# Statistic
+k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
+ka= round(k$value,3)
+p = format.pval(k$p.value,eps=0.001,digits = 3)
+# Plot
+data %>% filter(feature==feat) %>%
+  select(scan_id,location,AF:JW) %>%
+  pivot_longer(AF:JW) %>%
+  ggplot(.,aes(x=name,y=location,fill=value))+
+  geom_tile(color = "black") + 
+  theme_bw() + labs(fill="",x="Scorer",y="Location") +
+  custom_colors+
+  facet_wrap(~scan_id)
+```
+
+Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
+
+## Tree in Bud
+
+```{r}
+feat = "Tree In Bud"
+# Statistics
+k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
+ka= round(k$value,3)
+p = format.pval(k$p.value,eps=0.001,digits = 3)
+# Plot
+data %>% filter(feature==feat) %>%
+  select(scan_id,location,AF:JW) %>%
+  pivot_longer(AF:JW) %>%
+  ggplot(.,aes(x=name,y=location,fill=value))+
+  geom_tile(color = "black") + 
+  theme_bw() + labs(fill="",x="Scorer",y="Location") +
+  custom_colors+
+  facet_wrap(~scan_id)
+```
+
+Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
