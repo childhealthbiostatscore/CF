@@ -4,41 +4,125 @@ author: "Tim Vigers"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 format:
   html:
+    code-fold: true
     toc: true
     toc-depth: 5
     toc-float: true
     self-contained: true
+    fig-height: 8
+    fig-width: 10
 editor: visual
 ---
 
 ```{r}
 #| include: false
-library(dplyr)
+library(tidyverse)
 library(irr)
 library(redcapAPI)
+library(Hmisc)
+library(DT)
+library(RColorBrewer)
 # Import data
-api <- read.table("~/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt",header = F)
+api <- read.table("~/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt",
+                  header = F)
 rcon <- redcapConnection(url = "https://redcap.ucdenver.edu/api/",
                          token = api[1,1])
-data = exportRecords(rcon)
+data = exportRecords(rcon,labels = F)
+data = data.frame(lapply(data,as.character))
 # Make scorer IDs by initial
 data$scorer = paste0(toupper(substr(data$reader_first_name,1,1)),
                      toupper(substr(data$reader_last_name,1,1)))
+# Select relevant columns, convert to long data
 data = data %>% arrange(scan_id,scorer) %>% filter(scan_id>2) %>% 
   select(scorer,scan_id,bronchiectasis_rul:atelectasis___6)
+data = data %>% pivot_longer(bronchiectasis_rul:atelectasis___6,
+                             names_to = c("feature","location"),
+                             names_pattern = "(.*)_(.*)$") %>%
+  mutate(feature=gsub("__","",feature),
+         feature = str_to_title(gsub("_"," ",feature)))
+data$location = factor(data$location,
+                       levels = c("1","2","3","4","5","6","ling","lll","lul","rll","rml","rul"),
+                       labels = c("RUL","RML","RLL","LUL","Ling","LLL","Ling","LLL","LUL","RLL","RML","RUL"))
+data$value = factor(data$value,levels = c("Checked","Unchecked","Absent","Cylindric","Varicose"))
+vals = levels(data$value)
+# One column per scorer
+data = data %>% pivot_wider(names_from = scorer,values_from = value)
+# Find disagreements
+data$disagree = !(data$AF == data$DL & data$DL == data$JW)
+# Set colors for whole document
+n = length(vals)
+name = "Accent"
+colors <- brewer.pal(n,name)
+names(colors) <- vals
+custom_colors <- scale_fill_manual(name = "", values = colors)
 ```
 
-# Scan 3
+# All disagreements
 
-## Bronchiectasis
+The table below is sortable and searchable, and includes only the features and locations where there was some disagreement.
 
 ```{r}
-# Get relevant columns and prepare for Fleiss' kappa calculation
-bronch = data %>% filter(scan_id==3) %>% 
-  select(scorer,bronchiectasis_rul:bronchiectasis_lll)
-rows = as.character(label(bronch)[-1])
-cols = bronch$scorer
-bronch = data.frame(t(bronch[,-1]))
-rownames(bronch) = rows
-colnames(bronch) = cols
+# Table
+data %>% filter(disagree == T) %>% select(-disagree) %>% datatable(.,rownames = F)
+```
+# Plots
+
+## All scans
+
+```{r}
+data %>% 
+  pivot_longer(AF:JW) %>%
+  ggplot(.,aes(x=name,y=location,fill=value))+
+  geom_tile(color = "black") + 
+  theme_bw() + labs(fill="",x="Scorer",y="Location") +
+  custom_colors+
+  facet_grid(rows = vars(scan_id),cols = vars(feature))
+```
+
+## Scan 3
+
+```{r}
+scan = 3
+data %>% filter(scan_id == scan) %>%
+  select(feature,location,AF:JW) %>%
+  pivot_longer(AF:JW) %>%
+  ggplot(.,aes(x=name,y=location,fill=value))+
+  geom_tile(color = "black") + 
+  theme_bw() + labs(fill="",x="Scorer",y="Location") +
+  custom_colors+
+  facet_wrap(~feature)
+```
+
+## Scan 4
+
+```{r}
+scan = 4
+data %>% filter(scan_id == scan) %>%
+  select(feature,location,AF:JW) %>%
+  pivot_longer(AF:JW) %>%
+  ggplot(.,aes(x=name,y=location,fill=value))+
+  geom_tile(color = "black") + 
+  theme_bw() + labs(fill="",x="Scorer",y="Location") +
+  custom_colors+
+  facet_wrap(~feature)
+```
+
+## Scan 5
+
+```{r}
+scan = 5
+data %>% filter(scan_id == scan) %>%
+  select(feature,location,AF:JW) %>%
+  pivot_longer(AF:JW) %>%
+  ggplot(.,aes(x=name,y=location,fill=value))+
+  geom_tile(color = "black") + 
+  theme_bw() + labs(fill="",x="Scorer",y="Location") +
+  custom_colors+
+  facet_wrap(~feature)
+```
+
+# Fleiss' Kappa by Feature
+
+```{r}
+
 ```
