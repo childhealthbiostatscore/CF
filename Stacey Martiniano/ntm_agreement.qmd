@@ -24,35 +24,47 @@ library(DT)
 library(RColorBrewer)
 # Import data
 api <- read.table("~/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt",
-                  header = F)
-rcon <- redcapConnection(url = "https://redcap.ucdenver.edu/api/",
-                         token = api[1,1])
-data = exportRecords(rcon,labels = F)
-data = data.frame(lapply(data,as.character))
+  header = F
+)
+rcon <- redcapConnection(
+  url = "https://redcap.ucdenver.edu/api/",
+  token = api[1, 1]
+)
+data <- exportRecords(rcon, labels = F)
+data <- data.frame(lapply(data, as.character))
 # Make scorer IDs by initial
-data$scorer = paste0(toupper(substr(data$reader_first_name,1,1)),
-                     toupper(substr(data$reader_last_name,1,1)))
+data$scorer <- paste0(
+  toupper(substr(data$reader_first_name, 1, 1)),
+  toupper(substr(data$reader_last_name, 1, 1))
+)
 # Select relevant columns, convert to long data
-data = data %>% arrange(scan_id,scorer) %>% filter(scan_id>2) %>% 
-  select(scorer,scan_id,bronchiectasis_rul:atelectasis___6)
-data = data %>% pivot_longer(bronchiectasis_rul:atelectasis___6,
-                             names_to = c("feature","location"),
-                             names_pattern = "(.*)_(.*)$") %>%
-  mutate(feature=gsub("__","",feature),
-         feature = str_to_title(gsub("_"," ",feature)))
-data$location = factor(data$location,
-                       levels = c("1","2","3","4","5","6","ling","lll","lul","rll","rml","rul"),
-                       labels = c("RUL","RML","RLL","LUL","Ling","LLL","Ling","LLL","LUL","RLL","RML","RUL"))
-data$value = factor(data$value,levels = c("Checked","Unchecked","Absent","Cylindric","Varicose"))
-vals = levels(data$value)
+data <- data %>%
+  arrange(scan_id, scorer) %>%
+  filter(scan_id > 2) %>%
+  select(scorer, scan_id, bronchiectasis_rul:atelectasis___6)
+data <- data %>%
+  pivot_longer(bronchiectasis_rul:atelectasis___6,
+    names_to = c("feature", "location"),
+    names_pattern = "(.*)_(.*)$"
+  ) %>%
+  mutate(
+    feature = gsub("__", "", feature),
+    feature = str_to_title(gsub("_", " ", feature))
+  )
+data$location <- factor(data$location,
+  levels = c("1", "2", "3", "4", "5", "6", "ling", "lll", "lul", "rll", "rml", "rul"),
+  labels = c("RUL", "RML", "RLL", "LUL", "Ling", "LLL", "Ling", "LLL", "LUL", "RLL", "RML", "RUL")
+)
+data$value <- factor(data$value, levels = c("Checked", "Unchecked", "Absent", "Cylindric", "Varicose"))
+vals <- levels(data$value)
 # One column per scorer
-data = data %>% pivot_wider(names_from = scorer,values_from = value)
+data <- data %>% pivot_wider(names_from = scorer, values_from = value)
 # Find disagreements
-data$disagree = !(data$AF == data$DL & data$DL == data$JW)
+data$disagree <- !(data$AF == data$DL & data$DL == data$JW)
 # Set colors for whole document
-n = length(vals)
-name = "Accent"
-colors <- brewer.pal(n,name)
+n <- length(vals)
+name <- "Accent"
+colors <- brewer.pal(n, name)
 names(colors) <- vals
 custom_colors <- scale_fill_manual(name = "", values = colors)
 ```
@@ -63,61 +75,71 @@ The table below is sortable and searchable, and includes only the features and l
 
 ```{r}
 # Table
-data %>% filter(disagree == T) %>% select(-disagree) %>% datatable(.,rownames = F)
+data %>%
+  filter(disagree == T) %>%
+  select(-disagree) %>%
+  datatable(., rownames = F)
 ```
 # Plots
 
 ## All scans
 
 ```{r}
-data %>% 
+data %>%
   pivot_longer(AF:JW) %>%
-  ggplot(.,aes(x=name,y=location,fill=value))+
-  geom_tile(color = "black") + 
-  theme_bw() + labs(fill="",x="Scorer",y="Location") +
-  custom_colors+
-  facet_grid(rows = vars(scan_id),cols = vars(feature))
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  custom_colors +
+  facet_grid(rows = vars(scan_id), cols = vars(feature))
 ```
 
 ## Scan 3
 
 ```{r}
-scan = 3
-data %>% filter(scan_id == scan) %>%
-  select(feature,location,AF:JW) %>%
+scan <- 3
+data %>%
+  filter(scan_id == scan) %>%
+  select(feature, location, AF:JW) %>%
   pivot_longer(AF:JW) %>%
-  ggplot(.,aes(x=name,y=location,fill=value))+
-  geom_tile(color = "black") + 
-  theme_bw() + labs(fill="",x="Scorer",y="Location") +
-  custom_colors+
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  custom_colors +
   facet_wrap(~feature)
 ```
 
 ## Scan 4
 
 ```{r}
-scan = 4
-data %>% filter(scan_id == scan) %>%
-  select(feature,location,AF:JW) %>%
+scan <- 4
+data %>%
+  filter(scan_id == scan) %>%
+  select(feature, location, AF:JW) %>%
   pivot_longer(AF:JW) %>%
-  ggplot(.,aes(x=name,y=location,fill=value))+
-  geom_tile(color = "black") + 
-  theme_bw() + labs(fill="",x="Scorer",y="Location") +
-  custom_colors+
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  custom_colors +
   facet_wrap(~feature)
 ```
 
 ## Scan 5
 
 ```{r}
-scan = 5
-data %>% filter(scan_id == scan) %>%
-  select(feature,location,AF:JW) %>%
+scan <- 5
+data %>%
+  filter(scan_id == scan) %>%
+  select(feature, location, AF:JW) %>%
   pivot_longer(AF:JW) %>%
-  ggplot(.,aes(x=name,y=location,fill=value))+
-  geom_tile(color = "black") + 
-  theme_bw() + labs(fill="",x="Scorer",y="Location") +
-  custom_colors+
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  custom_colors +
   facet_wrap(~feature)
 ```
 
@@ -126,19 +148,24 @@ data %>% filter(scan_id == scan) %>%
 ## Atelectasis
 
 ```{r}
-feat = "Atelectasis"
+feat <- "Atelectasis"
 # Statistic
-k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
-ka= round(k$value,3)
-p = format.pval(k$p.value,eps=0.001,digits = 3)
+k <- data %>%
+  filter(feature == feat) %>%
+  select(AF:JW) %>%
+  kappam.fleiss(.)
+ka <- round(k$value, 3)
+p <- format.pval(k$p.value, eps = 0.001, digits = 3)
 # Plot
-data %>% filter(feature==feat) %>%
-  select(scan_id,location,AF:JW) %>%
+data %>%
+  filter(feature == feat) %>%
+  select(scan_id, location, AF:JW) %>%
   pivot_longer(AF:JW) %>%
-  ggplot(.,aes(x=name,y=location,fill=value))+
-  geom_tile(color = "black") + 
-  theme_bw() + labs(fill="",x="Scorer",y="Location") +
-  custom_colors+
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  custom_colors +
   facet_wrap(~scan_id)
 ```
 
@@ -147,19 +174,24 @@ Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
 ## Bronchiectasis
 
 ```{r}
-feat = "Bronchiectasis"
+feat <- "Bronchiectasis"
 # Statistic
-k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
-ka= round(k$value,3)
-p = format.pval(k$p.value,eps=0.001,digits = 3)
+k <- data %>%
+  filter(feature == feat) %>%
+  select(AF:JW) %>%
+  kappam.fleiss(.)
+ka <- round(k$value, 3)
+p <- format.pval(k$p.value, eps = 0.001, digits = 3)
 # Plot
-data %>% filter(feature==feat) %>%
-  select(scan_id,location,AF:JW) %>%
+data %>%
+  filter(feature == feat) %>%
+  select(scan_id, location, AF:JW) %>%
   pivot_longer(AF:JW) %>%
-  ggplot(.,aes(x=name,y=location,fill=value))+
-  geom_tile(color = "black") + 
-  theme_bw() + labs(fill="",x="Scorer",y="Location") +
-  custom_colors+
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  custom_colors +
   facet_wrap(~scan_id)
 ```
 
@@ -168,19 +200,24 @@ Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
 ## Cavity
 
 ```{r}
-feat = "Cavity"
+feat <- "Cavity"
 # Statistic
-k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
-ka= round(k$value,3)
-p = format.pval(k$p.value,eps=0.001,digits = 3)
+k <- data %>%
+  filter(feature == feat) %>%
+  select(AF:JW) %>%
+  kappam.fleiss(.)
+ka <- round(k$value, 3)
+p <- format.pval(k$p.value, eps = 0.001, digits = 3)
 # Plot
-data %>% filter(feature==feat) %>%
-  select(scan_id,location,AF:JW) %>%
+data %>%
+  filter(feature == feat) %>%
+  select(scan_id, location, AF:JW) %>%
   pivot_longer(AF:JW) %>%
-  ggplot(.,aes(x=name,y=location,fill=value))+
-  geom_tile(color = "black") + 
-  theme_bw() + labs(fill="",x="Scorer",y="Location") +
-  custom_colors+
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  custom_colors +
   facet_wrap(~scan_id)
 ```
 
@@ -189,19 +226,24 @@ Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
 ## Consolidation
 
 ```{r}
-feat = "Consolidation"
+feat <- "Consolidation"
 # Statistic
-k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
-ka= round(k$value,3)
-p = format.pval(k$p.value,eps=0.001,digits = 3)
+k <- data %>%
+  filter(feature == feat) %>%
+  select(AF:JW) %>%
+  kappam.fleiss(.)
+ka <- round(k$value, 3)
+p <- format.pval(k$p.value, eps = 0.001, digits = 3)
 # Plot
-data %>% filter(feature==feat) %>%
-  select(scan_id,location,AF:JW) %>%
+data %>%
+  filter(feature == feat) %>%
+  select(scan_id, location, AF:JW) %>%
   pivot_longer(AF:JW) %>%
-  ggplot(.,aes(x=name,y=location,fill=value))+
-  geom_tile(color = "black") + 
-  theme_bw() + labs(fill="",x="Scorer",y="Location") +
-  custom_colors+
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  custom_colors +
   facet_wrap(~scan_id)
 ```
 
@@ -210,19 +252,24 @@ Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
 ## Cyst
 
 ```{r}
-feat = "Cyst"
+feat <- "Cyst"
 # Statistic
-k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
-ka= round(k$value,3)
-p = format.pval(k$p.value,eps=0.001,digits = 3)
+k <- data %>%
+  filter(feature == feat) %>%
+  select(AF:JW) %>%
+  kappam.fleiss(.)
+ka <- round(k$value, 3)
+p <- format.pval(k$p.value, eps = 0.001, digits = 3)
 # Plot
-data %>% filter(feature==feat) %>%
-  select(scan_id,location,AF:JW) %>%
+data %>%
+  filter(feature == feat) %>%
+  select(scan_id, location, AF:JW) %>%
   pivot_longer(AF:JW) %>%
-  ggplot(.,aes(x=name,y=location,fill=value))+
-  geom_tile(color = "black") + 
-  theme_bw() + labs(fill="",x="Scorer",y="Location") +
-  custom_colors+
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  custom_colors +
   facet_wrap(~scan_id)
 ```
 
@@ -231,19 +278,24 @@ Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
 ## Ground Glass
 
 ```{r}
-feat = "Ground Glass"
+feat <- "Ground Glass"
 # Statistic
-k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
-ka= round(k$value,3)
-p = format.pval(k$p.value,eps=0.001,digits = 3)
+k <- data %>%
+  filter(feature == feat) %>%
+  select(AF:JW) %>%
+  kappam.fleiss(.)
+ka <- round(k$value, 3)
+p <- format.pval(k$p.value, eps = 0.001, digits = 3)
 # Plot
-data %>% filter(feature==feat) %>%
-  select(scan_id,location,AF:JW) %>%
+data %>%
+  filter(feature == feat) %>%
+  select(scan_id, location, AF:JW) %>%
   pivot_longer(AF:JW) %>%
-  ggplot(.,aes(x=name,y=location,fill=value))+
-  geom_tile(color = "black") + 
-  theme_bw() + labs(fill="",x="Scorer",y="Location") +
-  custom_colors+
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  custom_colors +
   facet_wrap(~scan_id)
 ```
 
@@ -252,19 +304,24 @@ Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
 ## Mucoid Impaction
 
 ```{r}
-feat = "Mucoid Impaction"
+feat <- "Mucoid Impaction"
 # Statistic
-k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
-ka= round(k$value,3)
-p = format.pval(k$p.value,eps=0.001,digits = 3)
+k <- data %>%
+  filter(feature == feat) %>%
+  select(AF:JW) %>%
+  kappam.fleiss(.)
+ka <- round(k$value, 3)
+p <- format.pval(k$p.value, eps = 0.001, digits = 3)
 # Plot
-data %>% filter(feature==feat) %>%
-  select(scan_id,location,AF:JW) %>%
+data %>%
+  filter(feature == feat) %>%
+  select(scan_id, location, AF:JW) %>%
   pivot_longer(AF:JW) %>%
-  ggplot(.,aes(x=name,y=location,fill=value))+
-  geom_tile(color = "black") + 
-  theme_bw() + labs(fill="",x="Scorer",y="Location") +
-  custom_colors+
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  custom_colors +
   facet_wrap(~scan_id)
 ```
 
@@ -273,19 +330,24 @@ Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
 ## Nodule
 
 ```{r}
-feat = "Nodule"
+feat <- "Nodule"
 # Statistic
-k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
-ka= round(k$value,3)
-p = format.pval(k$p.value,eps=0.001,digits = 3)
+k <- data %>%
+  filter(feature == feat) %>%
+  select(AF:JW) %>%
+  kappam.fleiss(.)
+ka <- round(k$value, 3)
+p <- format.pval(k$p.value, eps = 0.001, digits = 3)
 # Plot
-data %>% filter(feature==feat) %>%
-  select(scan_id,location,AF:JW) %>%
+data %>%
+  filter(feature == feat) %>%
+  select(scan_id, location, AF:JW) %>%
   pivot_longer(AF:JW) %>%
-  ggplot(.,aes(x=name,y=location,fill=value))+
-  geom_tile(color = "black") + 
-  theme_bw() + labs(fill="",x="Scorer",y="Location") +
-  custom_colors+
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  custom_colors +
   facet_wrap(~scan_id)
 ```
 
@@ -294,19 +356,24 @@ Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
 ## Tree in Bud
 
 ```{r}
-feat = "Tree In Bud"
+feat <- "Tree In Bud"
 # Statistics
-k=data %>% filter(feature==feat) %>% select(AF:JW) %>% kappam.fleiss(.)
-ka= round(k$value,3)
-p = format.pval(k$p.value,eps=0.001,digits = 3)
+k <- data %>%
+  filter(feature == feat) %>%
+  select(AF:JW) %>%
+  kappam.fleiss(.)
+ka <- round(k$value, 3)
+p <- format.pval(k$p.value, eps = 0.001, digits = 3)
 # Plot
-data %>% filter(feature==feat) %>%
-  select(scan_id,location,AF:JW) %>%
+data %>%
+  filter(feature == feat) %>%
+  select(scan_id, location, AF:JW) %>%
   pivot_longer(AF:JW) %>%
-  ggplot(.,aes(x=name,y=location,fill=value))+
-  geom_tile(color = "black") + 
-  theme_bw() + labs(fill="",x="Scorer",y="Location") +
-  custom_colors+
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  custom_colors +
   facet_wrap(~scan_id)
 ```
 
