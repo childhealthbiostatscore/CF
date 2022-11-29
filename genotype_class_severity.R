@@ -1,4 +1,4 @@
-get_cf_genotype_class_severity = function(genotypes,out = "severity",na_unknown = T){
+cf_genotype_class_severity = function(genotypes,out = "severity",na_unknown = T){
   # Make table
   I = c('1717-1G->A', '1717-1G-A',  'G542X', 'Q493X', 'R1162X', 'R553X', 'R553x', 'W1089X', 'W1282X', '1078delT', 'R75X',
         '3659delC', '621+1G->T', '621+1G>T', '394delTT', '3120 + 1g->A', '1154InsTC',  '1154insTC', '1213delT',
