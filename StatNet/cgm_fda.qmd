@@ -1,0 +1,86 @@
+---
+title: "Functional Analysis of CGM Data"
+author: "Tim Vigers"
+format: revealjs
+editor: visual
+---
+
+## The Question 
+
+-   Do nighttime glucose patterns differ between controls (HC), CF with normal glucose tolerance (CFNGT), CF with abnormal glucose tolerance (CFAGT), and people with CF related diabetes (CFRD)?
+
+```{r}
+#| include: false
+# Libraries
+library(tidyverse)
+library(lubridate)
+library(cgmanalysis)
+library(tidyfun)
+# Data import
+sleep = read.csv("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Raw/sleep.csv",
+                 na.strings = "")
+# Get bedtime and wake times
+sleep = sleep %>% 
+  mutate(Day.1.End = Day.2.Date,Day.2.End = Day.3.Date,Day.3.End = Day.4.Date,
+         Day.4.End = Day.5.Date,Day.5.End = Day.6.Date,Day.6.End = Day.7.Date) %>%
+  select(Subject.ID:Average.BMI.Z.score,
+                         matches("Day\\.\\d\\.Date"),
+         matches("Day\\.\\d\\.Date"),
+                         matches("Day\\.\\d\\.Bed.Time"),
+                         matches("Day\\.\\d\\.Get.Up.Time"))
+sleep = sleep %>% 
+  pivot_longer(Day.1.Date:Day.7.Get.Up.Time,
+               names_to = c("Day",".value"),names_pattern = "Day\\.(.)\\.(.*)") %>%
+  filter(!is.na(Bed.Time) & !is.na(Get.Up.Time)) %>%
+  mutate(Night.Start = ymd_hm(paste(Date,Bed.Time)),
+         Night.End = ymd_hm(paste(Date,Get.Up.Time))+days(1)) %>%
+  select(Subject.ID:Average.BMI.Z.score,Day,Night.Start,Night.End)
+sleep$Subject.ID = sub("--1","",sleep$Subject.ID)
+# Add a day for those going to sleep between 12am - 6am
+sleep$Night.Start[hour(sleep$Night.Start) %in% 0:6] = 
+  sleep$Night.Start[hour(sleep$Night.Start) %in% 0:6] + days(1)
+# CGMs
+# cleandata("~/Dropbox/Work/CHCO/Christine Chan/Functional data analysis/Raw CGM Data",
+#           "~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean",removegaps = F)
+cgms = list.files("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean",
+                  full.names = T)
+names(cgms) = unlist(lapply(cgms, function(f){
+  df = read.csv(f)
+  id = strsplit(basename(f),"_")[[1]][1]
+  return(id)
+}))
+# For each actiwatch, pull out the relevant vector of CGM values
+sleep = sleep[sleep$Subject.ID %in% names(cgms),]
+vecs = apply(sleep,1,function(r){
+  # Pull info
+  id = as.character(r["Subject.ID"])
+  start = ymd_hms(as.character(r["Night.Start"]))
+  end = ymd_hms(as.character(r["Night.End"]))
+  # Find CGM file
+  df = read.csv(cgms[id])
+  df$timestamp = round_date(ymd_hms(df$timestamp),"5 minutes")
+  # Get the time between sensors
+  interval = table(round(diff(df$timestamp)/60))
+  interval = names(interval)[which.max(interval)]
+  # Put glucose values on time grid, pull glucose values
+  times = round_date(seq(start,end,by = paste(interval,"min")),"5 minutes")
+  glucs = data.frame(cbind(times,df$sensorglucose[match(times,df$timestamp)]))
+  glucs = glucs[,2]
+  # Grid sequence for functional data
+  arg = seq(0,1,length.out = length(glucs))
+  return(list(glucs,arg))
+})
+# Pull out glucose values and sequences separately
+args = sapply(vecs,"[[",2)
+glucs = sapply(vecs,"[[",1)
+# Find those where all glucose values are missing
+keep = which(sapply(glucs, function(g){!all(is.na(g))}))
+# Make functional object
+fda_df = tfd(glucs[keep],args[keep])
+```
+
+## Questions for the Group
+
+1.  How do we evaluate everyone over a common grid? Do we want to keep one night as the "grid unit?"
+2.  How to handle missing data? Is linear approximation reasonable (I would assume not)?
+3.  How to account for within-subject correlation?
