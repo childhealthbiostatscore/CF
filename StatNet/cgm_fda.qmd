@@ -39,6 +39,9 @@ sleep$Subject.ID = sub("--1","",sleep$Subject.ID)
 # Add a day for those going to sleep between 12am - 6am
 sleep$Night.Start[hour(sleep$Night.Start) %in% 0:6] = 
   sleep$Night.Start[hour(sleep$Night.Start) %in% 0:6] + days(1)
+# Shorter group names
+sleep$Combined.Group.Category = as.factor(sleep$Combined.Group.Category)
+levels(sleep$Combined.Group.Category) = c("CFAGT","CFNGT","CFRD","HC")
 # CGMs
 # cleandata("~/Dropbox/Work/CHCO/Christine Chan/Functional data analysis/Raw CGM Data",
 #           "~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean",removegaps = F)
@@ -74,9 +77,24 @@ vecs = apply(sleep,1,function(r){
 args = sapply(vecs,"[[",2)
 glucs = sapply(vecs,"[[",1)
 # Find those where all glucose values are missing
-keep = which(sapply(glucs, function(g){!all(is.na(g))}))
-# Make functional object
-fda_df = tfd(glucs[keep],args[keep])
+keep = sapply(glucs, function(g){!all(is.na(g))})
+# Make functional object, add to demographic info
+fda_df = sleep %>% select(Subject.ID:Average.BMI.Z.score)
+fda_df = fda_df[keep,]
+fda_df$Glucose = tfd(glucs[keep],args[keep])
+```
+
+## Our dataset
+
+### FILL THIS IN
+
+```{r}
+fda_df %>% 
+  ggplot() + 
+  geom_spaghetti(aes(tf = Glucose, col = Combined.Group.Category)) +
+  facet_wrap(~ Gender) + 
+  scale_alpha(guide = 'none', range = c(.2, .4)) +
+  scale_color_discrete(name="") + theme_bw()
 ```
 
 ## Questions for the Group
