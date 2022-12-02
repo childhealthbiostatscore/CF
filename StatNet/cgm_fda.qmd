@@ -18,6 +18,8 @@ library(arsenal)
 library(tidyverse)
 library(lubridate)
 library(cgmanalysis)
+library(refund)
+library(refund.shiny)
 library(tidyfun)
 library(refundr)
 # Data import
@@ -86,8 +88,8 @@ vecs = apply(sleep,1,function(r){
   return(list(glucs,arg))
 })
 # Pull out glucose values and sequences separately
-args = sapply(vecs,"[[",2)
 glucs = sapply(vecs,"[[",1)
+args = sapply(vecs,"[[",2)
 # Find those where all glucose values are missing
 keep = sapply(glucs, function(g){!all(is.na(g)) & !is.na(var(g,na.rm = T))})
 # Make functional object, add to demographic info
@@ -105,14 +107,13 @@ demo = fda_df %>%
   summarise(Age = Age[1],Gender = Gender[1],Race = Race.Ethnicity[1],
             Insulin = CF.Insulin.Use[1],`BMI Z Score`= Average.BMI.Z.score[1],
             `Days of Data` = n(),Group = Combined.Group.Category[1])
-
 t1 = 
   tableby(Group~Age+Gender+Race+Insulin+`BMI Z Score`+`Days of Data`,
              data = demo)
 summary(t1)
 ```
 
-## Plot {.smaller}
+## Plot
 
 ```{r}
 fda_df %>% 
@@ -124,11 +125,72 @@ fda_df %>%
 
 ```{r cache=TRUE}
 fpca = rfr_fpca(Y = "Glucose", data = fda_df)
-# dti_df %>% 
-#   modelr::add_predictions(fpca, var = "glucose_fits") %>% 
-#   ggplot(aes(y = glucose_fits)) + 
-#   geom_spaghetti() + 
-#   geom_spaghetti(aes(y = Glucose), color = "blue", alpha = .2)
+fda_df %>%
+  modelr::add_predictions(fpca, var = "glucose_fits") %>%
+  ggplot(aes(y = glucose_fits)) +
+  geom_spaghetti() +
+  geom_spaghetti(aes(y = Glucose), color = "blue", alpha = .2)
+```
+
+```{r}
+ys = apply(sleep,1,function(r){
+  # Pull info
+  id = as.character(r["Subject.ID"])
+  start = ymd_hms(as.character(r["Night.Start"]))
+  end = ymd_hms(as.character(r["Night.End"]))
+  # Find CGM file
+  df = read.csv(cgms[id])
+  id = paste(as.character(r["Subject.ID"]),as.character(r["Day"]),sep = "_")
+  df$timestamp = round_date(ymd_hms(df$timestamp),"5 minutes")
+  # Get the time between sensors
+  interval = table(round(diff(df$timestamp)/60))
+  interval = names(interval)[which.max(interval)]
+  # Put glucose values on time grid
+  times = round_date(seq(start,end,by = paste(interval,"min")),"5 minutes")
+  glucs = df$sensorglucose[match(times,df$timestamp)]
+  y = data.frame(".obs"=rep(id,length(glucs)),
+                 ".index"=seq(0,1,length.out=length(glucs)),
+                 ".value" = glucs)
+  return(y)
+})
+# Find those where all glucose values are missing
+# keep = sapply(ys, function(y){!all(is.na(y$.value)) & !is.na(var(y$.value,na.rm = T))})
+ydata = do.call(rbind,ys)
+colnames(ydata)[1] = ".id"
+fit = fpca.sc(ydata=na.omit(ydata[ydata$.id %in% names(table(ydata$.id)[1:10]),]),
+              var = TRUE, simul = FALSE)
+```
+
+```{r}
+library(fdapace)
+library(fastDummies)
+vecs = apply(sleep,1,function(r){
+  # Pull info
+  id = as.character(r["Subject.ID"])
+  start = ymd_hms(as.character(r["Night.Start"]))
+  end = ymd_hms(as.character(r["Night.End"]))
+  # Find CGM file
+  df = read.csv(cgms[id])
+  df$timestamp = round_date(ymd_hms(df$timestamp),"5 minutes")
+  # Get the time between sensors
+  interval = table(round(diff(df$timestamp)/60))
+  interval = names(interval)[which.max(interval)]
+  # Put glucose values on time grid, pull glucose values
+  times = round_date(seq(start,end,by = paste(interval,"min")),"5 minutes")
+  glucs = data.frame(cbind(times,df$sensorglucose[match(times,df$timestamp)]))
+  glucs = glucs[,2]
+  # Grid sequence for functional data
+  arg = seq(0,length(glucs))
+  return(list(glucs,arg))
+})
+ylist = sapply(vecs,"[[",1)
+tlist = sapply(vecs,"[[",2)
+keep = sapply(ylist, function(g){!all(is.na(g)) & !is.na(var(g,na.rm = T))})
+X = sleep %>% select(Subject.ID:Average.BMI.Z.score)
+X = X[keep,]
+X = dummy_cols(X[,"Combined.Group.Category"],remove_selected_columns=T,remove_first_dummy=T)
+FPCAobj <- FPCA(Ly=ylist[keep], Lt=tlist[keep],list(plot = TRUE))
+VCAM(Lt=tlist[keep], Ly=ylist[keep],X)
 ```
 
 ## Questions for the Group
