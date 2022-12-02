@@ -95,9 +95,7 @@ keep = sapply(glucs, function(g){!all(is.na(g)) & !is.na(var(g,na.rm = T))})
 fda_df = sleep %>% select(Subject.ID:Average.BMI.Z.score)
 fda_df = fda_df[keep,]
 fda_df$Glucose = tfd(glucs[keep],args[keep],interpolate=T)
-```
-
-```{r}
+# Prepare for the refund package (tidyfun still pretty limited)
 ys = apply(sleep,1,function(r){
   # Pull info
   id = as.character(r["Subject.ID"])
@@ -121,16 +119,11 @@ ys = apply(sleep,1,function(r){
 # Find those where all glucose values are missing
 ydf = do.call(rbind,ys[keep])
 colnames(ydf)[1] = ".id"
+# Save
+save(ydf,file = "C:/Users/timbv/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/R_Objects/ydf.Rdata")
 ```
 
-```{r eval=FALSE}
-# FPCA on irregularly sampled data
-fit = fpca.sc(ydata = na.omit(ydf))
-# Save object
-save(fit,file = "C:/Users/timbv/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/R_Objects/fpca_sc_fit.Rdata")
-```
-
-## Our dataset {.smaller}
+## Our Dataset {.smaller}
 
 ```{r results='asis'}
 demo = fda_df %>%
@@ -145,7 +138,7 @@ t1 =
 summary(t1)
 ```
 
-## Plot
+## Spaghetti Plot
 
 ```{r}
 fda_df %>% 
@@ -155,19 +148,18 @@ fda_df %>%
   facet_wrap(~Combined.Group.Category)
 ```
 
-## Basis Function
-
-In general, the Fourier basis is the usual choice for periodic functions.
-
-\cite{ramsayFunctionalDataAnalysis2009}
+## FPCA
 
 ```{r}
-# Create a functional data object
+#| eval: false
+#| echo: true
+# FPCA on irregularly sampled data
+fit = fpca.sc(ydata = na.omit(ydf))
+```
 
-
-
-basisobj = create.fourier.basis(rangeval=c(0, 1))
-plot(basisobj)
+```{r}
+#| include: false
+# load("C:/Users/timbv/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/R_Objects/fpca_sc_fit.Rdata")
 ```
 
 ## Questions for the Group
