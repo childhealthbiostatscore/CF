@@ -96,6 +96,37 @@ fda_df = fda_df[keep,]
 fda_df$Glucose = tfd(glucs[keep],args[keep],interpolate=T)
 ```
 
+```{r}
+ys = apply(sleep,1,function(r){
+  # Pull info
+  id = as.character(r["Subject.ID"])
+  start = ymd_hms(as.character(r["Night.Start"]))
+  end = ymd_hms(as.character(r["Night.End"]))
+  # Find CGM file
+  df = read.csv(cgms[id])
+  id = paste(as.character(r["Subject.ID"]),as.character(r["Day"]),sep = "_")
+  df$timestamp = round_date(ymd_hms(df$timestamp),"5 minutes")
+  # Get the time between sensors
+  interval = table(round(diff(df$timestamp)/60))
+  interval = names(interval)[which.max(interval)]
+  # Put glucose values on time grid
+  times = round_date(seq(start,end,by = paste(interval,"min")),"5 minutes")
+  glucs = df$sensorglucose[match(times,df$timestamp)]
+  y = data.frame(".obs"=rep(id,length(glucs)),
+                 ".index"=seq(0,1,length.out=length(glucs)),
+                 ".value" = glucs)
+  return(y)
+})
+# Find those where all glucose values are missing
+# keep = sapply(ys, function(y){!all(is.na(y$.value)) & !is.na(var(y$.value,na.rm = T))})
+ydf = do.call(rbind,ys)
+colnames(ydf)[1] = ".id"
+```
+
+```{r}
+fit = fpca.sc(ydata = ydf[ydf$.id %in% names(table(ydf$.id))[1:5],],pve = 0.95)
+```
+
 ## Our dataset {.smaller}
 
 ```{r results='asis'}
@@ -128,81 +159,15 @@ In general, the Fourier basis is the usual choice for periodic functions.
 \cite{ramsayFunctionalDataAnalysis2009}
 
 ```{r}
+# Create a functional data object
+
+
+
 basisobj = create.fourier.basis(rangeval=c(0, 1))
 plot(basisobj)
 ```
 
-```{r cache=TRUE}
-fpca = rfr_fpca(Y = "Glucose", data = fda_df)
-fda_df %>%
-  modelr::add_predictions(fpca, var = "glucose_fits") %>%
-  ggplot(aes(y = glucose_fits)) +
-  geom_spaghetti() +
-  geom_spaghetti(aes(y = Glucose), color = "blue", alpha = .2)
-```
-
-```{r}
-ys = apply(sleep,1,function(r){
-  # Pull info
-  id = as.character(r["Subject.ID"])
-  start = ymd_hms(as.character(r["Night.Start"]))
-  end = ymd_hms(as.character(r["Night.End"]))
-  # Find CGM file
-  df = read.csv(cgms[id])
-  id = paste(as.character(r["Subject.ID"]),as.character(r["Day"]),sep = "_")
-  df$timestamp = round_date(ymd_hms(df$timestamp),"5 minutes")
-  # Get the time between sensors
-  interval = table(round(diff(df$timestamp)/60))
-  interval = names(interval)[which.max(interval)]
-  # Put glucose values on time grid
-  times = round_date(seq(start,end,by = paste(interval,"min")),"5 minutes")
-  glucs = df$sensorglucose[match(times,df$timestamp)]
-  y = data.frame(".obs"=rep(id,length(glucs)),
-                 ".index"=seq(0,1,length.out=length(glucs)),
-                 ".value" = glucs)
-  return(y)
-})
-# Find those where all glucose values are missing
-# keep = sapply(ys, function(y){!all(is.na(y$.value)) & !is.na(var(y$.value,na.rm = T))})
-ydata = do.call(rbind,ys)
-colnames(ydata)[1] = ".id"
-fit = fpca.sc(ydata=na.omit(ydata[ydata$.id %in% names(table(ydata$.id)[1:10]),]),
-              var = TRUE, simul = FALSE)
-```
-
-```{r}
-library(fdapace)
-library(fastDummies)
-vecs = apply(sleep,1,function(r){
-  # Pull info
-  id = as.character(r["Subject.ID"])
-  start = ymd_hms(as.character(r["Night.Start"]))
-  end = ymd_hms(as.character(r["Night.End"]))
-  # Find CGM file
-  df = read.csv(cgms[id])
-  df$timestamp = round_date(ymd_hms(df$timestamp),"5 minutes")
-  # Get the time between sensors
-  interval = table(round(diff(df$timestamp)/60))
-  interval = names(interval)[which.max(interval)]
-  # Put glucose values on time grid, pull glucose values
-  times = round_date(seq(start,end,by = paste(interval,"min")),"5 minutes")
-  glucs = data.frame(cbind(times,df$sensorglucose[match(times,df$timestamp)]))
-  glucs = glucs[,2]
-  # Grid sequence for functional data
-  arg = seq(0,length(glucs))
-  return(list(glucs,arg))
-})
-ylist = sapply(vecs,"[[",1)
-tlist = sapply(vecs,"[[",2)
-keep = sapply(ylist, function(g){!all(is.na(g)) & !is.na(var(g,na.rm = T))})
-X = sleep %>% select(Subject.ID:Average.BMI.Z.score)
-X = X[keep,]
-X = dummy_cols(X[,"Combined.Group.Category"],remove_selected_columns=T,remove_first_dummy=T)
-FPCAobj <- FPCA(Ly=ylist[keep], Lt=tlist[keep],list(plot = TRUE))
-VCAM(Lt=tlist[1:10], Ly=ylist[1:10],X[1:10])
-```
-
 ## Questions for the Group
 
--   What is the best way to pick the order of basis functions, etc.?
+-   What is the best way to pick the order of basis functions, etc.? Visually?
 -   Currently I'm forcing the glucose measures to be on the interval \[0,1\], which means that the period for the Fourier basis is "nighttime." Since those with shorter sleep periods will have fewer observations, I think this means that
