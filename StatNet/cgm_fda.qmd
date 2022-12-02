@@ -1,21 +1,25 @@
 ---
 title: "Functional Analysis of CGM Data"
 author: "Tim Vigers"
-format: revealjs
+format: 
+  revealjs:
+    scrollable: true
 editor: visual
 ---
 
-## The Question 
+## The Question
 
 -   Do nighttime glucose patterns differ between controls (HC), CF with normal glucose tolerance (CFNGT), CF with abnormal glucose tolerance (CFAGT), and people with CF related diabetes (CFRD)?
 
 ```{r}
 #| include: false
 # Libraries
+library(arsenal)
 library(tidyverse)
 library(lubridate)
 library(cgmanalysis)
 library(tidyfun)
+library(refundr)
 # Data import
 sleep = read.csv("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Raw/sleep.csv",
                  na.strings = "")
@@ -31,7 +35,7 @@ sleep = sleep %>%
 sleep = sleep %>% 
   pivot_longer(Day.1.Date:Day.7.Get.Up.Time,
                names_to = c("Day",".value"),names_pattern = "Day\\.(.)\\.(.*)") %>%
-  filter(!is.na(Bed.Time) & !is.na(Get.Up.Time)) %>%
+  filter(!is.na(Bed.Time) & !is.na(Get.Up.Time) & Day < 7) %>%
   mutate(Night.Start = ymd_hm(paste(Date,Bed.Time)),
          Night.End = ymd_hm(paste(Date,Get.Up.Time))+days(1)) %>%
   select(Subject.ID:Average.BMI.Z.score,Day,Night.Start,Night.End)
@@ -47,7 +51,8 @@ sleep$Combined.Group.Category =
                     "Cystic Fibrosis Abnormal Glycemia",
                     "Cystic Fibrosis Related Diabetes"),
          labels = c("HC","CF-NGT","CF-AGT","CFRD"),ordered = T)
-levels(sleep$Combined.Group.Category) = c("CFAGT","CFNGT","CFRD","HC")
+# HC not on insulin
+sleep$CF.Insulin.Use[sleep$Combined.Group.Category == "HC"]="No"
 # CGMs
 # cleandata("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Raw/CGM",
 #           "~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean/CGM",
@@ -88,22 +93,42 @@ keep = sapply(glucs, function(g){!all(is.na(g)) & !is.na(var(g,na.rm = T))})
 # Make functional object, add to demographic info
 fda_df = sleep %>% select(Subject.ID:Average.BMI.Z.score)
 fda_df = fda_df[keep,]
-fda_df$Glucose = tfd(glucs[keep],args[keep])
+fda_df$Glucose = tfd(glucs[keep],args[keep],interpolate=T)
 ```
 
-## Our dataset
+## Our dataset {.smaller}
 
-### FILL THIS IN
+```{r results='asis'}
+demo = fda_df %>%
+  select(Subject.ID:Average.BMI.Z.score) %>% 
+  group_by(Subject.ID) %>% 
+  summarise(Age = Age[1],Gender = Gender[1],Race = Race.Ethnicity[1],
+            Insulin = CF.Insulin.Use[1],`BMI Z Score`= Average.BMI.Z.score[1],
+            `Days of Data` = n(),Group = Combined.Group.Category[1])
 
+t1 = 
+  tableby(Group~Age+Gender+Race+Insulin+`BMI Z Score`+`Days of Data`,
+             data = demo)
+summary(t1)
+```
 
+## Plot {.smaller}
 
 ```{r}
 fda_df %>% 
   ggplot() + 
-  geom_spaghetti(aes(tf = Glucose, col = Combined.Group.Category)) +
-  facet_wrap(~ Gender) + 
-  scale_alpha(guide = 'none', range = c(.2, .4)) +
-  scale_color_discrete(name="") + theme_bw()
+  geom_spaghetti(aes(tf = Glucose),alpha=0.2) +
+  scale_color_discrete(name="") + theme_bw() +
+  facet_wrap(~Combined.Group.Category)
+```
+
+```{r cache=TRUE}
+fpca = rfr_fpca(Y = "Glucose", data = fda_df)
+# dti_df %>% 
+#   modelr::add_predictions(fpca, var = "glucose_fits") %>% 
+#   ggplot(aes(y = glucose_fits)) + 
+#   geom_spaghetti() + 
+#   geom_spaghetti(aes(y = Glucose), color = "blue", alpha = .2)
 ```
 
 ## Questions for the Group
