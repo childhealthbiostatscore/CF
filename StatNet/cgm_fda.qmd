@@ -20,8 +20,6 @@ library(lubridate)
 library(cgmanalysis)
 library(refund)
 library(refund.shiny)
-library(tidyfun)
-library(refundr)
 # Data import
 sleep = read.csv("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Raw/sleep.csv",
                  na.strings = "")
@@ -123,6 +121,17 @@ fda_df %>%
   facet_wrap(~Combined.Group.Category)
 ```
 
+## Basis Function
+
+In general, the Fourier basis is the usual choice for periodic functions.
+
+\cite{ramsayFunctionalDataAnalysis2009}
+
+```{r}
+basisobj = create.fourier.basis(rangeval=c(0, 1))
+plot(basisobj)
+```
+
 ```{r cache=TRUE}
 fpca = rfr_fpca(Y = "Glucose", data = fda_df)
 fda_df %>%
@@ -190,11 +199,10 @@ X = sleep %>% select(Subject.ID:Average.BMI.Z.score)
 X = X[keep,]
 X = dummy_cols(X[,"Combined.Group.Category"],remove_selected_columns=T,remove_first_dummy=T)
 FPCAobj <- FPCA(Ly=ylist[keep], Lt=tlist[keep],list(plot = TRUE))
-VCAM(Lt=tlist[keep], Ly=ylist[keep],X)
+VCAM(Lt=tlist[1:10], Ly=ylist[1:10],X[1:10])
 ```
 
 ## Questions for the Group
 
-1.  How do we evaluate everyone over a common grid? Do we want to keep one night as the "grid unit?"
-2.  How to handle missing data? Is linear approximation reasonable (I would assume not)?
-3.  How to account for within-subject correlation?
+-   What is the best way to pick the order of basis functions, etc.?
+-   Currently I'm forcing the glucose measures to be on the interval \[0,1\], which means that the period for the Fourier basis is "nighttime." Since those with shorter sleep periods will have fewer observations, I think this means that
