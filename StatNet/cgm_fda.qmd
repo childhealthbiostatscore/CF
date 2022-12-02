@@ -24,10 +24,10 @@ sleep = sleep %>%
   mutate(Day.1.End = Day.2.Date,Day.2.End = Day.3.Date,Day.3.End = Day.4.Date,
          Day.4.End = Day.5.Date,Day.5.End = Day.6.Date,Day.6.End = Day.7.Date) %>%
   select(Subject.ID:Average.BMI.Z.score,
-                         matches("Day\\.\\d\\.Date"),
          matches("Day\\.\\d\\.Date"),
-                         matches("Day\\.\\d\\.Bed.Time"),
-                         matches("Day\\.\\d\\.Get.Up.Time"))
+         matches("Day\\.\\d\\.Date"),
+         matches("Day\\.\\d\\.Bed.Time"),
+         matches("Day\\.\\d\\.Get.Up.Time"))
 sleep = sleep %>% 
   pivot_longer(Day.1.Date:Day.7.Get.Up.Time,
                names_to = c("Day",".value"),names_pattern = "Day\\.(.)\\.(.*)") %>%
@@ -40,16 +40,23 @@ sleep$Subject.ID = sub("--1","",sleep$Subject.ID)
 sleep$Night.Start[hour(sleep$Night.Start) %in% 0:6] = 
   sleep$Night.Start[hour(sleep$Night.Start) %in% 0:6] + days(1)
 # Shorter group names
-sleep$Combined.Group.Category = as.factor(sleep$Combined.Group.Category)
+sleep$Combined.Group.Category = 
+  factor(sleep$Combined.Group.Category,
+         levels = c("Healthy Control",
+                    "Cystic Fibrosis Normal Glucose Tolerant",
+                    "Cystic Fibrosis Abnormal Glycemia",
+                    "Cystic Fibrosis Related Diabetes"),
+         labels = c("HC","CF-NGT","CF-AGT","CFRD"),ordered = T)
 levels(sleep$Combined.Group.Category) = c("CFAGT","CFNGT","CFRD","HC")
 # CGMs
-# cleandata("~/Dropbox/Work/CHCO/Christine Chan/Functional data analysis/Raw CGM Data",
-#           "~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean",removegaps = F)
-cgms = list.files("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean",
+# cleandata("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Raw/CGM",
+#           "~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean/CGM",
+#           removegaps = F)
+cgms = list.files("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean/CGM",
                   full.names = T)
 names(cgms) = unlist(lapply(cgms, function(f){
   df = read.csv(f)
-  id = strsplit(basename(f),"_")[[1]][1]
+  id = strsplit(basename(f)," ")[[1]][1]
   return(id)
 }))
 # For each actiwatch, pull out the relevant vector of CGM values
@@ -77,7 +84,7 @@ vecs = apply(sleep,1,function(r){
 args = sapply(vecs,"[[",2)
 glucs = sapply(vecs,"[[",1)
 # Find those where all glucose values are missing
-keep = sapply(glucs, function(g){!all(is.na(g))})
+keep = sapply(glucs, function(g){!all(is.na(g)) & !is.na(var(g,na.rm = T))})
 # Make functional object, add to demographic info
 fda_df = sleep %>% select(Subject.ID:Average.BMI.Z.score)
 fda_df = fda_df[keep,]
@@ -87,6 +94,8 @@ fda_df$Glucose = tfd(glucs[keep],args[keep])
 ## Our dataset
 
 ### FILL THIS IN
+
+
 
 ```{r}
 fda_df %>% 
