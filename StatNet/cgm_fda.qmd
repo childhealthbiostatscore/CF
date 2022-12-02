@@ -20,8 +20,9 @@ library(lubridate)
 library(cgmanalysis)
 library(refund)
 library(refund.shiny)
+library(tidyfun)
 # Data import
-sleep = read.csv("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Raw/sleep.csv",
+sleep = read.csv("C:/Users/timbv/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Raw/sleep.csv",
                  na.strings = "")
 # Get bedtime and wake times
 sleep = sleep %>% 
@@ -54,10 +55,10 @@ sleep$Combined.Group.Category =
 # HC not on insulin
 sleep$CF.Insulin.Use[sleep$Combined.Group.Category == "HC"]="No"
 # CGMs
-# cleandata("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Raw/CGM",
-#           "~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean/CGM",
+# cleandata("C:/Users/timbv/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Raw/CGM",
+#           "C:/Users/timbv/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean/CGM",
 #           removegaps = F)
-cgms = list.files("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean/CGM",
+cgms = list.files("C:/Users/timbv/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean/CGM",
                   full.names = T)
 names(cgms) = unlist(lapply(cgms, function(f){
   df = read.csv(f)
@@ -118,13 +119,15 @@ ys = apply(sleep,1,function(r){
   return(y)
 })
 # Find those where all glucose values are missing
-# keep = sapply(ys, function(y){!all(is.na(y$.value)) & !is.na(var(y$.value,na.rm = T))})
-ydf = do.call(rbind,ys)
+ydf = do.call(rbind,ys[keep])
 colnames(ydf)[1] = ".id"
 ```
 
-```{r}
-fit = fpca.sc(ydata = ydf[ydf$.id %in% names(table(ydf$.id))[1:5],],pve = 0.95)
+```{r eval=FALSE}
+# FPCA on irregularly sampled data
+fit = fpca.sc(ydata = na.omit(ydf))
+# Save object
+save(fit,file = "C:/Users/timbv/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/R_Objects/fpca_sc_fit.Rdata")
 ```
 
 ## Our dataset {.smaller}
