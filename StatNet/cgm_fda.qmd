@@ -8,10 +8,6 @@ format:
 editor: visual
 ---
 
-## The Question
-
--   Do nighttime glucose patterns differ between controls (HC), CF with normal glucose tolerance (CFNGT), CF with abnormal glucose tolerance (CFAGT), and people with CF related diabetes (CFRD)?
-
 ```{r}
 #| include: false
 # Libraries
@@ -119,7 +115,8 @@ ys = apply(sleep,1,function(r){
 })
 sleep = sleep %>% unite("id_day",Subject.ID,Day,remove = F)
 names(ys) = sleep$id_day
-# Limit to first day with no missing
+# Limit to first day with enough data (50 obs. for now, but that's ad-hoc)
+keep = sapply(glucs, function(g){sum(!is.na(g))>=50})
 sleep = sleep[keep,]
 sleep = sleep %>%
   group_by(Subject.ID) %>%
@@ -176,6 +173,32 @@ save(ydf,file = "~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/R_Objects/y
 -   If $b_j(x)$ is the $j^{th}$ basis function, then: $$f(x)=\sum_{j=1}^k \beta_j b_j(x)$$
 -   Polynomials are a simple form of basis function: $$f(x)=\beta_1+\beta_2x+\beta_3x^2+\beta_4x^3+\beta_5x^4$$ and $$y_i=\beta_1+\beta_2x+\beta_3x^2+\beta_4x^3+\beta_5x^4+\epsilon_i$$
 
+## FPCA
+
+-   The FPCA model is of the form:
+
+$$Y_i(t)=\mu(t)+\sum_{k=1}^{K}c_{ik}\psi_k(t)+\epsilon_{i}(t) $$
+
+-   $\mu(t)$ is the population mean
+-   $\psi_k(t)$ are a set of population-level basis functions
+-   $c_{ik}$ are subject-specific scores with mean zero and variance $\lambda_k$
+-   $\epsilon_i(t)$ are residual curves
+-   There is an eigenfunction associated with each eigenvalue, rather than an eigenvector.
+-   These eigenfunctions describe major variational components, but in function form
+
+## Function-on-Scalar Regression
+
+-   The most common FoSR model is:
+
+$$Y_i(t)= \beta_0(t) + \sum_{k=1}^{p}x_{ik}\beta_k(t) + \epsilon_i(t)$$
+
+-   $\beta_k(t)$ are fixed effects associated with scalar covariates and the $\epsilon_i(t)$ are residual curves.
+-   $\beta_k(t)$ are interpreted analogously to coefficients in a multiple linear regression
+
+## The Question
+
+-   Do nighttime glucose patterns differ between controls (HC), CF with normal glucose tolerance (CFNGT), CF with abnormal glucose tolerance (CFAGT), and people with CF related diabetes (CFRD)?
+
 ## Our Dataset
 
 ```{r results='asis'}
@@ -200,7 +223,16 @@ fda_df %>%
   facet_wrap(~Combined.Group.Category)
 ```
 
-## FPCA
+## FPCA on This Dataset
+
+```{r}
+#| include: false
+load("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/R_Objects/fpca_sc_fit.Rdata")
+```
+
+```{r}
+knitr::kable(head(ydf))
+```
 
 ```{r}
 #| eval: false
@@ -209,11 +241,46 @@ fda_df %>%
 fit = fpca.sc(ydata = na.omit(ydf))
 ```
 
+## Function-on-Scalar Regression for Our Data
+
 ```{r}
 #| include: false
-# load("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/R_Objects/fpca_sc_fit.Rdata")
+ydf_wide = 
+  ydf %>% group_by(.id) %>% 
+  filter(row_number() <= 54) %>%
+  mutate(.index = row_number()) %>%
+  pivot_wider(id_cols = .id,names_from = .index,values_from = .value,names_prefix = "glucose_")
+ids = ydf_wide$.id
+ydf_wide$.id = NULL
+ydf_wide = data.matrix(ydf_wide)
+rownames(ydf_wide) = ids
+sleep$Glucose = ydf_wide
+sleep$Group = factor(sleep$Group,ordered = F)
+sleep = na.omit(sleep)
+```
+
+```{r}
+#| echo: true
+fosr_mod = bayes_fosr(Glucose ~ Group,data = sleep) 
+```
+
+```{r}
+data(DTI)
+DTI = subset(DTI, select = c(cca, case, pasat))
+DTI = DTI[complete.cases(DTI),]
+DTI$gender = factor(sample(c("male","female"), dim(DTI)[1], replace = TRUE))
+DTI$status = factor(sample(c("RRMS", "SPMS", "PPMS"), dim(DTI)[1], replace = TRUE))
+## fit models
+dti_fosr_mod = bayes_fosr(cca ~ gender, data = DTI)
 ```
 
 ## Questions for the Group
 
--   I'm having some trouble running
+-   Does this even seem like the correct approach?
+-   Really what we want to do is classify people based on CGM tracing. Is there a good package for functional discriminant analysis?
+-   FoSR in `refund` requires complete data, so how do we deal with irregular sampling across CGM tracings
+    -   There is between and within-subject variability in terms length of sleep and therefore number of glucose measures
+-   What does it mean that the FPCA eigenfunctions are essentially flat?
+-   I'm having some trouble running the full dataset, even on a relatively beefed up desktop. Any recommendations?
+-   Recommendations for easier to use packages?
+    -   Data formatting is a nightmare with the various FDA packages, and unfortunately `tidyfun` is pretty limited.
