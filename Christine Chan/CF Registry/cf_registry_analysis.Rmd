@@ -16,7 +16,7 @@ library(tidyverse)
 library(knitr)
 library(parallel)
 knitr::opts_chunk$set(echo = FALSE)
-knitr::opts_knit$set(root.dir = "/home/tim/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data")
+knitr::opts_knit$set(root.dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data")
 ```
 
 ```{r eval=FALSE}
@@ -25,6 +25,7 @@ df <- read.csv("CFF19_encountersMerged_Del1.csv")
 annual <- read.csv("CFF19_Annualized_Del1.csv")
 colnames(annual)[colnames(annual) == "ReviewYear"] <- "reviewyear"
 demo <- read.csv("CFF19_DemogCFDiag_Del1.csv")
+geno = read.csv("Data_Clean/genotypes.csv",header = F)
 # Combine and format demographics columns
 demo$Race <- apply(demo, 1, function(r) {
   race <- r[paste0("Race", 1:6)]
@@ -157,6 +158,11 @@ df$oxygen_therapy <- factor(df$oxygen_therapy,levels = 1:5,
                                        "Yes, During exacerbation",
                                        "Yes, prn",
                                        "No"))
+# Genotypes
+df$Mutation1 = factor(df$Mutation1,levels = geno[geno$V1=="mutation1","V2"],
+                      labels = geno[geno$V1=="mutation1","V3"])
+df$Mutation2 = factor(df$Mutation2,levels = geno[geno$V1=="mutation2","V2"],
+                      labels = geno[geno$V1=="mutation2","V3"])
 # Save formatted data for re-import later
 save(df,file = "Data_Clean/formatted_data.Rdata")
 ```
