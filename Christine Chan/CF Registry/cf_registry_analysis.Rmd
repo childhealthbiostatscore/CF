@@ -93,28 +93,27 @@ df$spouse_education <- factor(df$spouse_education,
 df$pregnant <- factor(df$pregnant, levels = 0:1, labels = c("No", "Yes"), ordered = T)
 # Combine education checkboxes
 df$employment <- apply(df, 1, function(r) {
-  emp <- r[paste0("employment", 1:7)]
-  emp <- as.numeric(emp)
-  if (all(is.na(emp) | emp == 0)) {
+  emp <- r[grep("A_employment",names(r))]
+  names(emp) = c("Part Time",
+                    "Full time homemaker",
+                    "Full time employment",
+                    "Unemployed",
+                    "Student",
+                    "Disabled",
+                    "Retired"
+                    )
+  if (all(is.na(emp))) {
     return(NA)
   } else {
-    emp <- as.numeric(emp)
-    emp <- which(emp == 1)
+    emp <- names(emp)[which(emp == 1)]
     emp <- paste(emp, collapse = ", ")
     return(emp)
   }
+  }
 })
-df$employment <- sub("1", "Part Time", df$employment)
-df$employment <- sub("2", "Full time homemaker", df$employment)
-df$employment <- sub("3", "Full time employment", df$employment)
-df$employment <- sub("4", "Unemployed", df$employment)
-df$employment <- sub("5", "Student", df$employment)
-df$employment <- sub("6", "Disabled", df$employment)
-df$employment <- sub("7", "Retired", df$employment)
-df$employment <- as.factor(df$employment)
 # Bronchodilator use
 df$bronchodilators <- apply(df, 1, function(r) {
-  bronch <- r[grep("bronchodilators",names(r))]
+  bronch <- r[grep("A_bronchodilators",names(r))]
   names(bronch) = c("Beta agonist",
                     "Theophylline product",
                     "Short acting beta agonist",
