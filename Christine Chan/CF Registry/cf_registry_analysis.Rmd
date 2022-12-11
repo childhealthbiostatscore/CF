@@ -13,11 +13,10 @@ output:
 ```{r setup, include=FALSE}
 library(arsenal)
 library(tidyverse)
-library(performance)
 library(knitr)
 library(parallel)
 knitr::opts_chunk$set(echo = FALSE)
-knitr::opts_knit$set(root.dir = "~/Dropbox/Work/CHCO/Christine Chan/CF registry data")
+knitr::opts_knit$set(root.dir = "~/Work/CHCO/Christine Chan/CF registry data")
 ```
 
 ```{r eval=FALSE}
@@ -60,7 +59,7 @@ df$smoking <- factor(df$smoking, levels = 1:4, labels = c(
   "Yes, Regularly, less than 1 ppd",
   "Yes, Regularly, 1 ppd or more"
 ), ordered = T)
-df$second_smoke <- factor(df$smoking, levels = 1:4, labels = c(
+df$second_smoke <- factor(df$second_smoke, levels = c(1:4), labels = c(
   "No",
   "Occasionally",
   "Yes, Regularly, less than 1 ppd",
@@ -115,11 +114,11 @@ df$employment <- sub("6", "Disabled", df$employment)
 df$employment <- sub("7", "Retired", df$employment)
 df$employment <- as.factor(df$employment)
 # Save formatted data for re-import later
-save(df,file = "formatted_data.Rdata")
+save(df,file = "Data_Clean/formatted_data.Rdata")
 ```
 
 ```{r}
-load("formatted_data.Rdata")
+load("Data_Clean/formatted_data.Rdata")
 ```
 
 # Table 1: Participant characteristics at last visit in time period
@@ -138,6 +137,31 @@ t1_df <- df %>%
     `Marital Status` = last(na.omit(marital_status)),
     Employment = last(na.omit(employment)),
     Pregnancy = max(pregnant, na.rm = T)
+  )
+# Replace infinite values with missing
+t1_df <- data.frame(lapply(t1_df, function(c) {
+  c[is.infinite(c)] <- NA
+  return(c)
+}))
+# Print table 1
+cols <- colnames(t1_df)[3:ncol(t1_df)]
+t1 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
+  data = t1_df
+)
+summary(t1)
+```
+
+
+# Table 2: Pulmonary function
+
+```{r warning=FALSE,results='asis'}
+# Summarize by ID and period
+t2_df <- df %>%
+  group_by(eDWID, Period) %>%
+  summarise(
+    Smoking = max(smoking,na.rm = T),
+    `Secondhand smoke`=max(second_smoke,na.rm = T),
+    .groups = "keep"
   )
 # Replace infinite values with missing
 t1_df <- data.frame(lapply(t1_df, function(c) {
