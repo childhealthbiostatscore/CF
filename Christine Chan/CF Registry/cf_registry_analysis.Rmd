@@ -16,7 +16,7 @@ library(tidyverse)
 library(knitr)
 library(parallel)
 knitr::opts_chunk$set(echo = FALSE)
-knitr::opts_knit$set(root.dir = "~/Work/CHCO/Christine Chan/CF registry data")
+knitr::opts_knit$set(root.dir = "/home/tim/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data")
 ```
 
 ```{r eval=FALSE}
@@ -33,25 +33,25 @@ demo$Race <- apply(demo, 1, function(r) {
 })
 demo$Race[grep(", ", demo$Race)] <- "More Than One"
 demo$Race <- factor(demo$Race,
-  levels = c(1:6, "More Than One"),
-  labels = c(
-    "White", "Black or African American",
-    "American Indian or Alaska Native", "Asian",
-    "Native Hawaiian or Other Pacific Islander",
-    "Some other race", "More Than One"
-  )
+                    levels = c(1:6, "More Than One"),
+                    labels = c(
+                      "White", "Black or African American",
+                      "American Indian or Alaska Native", "Asian",
+                      "Native Hawaiian or Other Pacific Islander",
+                      "Some other race", "More Than One"
+                    )
 )
 demo$Hispanicrace <- factor(demo$Hispanicrace,
-  levels = 1:2,
-  labels = c("Yes", "No")
+                            levels = 1:2,
+                            labels = c("Yes", "No")
 )
 # Merge
 df <- left_join(df, annual, by = c("eDWID", "reviewyear"))
 df <- left_join(df, demo, by = "eDWID")
 # Group years by 2003-2009, 2010-2013, and 2014-2018
 df$Period <- cut(df$reviewyear,
-  breaks = c(2002, 2009, 2013, 2018),
-  labels = c("2003 - 2009", "2010 - 2013", "2014 - 2018")
+                 breaks = c(2002, 2009, 2013, 2018),
+                 labels = c("2003 - 2009", "2010 - 2013", "2014 - 2018")
 )
 df$smoking <- factor(df$smoking, levels = 1:4, labels = c(
   "No",
@@ -74,25 +74,24 @@ ed_levels <- c(
   "Masters/Doctoral level degree"
 )
 df$patient_education <- factor(df$patient_education,
-  levels = c(1:5),
-  labels = ed_levels
+                               levels = c(1:5),
+                               labels = ed_levels
 )
 df$father_education <- factor(df$father_education,
-  levels = c(1:5),
-  labels = ed_levels
+                              levels = c(1:5),
+                              labels = ed_levels
 )
 df$mother_education <- factor(df$mother_education,
-  levels = c(1:5),
-  labels = ed_levels
+                              levels = c(1:5),
+                              labels = ed_levels
 )
 df$spouse_education <- factor(df$spouse_education,
-  levels = c(1:5),
-  labels = ed_levels
+                              levels = c(1:5),
+                              labels = ed_levels
 )
 df$pregnant <- factor(df$pregnant, levels = 0:1, labels = c("No", "Yes"), ordered = T)
 # Combine education checkboxes
-cl <- makeCluster(detectCores() * 0.5, type = "FORK")
-df$employment <- parApply(cl, df, 1, function(r) {
+df$employment <- apply(df, 1, function(r) {
   emp <- r[paste0("employment", 1:7)]
   emp <- as.numeric(emp)
   if (all(is.na(emp) | emp == 0)) {
@@ -104,7 +103,6 @@ df$employment <- parApply(cl, df, 1, function(r) {
     return(emp)
   }
 })
-stopCluster(cl)
 df$employment <- sub("1", "Part Time", df$employment)
 df$employment <- sub("2", "Full time homemaker", df$employment)
 df$employment <- sub("3", "Full time employment", df$employment)
@@ -113,12 +111,59 @@ df$employment <- sub("5", "Student", df$employment)
 df$employment <- sub("6", "Disabled", df$employment)
 df$employment <- sub("7", "Retired", df$employment)
 df$employment <- as.factor(df$employment)
+# Bronchodilator use
+df$bronchodilators <- apply(df, 1, function(r) {
+  bronch <- r[grep("bronchodilators",names(r))]
+  names(bronch) = c("Beta agonist",
+                    "Theophylline product",
+                    "Short acting beta agonist",
+                    "Long acting beta agonist",
+                    "Short acting anticholinergic",
+                    "Long acting anticholinergic",
+                    "Combination beta agonist and anticholinergic"
+  )
+  if (all(is.na(bronch))) {
+    return(NA)
+  } else {
+    bronch <- names(bronch)[which(bronch == 1)]
+    bronch <- paste(bronch, collapse = ", ")
+    return(bronch)
+  }
+})
+# Exacerbation medication
+df$act_primary <- apply(df, 1, function(r) {
+  act <- r[grep("A_act_primary",names(r))]
+  names(act) = c("Positive Expiratory Pressure (PEP)",
+                 "Postural drainage with clapping (CPT)",
+                 "Forced expiratory techniques",
+                 "Oscillating PEP",
+                 "High frequency chest wall oscillation",
+                 "Exercise",
+                 "None",
+                 "Other"
+  )
+  if (all(is.na(act) | act == 0)) {
+    return(NA)
+  } else {
+    act <- names(act)[which(act == 1)]
+    act <- paste(act, collapse = ", ")
+    return(act)
+  }
+})
+# Oxygen therapy
+df$oxygen_therapy <- factor(df$oxygen_therapy,levels = 1:5,
+                            labels = c("Yes, Continuously",
+                                       "Yes, Nocturnal and/or with exertion",
+                                       "Yes, During exacerbation",
+                                       "Yes, prn",
+                                       "No"))
 # Save formatted data for re-import later
 save(df,file = "Data_Clean/formatted_data.Rdata")
 ```
 
 ```{r}
 load("Data_Clean/formatted_data.Rdata")
+df = df %>% arrange(eDWID,reviewyear,encounternum)
 ```
 
 # Table 1: Participant characteristics at last visit in time period
@@ -154,6 +199,8 @@ summary(t1)
 
 # Table 2: Pulmonary function
 
+Continuous and count variables are from the last year of each period.
+
 ```{r warning=FALSE,results='asis'}
 # Summarize by ID and period
 t2_df <- df %>%
@@ -161,17 +208,25 @@ t2_df <- df %>%
   summarise(
     Smoking = max(smoking,na.rm = T),
     `Secondhand smoke`=max(second_smoke,na.rm = T),
+    `FEV1 % Predicted` = last(na.omit(GLI_FEV1_pct_predicted)),
+    `FVC % Predicted` = last(na.omit(GLI_FVC_pct_predicted)),
+    `Pulm. Exacerbations` = last(na.omit(NumPulmExacerbation)),
     .groups = "keep"
   )
 # Replace infinite values with missing
-t1_df <- data.frame(lapply(t1_df, function(c) {
-  c[is.infinite(c)] <- NA
-  return(c)
-}))
+# t2_df <- data.frame(lapply(t2_df, function(c) {
+#   c[is.infinite(c)] <- NA
+#   return(c)
+# }))
 # Print table 1
-cols <- colnames(t1_df)[3:ncol(t1_df)]
-t1 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
-  data = t1_df
+cols <- colnames(t2_df)[3:ncol(t2_df)]
+t2 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
+  data = t2_df
 )
-summary(t1)
+summary(t2)
 ```
+
+# Questions
+
+1. Which variables do we include for microbiome stuff? Include "othermicroorganismstypes"?
+
