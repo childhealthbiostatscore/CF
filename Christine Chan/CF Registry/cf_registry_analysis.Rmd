@@ -167,17 +167,21 @@ df$Mutation2 = factor(df$Mutation2,levels = geno[geno$V1=="mutation2","V2"],
 df$F508del = (df$Mutation1 =="F508del") + (df$Mutation2=="F508del")
 df$F508del = factor(df$F508del,levels = 0:2,labels = c("None","Heterozygous","Homozygous"))
 # Yes/no variables
-df$A_IsOnEnzymes = factor(df$A_IsOnEnzymes,levels = 0:1,labels = c("No","Yes"))
-df$A_salt_supplement = factor(df$A_salt_supplement,levels = 0:1,labels = c("No","Yes"))
-df$A_cf_vitamins = factor(df$A_cf_vitamins,levels = 0:1,labels = c("No","Yes"))
-df$A_dornasealfa = factor(df$A_dornasealfa,levels = 0:1,labels = c("No","Yes"))
-df$A_pulmonarycomplications4 = factor(df$A_pulmonarycomplications4,
+df$A_IsOnEnzymes = factor(df$A_IsOnEnzymes,ordered = T,
+                          levels = 0:1,labels = c("No","Yes"))
+df$A_salt_supplement = factor(df$A_salt_supplement,ordered = T,
+                              levels = 0:1,labels = c("No","Yes"))
+df$A_cf_vitamins = factor(df$A_cf_vitamins,ordered = T,
+                          levels = 0:1,labels = c("No","Yes"))
+df$A_dornasealfa = factor(df$A_dornasealfa,ordered = T,
+                          levels = 0:1,labels = c("No","Yes"))
+df$A_pulmonarycomplications4 = factor(df$A_pulmonarycomplications4,ordered = T,
                                       levels = 0:1,labels = c("No","Yes"))
-df$A_pulmonarycomplications5 = factor(df$A_pulmonarycomplications5,
+df$A_pulmonarycomplications5 = factor(df$A_pulmonarycomplications5,ordered = T,
                                       levels = 0:1,labels = c("No","Yes"))
-df$A_othercomplications9 = factor(df$A_othercomplications9,
+df$A_othercomplications9 = factor(df$A_othercomplications9,ordered = T,
                                       levels = 0:1,labels = c("No","Yes"))
-df$A_hepatobiliary1_3 = factor(df$A_hepatobiliary1_3,
+df$A_hepatobiliary1_3 = factor(df$A_hepatobiliary1_3,ordered = T,
                                       levels = 0:1,labels = c("No","Yes"))
 # Save formatted data for re-import later
 save(df,file = "Data_Clean/formatted_data.Rdata")
@@ -203,7 +207,8 @@ t1_df <- df %>%
     `Spouse Education` = last(na.omit(spouse_education)),
     `Marital Status` = last(na.omit(marital_status)),
     Employment = last(na.omit(employment)),
-    Pregnancy = max(pregnant, na.rm = T)
+    Pregnancy = max(pregnant, na.rm = T),
+    .groups = "keep"
   )
 # Replace infinite values with missing
 t1_df <- data.frame(lapply(t1_df, function(c) {
@@ -217,7 +222,6 @@ t1 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"
 )
 summary(t1)
 ```
-
 
 # Table 2: Pulmonary function
 
