@@ -16,7 +16,7 @@ library(tidyverse)
 library(knitr)
 library(parallel)
 knitr::opts_chunk$set(echo = FALSE, cache = TRUE)
-knitr::opts_knit$set(root.dir = "~/Work/CHCO/Christine Chan/CF registry data")
+knitr::opts_knit$set(root.dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data")
 ```
 
 ```{r}
