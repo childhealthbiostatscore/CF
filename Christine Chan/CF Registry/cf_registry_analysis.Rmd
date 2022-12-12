@@ -93,7 +93,8 @@ df$spouse_education <- factor(df$spouse_education,
 df$pregnant <- factor(df$pregnant, levels = 0:1, labels = c("No", "Yes"), ordered = T)
 # Combine education checkboxes
 df$employment <- apply(df, 1, function(r) {
-  emp <- r[grep("A_employment",names(r))]
+  emp <- r[paste0("employment",1:7)]
+  emp = as.numeric(emp)
   names(emp) = c("Part Time",
                     "Full time homemaker",
                     "Full time employment",
@@ -109,11 +110,11 @@ df$employment <- apply(df, 1, function(r) {
     emp <- paste(emp, collapse = ", ")
     return(emp)
   }
-  }
 })
 # Bronchodilator use
 df$bronchodilators <- apply(df, 1, function(r) {
   bronch <- r[grep("A_bronchodilators",names(r))]
+  bronch = as.numeric(bronch)
   names(bronch) = c("Beta agonist",
                     "Theophylline product",
                     "Short acting beta agonist",
@@ -133,6 +134,7 @@ df$bronchodilators <- apply(df, 1, function(r) {
 # Exacerbation medication
 df$act_primary <- apply(df, 1, function(r) {
   act <- r[grep("A_act_primary",names(r))]
+  act = as.numeric(act)
   names(act) = c("Positive Expiratory Pressure (PEP)",
                  "Postural drainage with clapping (CPT)",
                  "Forced expiratory techniques",
@@ -162,6 +164,21 @@ df$Mutation1 = factor(df$Mutation1,levels = geno[geno$V1=="mutation1","V2"],
                       labels = geno[geno$V1=="mutation1","V3"])
 df$Mutation2 = factor(df$Mutation2,levels = geno[geno$V1=="mutation2","V2"],
                       labels = geno[geno$V1=="mutation2","V3"])
+df$F508del = (df$Mutation1 =="F508del") + (df$Mutation2=="F508del")
+df$F508del = factor(df$F508del,levels = 0:2,labels = c("None","Heterozygous","Homozygous"))
+# Yes/no variables
+df$A_IsOnEnzymes = factor(df$A_IsOnEnzymes,levels = 0:1,labels = c("No","Yes"))
+df$A_salt_supplement = factor(df$A_salt_supplement,levels = 0:1,labels = c("No","Yes"))
+df$A_cf_vitamins = factor(df$A_cf_vitamins,levels = 0:1,labels = c("No","Yes"))
+df$A_dornasealfa = factor(df$A_dornasealfa,levels = 0:1,labels = c("No","Yes"))
+df$A_pulmonarycomplications4 = factor(df$A_pulmonarycomplications4,
+                                      levels = 0:1,labels = c("No","Yes"))
+df$A_pulmonarycomplications5 = factor(df$A_pulmonarycomplications5,
+                                      levels = 0:1,labels = c("No","Yes"))
+df$A_othercomplications9 = factor(df$A_othercomplications9,
+                                      levels = 0:1,labels = c("No","Yes"))
+df$A_hepatobiliary1_3 = factor(df$A_hepatobiliary1_3,
+                                      levels = 0:1,labels = c("No","Yes"))
 # Save formatted data for re-import later
 save(df,file = "Data_Clean/formatted_data.Rdata")
 ```
@@ -216,6 +233,9 @@ t2_df <- df %>%
     `FEV1 % Predicted` = last(na.omit(GLI_FEV1_pct_predicted)),
     `FVC % Predicted` = last(na.omit(GLI_FVC_pct_predicted)),
     `Pulm. Exacerbations` = last(na.omit(NumPulmExacerbation)),
+    `Bronchodilator` = last(na.omit(bronchodilators)),
+    `Primary ACT` = last(na.omit(act_primary)),
+    `Oxygen Therapy` = last(na.omit(oxygen_therapy)),
     .groups = "keep"
   )
 # Replace infinite values with missing
@@ -229,6 +249,64 @@ t2 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"
   data = t2_df
 )
 summary(t2)
+```
+
+# Table 3: Panreactic function
+
+Continuous and count variables are from the last year of each period.
+
+```{r warning=FALSE,results='asis'}
+# Summarize by ID and period
+t3_df <- df %>%
+  group_by(eDWID, Period) %>%
+  summarise(
+    `On Enzymes` = last(na.omit(A_IsOnEnzymes)),
+    `Mutation Class` = last(na.omit(MutClass)),
+    `F508del`=last(na.omit(F508del)),
+    .groups = "keep"
+  )
+# Replace infinite values with missing
+# t3_df <- data.frame(lapply(t3_df, function(c) {
+#   c[is.infinite(c)] <- NA
+#   return(c)
+# }))
+# Print table 1
+cols <- colnames(t3_df)[3:ncol(t3_df)]
+t3 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
+  data = t3_df
+)
+summary(t3)
+```
+
+# Table 4: Nutrition
+
+Continuous and count variables are from the last year of each period.
+
+```{r warning=FALSE,results='asis'}
+# Summarize by ID and period
+t4_df <- df %>%
+  group_by(eDWID, Period) %>%
+  summarise(
+    `BMI %ile` = last(na.omit(A_bmipercentile)),
+    `Salt Supplement` = max(A_salt_supplement,na.rm = T),
+    `CF Vitamins` = max(A_cf_vitamins,na.rm = T),
+    `Hemoptysis` = max(A_pulmonarycomplications4,na.rm = T),
+    `Pneumothorax Chest Tube` = max(A_pulmonarycomplications5,na.rm = T),
+    `Sinus Disease` = max(A_othercomplications9,na.rm = T),
+    `Cirrhosis` = max(A_hepatobiliary1_3,na.rm = T),
+    .groups = "keep"
+  )
+# Replace infinite values with missing
+# t4_df <- data.frame(lapply(t4_df, function(c) {
+#   c[is.infinite(c)] <- NA
+#   return(c)
+# }))
+# Print table 1
+cols <- colnames(t4_df)[3:ncol(t4_df)]
+t4 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
+  data = t4_df
+)
+summary(t4)
 ```
 
 # Questions
