@@ -15,17 +15,17 @@ library(arsenal)
 library(tidyverse)
 library(knitr)
 library(parallel)
-knitr::opts_chunk$set(echo = FALSE)
-knitr::opts_knit$set(root.dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data")
+knitr::opts_chunk$set(echo = FALSE, cache = TRUE)
+knitr::opts_knit$set(root.dir = "~/Work/CHCO/Christine Chan/CF registry data")
 ```
 
-```{r eval=FALSE}
+```{r}
 # Read in CSVs
 df <- read.csv("CFF19_encountersMerged_Del1.csv")
 annual <- read.csv("CFF19_Annualized_Del1.csv")
 colnames(annual)[colnames(annual) == "ReviewYear"] <- "reviewyear"
 demo <- read.csv("CFF19_DemogCFDiag_Del1.csv")
-geno = read.csv("Data_Clean/genotypes.csv",header = F)
+geno <- read.csv("Data_Clean/genotypes.csv", header = F)
 # Combine and format demographics columns
 demo$Race <- apply(demo, 1, function(r) {
   race <- r[paste0("Race", 1:6)]
@@ -90,111 +90,55 @@ df$spouse_education <- factor(df$spouse_education,
                               levels = c(1:5),
                               labels = ed_levels
 )
-df$pregnant <- factor(df$pregnant, levels = 0:1, labels = c("No", "Yes"), ordered = T)
-# Combine education checkboxes
-df$employment <- apply(df, 1, function(r) {
-  emp <- r[paste0("employment",1:7)]
-  emp = as.numeric(emp)
-  names(emp) = c("Part Time",
-                    "Full time homemaker",
-                    "Full time employment",
-                    "Unemployed",
-                    "Student",
-                    "Disabled",
-                    "Retired"
-                    )
-  if (all(is.na(emp))) {
-    return(NA)
-  } else {
-    emp <- names(emp)[which(emp == 1)]
-    emp <- paste(emp, collapse = ", ")
-    return(emp)
-  }
-})
-# Bronchodilator use
-df$bronchodilators <- apply(df, 1, function(r) {
-  bronch <- r[grep("A_bronchodilators",names(r))]
-  bronch = as.numeric(bronch)
-  names(bronch) = c("Beta agonist",
-                    "Theophylline product",
-                    "Short acting beta agonist",
-                    "Long acting beta agonist",
-                    "Short acting anticholinergic",
-                    "Long acting anticholinergic",
-                    "Combination beta agonist and anticholinergic"
-  )
-  if (all(is.na(bronch))) {
-    return(NA)
-  } else {
-    bronch <- names(bronch)[which(bronch == 1)]
-    bronch <- paste(bronch, collapse = ", ")
-    return(bronch)
-  }
-})
-# Exacerbation medication
-df$act_primary <- apply(df, 1, function(r) {
-  act <- r[grep("A_act_primary",names(r))]
-  act = as.numeric(act)
-  names(act) = c("Positive Expiratory Pressure (PEP)",
-                 "Postural drainage with clapping (CPT)",
-                 "Forced expiratory techniques",
-                 "Oscillating PEP",
-                 "High frequency chest wall oscillation",
-                 "Exercise",
-                 "None",
-                 "Other"
-  )
-  if (all(is.na(act) | act == 0)) {
-    return(NA)
-  } else {
-    act <- names(act)[which(act == 1)]
-    act <- paste(act, collapse = ", ")
-    return(act)
-  }
-})
-# Oxygen therapy
-df$oxygen_therapy <- factor(df$oxygen_therapy,levels = 1:5,
-                            labels = c("Yes, Continuously",
-                                       "Yes, Nocturnal and/or with exertion",
-                                       "Yes, During exacerbation",
-                                       "Yes, prn",
-                                       "No"))
+df$oxygen_therapy <- factor(df$oxygen_therapy,
+                            levels = 1:6,
+                            labels = c(
+                              "Yes, Continuously",
+                              "Yes, Nocturnal and/or with exertion",
+                              "Yes, During exacerbation",
+                              "Yes, prn",
+                              "No",
+                              "Unknown"
+                            )
+)
 # Genotypes
-df$Mutation1 = factor(df$Mutation1,levels = geno[geno$V1=="mutation1","V2"],
-                      labels = geno[geno$V1=="mutation1","V3"])
-df$Mutation2 = factor(df$Mutation2,levels = geno[geno$V1=="mutation2","V2"],
-                      labels = geno[geno$V1=="mutation2","V3"])
-df$F508del = (df$Mutation1 =="F508del") + (df$Mutation2=="F508del")
-df$F508del = factor(df$F508del,levels = 0:2,labels = c("None","Heterozygous","Homozygous"))
+df$Mutation1 <- factor(df$Mutation1,
+                       levels = geno[geno$V1 == "mutation1", "V2"],
+                       labels = geno[geno$V1 == "mutation1", "V3"]
+)
+df$Mutation2 <- factor(df$Mutation2,
+                       levels = geno[geno$V1 == "mutation2", "V2"],
+                       labels = geno[geno$V1 == "mutation2", "V3"]
+)
+df$F508del <- (df$Mutation1 == "F508del") + (df$Mutation2 == "F508del")
+df$F508del <- factor(df$F508del, levels = 0:2, 
+                     labels = c("None", "Heterozygous", "Homozygous"))
+# Percentiles for peds
+df$bmi_peds = df$A_bmipercentile * (df$Age_YrEnd < 18)
+df$bmi_adults = df$A_bmivalue * (df$Age_YrEnd >= 18)
+df$height_peds = df$A_heightpercentile * (df$Age_YrEnd < 18)
+df$height_adults = df$A_height * (df$Age_YrEnd >= 18)
+df$weight_peds = df$A_weightpercentile * (df$Age_YrEnd < 18)
+df$weight_adults = df$A_weight * (df$Age_YrEnd >= 18)
 # Yes/no variables
-df$A_IsOnEnzymes = factor(df$A_IsOnEnzymes,ordered = T,
-                          levels = 0:1,labels = c("No","Yes"))
-df$A_salt_supplement = factor(df$A_salt_supplement,ordered = T,
-                              levels = 0:1,labels = c("No","Yes"))
-df$A_cf_vitamins = factor(df$A_cf_vitamins,ordered = T,
-                          levels = 0:1,labels = c("No","Yes"))
-df$A_dornasealfa = factor(df$A_dornasealfa,ordered = T,
-                          levels = 0:1,labels = c("No","Yes"))
-df$A_pulmonarycomplications4 = factor(df$A_pulmonarycomplications4,ordered = T,
-                                      levels = 0:1,labels = c("No","Yes"))
-df$A_pulmonarycomplications5 = factor(df$A_pulmonarycomplications5,ordered = T,
-                                      levels = 0:1,labels = c("No","Yes"))
-df$A_othercomplications9 = factor(df$A_othercomplications9,ordered = T,
-                                      levels = 0:1,labels = c("No","Yes"))
-df$A_hepatobiliary1_3 = factor(df$A_hepatobiliary1_3,ordered = T,
-                                      levels = 0:1,labels = c("No","Yes"))
-# Save formatted data for re-import later
-save(df,file = "Data_Clean/formatted_data.Rdata")
-```
-
-```{r}
-load("Data_Clean/formatted_data.Rdata")
-df = df %>% arrange(eDWID,reviewyear,encounternum)
+yn <- c("A_IsOnEnzymes", "A_salt_supplement", "A_cf_vitamins", "A_dornasealfa", 
+        "A_pulmonarycomplications4", "A_pulmonarycomplications5", 
+        "A_othercomplications9", paste0("A_hepatobiliary1_",1:3), 
+        paste0("A_hepatobiliary2_",1:4),paste0("employment", 1:7),
+        "pregnant","dexa_results_osteoporosis","A_Vx770","A_VX809comb",
+        "A_feeding3","A_corticosteroids1","A_pulmonarycomplications2",
+        paste0("A_mycobacterials",c(1:5,7:10)),
+        "A_pseudomonasaeruginosa","A_staphylococcus_aureus",
+        "A_othermicroorganisms1","A_othermicroorganisms2",
+        "A_fungalyeast1","A_fungalyeast2","A_fungalyeast3")
+df[, yn] <- lapply(df[, yn], function(c) {
+  factor(c, levels = 0:1, labels = c("No", "Yes"), ordered = T)
+})
 ```
 
 # Table 1: Participant characteristics at last visit in time period
 
-```{r warning=FALSE,results='asis'}
+```{r results='asis'}
 # Summarize by ID and period
 t1_df <- df %>%
   group_by(eDWID, Period) %>%
@@ -206,19 +150,20 @@ t1_df <- df %>%
     `Mother Education` = last(na.omit(mother_education)),
     `Spouse Education` = last(na.omit(spouse_education)),
     `Marital Status` = last(na.omit(marital_status)),
-    Employment = last(na.omit(employment)),
+    `Part Time` = max(employment1, na.rm = F),
+    `Full time homemaker` = max(employment2, na.rm = F),
+    `Full time employment` = max(employment3, na.rm = F),
+    `Unemployed` = max(employment4, na.rm = F),
+    `Student` = max(employment5, na.rm = F),
+    `Disabled` = max(employment6, na.rm = F),
+    `Retired` = max(employment7, na.rm = F),
     Pregnancy = max(pregnant, na.rm = T),
     .groups = "keep"
   )
-# Replace infinite values with missing
-t1_df <- data.frame(lapply(t1_df, function(c) {
-  c[is.infinite(c)] <- NA
-  return(c)
-}))
-# Print table 1
+# Print table
 cols <- colnames(t1_df)[3:ncol(t1_df)]
 t1 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
-  data = t1_df
+              data = t1_df
 )
 summary(t1)
 ```
@@ -227,30 +172,38 @@ summary(t1)
 
 Continuous and count variables are from the last year of each period.
 
-```{r warning=FALSE,results='asis'}
+```{r results='asis'}
 # Summarize by ID and period
 t2_df <- df %>%
   group_by(eDWID, Period) %>%
   summarise(
-    Smoking = max(smoking,na.rm = T),
-    `Secondhand smoke`=max(second_smoke,na.rm = T),
+    Smoking = max(smoking, na.rm = T),
+    `Secondhand smoke` = max(second_smoke, na.rm = T),
     `FEV1 % Predicted` = last(na.omit(GLI_FEV1_pct_predicted)),
     `FVC % Predicted` = last(na.omit(GLI_FVC_pct_predicted)),
-    `Pulm. Exacerbations` = last(na.omit(NumPulmExacerbation)),
-    `Bronchodilator` = last(na.omit(bronchodilators)),
-    `Primary ACT` = last(na.omit(act_primary)),
+    `Pulm. Exacerbations` = sum(NumPulmExacerbation,na.rm = T),
+    `Beta agonist` = max(bronchodilators1, na.rm = T),
+    `Theophylline product` = max(bronchodilators2, na.rm = T),
+    `Short acting beta agonist` = max(bronchodilatorsinhaled1, na.rm = T),
+    `Long acting beta agonist` = max(bronchodilatorsinhaled2, na.rm = T),
+    `Short acting anticholinergic` = max(bronchodilatorsinhaled3, na.rm = T),
+    `Long acting anticholinergic` = max(bronchodilatorsinhaled4, na.rm = T),
+    `Combination beta agonist and anticholinergic` = max(bronchodilatorsinhaled5, na.rm = T),
+    `Positive Expiratory Pressure (PEP)` = max(act_primary1, na.rm = T),
+    `Postural drainage with clapping (CPT)` = max(act_primary2, na.rm = T),
+    `Forced expiratory techniques` = max(act_primary3, na.rm = T),
+    `Oscillating PEP` = max(act_primary4, na.rm = T),
+    `High frequency chest wall oscillation` = max(act_primary5, na.rm = T),
+    `Exercise` = max(act_primary6, na.rm = T),
+    `None` = max(act_primary7, na.rm = T),
+    `Other` = max(act_primary8, na.rm = T),
     `Oxygen Therapy` = last(na.omit(oxygen_therapy)),
     .groups = "keep"
   )
-# Replace infinite values with missing
-# t2_df <- data.frame(lapply(t2_df, function(c) {
-#   c[is.infinite(c)] <- NA
-#   return(c)
-# }))
-# Print table 1
+# Print table
 cols <- colnames(t2_df)[3:ncol(t2_df)]
 t2 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
-  data = t2_df
+              data = t2_df
 )
 summary(t2)
 ```
@@ -259,25 +212,20 @@ summary(t2)
 
 Continuous and count variables are from the last year of each period.
 
-```{r warning=FALSE,results='asis'}
+```{r results='asis'}
 # Summarize by ID and period
 t3_df <- df %>%
   group_by(eDWID, Period) %>%
   summarise(
     `On Enzymes` = last(na.omit(A_IsOnEnzymes)),
     `Mutation Class` = last(na.omit(MutClass)),
-    `F508del`=last(na.omit(F508del)),
+    `F508del` = last(na.omit(F508del)),
     .groups = "keep"
   )
-# Replace infinite values with missing
-# t3_df <- data.frame(lapply(t3_df, function(c) {
-#   c[is.infinite(c)] <- NA
-#   return(c)
-# }))
-# Print table 1
+# Print table
 cols <- colnames(t3_df)[3:ncol(t3_df)]
 t3 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
-  data = t3_df
+              data = t3_df
 )
 summary(t3)
 ```
@@ -286,34 +234,100 @@ summary(t3)
 
 Continuous and count variables are from the last year of each period.
 
-```{r warning=FALSE,results='asis'}
+```{r results='asis'}
 # Summarize by ID and period
 t4_df <- df %>%
   group_by(eDWID, Period) %>%
   summarise(
-    `BMI %ile` = last(na.omit(A_bmipercentile)),
-    `Salt Supplement` = max(A_salt_supplement,na.rm = T),
-    `CF Vitamins` = max(A_cf_vitamins,na.rm = T),
-    `Hemoptysis` = max(A_pulmonarycomplications4,na.rm = T),
-    `Pneumothorax Chest Tube` = max(A_pulmonarycomplications5,na.rm = T),
-    `Sinus Disease` = max(A_othercomplications9,na.rm = T),
-    `Cirrhosis` = max(A_hepatobiliary1_3,na.rm = T),
+    `BMI %ile (age <18)` = last(na.omit(bmi_peds)),
+    `BMI Value (age <= 18)` = last(na.omit(bmi_adults)),
+    `Salt Supplement` = max(A_salt_supplement, na.rm = T),
+    `CF Vitamins` = max(A_cf_vitamins, na.rm = T),
+    `Hemoptysis` = max(A_pulmonarycomplications4, na.rm = T),
+    `Pneumothorax Chest Tube` = max(A_pulmonarycomplications5, na.rm = T),
+    `Sinus Disease` = max(A_othercomplications9, na.rm = T),
+    `Cirrhosis` = max(A_hepatobiliary1_3, na.rm = T),
     .groups = "keep"
   )
-# Replace infinite values with missing
-# t4_df <- data.frame(lapply(t4_df, function(c) {
-#   c[is.infinite(c)] <- NA
-#   return(c)
-# }))
-# Print table 1
+# Print table
 cols <- colnames(t4_df)[3:ncol(t4_df)]
 t4 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
-  data = t4_df
+              data = t4_df
 )
 summary(t4)
 ```
 
-# Questions
+# Table 5: Other
+
+Continuous and count variables are from the last year of each period.
+
+```{r results='asis'}
+# Summarize by ID and period
+t5_df <- df %>%
+  group_by(eDWID, Period) %>%
+  summarise(
+    `Osteoperosis`=max(dexa_results_osteoporosis,na.rm = T),
+    `Kalydeco`=max(A_Vx770,na.rm = T),
+    `Lumacaftor/Ivacaftor`=max(A_VX809comb,na.rm = T),
+    `Height %ile (age <18)` = last(na.omit(height_peds)),
+    `Height Value (age <= 18)` = last(na.omit(height_adults)),
+    `Weight %ile (age <18)` = last(na.omit(weight_peds)),
+    `Weight Value (age <= 18)` = last(na.omit(weight_adults)),
+    `Num. Hospitalizations` = sum(NumHosp,na.rm = T),
+    `Gall stones`=max(hepatobiliary1_1,na.rm=T),
+    `Gall stones, requiring surgery/procedure`=max(hepatobiliary1_2,na.rm=T),
+    `Liver disease, cirrhosis`=max(hepatobiliary1_3,na.rm=T),
+    `Liver disease, non- cirrhosis`=max(hepatobiliary2_1,na.rm=T),
+    `Hepatic Steatosis`=max(hepatobiliary2_2,na.rm=T),
+    `Liver disease, other`=max(hepatobiliary2_3,na.rm=T),
+    `Acute Liver Failure`=max(hepatobiliary2_4,na.rm=T),
+    `G-Tube`=max(A_feeding3,na.rm = T),
+    `Oral corticosteroids`=max(A_corticosteroids1,na.rm = T),
+    `Asthma`=max(A_pulmonarycomplications2,na.rm = T),
+    `Mycobacterial tuberculosis`=max(A_mycobacterials1,na.rm=T),
+    `Mycobacterium abscessus/chelonae`=max(A_mycobacterials2,na.rm=T),
+    `Mycobacterium avium complex (MAC)`=max(A_mycobacterials3,na.rm=T),
+    `Mycobacterium fortuitum group`=max(A_mycobacterials4,na.rm=T),
+    `Mycobacterium gordonae`=max(A_mycobacterials5,na.rm=T),
+    `Mycobacterium kansasii`=max(A_mycobacterials7,na.rm=T),
+    `Mycobacterium marinum`=max(A_mycobacterials8,na.rm=T),
+    `Mycobacterium terrae`=max(A_mycobacterials9,na.rm=T),
+    `Other Mycobacterium`=max(A_mycobacterials10,na.rm=T),
+    .groups = "keep"
+  )
+# Print table
+cols <- colnames(t5_df)[3:ncol(t5_df)]
+t5 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
+              data = t5_df
+)
+summary(t5)
+```
+
+# Table 6: Microbiome
+
+```{r results='asis'}
+# Summarize by ID and period
+t6_df <- df %>%
+  group_by(eDWID, Period) %>%
+  summarise(
+    `Pseudomonas`=max(A_pseudomonasaeruginosa,na.rm=T),
+    `Burkholderia`=max(A_staphylococcus_aureus,na.rm=T),
+    `Alcaligenes`=max(A_othermicroorganisms1,na.rm=T),
+    `Stenotrophomonas`=max(A_othermicroorganisms2,na.rm=T),
+    `Aspergillus`=max(A_fungalyeast1,na.rm=T),
+    `Candida`=max(A_fungalyeast2,na.rm=T),
+    `Scedosporium`=max(A_fungalyeast3,na.rm=T),
+    .groups = "keep"
+  )
+# Print table
+cols <- colnames(t6_df)[3:ncol(t6_df)]
+t6 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
+              data = t6_df
+)
+summary(t6)
+```
+
+# Questions/notes
 
 1. Which variables do we include for microbiome stuff? Include "othermicroorganismstypes"?
-
+2. We don't seem to have ETI data.
