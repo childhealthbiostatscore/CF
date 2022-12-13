@@ -6,26 +6,30 @@ output:
   html_document:
     number_sections: yes
     toc: yes
-    toc_depth: 2
-    toc_float: yes
+    toc_depth: 5
+    toc_float: no
+    page-layout: full
 ---
 
 ```{r setup, include=FALSE}
+library(JM)
 library(arsenal)
 library(tidyverse)
 library(knitr)
-library(parallel)
-knitr::opts_chunk$set(echo = FALSE, cache = TRUE)
-knitr::opts_knit$set(root.dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data")
+library(pROC)
+library(lavaan)
+library(survMisc)
+knitr::opts_chunk$set(echo = FALSE,cache = TRUE,cache.lazy = FALSE)
+knitr::opts_knit$set(root.dir = "~/Work/CHCO/Christine Chan/CF registry data")
 ```
 
 ```{r}
 # Read in CSVs
-df <- read.csv("CFF19_encountersMerged_Del1.csv")
-annual <- read.csv("CFF19_Annualized_Del1.csv")
+df <- read.csv("CFF19_encountersMerged_Del1.csv",na.strings = c("","N/A"))
+annual <- read.csv("CFF19_Annualized_Del1.csv",na.strings = c("","N/A"))
 colnames(annual)[colnames(annual) == "ReviewYear"] <- "reviewyear"
-demo <- read.csv("CFF19_DemogCFDiag_Del1.csv")
-geno <- read.csv("Data_Clean/genotypes.csv", header = F)
+demo <- read.csv("CFF19_DemogCFDiag_Del1.csv",na.strings = c("","N/A"))
+geno <- read.csv("Data_Clean/genotypes.csv", header = F,na.strings = c("","N/A"))
 # Combine and format demographics columns
 demo$Race <- apply(demo, 1, function(r) {
   race <- r[paste0("Race", 1:6)]
@@ -111,7 +115,7 @@ df$Mutation2 <- factor(df$Mutation2,
                        labels = geno[geno$V1 == "mutation2", "V3"]
 )
 df$F508del <- (df$Mutation1 == "F508del") + (df$Mutation2 == "F508del")
-df$F508del <- factor(df$F508del, levels = 0:2, 
+df$F508del <- factor(df$F508del, levels = 0:2, ordered = T,
                      labels = c("None", "Heterozygous", "Homozygous"))
 # Percentiles for peds
 df$bmi_peds = df$A_bmipercentile * (df$Age_YrEnd < 18)
@@ -130,19 +134,46 @@ yn <- c("A_IsOnEnzymes", "A_salt_supplement", "A_cf_vitamins", "A_dornasealfa",
         paste0("A_mycobacterials",c(1:5,7:10)),
         "A_pseudomonasaeruginosa","A_staphylococcus_aureus",
         "A_othermicroorganisms1","A_othermicroorganisms2",
-        "A_fungalyeast1","A_fungalyeast2","A_fungalyeast3")
+        "A_fungalyeast1","A_fungalyeast2","A_fungalyeast3",
+        paste0("A_act_primary",1:8),paste0("A_bronchodilators",1:2),
+        paste0("A_bronchodilatorsinhaled",1:5))
 df[, yn] <- lapply(df[, yn], function(c) {
   factor(c, levels = 0:1, labels = c("No", "Yes"), ordered = T)
 })
+df$Gender = as.factor(df$Gender)
+# CFRD diagnosis
+df$cfrd = df$cfrd_status == 3
+df$cfrd = factor(df$cfrd,levels = c(F,T),labels = c("CFRD-","CFRD+"),ordered = T)
+# Sort
+df = df %>% arrange(eDWID,reviewyear,encounternum)
 ```
 
-# Table 1: Participant characteristics at last visit in time period
+# Aim 1
 
-```{r results='asis'}
+## CFRD Incidence
+
+```{r warning=FALSE}
+df %>% group_by(reviewyear,eDWID) %>% 
+  summarise(cfrd = max(cfrd,na.rm = T),
+            age = max(Age_YrEnd,na.rm = T),
+            .groups = "drop_last") %>%
+  summarise(`CFRD Cases` = sum(cfrd=="CFRD+",na.rm = T),
+            `Total People with CF` = n(),
+            `CFRD Prevalence` =`CFRD Cases`/`Total People with CF`,
+            .groups = "drop") %>%
+  mutate(`New Cases` = `CFRD Cases`-`CFRD Cases`[1],
+         `CFRD Incidence` = `New Cases`/`Total People with CF`) %>%
+  kable(.)
+```
+
+## Table 1: Participant characteristics at last visit in time period
+
+```{r results='asis',warning=FALSE}
 # Summarize by ID and period
 t1_df <- df %>%
   group_by(eDWID, Period) %>%
   summarise(
+    CFRD = max(cfrd,na.rm = T),
     Age = max(Age_YrEnd), Race = last(na.omit(Race)),
     Hispanic = last(na.omit(Hispanicrace)), Gender = last(na.omit(Gender)),
     `Patient Education` = last(na.omit(patient_education)),
@@ -160,85 +191,100 @@ t1_df <- df %>%
     Pregnancy = max(pregnant, na.rm = T),
     .groups = "keep"
   )
+# Convert infinite values to missing
+t1_df = data.frame(lapply(t1_df, function(c){
+  c[is.infinite(c)] = NA
+  return(c)
+}))
 # Print table
-cols <- colnames(t1_df)[3:ncol(t1_df)]
-t1 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
-              data = t1_df
-)
+cols <- colnames(t1_df)[4:ncol(t1_df)]
+t1 = tableby(as.formula(paste0("CFRD~", paste0("`", cols, "`", collapse = "+"))),
+             strata = Period,data = t1_df)
 summary(t1)
 ```
 
-# Table 2: Pulmonary function
+## Table 2: Pulmonary function
 
 Continuous and count variables are from the last year of each period.
 
-```{r results='asis'}
+```{r results='asis',warning=FALSE}
 # Summarize by ID and period
 t2_df <- df %>%
   group_by(eDWID, Period) %>%
   summarise(
+    CFRD = max(cfrd,na.rm = T),
     Smoking = max(smoking, na.rm = T),
     `Secondhand smoke` = max(second_smoke, na.rm = T),
-    `FEV1 % Predicted` = last(na.omit(GLI_FEV1_pct_predicted)),
-    `FVC % Predicted` = last(na.omit(GLI_FVC_pct_predicted)),
+    `FEV1 % Predicted` = last(na.omit(A_GLI_FEV1_pct_predicted)),
+    `FVC % Predicted` = last(na.omit(A_GLI_FVC_pct_predicted)),
     `Pulm. Exacerbations` = sum(NumPulmExacerbation,na.rm = T),
-    `Beta agonist` = max(bronchodilators1, na.rm = T),
-    `Theophylline product` = max(bronchodilators2, na.rm = T),
-    `Short acting beta agonist` = max(bronchodilatorsinhaled1, na.rm = T),
-    `Long acting beta agonist` = max(bronchodilatorsinhaled2, na.rm = T),
-    `Short acting anticholinergic` = max(bronchodilatorsinhaled3, na.rm = T),
-    `Long acting anticholinergic` = max(bronchodilatorsinhaled4, na.rm = T),
-    `Combination beta agonist and anticholinergic` = max(bronchodilatorsinhaled5, na.rm = T),
-    `Positive Expiratory Pressure (PEP)` = max(act_primary1, na.rm = T),
-    `Postural drainage with clapping (CPT)` = max(act_primary2, na.rm = T),
-    `Forced expiratory techniques` = max(act_primary3, na.rm = T),
-    `Oscillating PEP` = max(act_primary4, na.rm = T),
-    `High frequency chest wall oscillation` = max(act_primary5, na.rm = T),
-    `Exercise` = max(act_primary6, na.rm = T),
-    `None` = max(act_primary7, na.rm = T),
-    `Other` = max(act_primary8, na.rm = T),
+    `Beta agonist` = max(A_bronchodilators1, na.rm = T),
+    `Theophylline product` = max(A_bronchodilators2, na.rm = T),
+    `Short acting beta agonist` = max(A_bronchodilatorsinhaled1, na.rm = T),
+    `Long acting beta agonist` = max(A_bronchodilatorsinhaled2, na.rm = T),
+    `Short acting anticholinergic` = max(A_bronchodilatorsinhaled3, na.rm = T),
+    `Long acting anticholinergic` = max(A_bronchodilatorsinhaled4, na.rm = T),
+    `Combination beta agonist and anticholinergic` = max(A_bronchodilatorsinhaled5, na.rm = T),
+    `Positive Expiratory Pressure (PEP)` = max(A_act_primary1, na.rm = T),
+    `Postural drainage with clapping (CPT)` = max(A_act_primary2, na.rm = T),
+    `Forced expiratory techniques` = max(A_act_primary3, na.rm = T),
+    `Oscillating PEP` = max(A_act_primary4, na.rm = T),
+    `High frequency chest wall oscillation` = max(A_act_primary5, na.rm = T),
+    `Exercise` = max(A_act_primary6, na.rm = T),
+    `None` = max(A_act_primary7, na.rm = T),
+    `Other` = max(A_act_primary8, na.rm = T),
     `Oxygen Therapy` = last(na.omit(oxygen_therapy)),
     .groups = "keep"
   )
+# Convert infinite values to missing
+t2_df = data.frame(lapply(t2_df, function(c){
+  c[is.infinite(c)] = NA
+  return(c)
+}))
 # Print table
-cols <- colnames(t2_df)[3:ncol(t2_df)]
-t2 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
-              data = t2_df
-)
+cols <- colnames(t2_df)[4:ncol(t2_df)]
+t2 = tableby(as.formula(paste0("CFRD~", paste0("`", cols, "`", collapse = "+"))),
+             strata = Period,data = t2_df)
 summary(t2)
 ```
 
-# Table 3: Panreactic function
+## Table 3: Panreactic function
 
 Continuous and count variables are from the last year of each period.
 
-```{r results='asis'}
+```{r results='asis',warning=FALSE}
 # Summarize by ID and period
 t3_df <- df %>%
   group_by(eDWID, Period) %>%
   summarise(
+    CFRD = max(cfrd,na.rm = T),
     `On Enzymes` = last(na.omit(A_IsOnEnzymes)),
     `Mutation Class` = last(na.omit(MutClass)),
     `F508del` = last(na.omit(F508del)),
     .groups = "keep"
   )
+# Convert infinite values to missing
+t3_df = data.frame(lapply(t3_df, function(c){
+  c[is.infinite(c)] = NA
+  return(c)
+}))
 # Print table
-cols <- colnames(t3_df)[3:ncol(t3_df)]
-t3 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
-              data = t3_df
-)
+cols <- colnames(t3_df)[4:ncol(t3_df)]
+t3 = tableby(as.formula(paste0("CFRD~", paste0("`", cols, "`", collapse = "+"))),
+             strata = Period,data = t3_df)
 summary(t3)
 ```
 
-# Table 4: Nutrition
+## Table 4: Nutrition
 
 Continuous and count variables are from the last year of each period.
 
-```{r results='asis'}
+```{r results='asis',warning=FALSE}
 # Summarize by ID and period
 t4_df <- df %>%
   group_by(eDWID, Period) %>%
   summarise(
+    CFRD = max(cfrd,na.rm = T),
     `BMI %ile (age <18)` = last(na.omit(bmi_peds)),
     `BMI Value (age <= 18)` = last(na.omit(bmi_adults)),
     `Salt Supplement` = max(A_salt_supplement, na.rm = T),
@@ -249,23 +295,28 @@ t4_df <- df %>%
     `Cirrhosis` = max(A_hepatobiliary1_3, na.rm = T),
     .groups = "keep"
   )
+# Convert infinite values to missing
+t4_df = data.frame(lapply(t4_df, function(c){
+  c[is.infinite(c)] = NA
+  return(c)
+}))
 # Print table
-cols <- colnames(t4_df)[3:ncol(t4_df)]
-t4 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
-              data = t4_df
-)
+cols <- colnames(t4_df)[4:ncol(t4_df)]
+t4 = tableby(as.formula(paste0("CFRD~", paste0("`", cols, "`", collapse = "+"))),
+             strata = Period,data = t4_df)
 summary(t4)
 ```
 
-# Table 5: Other
+## Table 5: Other
 
 Continuous and count variables are from the last year of each period.
 
-```{r results='asis'}
+```{r results='asis',warning=FALSE}
 # Summarize by ID and period
 t5_df <- df %>%
   group_by(eDWID, Period) %>%
   summarise(
+    CFRD = max(cfrd,na.rm = T),
     `Osteoperosis`=max(dexa_results_osteoporosis,na.rm = T),
     `Kalydeco`=max(A_Vx770,na.rm = T),
     `Lumacaftor/Ivacaftor`=max(A_VX809comb,na.rm = T),
@@ -274,13 +325,12 @@ t5_df <- df %>%
     `Weight %ile (age <18)` = last(na.omit(weight_peds)),
     `Weight Value (age <= 18)` = last(na.omit(weight_adults)),
     `Num. Hospitalizations` = sum(NumHosp,na.rm = T),
-    `Gall stones`=max(hepatobiliary1_1,na.rm=T),
-    `Gall stones, requiring surgery/procedure`=max(hepatobiliary1_2,na.rm=T),
-    `Liver disease, cirrhosis`=max(hepatobiliary1_3,na.rm=T),
-    `Liver disease, non- cirrhosis`=max(hepatobiliary2_1,na.rm=T),
-    `Hepatic Steatosis`=max(hepatobiliary2_2,na.rm=T),
-    `Liver disease, other`=max(hepatobiliary2_3,na.rm=T),
-    `Acute Liver Failure`=max(hepatobiliary2_4,na.rm=T),
+    `Gall stones`=max(A_hepatobiliary1_1,na.rm=T),
+    `Liver disease, cirrhosis`=max(A_hepatobiliary1_3,na.rm=T),
+    `Liver disease, non- cirrhosis`=max(A_hepatobiliary2_1,na.rm=T),
+    `Hepatic Steatosis`=max(A_hepatobiliary2_2,na.rm=T),
+    `Liver disease, other`=max(A_hepatobiliary2_3,na.rm=T),
+    `Acute Liver Failure`=max(A_hepatobiliary2_4,na.rm=T),
     `G-Tube`=max(A_feeding3,na.rm = T),
     `Oral corticosteroids`=max(A_corticosteroids1,na.rm = T),
     `Asthma`=max(A_pulmonarycomplications2,na.rm = T),
@@ -295,21 +345,26 @@ t5_df <- df %>%
     `Other Mycobacterium`=max(A_mycobacterials10,na.rm=T),
     .groups = "keep"
   )
+# Convert infinite values to missing
+t5_df = data.frame(lapply(t5_df, function(c){
+  c[is.infinite(c)] = NA
+  return(c)
+}))
 # Print table
-cols <- colnames(t5_df)[3:ncol(t5_df)]
-t5 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
-              data = t5_df
-)
+cols <- colnames(t5_df)[4:ncol(t5_df)]
+t5 = tableby(as.formula(paste0("CFRD~", paste0("`", cols, "`", collapse = "+"))),
+             strata = Period,data = t5_df)
 summary(t5)
 ```
 
-# Table 6: Microbiome
+## Table 6: Microbiome
 
-```{r results='asis'}
+```{r results='asis',warning=FALSE}
 # Summarize by ID and period
 t6_df <- df %>%
   group_by(eDWID, Period) %>%
   summarise(
+    CFRD = max(cfrd,na.rm = T),
     `Pseudomonas`=max(A_pseudomonasaeruginosa,na.rm=T),
     `Burkholderia`=max(A_staphylococcus_aureus,na.rm=T),
     `Alcaligenes`=max(A_othermicroorganisms1,na.rm=T),
@@ -319,15 +374,171 @@ t6_df <- df %>%
     `Scedosporium`=max(A_fungalyeast3,na.rm=T),
     .groups = "keep"
   )
+# Convert infinite values to missing
+t6_df = data.frame(lapply(t6_df, function(c){
+  c[is.infinite(c)] = NA
+  return(c)
+}))
 # Print table
-cols <- colnames(t6_df)[3:ncol(t6_df)]
-t6 <- tableby(as.formula(paste0("Period~", paste0("`", cols, "`", collapse = "+"))),
-              data = t6_df
-)
+cols <- colnames(t6_df)[4:ncol(t6_df)]
+t6 = tableby(as.formula(paste0("CFRD~", paste0("`", cols, "`", collapse = "+"))),
+             strata = Period,data = t6_df)
 summary(t6)
+```
+
+# Aim 2
+
+## Structural equation modeling (SEM)
+
+```{r echo=TRUE,eval=FALSE}
+model <- '
+  # regressions
+    GLI_FEV1_pct_predicted~cfrd
+    cfrd ~ Gender
+  # residual correlations
+    Gender ~~ corticosteroids1
+    Gender ~~ F508del
+    cfrd ~~ hgba1c
+    cfrd ~~ bmipercentile
+'
+fit <- sem(model, data = df)
+summary(fit, standardized = TRUE)
+```
+
+# Aim 3
+
+## ROC curves
+
+For each ROC curve, we used everyone's most recent visit where they had both a CFRD status and an A1c measure. Confidence intervals for the threshold that maximizes sensitivity and specificity (based on the Youden index) were calculated using 2000 bootstrap replicates.
+
+### CFRD
+
+```{r}
+# Clean data
+roc_df = df %>% group_by(eDWID) %>%
+  select(eDWID,Period,reviewyear,encounterid,encounternum,hgba1c,cfrd_status_annual) %>%
+  drop_na() %>% slice_max(reviewyear) %>% slice_max(encounternum)
+roc_df$cfrd_status = as.numeric(roc_df$cfrd_status_annual == 3)
+r = roc(cfrd_status~hgba1c,roc_df,plot=TRUE, print.auc=TRUE,ci=T,quiet=T)
+thresh.ci = ci.coords(r,"best",best.method="youden",progress="none")
+n = names(thresh.ci)
+thresh.ci = do.call(rbind,thresh.ci)
+rownames(thresh.ci)=n
+kable(thresh.ci,row.names = T)
+```
+
+### CFRD-related retinopathy
+
+```{r}
+# Clean data
+roc_df = df %>% group_by(eDWID) %>%
+  select(eDWID,Period,reviewyear,encounterid,encounternum,hgba1c,A_cfrdsecondarycomplications1) %>%
+  drop_na() %>% slice_max(reviewyear) %>% slice_max(encounternum)
+r = roc(A_cfrdsecondarycomplications1~hgba1c,roc_df,plot=TRUE, print.auc=TRUE,ci=T,quiet=T)
+thresh.ci = ci.coords(r,"best",best.method="youden",progress="none")
+n = names(thresh.ci)
+thresh.ci = do.call(rbind,thresh.ci)
+rownames(thresh.ci)=n
+kable(thresh.ci,row.names = T)
+```
+
+### CFRD-related microalbuminuria
+
+```{r}
+# Clean data
+roc_df = df %>% group_by(eDWID) %>%
+  select(eDWID,Period,reviewyear,encounterid,encounternum,hgba1c,A_cfrdsecondarycomplications2) %>%
+  drop_na() %>% slice_max(reviewyear) %>% slice_max(encounternum)
+r = roc(A_cfrdsecondarycomplications2~hgba1c,roc_df,plot=TRUE, print.auc=TRUE,ci=T,quiet=T)
+thresh.ci = ci.coords(r,"best",best.method="youden",progress="none")
+n = names(thresh.ci)
+thresh.ci = do.call(rbind,thresh.ci)
+rownames(thresh.ci)=n
+kable(thresh.ci,row.names = T)
+```
+
+### CFRD-related chronic renal insufficiency
+
+```{r}
+# Clean data
+roc_df = df %>% group_by(eDWID) %>%
+  select(eDWID,Period,reviewyear,encounterid,encounternum,hgba1c,A_cfrdsecondarycomplications3) %>%
+  drop_na() %>% slice_max(reviewyear) %>% slice_max(encounternum)
+r = roc(A_cfrdsecondarycomplications3~hgba1c,roc_df,plot=TRUE, print.auc=TRUE,ci=T,quiet=T)
+thresh.ci = ci.coords(r,"best",best.method="youden",progress="none")
+n = names(thresh.ci)
+thresh.ci = do.call(rbind,thresh.ci)
+rownames(thresh.ci)=n
+kable(thresh.ci,row.names = T)
+```
+
+### CFRD-related chronic renal insufficiency
+
+```{r}
+# Clean data
+roc_df = df %>% group_by(eDWID) %>%
+  select(eDWID,Period,reviewyear,encounterid,encounternum,hgba1c,A_cfrdsecondarycomplications3) %>%
+  drop_na() %>% slice_max(reviewyear) %>% slice_max(encounternum)
+r = roc(A_cfrdsecondarycomplications3~hgba1c,roc_df,plot=TRUE, print.auc=TRUE,ci=T,quiet=T)
+thresh.ci = ci.coords(r,"best",best.method="youden",progress="none")
+n = names(thresh.ci)
+thresh.ci = do.call(rbind,thresh.ci)
+rownames(thresh.ci)=n
+kable(thresh.ci,row.names = T)
+```
+
+### CFRD-related chronic renal failure requiring dialysis
+
+```{r}
+# Clean data
+roc_df = df %>% group_by(eDWID) %>%
+  select(eDWID,Period,reviewyear,encounterid,encounternum,hgba1c,A_cfrdsecondarycomplications4) %>%
+  drop_na() %>% slice_max(reviewyear) %>% slice_max(encounternum)
+r = roc(A_cfrdsecondarycomplications4~hgba1c,roc_df,plot=TRUE, print.auc=TRUE,ci=T,quiet=T)
+thresh.ci = ci.coords(r,"best",best.method="youden",progress="none")
+n = names(thresh.ci)
+thresh.ci = do.call(rbind,thresh.ci)
+rownames(thresh.ci)=n
+kable(thresh.ci,row.names = T)
+```
+
+### CFRD-related peripheral neuropathy
+
+```{r}
+# Clean data
+roc_df = df %>% group_by(eDWID) %>%
+  select(eDWID,Period,reviewyear,encounterid,encounternum,hgba1c,A_cfrdsecondarycomplications5) %>%
+  drop_na() %>% slice_max(reviewyear) %>% slice_max(encounternum)
+r = roc(A_cfrdsecondarycomplications5~hgba1c,roc_df,plot=TRUE, print.auc=TRUE,ci=T,quiet=T)
+thresh.ci = ci.coords(r,"best",best.method="youden",progress="none")
+n = names(thresh.ci)
+thresh.ci = do.call(rbind,thresh.ci)
+rownames(thresh.ci)=n
+kable(thresh.ci,row.names = T)
+```
+
+## Joint model
+
+```{r eval=FALSE,echo=TRUE}
+annual = left_join(annual,demo,by = "eDWID")
+# Super simple joint model to start with
+jm_df = annual %>% dplyr::select(eDWID,reviewyear,Gender,A_hgba1c,cfrd_status_annual) %>%
+  filter(cfrd_status_annual <= 3)
+jm_df$cfrd_status_annual = as.numeric(jm_df$cfrd_status_annual==3)
+jm_df = jm_df %>% group_by(eDWID) %>% 
+  mutate(cfrd = max(cfrd_status_annual),
+         reviewyear = reviewyear-2003)
+jm_df$stop = 
+# Survival model
+sf <- survfit(Surv(reviewyear, cfrd) ~ factor(Gender), data = jm_df)
+autoplot(sf)
 ```
 
 # Questions/notes
 
-1. Which variables do we include for microbiome stuff? Include "othermicroorganismstypes"?
-2. We don't seem to have ETI data.
+1. In the cleaned ROC data about 34% of people had CFRD. Does that seem correct?
+2. I also need to meet with Laura about the SEM since she's an expert.
+  - Do we want to include any latent variables?
+  - How should we treat BMI in the SEM? Percentile or raw value adjusted for age?
+3. Unfortunately some of the complicated models are not converging, so I need to investigate that a bit.
+4. What is the best way to treat time in these models? Should we use annualized data and assum even spacing?
