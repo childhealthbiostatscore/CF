@@ -1,0 +1,17 @@
+---
+title: "CF Registry Analysis"
+author: "Tim Vigers"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+editor: visual
+---
+
+```{r}
+library(table1)
+```
