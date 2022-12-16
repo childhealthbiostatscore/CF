@@ -13,5 +13,34 @@ editor: visual
 ---
 
 ```{r}
+#| include: false
+library(tidyverse)
 library(table1)
+# All data
+df = read.csv("/home/timvigers/Work/CHCO/Christine Chan/CF registry data/CFF19_encountersMerged_Del1.csv",na.strings = c("","N/A"))
+df = df %>% arrange(eDWID,reviewyear,encounternum)
+# For those with CFRD by OGTT, find first visit with diagnosis
+first_cfrd = df %>% group_by(eDWID) %>% 
+  summarise(first_cfrd = which(twohour_bloodglucose >= 200),.groups = "drop")
+df = left_join(df,first_cfrd,by = "eDWID")
+df = df %>% group_by(eDWID) %>% 
+  mutate(cfrd_ogtt = case_when(
+    row_number() < first_cfrd ~ "No",
+    row_number() >= first_cfrd ~ "Yes"
+  )) %>%
+  ungroup()
+df$cfrd_ogtt[is.na(df$cfrd_ogtt)] = "No"
+df$cfrd_ogtt = factor(df$cfrd_ogtt,levels = c("No","Yes"),
+                      labels = c("No","Yes"),ordered = TRUE)
+# Testing
+t = df %>% select(eDWID,reviewyear,)
+```
+
+```{r}
+#| @tbl-incidence
+t = df %>% 
+  group_by(eDWID,reviewyear) %>% 
+  summarise(cfrd_ogtt = max(cfrd_ogtt),.groups = "drop") %>% 
+  group_by(reviewyear) %>%
+  summarise(cfrd_rate = mean(as.numeric(cfrd_ogtt)-1))
 ```
