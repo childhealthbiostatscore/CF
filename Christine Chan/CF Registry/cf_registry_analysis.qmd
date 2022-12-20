@@ -17,7 +17,7 @@ editor: visual
 library(tidyverse)
 library(table1)
 # All data
-df = read.csv("/home/timvigers/Work/CHCO/Christine Chan/CF registry data/CFF19_encountersMerged_Del1.csv",na.strings = c("","N/A"))
+df = read.csv("/home/timvigers/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/CFF19_encountersMerged_Del1.csv",na.strings = c("","N/A"))
 df = df %>% arrange(eDWID,reviewyear,encounternum)
 # For those with CFRD by OGTT, find first visit with diagnosis
 first_cfrd = df %>% group_by(eDWID) %>% 
@@ -32,15 +32,24 @@ df = df %>% group_by(eDWID) %>%
 df$cfrd_ogtt[is.na(df$cfrd_ogtt)] = "No"
 df$cfrd_ogtt = factor(df$cfrd_ogtt,levels = c("No","Yes"),
                       labels = c("No","Yes"),ordered = TRUE)
-# Testing
-t = df %>% select(eDWID,reviewyear,)
+diagnosis = df %>% 
+  group_by(eDWID,reviewyear) %>% 
+  summarise(cfrd_ogtt = max(cfrd_ogtt),.groups = "drop")
 ```
 
-```{r}
+```{python}
 #| @tbl-incidence
-t = df %>% 
-  group_by(eDWID,reviewyear) %>% 
-  summarise(cfrd_ogtt = max(cfrd_ogtt),.groups = "drop") %>% 
-  group_by(reviewyear) %>%
-  summarise(cfrd_rate = mean(as.numeric(cfrd_ogtt)-1))
+diagnosis = r.diagnosis
+years = diagnosis["reviewyear"].unique()
+cases = []
+at_risk = []
+incidence = []
+# Loop through years
+for y in years:
+  d = diagnosis[diagnosis["reviewyear"]==y]
+  this_year = d.loc[d["cfrd_ogtt"]=="Yes","eDWID"].to_list()
+  cases = set(cases).union(this_year)
+  new_cases = set(cases).difference(set(this_year))
+  at_risk = set(d["eDWID"].to_list()).difference(at_risk)
+  incidence.append(round(len(new_cases)/len(at_risk),3))
 ```
