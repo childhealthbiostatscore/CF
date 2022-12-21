@@ -14,17 +14,19 @@ editor: visual
 
 ```{r}
 #| include: false
+library(knitr)
 library(tidyverse)
 library(table1)
 # All data
 df = read.csv("Z:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/CFF19_Annualized_Del1.csv",
               na.strings = c("","N/A"))
-df = df %>% arrange(eDWID,ReviewYear) 
+df = df %>% arrange(eDWID,ReviewYear) %>% 
+  mutate(`Age in 2018` = 2018-(ReviewYear-Age_YrEnd))
 # For those with CFRD by OGTT, find first visit with diagnosis
 first_cfrd = df %>% filter(A_twohour_bloodglucose >= 200) %>% 
   group_by(eDWID) %>% slice_min(ReviewYear) %>% 
-  select(eDWID,ReviewYear) %>% rename(first_cfrd = ReviewYear)
-df = left_join(df,first_cfrd,by = "eDWID")
+  select(eDWID,ReviewYear,`Age in 2018`) %>% rename(first_cfrd = ReviewYear)
+df = left_join(df,first_cfrd,by = c("eDWID","Age in 2018"))
 df = df %>% group_by(eDWID) %>% 
   mutate(cfrd_ogtt = case_when(
     ReviewYear < first_cfrd ~ "No",
@@ -32,10 +34,85 @@ df = df %>% group_by(eDWID) %>%
   )) %>%
   ungroup()
 df$cfrd_ogtt[is.na(df$cfrd_ogtt)] = "No"
-diagnosis = df %>% 
-  select(eDWID,ReviewYear,Age_YrEnd,first_cfrd,cfrd_ogtt) %>%
-  group_by(eDWID) %>%
-  mutate(`Age in 2018` = 2018-(ReviewYear-Age_YrEnd))
+df = df %>% 
+  select(eDWID,ReviewYear,`Age in 2018`,first_cfrd,cfrd_ogtt)
+ages = df %>% group_by(eDWID) %>% 
+  summarise(`Age in 2018` = names(sort(table(`Age in 2018`), decreasing = TRUE)[1]))
+ages$`Age in 2018` = round(as.numeric(ages$`Age in 2018`),1)
+```
+
+```{r}
+# Person-years variable
+py=1000
+# For each year, get the number of people diagnosed with CFRD that year
+years = 2003:2018
+cases = lapply(years, function(y){
+  total = unique(first_cfrd$eDWID[first_cfrd$first_cfrd==y])
+  cases_age_10 = total[total %in% ages$eDWID[ages$`Age in 2018` < 10]]
+  cases_age_10_18 = total[total %in% ages$eDWID[ages$`Age in 2018` >= 10 & ages$`Age in 2018` < 19]]
+  cases_age_19_30 = total[total %in% ages$eDWID[ages$`Age in 2018` >= 19 & ages$`Age in 2018` < 31]]
+  cases_age_30 = total[total %in% ages$eDWID[ages$`Age in 2018` >= 31]]
+  return(list("total"=total,"cases_age_10"=cases_age_10,
+              "cases_age_10_18"=cases_age_10_18,
+              "cases_age_19_30"=cases_age_19_30,
+              "cases_age_30"=cases_age_30))
+})
+# Double check that there is no overlap between sets (there isn't!)
+# lapply(1:length(cases), function(y){intersect(cases[[y]],unlist(cases[-y]))})
+# For each year, get the number of people at risk
+at_risk = lapply(years, function(y){
+  ar = unique(df$eDWID[df$ReviewYear==y])
+  ar = ar[!ar %in% unlist(cases[which(years<=y)]$total)]
+  ar_age_10 = intersect(df$eDWID[df$ReviewYear==y],ages$eDWID[ages$`Age in 2018`<10])
+  ar_age_10_18 = intersect(df$eDWID[df$ReviewYear==y],
+                           ages$eDWID[ages$`Age in 2018`>=10 & ages$`Age in 2018`<19])
+  ar_age_19_30 = intersect(df$eDWID[df$ReviewYear==y],
+                           ages$eDWID[ages$`Age in 2018`>=19 & ages$`Age in 2018`<31])
+  ar_age_30 = intersect(df$eDWID[df$ReviewYear==y],ages$eDWID[ages$`Age in 2018`>=31])
+  return(list("total"=ar,"ar_age_10"=ar_age_10,"ar_age_10_18"=ar_age_10_18,
+              "ar_age_19_30"=ar_age_19_30,"ar_age_30"=ar_age_30))
+})
+# Put everything in one table
+inc_df = lapply(years, function(y){
+  # Total
+  new_cases = length(cases[[which(years==y)]]$total)
+  total_at_risk = length(at_risk[[which(years==y)]]$total)
+  total_inc = new_cases/(total_at_risk/py)
+  # < 10
+  new_cases_10 = length(cases[[which(years==y)]]$cases_age_10)
+  at_risk_10 = length(at_risk[[which(years==y)]]$ar_age_10)
+  inc_10 = new_cases_10/(at_risk_10/py)
+  # 10 - 18
+  new_cases_10_18 = length(cases[[which(years==y)]]$cases_age_10_18)
+  at_risk_10_18 = length(at_risk[[which(years==y)]]$ar_age_10_18)
+  inc_10_18 = new_cases_10_18/(at_risk_10_18/py)
+  # 19 - 30
+  new_cases_19_30 = length(cases[[which(years==y)]]$cases_age_19_30)
+  at_risk_19_30 = length(at_risk[[which(years==y)]]$ar_age_19_30)
+  inc_19_30 = new_cases_19_30/(at_risk_19_30/py)
+  # > 30
+  new_cases_30 = length(cases[[which(years==y)]]$cases_age_30)
+  at_risk_30 = length(at_risk[[which(years==y)]]$ar_age_30)
+  inc_30 = new_cases_30/(at_risk_30/py)
+  return(list("Year" = y,
+              "Total New Cases" = new_cases,
+              "Total At Risk" = total_at_risk,
+              "Total Incidence" = total_inc,
+              "Total New Cases Age < 10" = new_cases_10,
+              "Total At Risk Age < 10" = at_risk_10,
+              "Total Incidence Age < 10" = inc_10,
+              "Total New Cases Age 10-18" = new_cases_10_18,
+              "Total At Risk Age 10-18" = at_risk_10_18,
+              "Total Incidence Age 10-18" = inc_10_18,
+              "Total New Cases Age 19-30" = new_cases_19_30,
+              "Total At Risk Age 19-30" = at_risk_19_30,
+              "Total Incidence Age 19-30" = inc_19_30,
+              "Total New Cases Age > 30" = new_cases_30,
+              "Total At Risk Age > 30" = at_risk_30,
+              "Total Incidence Age > 30" = inc_30))
+})
+inc_df = do.call(rbind,inc_df)
+kable(inc_df,digits=3)
 ```
 
 ```{python}
