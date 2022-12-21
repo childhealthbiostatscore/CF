@@ -17,39 +17,85 @@ editor: visual
 library(tidyverse)
 library(table1)
 # All data
-df = read.csv("/home/timvigers/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/CFF19_encountersMerged_Del1.csv",na.strings = c("","N/A"))
-df = df %>% arrange(eDWID,reviewyear,encounternum)
+df = read.csv("Z:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/CFF19_Annualized_Del1.csv",
+              na.strings = c("","N/A"))
+df = df %>% arrange(eDWID,ReviewYear) 
 # For those with CFRD by OGTT, find first visit with diagnosis
-first_cfrd = df %>% group_by(eDWID) %>% 
-  summarise(first_cfrd = which(twohour_bloodglucose >= 200),.groups = "drop")
+first_cfrd = df %>% filter(A_twohour_bloodglucose >= 200) %>% 
+  group_by(eDWID) %>% slice_min(ReviewYear) %>% 
+  select(eDWID,ReviewYear) %>% rename(first_cfrd = ReviewYear)
 df = left_join(df,first_cfrd,by = "eDWID")
 df = df %>% group_by(eDWID) %>% 
   mutate(cfrd_ogtt = case_when(
-    row_number() < first_cfrd ~ "No",
-    row_number() >= first_cfrd ~ "Yes"
+    ReviewYear < first_cfrd ~ "No",
+    ReviewYear >= first_cfrd ~ "Yes"
   )) %>%
   ungroup()
 df$cfrd_ogtt[is.na(df$cfrd_ogtt)] = "No"
-df$cfrd_ogtt = factor(df$cfrd_ogtt,levels = c("No","Yes"),
-                      labels = c("No","Yes"),ordered = TRUE)
 diagnosis = df %>% 
-  group_by(eDWID,reviewyear) %>% 
-  summarise(cfrd_ogtt = max(cfrd_ogtt),.groups = "drop")
+  select(eDWID,ReviewYear,Age_YrEnd,first_cfrd,cfrd_ogtt) %>%
+  group_by(eDWID) %>%
+  mutate(`Age in 2018` = 2018-(ReviewYear-Age_YrEnd))
 ```
 
 ```{python}
 #| @tbl-incidence
+import pandas as pd
+import numpy as np
+
 diagnosis = r.diagnosis
-years = diagnosis["reviewyear"].unique()
+years = diagnosis["ReviewYear"].unique()
+# Loop through years - all ages
 cases = []
 at_risk = []
 incidence = []
-# Loop through years
 for y in years:
-  d = diagnosis[diagnosis["reviewyear"]==y]
+  d = diagnosis[diagnosis["ReviewYear"]==y]
   this_year = d.loc[d["cfrd_ogtt"]=="Yes","eDWID"].to_list()
   cases = set(cases).union(this_year)
   new_cases = set(cases).difference(set(this_year))
   at_risk = set(d["eDWID"].to_list()).difference(at_risk)
-  incidence.append(round(len(new_cases)/len(at_risk),3))
+  incidence.append(round(len(new_cases)/(len(at_risk)/1000),3))
+# Loop through years - age < 10
+cases = []
+at_risk = []
+incidence_10 = []
+for y in years:
+  d = diagnosis[(diagnosis["ReviewYear"]==y) & (diagnosis["Age in 2018"]<10)]
+  this_year = d.loc[d["cfrd_ogtt"]=="Yes","eDWID"].to_list()
+  cases = set(cases).union(this_year)
+  new_cases = set(cases).difference(set(this_year))
+  at_risk = set(d["eDWID"].to_list()).difference(at_risk)
+  if len(at_risk)==0:
+    incidence_10.append(np.nan)
+  else:
+    incidence_10.append(round(len(new_cases)/(len(at_risk)/1000),3))
+# Loop through years - age 10 - 18
+cases = []
+at_risk = []
+incidence_10_18 = []
+for y in years:
+  d = diagnosis[(diagnosis["ReviewYear"]==y) & (diagnosis["Age in 2018"]>=10) & (diagnosis["Age in 2018"]<=18)]
+  this_year = d.loc[d["cfrd_ogtt"]=="Yes","eDWID"].to_list()
+  cases = set(cases).union(this_year)
+  new_cases = set(cases).difference(set(this_year))
+  at_risk = set(d["eDWID"].to_list()).difference(at_risk)
+  if len(at_risk)==0:
+    incidence_10_18.append(np.nan)
+  else:
+    incidence_10_18.append(round(len(new_cases)/(len(at_risk)/1000),3))
+# Loop through years - age 19 - 30
+cases = []
+at_risk = []
+incidence_19_30 = []
+for y in years:
+  d = diagnosis[(diagnosis["ReviewYear"]==y) & (diagnosis["Age in 2018"]>=19) & (diagnosis["Age in 2018"]<=30)]
+  this_year = d.loc[d["cfrd_ogtt"]=="Yes","eDWID"].to_list()
+  cases = set(cases).union(this_year)
+  new_cases = set(cases).difference(set(this_year))
+  at_risk = set(d["eDWID"].to_list()).difference(at_risk)
+  if len(at_risk)==0:
+    incidence_19_30.append(np.nan)
+  else:
+    incidence_19_30.append(round(len(new_cases)/(len(at_risk)/1000),3))
 ```
