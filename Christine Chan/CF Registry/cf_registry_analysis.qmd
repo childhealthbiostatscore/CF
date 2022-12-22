@@ -9,6 +9,7 @@ format:
     toc-float: true
     code-fold: true
     self-contained: true
+    page-layout: full
 editor: visual
 ---
 
@@ -17,6 +18,7 @@ editor: visual
 library(knitr)
 library(tidyverse)
 library(table1)
+library(pROC)
 # All data
 df = read.csv("Z:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/CFF19_Annualized_Del1.csv",
               na.strings = c("","N/A"))
@@ -35,13 +37,15 @@ df = df %>% group_by(eDWID) %>%
   ungroup()
 df$cfrd_ogtt[is.na(df$cfrd_ogtt)] = "No"
 df = df %>% 
-  select(eDWID,ReviewYear,`Age in 2018`,first_cfrd,cfrd_ogtt)
+  select(eDWID,ReviewYear,`Age in 2018`,first_cfrd,cfrd_ogtt,A_hgba1c)
 ages = df %>% group_by(eDWID) %>% 
   summarise(`Age in 2018` = names(sort(table(`Age in 2018`), decreasing = TRUE)[1]))
 ages$`Age in 2018` = round(as.numeric(ages$`Age in 2018`),1)
 ```
 
 ```{r}
+#| label: tbl-incidence
+#| tbl-cap: "Year-on-Year Incidence of CFRD"
 # Person-years variable
 py=1000
 # For each year, get the number of people diagnosed with CFRD that year
@@ -94,85 +98,56 @@ inc_df = lapply(years, function(y){
   new_cases_30 = length(cases[[which(years==y)]]$cases_age_30)
   at_risk_30 = length(at_risk[[which(years==y)]]$ar_age_30)
   inc_30 = new_cases_30/(at_risk_30/py)
-  return(list("Year" = y,
-              "Total New Cases" = new_cases,
-              "Total At Risk" = total_at_risk,
-              "Total Incidence" = total_inc,
-              "Total New Cases Age < 10" = new_cases_10,
-              "Total At Risk Age < 10" = at_risk_10,
-              "Total Incidence Age < 10" = inc_10,
-              "Total New Cases Age 10-18" = new_cases_10_18,
-              "Total At Risk Age 10-18" = at_risk_10_18,
-              "Total Incidence Age 10-18" = inc_10_18,
-              "Total New Cases Age 19-30" = new_cases_19_30,
-              "Total At Risk Age 19-30" = at_risk_19_30,
-              "Total Incidence Age 19-30" = inc_19_30,
-              "Total New Cases Age > 30" = new_cases_30,
-              "Total At Risk Age > 30" = at_risk_30,
-              "Total Incidence Age > 30" = inc_30))
+  return(list(`Year` = y,
+              `Total New Cases` = new_cases,
+              `Total At Risk` = total_at_risk,
+              `Total Incidence` = total_inc,
+              `Total New Cases Age < 10` = new_cases_10,
+              `Total At Risk Age < 10` = at_risk_10,
+              `Total Incidence Age < 10` = inc_10,
+              `Total New Cases Age 10-18` = new_cases_10_18,
+              `Total At Risk Age 10-18` = at_risk_10_18,
+              `Total Incidence Age 10-18` = inc_10_18,
+              `Total New Cases Age 19-30` = new_cases_19_30,
+              `Total At Risk Age 19-30` = at_risk_19_30,
+              `Total Incidence Age 19-30` = inc_19_30,
+              `Total New Cases Age > 30` = new_cases_30,
+              `Total At Risk Age > 30` = at_risk_30,
+              `Total Incidence Age > 30` = inc_30))
 })
-inc_df = do.call(rbind,inc_df)
+inc_df = as.data.frame(do.call(rbind,inc_df))
+inc_df = data.frame(lapply(inc_df,as.numeric),check.names = F)
 kable(inc_df,digits=3)
 ```
 
-```{python}
-#| @tbl-incidence
-import pandas as pd
-import numpy as np
+In @tbl-incidence, incidence per year is calculated as the number of new CFRD diagnoses per 1,000 person-years of those at risk (excluding previously identified cases).
 
-diagnosis = r.diagnosis
-years = diagnosis["ReviewYear"].unique()
-# Loop through years - all ages
-cases = []
-at_risk = []
-incidence = []
-for y in years:
-  d = diagnosis[diagnosis["ReviewYear"]==y]
-  this_year = d.loc[d["cfrd_ogtt"]=="Yes","eDWID"].to_list()
-  cases = set(cases).union(this_year)
-  new_cases = set(cases).difference(set(this_year))
-  at_risk = set(d["eDWID"].to_list()).difference(at_risk)
-  incidence.append(round(len(new_cases)/(len(at_risk)/1000),3))
-# Loop through years - age < 10
-cases = []
-at_risk = []
-incidence_10 = []
-for y in years:
-  d = diagnosis[(diagnosis["ReviewYear"]==y) & (diagnosis["Age in 2018"]<10)]
-  this_year = d.loc[d["cfrd_ogtt"]=="Yes","eDWID"].to_list()
-  cases = set(cases).union(this_year)
-  new_cases = set(cases).difference(set(this_year))
-  at_risk = set(d["eDWID"].to_list()).difference(at_risk)
-  if len(at_risk)==0:
-    incidence_10.append(np.nan)
-  else:
-    incidence_10.append(round(len(new_cases)/(len(at_risk)/1000),3))
-# Loop through years - age 10 - 18
-cases = []
-at_risk = []
-incidence_10_18 = []
-for y in years:
-  d = diagnosis[(diagnosis["ReviewYear"]==y) & (diagnosis["Age in 2018"]>=10) & (diagnosis["Age in 2018"]<=18)]
-  this_year = d.loc[d["cfrd_ogtt"]=="Yes","eDWID"].to_list()
-  cases = set(cases).union(this_year)
-  new_cases = set(cases).difference(set(this_year))
-  at_risk = set(d["eDWID"].to_list()).difference(at_risk)
-  if len(at_risk)==0:
-    incidence_10_18.append(np.nan)
-  else:
-    incidence_10_18.append(round(len(new_cases)/(len(at_risk)/1000),3))
-# Loop through years - age 19 - 30
-cases = []
-at_risk = []
-incidence_19_30 = []
-for y in years:
-  d = diagnosis[(diagnosis["ReviewYear"]==y) & (diagnosis["Age in 2018"]>=19) & (diagnosis["Age in 2018"]<=30)]
-  this_year = d.loc[d["cfrd_ogtt"]=="Yes","eDWID"].to_list()
-  cases = set(cases).union(this_year)
-  new_cases = set(cases).difference(set(this_year))
-  at_risk = set(d["eDWID"].to_list()).difference(at_risk)
-  if len(at_risk)==0:
-    incidence_19_30.append(np.nan)
-  else:
-    incidence_19_30.append(round(len(new_cases)/(len(at_risk)/1000),3))
+```{r}
+df$cfrd_ogtt = factor(df$cfrd_ogtt,levels = c("No","Yes"),ordered = T)
+cfrd = df %>% group_by(eDWID) %>% 
+  mutate(cfrd_ever = max(cfrd_ogtt),
+         time_from_diag = ReviewYear-first_cfrd) %>%
+  filter(cfrd_ever=="Yes",time_from_diag <= 0,time_from_diag >= -1) %>%
+  summarise(hba1c = last(na.omit(round(A_hgba1c,1)))) %>% drop_na()
+non_cfrd =  df %>% group_by(eDWID) %>% 
+  mutate(cfrd_ever = max(cfrd_ogtt)) %>% filter(cfrd_ever=="No") %>%
+  summarise(hba1c = last(na.omit(round(A_hgba1c,1)))) %>% drop_na()
 ```
+
+```{r}
+#| label: fig-roc
+#| fig-cap: "ROC Curve"
+r = roc(cases = cfrd$hba1c,controls=non_cfrd$hba1c,quiet = T,plot=T,auc=T, ci=T,
+        print.auc=TRUE, show.thres=TRUE)
+```
+
+Because we do not have exact information regarding HbA1c timing (we only have encounter number within year), the annualized HbA1c from the year of diagnosis or from one year prior to diagnosis was used in the ROC analysis. For those with HbA1c measures the year of diagnosis and one year prior, the value from year of diagnosis was preferred. For those never diagnosed with CFRD, the most recent HbA1c was used. There were a total of `r nrow(cfrd)` HbA1c measures for people with CFRD and `r nrow(non_cfrd)` measures for those without.
+
+The AUC for this ROC curve was 0.61 (see @fig-roc).
+
+```{r}
+#| label: tbl-roc_thresh
+#| tbl-cap: "Best ROC Threshold (Youden Index)"
+kable(coords(r,"best"),digits = 3)
+```
+
