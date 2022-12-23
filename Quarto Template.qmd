@@ -7,10 +7,25 @@ format:
     toc: true
     toc-depth: 5
     toc-float: true
+    code-fold: true
     self-contained: true
+    fig-cap-location: top
+    page-layout: full
 editor: visual
 ---
 
+# Table
+
 ```{r}
+#| label: tbl-planets
+#| tbl-cap: Planets
+
+```
+
+# figure
+
+```{r}
+#| label: fig-planets
+#| fig-cap: Planets
 
 ```
