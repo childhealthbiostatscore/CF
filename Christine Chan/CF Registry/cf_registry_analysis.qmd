@@ -116,7 +116,8 @@ year_inc = function(df=encounter,year,py = 1000){
        `Total Incidence Age > 30` = inc_30)
 }
 incidence = lapply(2003:2018, function(y){year_inc(year = y)})
-incidence = do.call(rbind,incidence)
+incidence = data.frame(do.call(rbind,incidence),check.names = F)
+incidence = data.frame(lapply(incidence,as.numeric),check.names = F)
 kable(incidence,digits = 3)
 ```
 
@@ -125,11 +126,16 @@ In @tbl-incidence, incidence per year is calculated as the number of new CFRD di
 ```{r}
 #| label: tbl-prevalence
 #| tbl-cap: "Yearly Prevalence of CFRD"
-encounter %>% 
+encounter$cfrd_ogtt = factor(encounter$cfrd_ogtt,levels = c("No","Yes"),ordered = T)
+encounter %>% group_by(eDWID,reviewyear) %>% 
+  summarise(highest_2_hour_bg = suppressWarnings(max(twohour_bloodglucose,na.rm = T)),
+            cfrd = max(cfrd_ogtt),
+            cfrd_status = suppressWarnings(max(cfrd_status,na.rm = T)),
+            .groups = "drop") %>%
+  group_by(reviewyear) %>%
+  summarise(`Prevalence by OGTT` = mean(as.numeric(cfrd)-1)*100,
+            `Prevalence by CFFPR` = mean(cfrd_status == 3,na.rm = T)*100) %>%
+  kable(.,digits = 3)
 ```
 
 In @tbl-prevalence, prevalence is calculated as the total number of CFRD cases seen in clinic divided by the total number of people seen in clinic in a given year.
-
-# Questions
-
-1.  For these calculations, do we need to just use those with an OGTT? Or everybody in the database?
