@@ -28,14 +28,21 @@ annual <- read.csv("Z:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/P
 )
 encounter <- encounter %>%
   arrange(eDWID, reviewyear, encounternum)
+annual = annual %>% arrange(eDWID,ReviewYear)
 # Add age
-ages <- annual %>% arrange(eDWID,ReviewYear) %>% 
+ages <- annual %>% 
   mutate(`Age in 2018` = 2018-(ReviewYear-Age_YrEnd)) %>%
-  group_by(eDWID) %>%
+  rename(reviewyear = ReviewYear) %>%
+  group_by(eDWID,reviewyear) %>%
   summarise(`Age in 2018` = as.numeric(names(sort(table(`Age in 2018`), 
-                                                  decreasing = TRUE)[1])))
-encounter = left_join(encounter,ages,by = "eDWID")
-encounter$`Age Group` = cut(encounter$`Age in 2018`,
+                                                  decreasing = TRUE)[1])),
+            Age = Age_YrEnd[1],.groups = "drop")
+encounter = left_join(encounter,ages,by = c("eDWID", "reviewyear"))
+encounter$`Age Group 2018` = cut(encounter$`Age in 2018`,
+                            c(-Inf,10,19,31,Inf),
+                            labels = c("< 10", "10 - 18", "19 - 30", "> 30"),
+                            right=F)
+encounter$`Age Group` = cut(encounter$Age,
                             c(-Inf,10,19,31,Inf),
                             labels = c("< 10", "10 - 18", "19 - 30", "> 30"),
                             right=F)
@@ -89,6 +96,8 @@ encounter$cfrd_both[is.na(encounter$cfrd_both)] <- "No"
 encounter$cfrd_ogtt = factor(encounter$cfrd_ogtt,levels = c("No","Yes"),ordered = T)
 encounter$cfrd_cffpr = factor(encounter$cfrd_cffpr,levels = c("No","Yes"),ordered = T)
 encounter$cfrd_both = factor(encounter$cfrd_both,levels = c("No","Yes"),ordered = T)
+# Remove those missing age
+encounter = encounter %>% filter(!is.na(Age))
 ```
 
 ```{r}
@@ -100,27 +109,27 @@ year_inc = function(df=encounter,year,py = 1000){
   inc = df %>%  
     filter(reviewyear==year,is.na(first_cfrd_cffpr) | first_cfrd_cffpr == year) %>%
     group_by(eDWID) %>% filter(row_number() == 1) %>% 
-    select(eDWID,`Age Group`,cfrd_cffpr)
-  inc = inc %>% group_by(cfrd_cffpr) %>% count(`Age Group`,.drop = F)
+    select(eDWID,`Age Group 2018`,cfrd_cffpr)
+  inc = inc %>% group_by(cfrd_cffpr) %>% count(`Age Group 2018`,.drop = F)
   # Calculations
   new_cases = sum(inc$n[inc$cfrd_cffpr=="Yes"])
   total_at_risk = sum(inc$n)
   total_inc = new_cases/(total_at_risk/py)
   
-  new_cases_10 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group` == "< 10"])
-  at_risk_10 = sum(inc$n[inc$`Age Group` == "< 10"])
+  new_cases_10 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group 2018` == "< 10"])
+  at_risk_10 = sum(inc$n[inc$`Age Group 2018` == "< 10"])
   inc_10 = new_cases_10/(at_risk_10/py)
   
-  new_cases_10_18 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group` == "10 - 18"])
-  at_risk_10_18 = sum(inc$n[inc$`Age Group` == "10 - 18"])
+  new_cases_10_18 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group 2018` == "10 - 18"])
+  at_risk_10_18 = sum(inc$n[inc$`Age Group 2018` == "10 - 18"])
   inc_10_18 = new_cases_10_18/(at_risk_10_18/py)
   
-  new_cases_19_30 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group` == "19 - 30"])
-  at_risk_19_30 = sum(inc$n[inc$`Age Group` == "19 - 30"])
+  new_cases_19_30 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group 2018` == "19 - 30"])
+  at_risk_19_30 = sum(inc$n[inc$`Age Group 2018` == "19 - 30"])
   inc_19_30 = new_cases_19_30/(at_risk_19_30/py)
   
-  new_cases_30 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group` == "> 30"])
-  at_risk_30 = sum(inc$n[inc$`Age Group` == "> 30"])
+  new_cases_30 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group 2018` == "> 30"])
+  at_risk_30 = sum(inc$n[inc$`Age Group 2018` == "> 30"])
   inc_30 = new_cases_30/(at_risk_30/py)
   
   # Nice results
@@ -129,21 +138,21 @@ year_inc = function(df=encounter,year,py = 1000){
        `Total At Risk` = total_at_risk,
        `Total Incidence` = total_inc,
        
-       `Total New Cases Age < 10` = new_cases_10,
-       `Total At Risk Age < 10` = at_risk_10,
-       `Total Incidence Age < 10` = inc_10,
+       `Total New Cases Age in 2018 < 10` = new_cases_10,
+       `Total At Risk Age in 2018 < 10` = at_risk_10,
+       `Total Incidence Age in 2018 < 10` = inc_10,
        
-       `Total New Cases Age 10-18` = new_cases_10_18,
-       `Total At Risk Age 10-18` = at_risk_10_18,
-       `Total Incidence Age 10-18` = inc_10_18,
+       `Total New Cases Age in 2018 10-18` = new_cases_10_18,
+       `Total At Risk Age in 2018 10-18` = at_risk_10_18,
+       `Total Incidence Age in 2018 10-18` = inc_10_18,
        
-       `Total New Cases Age 19-30` = new_cases_19_30,
-       `Total At Risk Age 19-30` = at_risk_19_30,
-       `Total Incidence Age 19-30` = inc_19_30,
+       `Total New Cases Age in 2018 19-30` = new_cases_19_30,
+       `Total At Risk Age in 2018 19-30` = at_risk_19_30,
+       `Total Incidence Age in 2018 19-30` = inc_19_30,
        
-       `Total New Cases Age > 30` = new_cases_30,
-       `Total At Risk Age > 30` = at_risk_30,
-       `Total Incidence Age > 30` = inc_30)
+       `Total New Cases Age in 2018 > 30` = new_cases_30,
+       `Total At Risk Age in 2018 > 30` = at_risk_30,
+       `Total Incidence Age in 2018 > 30` = inc_30)
 }
 incidence = lapply(2003:2018, function(y){year_inc(year = y)})
 incidence = data.frame(do.call(rbind,incidence),check.names = F)
@@ -174,28 +183,28 @@ year_inc = function(df=encounter,year,py = 1000){
   inc = df %>% 
     filter(reviewyear==year,is.na(first_cfrd_both) | first_cfrd_both == year) %>%
     group_by(eDWID) %>% filter(row_number() == 1) %>%
-    select(eDWID,reviewyear,encounternum,`Age Group`,
+    select(eDWID,reviewyear,encounternum,`Age Group 2018`,
            twohour_bloodglucose,cfrd_both,first_cfrd_both)
-  inc = inc %>% group_by(cfrd_both) %>% count(`Age Group`,.drop = F)
+  inc = inc %>% group_by(cfrd_both) %>% count(`Age Group 2018`,.drop = F)
   # Calculations
   new_cases = sum(inc$n[inc$cfrd_both=="Yes"])
   total_at_risk = sum(inc$n)
   total_inc = new_cases/(total_at_risk/py)
   
-  new_cases_10 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group` == "< 10"])
-  at_risk_10 = sum(inc$n[inc$`Age Group` == "< 10"])
+  new_cases_10 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group 2018` == "< 10"])
+  at_risk_10 = sum(inc$n[inc$`Age Group 2018` == "< 10"])
   inc_10 = new_cases_10/(at_risk_10/py)
   
-  new_cases_10_18 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group` == "10 - 18"])
-  at_risk_10_18 = sum(inc$n[inc$`Age Group` == "10 - 18"])
+  new_cases_10_18 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group 2018` == "10 - 18"])
+  at_risk_10_18 = sum(inc$n[inc$`Age Group 2018` == "10 - 18"])
   inc_10_18 = new_cases_10_18/(at_risk_10_18/py)
   
-  new_cases_19_30 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group` == "19 - 30"])
-  at_risk_19_30 = sum(inc$n[inc$`Age Group` == "19 - 30"])
+  new_cases_19_30 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group 2018` == "19 - 30"])
+  at_risk_19_30 = sum(inc$n[inc$`Age Group 2018` == "19 - 30"])
   inc_19_30 = new_cases_19_30/(at_risk_19_30/py)
   
-  new_cases_30 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group` == "> 30"])
-  at_risk_30 = sum(inc$n[inc$`Age Group` == "> 30"])
+  new_cases_30 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group 2018` == "> 30"])
+  at_risk_30 = sum(inc$n[inc$`Age Group 2018` == "> 30"])
   inc_30 = new_cases_30/(at_risk_30/py)
   
   # Nice results
@@ -204,21 +213,21 @@ year_inc = function(df=encounter,year,py = 1000){
        `Total At Risk` = total_at_risk,
        `Total Incidence` = total_inc,
        
-       `Total New Cases Age < 10` = new_cases_10,
-       `Total At Risk Age < 10` = at_risk_10,
-       `Total Incidence Age < 10` = inc_10,
+       `Total New Cases Age in 2018 < 10` = new_cases_10,
+       `Total At Risk Age in 2018 < 10` = at_risk_10,
+       `Total Incidence Age in 2018 < 10` = inc_10,
        
-       `Total New Cases Age 10-18` = new_cases_10_18,
-       `Total At Risk Age 10-18` = at_risk_10_18,
-       `Total Incidence Age 10-18` = inc_10_18,
+       `Total New Cases Age in 2018 10-18` = new_cases_10_18,
+       `Total At Risk Age in 2018 10-18` = at_risk_10_18,
+       `Total Incidence Age in 2018 10-18` = inc_10_18,
        
-       `Total New Cases Age 19-30` = new_cases_19_30,
-       `Total At Risk Age 19-30` = at_risk_19_30,
-       `Total Incidence Age 19-30` = inc_19_30,
+       `Total New Cases Age in 2018 19-30` = new_cases_19_30,
+       `Total At Risk Age in 2018 19-30` = at_risk_19_30,
+       `Total Incidence Age in 2018 19-30` = inc_19_30,
        
-       `Total New Cases Age > 30` = new_cases_30,
-       `Total At Risk Age > 30` = at_risk_30,
-       `Total Incidence Age > 30` = inc_30)
+       `Total New Cases Age in 2018 > 30` = new_cases_30,
+       `Total At Risk Age in 2018 > 30` = at_risk_30,
+       `Total Incidence Age in 2018 > 30` = inc_30)
 }
 incidence = lapply(2003:2018, function(y){year_inc(year = y)})
 incidence = data.frame(do.call(rbind,incidence),check.names = F)
@@ -244,7 +253,53 @@ In @tbl-prevalence_both, prevalence is calculated as the total number of CFRD ca
 ```{r}
 #| label: tbl-screening
 #| tbl-cap: "Yearly Screening Rates"
-
+year_screen = function(df=encounter,year){
+  # Filter and count
+  inc = df %>% 
+    filter(reviewyear==year,first_cfrd_both >= year) %>%
+    mutate(ogtt = !(is.na(ogttfast_bloodglucose) | is.na(twohour_bloodglucose))) %>%
+    group_by(eDWID) %>%
+    summarise(ogtt = max(ogtt),`Age Group` = `Age Group`[1])
+  inc = inc %>% group_by(ogtt) %>% count(`Age Group`) %>% filter(`Age Group` != "< 10")
+  # Calculations
+  total_screened = sum(inc$n[inc$ogtt==1])
+  total_seen = sum(inc$n)
+  screen_rate = total_screened/total_seen * 100
+  
+  screened_10_18 = inc$n[inc$ogtt==1 & inc$`Age Group` == "10 - 18"]
+  seen_10_18 = sum(inc$n[inc$`Age Group` == "10 - 18"])
+  rate_10_18 = screened_10_18/seen_10_18 *100
+  
+  screened_19_30 = inc$n[inc$ogtt==1 & inc$`Age Group` == "19 - 30"]
+  seen_19_30 = sum(inc$n[inc$`Age Group` == "19 - 30"])
+  rate_19_30 = screened_19_30/seen_19_30 *100
+  
+  screened_30 = inc$n[inc$ogtt==1 & inc$`Age Group` == "> 30"]
+  seen_30 = sum(inc$n[inc$`Age Group` == "> 30"])
+  rate_30 = screened_30/seen_30 *100
+  
+  # Nice results
+  list(`Year` = year,
+       `Total Screened` = total_screened,
+       `Total Seen` = total_seen,
+       `Screen Rate (%)` = screen_rate,
+       
+       `Total Screened Age 10-18` = screened_10_18,
+       `Total Seen Age 10-18` = seen_10_18,
+       `Screen Rate Age 10-18 (%)` = rate_10_18,
+       
+       `Total Screened Age 19-30` = screened_19_30,
+       `Total Seen Age 19-30` = seen_19_30,
+       `Screen Rate Age 19-30 (%)` = rate_19_30,
+       
+       `Total Screened Age > 30` = screened_30,
+       `Total Seen Age > 30` = seen_30,
+       `Screen Rate Age > 30 (%)` = rate_30)
+}
+screen = lapply(2003:2018, function(y){year_screen(year = y)})
+screen = data.frame(do.call(rbind,screen),check.names = F)
+screen = data.frame(lapply(screen,as.numeric),check.names = F)
+kable(screen,digits = 3)
 ```
 
-In @tbl-screening, people with CFRD (by either registry definition or OGTT) and those under 10 were excluded. Screening rate is calculated as the number of people with OGTTs divided by the total number of people seen in clinic that year.
+In @tbl-screening, people with CFRD (by either registry definition or OGTT) and those under 10 were excluded. Screening rate is calculated as the number of people with an OGTT divided by the total number of people seen in clinic that year.
