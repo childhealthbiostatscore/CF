@@ -31,10 +31,17 @@ encounter <- encounter %>%
 annual = annual %>% arrange(eDWID,ReviewYear)
 # Add age
 ages <- annual %>% 
+  mutate(`Age in 2018` = 2018-(ReviewYear-Age_YrEnd)) %>%
   rename(reviewyear = ReviewYear) %>%
   group_by(eDWID,reviewyear) %>%
-  summarise(Age = as.numeric(Age_YrEnd[1]),.groups = "drop")
+  summarise(`Age in 2018` = as.numeric(names(sort(table(`Age in 2018`), 
+                                                  decreasing = TRUE)[1])),
+            Age = Age_YrEnd[1],.groups = "drop")
 encounter = left_join(encounter,ages,by = c("eDWID", "reviewyear"))
+encounter$`Age Group 2018` = cut(encounter$`Age in 2018`,
+                            c(-Inf,10,19,31,Inf),
+                            labels = c("< 10", "10 - 18", "19 - 30", "> 30"),
+                            right=F)
 encounter$`Age Group` = cut(encounter$Age,
                             c(-Inf,10,19,31,Inf),
                             labels = c("< 10", "10 - 18", "19 - 30", "> 30"),
@@ -44,26 +51,26 @@ first_cfrd_ogtt <- encounter %>%
   filter(twohour_bloodglucose >= 200) %>%
   group_by(eDWID) %>%
   filter(row_number()==1) %>%
-  select(eDWID, reviewyear, `Age Group`) %>%
+  select(eDWID, reviewyear, `Age in 2018`) %>%
   rename(first_cfrd_ogtt = reviewyear)
 # For those with CFRD by registry criteria, find first visit with diagnosis
 first_cfrd_cffpr <- encounter %>% 
   filter(cfrd_status==3) %>%
   group_by(eDWID) %>%
   filter(row_number()==1) %>%
-  select(eDWID, reviewyear, `Age Group`) %>%
+  select(eDWID, reviewyear, `Age in 2018`) %>%
   rename(first_cfrd_cffpr = reviewyear)
 # Both
 first_cfrd_both <- encounter %>% 
   filter(cfrd_status==3|twohour_bloodglucose >= 200) %>%
   group_by(eDWID) %>%
   filter(row_number()==1) %>%
-  select(eDWID, reviewyear, `Age Group`) %>%
+  select(eDWID, reviewyear, `Age in 2018`) %>%
   rename(first_cfrd_both = reviewyear)
 # Add to encounter level data
-encounter <- left_join(encounter, first_cfrd_ogtt, by = c("eDWID", "Age Group"))
-encounter <- left_join(encounter, first_cfrd_cffpr, by = c("eDWID", "Age Group"))
-encounter <- left_join(encounter, first_cfrd_both,by = c("eDWID", "Age Group"))
+encounter <- left_join(encounter, first_cfrd_ogtt, by = c("eDWID", "Age in 2018"))
+encounter <- left_join(encounter, first_cfrd_cffpr, by = c("eDWID", "Age in 2018"))
+encounter <- left_join(encounter, first_cfrd_both,by = c("eDWID", "Age in 2018"))
 # Fill down CFRD Yes/No by year
 encounter <- encounter %>%
   group_by(eDWID) %>%
@@ -104,6 +111,7 @@ year_inc = function(df=encounter,year,py = 1000){
     group_by(eDWID) %>% filter(row_number() == 1) %>% 
     select(eDWID,`Age Group`,cfrd_cffpr)
   inc = inc %>% group_by(cfrd_cffpr) %>% count(`Age Group`,.drop = F)
+  inc = inc[!is.na(inc$`Age Group`),]
   # Calculations
   new_cases = sum(inc$n[inc$cfrd_cffpr=="Yes"])
   total_at_risk = sum(inc$n)
@@ -131,21 +139,21 @@ year_inc = function(df=encounter,year,py = 1000){
        `Total At Risk` = total_at_risk,
        `Total Incidence` = total_inc,
        
-       `Total New Cases Age in 2018 < 10` = new_cases_10,
-       `Total At Risk Age in 2018 < 10` = at_risk_10,
-       `Total Incidence Age in 2018 < 10` = inc_10,
+       `Total New Cases Age < 10` = new_cases_10,
+       `Total At Risk Age < 10` = at_risk_10,
+       `Total Incidence Age < 10` = inc_10,
        
-       `Total New Cases Age in 2018 10-18` = new_cases_10_18,
-       `Total At Risk Age in 2018 10-18` = at_risk_10_18,
-       `Total Incidence Age in 2018 10-18` = inc_10_18,
+       `Total New Cases Age 10-18` = new_cases_10_18,
+       `Total At Risk Age 10-18` = at_risk_10_18,
+       `Total Incidence Age 10-18` = inc_10_18,
        
-       `Total New Cases Age in 2018 19-30` = new_cases_19_30,
-       `Total At Risk Age in 2018 19-30` = at_risk_19_30,
-       `Total Incidence Age in 2018 19-30` = inc_19_30,
+       `Total New Cases Age 19-30` = new_cases_19_30,
+       `Total At Risk Age 19-30` = at_risk_19_30,
+       `Total Incidence Age 19-30` = inc_19_30,
        
-       `Total New Cases Age in 2018 > 30` = new_cases_30,
-       `Total At Risk Age in 2018 > 30` = at_risk_30,
-       `Total Incidence Age in 2018 > 30` = inc_30)
+       `Total New Cases Age > 30` = new_cases_30,
+       `Total At Risk Age > 30` = at_risk_30,
+       `Total Incidence Age > 30` = inc_30)
 }
 incidence = lapply(2003:2018, function(y){year_inc(year = y)})
 incidence = data.frame(do.call(rbind,incidence),check.names = F)
@@ -156,16 +164,27 @@ kable(incidence,digits = 3)
 In @tbl-incidence_cffpr, incidence per year is calculated as the number of new CFRD diagnoses (by registry definition alone) per 1,000 person-years of those at risk, excluding previously identified cases.
 
 ```{r}
+#| label: tbl-prevalence_cffpr_year
+#| tbl-cap: "Yearly Prevalence of CFRD by Age Group Based on CFFPR Alone"
+encounter %>% group_by(eDWID,reviewyear,`Age Group`) %>% 
+  summarise(cfrd = max(cfrd_cffpr),.groups = "drop") %>%
+  group_by(reviewyear,`Age Group`) %>%
+  summarise(Prevalence = mean(as.numeric(cfrd)-1,na.rm = T)*100,.groups = "drop") %>%
+  pivot_wider(names_from = `Age Group`,values_from = Prevalence) %>%
+  kable(.,digits = 3)
+```
+
+```{r}
 #| label: tbl-prevalence_cffpr
 #| tbl-cap: "Yearly Prevalence of CFRD Based on CFFPR Alone"
 encounter %>% group_by(eDWID,reviewyear) %>% 
   summarise(cfrd = max(cfrd_cffpr),.groups = "drop") %>%
   group_by(reviewyear) %>%
-  summarise(Prevalence = mean(as.numeric(cfrd)-1,na.rm = T)*100) %>%
+  summarise(Prevalence = mean(as.numeric(cfrd)-1,na.rm = T)*100,.groups = "drop") %>%
   kable(.,digits = 3)
 ```
 
-In @tbl-prevalence_cffpr, prevalence is calculated as the total number of CFRD cases (by registry definition alone) seen in clinic divided by the total number of people seen in clinic in a given year.
+In @tbl-prevalence_cffpr_year and @tbl-prevalence_cffpr, prevalence is calculated as the total number of CFRD cases (by registry definition alone) seen in clinic divided by the total number of people seen in clinic in a given year.
 
 ```{r}
 #| label: tbl-incidence_both
@@ -179,6 +198,7 @@ year_inc = function(df=encounter,year,py = 1000){
     select(eDWID,reviewyear,encounternum,`Age Group`,
            twohour_bloodglucose,cfrd_both,first_cfrd_both)
   inc = inc %>% group_by(cfrd_both) %>% count(`Age Group`,.drop = F)
+  inc = inc[!is.na(inc$`Age Group`),]
   # Calculations
   new_cases = sum(inc$n[inc$cfrd_both=="Yes"])
   total_at_risk = sum(inc$n)
@@ -206,21 +226,21 @@ year_inc = function(df=encounter,year,py = 1000){
        `Total At Risk` = total_at_risk,
        `Total Incidence` = total_inc,
        
-       `Total New Cases Age in 2018 < 10` = new_cases_10,
-       `Total At Risk Age in 2018 < 10` = at_risk_10,
-       `Total Incidence Age in 2018 < 10` = inc_10,
+       `Total New Cases Age < 10` = new_cases_10,
+       `Total At Risk Age < 10` = at_risk_10,
+       `Total Incidence Age < 10` = inc_10,
        
-       `Total New Cases Age in 2018 10-18` = new_cases_10_18,
-       `Total At Risk Age in 2018 10-18` = at_risk_10_18,
-       `Total Incidence Age in 2018 10-18` = inc_10_18,
+       `Total New Cases Age 10-18` = new_cases_10_18,
+       `Total At Risk Age 10-18` = at_risk_10_18,
+       `Total Incidence Age 10-18` = inc_10_18,
        
-       `Total New Cases Age in 2018 19-30` = new_cases_19_30,
-       `Total At Risk Age in 2018 19-30` = at_risk_19_30,
-       `Total Incidence Age in 2018 19-30` = inc_19_30,
+       `Total New Cases Age 19-30` = new_cases_19_30,
+       `Total At Risk Age 19-30` = at_risk_19_30,
+       `Total Incidence Age 19-30` = inc_19_30,
        
-       `Total New Cases Age in 2018 > 30` = new_cases_30,
-       `Total At Risk Age in 2018 > 30` = at_risk_30,
-       `Total Incidence Age in 2018 > 30` = inc_30)
+       `Total New Cases Age > 30` = new_cases_30,
+       `Total At Risk Age > 30` = at_risk_30,
+       `Total Incidence Age > 30` = inc_30)
 }
 incidence = lapply(2003:2018, function(y){year_inc(year = y)})
 incidence = data.frame(do.call(rbind,incidence),check.names = F)
@@ -231,21 +251,32 @@ kable(incidence,digits = 3)
 In @tbl-incidence_both, incidence per year is calculated as the number of new CFRD diagnoses (by either registry definition or OGTT, whichever happened first) per 1,000 person-years of those at risk, excluding previously identified cases.
 
 ```{r}
-#| label: tbl-prevalence_both
-#| tbl-cap: "Yearly Prevalence of CFRD Based on CFFPR and OGTT"
+#| label: tbl-prevalence_both_year
+#| tbl-cap: "Yearly Prevalence of CFRD by Age Group Based on CFFPR and OGTT"
 encounter$cfrd_both = factor(encounter$cfrd_both,levels = c("No","Yes"),ordered = T)
-encounter %>% group_by(eDWID,reviewyear) %>% 
+encounter %>% group_by(eDWID,reviewyear,`Age Group`) %>% 
   summarise(cfrd = max(cfrd_both),.groups = "drop") %>%
-  group_by(reviewyear) %>%
-  summarise(`Prevalence` = mean(as.numeric(cfrd)-1,na.rm = T)*100) %>%
+  group_by(reviewyear,`Age Group`) %>%
+  summarise(`Prevalence` = mean(as.numeric(cfrd)-1,na.rm = T)*100,.groups = "drop") %>%
+  pivot_wider(names_from = `Age Group`,values_from = Prevalence)%>%
   kable(.,digits = 3)
 ```
 
-In @tbl-prevalence_both, prevalence is calculated as the total number of CFRD cases (by either registry definition or OGTT) seen in clinic divided by the total number of people seen in clinic in a given year.
+```{r}
+#| label: tbl-prevalence_both
+#| tbl-cap: "Yearly Prevalence of CFRD Based on CFFPR and OGTT"
+encounter %>% group_by(eDWID,reviewyear) %>% 
+  summarise(cfrd = max(cfrd_both),.groups = "drop") %>%
+  group_by(reviewyear) %>%
+  summarise(`Prevalence` = mean(as.numeric(cfrd)-1,na.rm = T)*100,.groups = "drop") %>%
+  kable(.,digits = 3)
+```
+
+In @tbl-prevalence_both_year and @tbl-prevalence_both, prevalence is calculated as the total number of CFRD cases (by either registry definition or OGTT) seen in clinic divided by the total number of people seen in clinic in a given year.
 
 ```{r}
-#| label: tbl-screening
-#| tbl-cap: "Yearly Screening Rates"
+#| label: tbl-screening_ogtt
+#| tbl-cap: "Yearly OGTT Screening Rates"
 year_screen = function(df=encounter,year){
   # Filter and count
   inc = df %>% 
@@ -295,33 +326,31 @@ screen = data.frame(lapply(screen,as.numeric),check.names = F)
 kable(screen,digits = 3)
 ```
 
-In @tbl-screening, people with CFRD (by either registry definition or OGTT) and those under 10 were excluded. Screening rate is calculated as the number of people with an OGTT divided by the total number of people seen in clinic that year.
-
 ```{r}
 #| label: tbl-screening_a1c
-#| tbl-cap: "Yearly Screening Rates"
+#| tbl-cap: "Yearly HbA1c Screening Rates"
 year_screen = function(df=encounter,year){
   # Filter and count
   inc = df %>% 
     filter(reviewyear==year,first_cfrd_both >= year) %>%
-    mutate(hba1c = !is.na(hgba1c)) %>%
+    mutate(a1c = !is.na(hgba1c)) %>%
     group_by(eDWID) %>%
-    summarise(hba1c = max(hba1c),`Age Group` = `Age Group`[1])
-  inc = inc %>% group_by(hba1c) %>% count(`Age Group`) %>% filter(`Age Group` != "< 10")
+    summarise(a1c = max(a1c),`Age Group` = `Age Group`[1])
+  inc = inc %>% group_by(a1c) %>% count(`Age Group`) %>% filter(`Age Group` != "< 10")
   # Calculations
-  total_screened = sum(inc$n[inc$hba1c==1])
+  total_screened = sum(inc$n[inc$a1c==1])
   total_seen = sum(inc$n)
   screen_rate = total_screened/total_seen * 100
   
-  screened_10_18 = inc$n[inc$hba1c==1 & inc$`Age Group` == "10 - 18"]
+  screened_10_18 = inc$n[inc$a1c==1 & inc$`Age Group` == "10 - 18"]
   seen_10_18 = sum(inc$n[inc$`Age Group` == "10 - 18"])
   rate_10_18 = screened_10_18/seen_10_18 *100
   
-  screened_19_30 = inc$n[inc$hba1c==1 & inc$`Age Group` == "19 - 30"]
+  screened_19_30 = inc$n[inc$a1c==1 & inc$`Age Group` == "19 - 30"]
   seen_19_30 = sum(inc$n[inc$`Age Group` == "19 - 30"])
   rate_19_30 = screened_19_30/seen_19_30 *100
   
-  screened_30 = inc$n[inc$hba1c==1 & inc$`Age Group` == "> 30"]
+  screened_30 = inc$n[inc$a1c==1 & inc$`Age Group` == "> 30"]
   seen_30 = sum(inc$n[inc$`Age Group` == "> 30"])
   rate_30 = screened_30/seen_30 *100
   
@@ -349,4 +378,4 @@ screen = data.frame(lapply(screen,as.numeric),check.names = F)
 kable(screen,digits = 3)
 ```
 
-In @tbl-screening_a1c, people with CFRD (by either registry definition or OGTT) and those under 10 were excluded. Screening rate is calculated as the number of people with an HbA1c value divided by the total number of people seen in clinic that year.
+In @tbl-screening_ogtt and @tbl-screening_a1c, people with CFRD (by either registry definition or OGTT) and those under age 10 were excluded. Screening rate is calculated as the number of people with an OGTT divided by the total number of people seen in clinic that year.
