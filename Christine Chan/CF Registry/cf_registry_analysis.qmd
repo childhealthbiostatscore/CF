@@ -280,8 +280,8 @@ In @tbl-prevalence_both_year and @tbl-prevalence_both, prevalence is calculated 
 year_screen = function(df=encounter,year){
   # Filter and count
   inc = df %>% 
-    filter(reviewyear==year,first_cfrd_both >= year) %>%
-    mutate(ogtt = !(is.na(ogttfast_bloodglucose) | is.na(twohour_bloodglucose))) %>%
+    filter(reviewyear==year,first_cfrd_cffpr > year | is.na(first_cfrd_cffpr)) %>%
+    mutate(ogtt = !is.na(ogttfast_bloodglucose) | !is.na(twohour_bloodglucose)) %>%
     group_by(eDWID) %>%
     summarise(ogtt = max(ogtt),`Age Group` = `Age Group`[1])
   inc = inc %>% group_by(ogtt) %>% count(`Age Group`) %>% filter(`Age Group` != "< 10")
@@ -332,7 +332,7 @@ kable(screen,digits = 3)
 year_screen = function(df=encounter,year){
   # Filter and count
   inc = df %>% 
-    filter(reviewyear==year,first_cfrd_both >= year) %>%
+    filter(reviewyear==year,first_cfrd_cffpr > year | is.na(first_cfrd_cffpr)) %>%
     mutate(a1c = !is.na(hgba1c)) %>%
     group_by(eDWID) %>%
     summarise(a1c = max(a1c),`Age Group` = `Age Group`[1])
@@ -378,4 +378,4 @@ screen = data.frame(lapply(screen,as.numeric),check.names = F)
 kable(screen,digits = 3)
 ```
 
-In @tbl-screening_ogtt and @tbl-screening_a1c, people with CFRD (by either registry definition or OGTT) and those under age 10 were excluded. Screening rate is calculated as the number of people with an OGTT divided by the total number of people seen in clinic that year.
+In @tbl-screening_ogtt and @tbl-screening_a1c, people with CFRD (by registry definition) and those under age 10 were excluded. Screening rate is calculated as the number of people with an OGTT divided by the total number of people seen in clinic that year.
