@@ -107,7 +107,7 @@ encounter = encounter %>% filter(!is.na(Age))
 year_inc = function(df=encounter,year,py = 1000){
   # Filter and count
   inc = df %>%  
-    filter(reviewyear==year,is.na(first_cfrd_cffpr) | first_cfrd_cffpr == year) %>%
+    filter(reviewyear==year,is.na(first_cfrd_cffpr) | first_cfrd_cffpr >= year) %>%
     group_by(eDWID) %>% filter(row_number() == 1) %>% 
     select(eDWID,`Age Group`,cfrd_cffpr)
   inc = inc %>% group_by(cfrd_cffpr) %>% count(`Age Group`,.drop = F)
@@ -193,7 +193,7 @@ In @tbl-prevalence_cffpr_year and @tbl-prevalence_cffpr, prevalence is calculate
 year_inc = function(df=encounter,year,py = 1000){
   # Filter and count
   inc = df %>% 
-    filter(reviewyear==year,is.na(first_cfrd_both) | first_cfrd_both == year) %>%
+    filter(reviewyear==year,is.na(first_cfrd_both) | first_cfrd_both >= year) %>%
     group_by(eDWID) %>% filter(row_number() == 1) %>%
     select(eDWID,reviewyear,encounternum,`Age Group`,
            twohour_bloodglucose,cfrd_both,first_cfrd_both)
