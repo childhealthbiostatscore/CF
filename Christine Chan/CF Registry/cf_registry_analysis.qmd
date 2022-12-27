@@ -102,27 +102,27 @@ year_inc = function(df=encounter,year,py = 1000){
   inc = df %>%  
     filter(reviewyear==year,is.na(first_cfrd_cffpr) | first_cfrd_cffpr == year) %>%
     group_by(eDWID) %>% filter(row_number() == 1) %>% 
-    select(eDWID,`Age Group 2018`,cfrd_cffpr)
-  inc = inc %>% group_by(cfrd_cffpr) %>% count(`Age Group 2018`,.drop = F)
+    select(eDWID,`Age Group`,cfrd_cffpr)
+  inc = inc %>% group_by(cfrd_cffpr) %>% count(`Age Group`,.drop = F)
   # Calculations
   new_cases = sum(inc$n[inc$cfrd_cffpr=="Yes"])
   total_at_risk = sum(inc$n)
   total_inc = new_cases/(total_at_risk/py)
   
-  new_cases_10 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group 2018` == "< 10"])
-  at_risk_10 = sum(inc$n[inc$`Age Group 2018` == "< 10"])
+  new_cases_10 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group` == "< 10"])
+  at_risk_10 = sum(inc$n[inc$`Age Group` == "< 10"])
   inc_10 = new_cases_10/(at_risk_10/py)
   
-  new_cases_10_18 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group 2018` == "10 - 18"])
-  at_risk_10_18 = sum(inc$n[inc$`Age Group 2018` == "10 - 18"])
+  new_cases_10_18 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group` == "10 - 18"])
+  at_risk_10_18 = sum(inc$n[inc$`Age Group` == "10 - 18"])
   inc_10_18 = new_cases_10_18/(at_risk_10_18/py)
   
-  new_cases_19_30 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group 2018` == "19 - 30"])
-  at_risk_19_30 = sum(inc$n[inc$`Age Group 2018` == "19 - 30"])
+  new_cases_19_30 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group` == "19 - 30"])
+  at_risk_19_30 = sum(inc$n[inc$`Age Group` == "19 - 30"])
   inc_19_30 = new_cases_19_30/(at_risk_19_30/py)
   
-  new_cases_30 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group 2018` == "> 30"])
-  at_risk_30 = sum(inc$n[inc$`Age Group 2018` == "> 30"])
+  new_cases_30 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group` == "> 30"])
+  at_risk_30 = sum(inc$n[inc$`Age Group` == "> 30"])
   inc_30 = new_cases_30/(at_risk_30/py)
   
   # Nice results
@@ -176,28 +176,28 @@ year_inc = function(df=encounter,year,py = 1000){
   inc = df %>% 
     filter(reviewyear==year,is.na(first_cfrd_both) | first_cfrd_both == year) %>%
     group_by(eDWID) %>% filter(row_number() == 1) %>%
-    select(eDWID,reviewyear,encounternum,`Age Group 2018`,
+    select(eDWID,reviewyear,encounternum,`Age Group`,
            twohour_bloodglucose,cfrd_both,first_cfrd_both)
-  inc = inc %>% group_by(cfrd_both) %>% count(`Age Group 2018`,.drop = F)
+  inc = inc %>% group_by(cfrd_both) %>% count(`Age Group`,.drop = F)
   # Calculations
   new_cases = sum(inc$n[inc$cfrd_both=="Yes"])
   total_at_risk = sum(inc$n)
   total_inc = new_cases/(total_at_risk/py)
   
-  new_cases_10 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group 2018` == "< 10"])
-  at_risk_10 = sum(inc$n[inc$`Age Group 2018` == "< 10"])
+  new_cases_10 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group` == "< 10"])
+  at_risk_10 = sum(inc$n[inc$`Age Group` == "< 10"])
   inc_10 = new_cases_10/(at_risk_10/py)
   
-  new_cases_10_18 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group 2018` == "10 - 18"])
-  at_risk_10_18 = sum(inc$n[inc$`Age Group 2018` == "10 - 18"])
+  new_cases_10_18 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group` == "10 - 18"])
+  at_risk_10_18 = sum(inc$n[inc$`Age Group` == "10 - 18"])
   inc_10_18 = new_cases_10_18/(at_risk_10_18/py)
   
-  new_cases_19_30 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group 2018` == "19 - 30"])
-  at_risk_19_30 = sum(inc$n[inc$`Age Group 2018` == "19 - 30"])
+  new_cases_19_30 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group` == "19 - 30"])
+  at_risk_19_30 = sum(inc$n[inc$`Age Group` == "19 - 30"])
   inc_19_30 = new_cases_19_30/(at_risk_19_30/py)
   
-  new_cases_30 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group 2018` == "> 30"])
-  at_risk_30 = sum(inc$n[inc$`Age Group 2018` == "> 30"])
+  new_cases_30 = sum(inc$n[inc$cfrd_both=="Yes" & inc$`Age Group` == "> 30"])
+  at_risk_30 = sum(inc$n[inc$`Age Group` == "> 30"])
   inc_30 = new_cases_30/(at_risk_30/py)
   
   # Nice results
