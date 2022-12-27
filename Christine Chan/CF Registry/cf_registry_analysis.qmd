@@ -31,17 +31,10 @@ encounter <- encounter %>%
 annual = annual %>% arrange(eDWID,ReviewYear)
 # Add age
 ages <- annual %>% 
-  mutate(`Age in 2018` = 2018-(ReviewYear-Age_YrEnd)) %>%
   rename(reviewyear = ReviewYear) %>%
   group_by(eDWID,reviewyear) %>%
-  summarise(`Age in 2018` = as.numeric(names(sort(table(`Age in 2018`), 
-                                                  decreasing = TRUE)[1])),
-            Age = Age_YrEnd[1],.groups = "drop")
+  summarise(Age = as.numeric(Age_YrEnd[1]),.groups = "drop")
 encounter = left_join(encounter,ages,by = c("eDWID", "reviewyear"))
-encounter$`Age Group 2018` = cut(encounter$`Age in 2018`,
-                            c(-Inf,10,19,31,Inf),
-                            labels = c("< 10", "10 - 18", "19 - 30", "> 30"),
-                            right=F)
 encounter$`Age Group` = cut(encounter$Age,
                             c(-Inf,10,19,31,Inf),
                             labels = c("< 10", "10 - 18", "19 - 30", "> 30"),
@@ -51,26 +44,26 @@ first_cfrd_ogtt <- encounter %>%
   filter(twohour_bloodglucose >= 200) %>%
   group_by(eDWID) %>%
   filter(row_number()==1) %>%
-  select(eDWID, reviewyear, `Age in 2018`) %>%
+  select(eDWID, reviewyear, `Age Group`) %>%
   rename(first_cfrd_ogtt = reviewyear)
 # For those with CFRD by registry criteria, find first visit with diagnosis
 first_cfrd_cffpr <- encounter %>% 
   filter(cfrd_status==3) %>%
   group_by(eDWID) %>%
   filter(row_number()==1) %>%
-  select(eDWID, reviewyear, `Age in 2018`) %>%
+  select(eDWID, reviewyear, `Age Group`) %>%
   rename(first_cfrd_cffpr = reviewyear)
 # Both
 first_cfrd_both <- encounter %>% 
   filter(cfrd_status==3|twohour_bloodglucose >= 200) %>%
   group_by(eDWID) %>%
   filter(row_number()==1) %>%
-  select(eDWID, reviewyear, `Age in 2018`) %>%
+  select(eDWID, reviewyear, `Age Group`) %>%
   rename(first_cfrd_both = reviewyear)
 # Add to encounter level data
-encounter <- left_join(encounter, first_cfrd_ogtt, by = c("eDWID", "Age in 2018"))
-encounter <- left_join(encounter, first_cfrd_cffpr, by = c("eDWID", "Age in 2018"))
-encounter <- left_join(encounter, first_cfrd_both,by = c("eDWID", "Age in 2018"))
+encounter <- left_join(encounter, first_cfrd_ogtt, by = c("eDWID", "Age Group"))
+encounter <- left_join(encounter, first_cfrd_cffpr, by = c("eDWID", "Age Group"))
+encounter <- left_join(encounter, first_cfrd_both,by = c("eDWID", "Age Group"))
 # Fill down CFRD Yes/No by year
 encounter <- encounter %>%
   group_by(eDWID) %>%
