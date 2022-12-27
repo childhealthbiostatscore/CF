@@ -296,3 +296,57 @@ kable(screen,digits = 3)
 ```
 
 In @tbl-screening, people with CFRD (by either registry definition or OGTT) and those under 10 were excluded. Screening rate is calculated as the number of people with an OGTT divided by the total number of people seen in clinic that year.
+
+```{r}
+#| label: tbl-screening_a1c
+#| tbl-cap: "Yearly Screening Rates"
+year_screen = function(df=encounter,year){
+  # Filter and count
+  inc = df %>% 
+    filter(reviewyear==year,first_cfrd_both >= year) %>%
+    mutate(hba1c = !is.na(hgba1c)) %>%
+    group_by(eDWID) %>%
+    summarise(hba1c = max(hba1c),`Age Group` = `Age Group`[1])
+  inc = inc %>% group_by(hba1c) %>% count(`Age Group`) %>% filter(`Age Group` != "< 10")
+  # Calculations
+  total_screened = sum(inc$n[inc$hba1c==1])
+  total_seen = sum(inc$n)
+  screen_rate = total_screened/total_seen * 100
+  
+  screened_10_18 = inc$n[inc$hba1c==1 & inc$`Age Group` == "10 - 18"]
+  seen_10_18 = sum(inc$n[inc$`Age Group` == "10 - 18"])
+  rate_10_18 = screened_10_18/seen_10_18 *100
+  
+  screened_19_30 = inc$n[inc$hba1c==1 & inc$`Age Group` == "19 - 30"]
+  seen_19_30 = sum(inc$n[inc$`Age Group` == "19 - 30"])
+  rate_19_30 = screened_19_30/seen_19_30 *100
+  
+  screened_30 = inc$n[inc$hba1c==1 & inc$`Age Group` == "> 30"]
+  seen_30 = sum(inc$n[inc$`Age Group` == "> 30"])
+  rate_30 = screened_30/seen_30 *100
+  
+  # Nice results
+  list(`Year` = year,
+       `Total Screened` = total_screened,
+       `Total Seen` = total_seen,
+       `Screen Rate (%)` = screen_rate,
+       
+       `Total Screened Age 10-18` = screened_10_18,
+       `Total Seen Age 10-18` = seen_10_18,
+       `Screen Rate Age 10-18 (%)` = rate_10_18,
+       
+       `Total Screened Age 19-30` = screened_19_30,
+       `Total Seen Age 19-30` = seen_19_30,
+       `Screen Rate Age 19-30 (%)` = rate_19_30,
+       
+       `Total Screened Age > 30` = screened_30,
+       `Total Seen Age > 30` = seen_30,
+       `Screen Rate Age > 30 (%)` = rate_30)
+}
+screen = lapply(2003:2018, function(y){year_screen(year = y)})
+screen = data.frame(do.call(rbind,screen),check.names = F)
+screen = data.frame(lapply(screen,as.numeric),check.names = F)
+kable(screen,digits = 3)
+```
+
+In @tbl-screening_a1c, people with CFRD (by either registry definition or OGTT) and those under 10 were excluded. Screening rate is calculated as the number of people with an HbA1c value divided by the total number of people seen in clinic that year.
