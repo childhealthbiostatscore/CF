@@ -22,7 +22,7 @@ editor: visual
 
 ```
 
-# figure
+# Figure
 
 ```{r}
 #| label: fig-planets
