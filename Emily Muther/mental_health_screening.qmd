@@ -1,68 +1,55 @@
 ---
 title: "Mental Health Screening in CF"
 author: "Tim Vigers"
-date: "`r format(Sys.time(), '%d %B %Y')`"
+date: last-modified
 format:
   html:
-    toc: true
-    toc-depth: 5
-    toc-float: true
     code-fold: true
     self-contained: true
-    fig-cap-location: top
     page-layout: full
+    title-block-banner: true
 editor: source
 ---
 
-```{r}
-#| include: false
-library(lubridate)
-library(tidyverse)
-```
+# Data Cleaning
 
-```{r}
+```{python}
+import pandas as pd
 # Data import
-cf_gad <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Raw/GAD-7_General_Anxiety_Disorder_Full_Data_data_11-15-22.csv", na.strings = "")
-cf_phq <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Raw/PHQ-9_Full_Data_data_11-11-22.csv", na.strings = "")
-cf_psc <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Raw/PSC_Full_Data_data_11-11-22.csv", na.strings = "")
-# Select and merge
-cf_gad <- cf_gad %>%
-  select(PAT_MRN_ID, CONTACT_DATE, GAD.7.Total.Score, GAD.7.Totals) %>%
-  drop_na()
-cf_phq <- cf_phq %>%
-  select(PAT_MRN_ID, CONTACT_DATE, PHQ.9.Total.Score..calculated., PHQ.9.Totals) %>%
-  drop_na()
-cf_psc <- cf_psc %>%
-  select(PAT_MRN_ID, CONTACT_DATE, Score, PSC.Totals) %>%
-  drop_na()
-df <- cf_gad %>%
-  full_join(cf_phq, by = c("PAT_MRN_ID", "CONTACT_DATE")) %>%
-  full_join(cf_psc, by = c("PAT_MRN_ID", "CONTACT_DATE"))
-# Get age
-pa <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Raw/CF_Psychosocial_Assessment_Full_Data_data_11-15-22.csv", na.strings = "")
-pa <- pa %>% select(PAT_MRN_ID, CONTACT_DATE, AGE_AT_CONTACT_IN_YEARS)
-# Rename columns, get distinct rows
-df <- left_join(df, pa, by = c("PAT_MRN_ID", "CONTACT_DATE")) %>%
-  select(PAT_MRN_ID, CONTACT_DATE, AGE_AT_CONTACT_IN_YEARS, everything()) %>%
-  rename(
-    id = PAT_MRN_ID, date = CONTACT_DATE, age = AGE_AT_CONTACT_IN_YEARS,
-    `GAD-7 Total` = GAD.7.Total.Score,
-    `GAD-7 Category` = GAD.7.Totals,
-    `PHQ-9 Total` = PHQ.9.Total.Score..calculated.,
-    `PHQ-9 Category` = PHQ.9.Totals,
-    `PSC-17 Total` = Score,
-    `PSC-17 Category` = PSC.Totals
-  ) %>%
-  distinct()
-# Format columns and sort
-df$date <- mdy(df$date)
-df <- df %>%
-  mutate(across(contains("Category"), factor)) %>%
-  arrange(id, date)
-# Write cleaned data
-write.csv(df, file = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Cleaned/cf_mental_health_screening.csv")
+gad7 = pd.read_csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Raw/GAD-7_General_Anxiety_Disorder_Full_Data_data_11-15-22.csv")
+gad7 = gad7[['PAT_MRN_ID','CONTACT_DATE','AGE AT CONTACT ','GAD-7 Total Score','GAD-7 Totals']]
+gad7.dropna(axis=0,inplace=True)
+gad7.drop_duplicates(inplace=True)
+phq9 = pd.read_csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Raw/PHQ-9_Full_Data_data_11-11-22.csv")
+phq9 = phq9[['PAT_MRN_ID','CONTACT_DATE','AGE AT CONTACT ','PHQ-9 Total Score (calculated)','PHQ-9 Totals']]
+phq9.dropna(axis=0,inplace=True)
+phq9.drop_duplicates(inplace=True)
+psc = pd.read_csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Raw/PSC_Full_Data_data_11-11-22.csv")
+psc = psc[['PAT_MRN_ID','CONTACT_DATE','AGE AT CONTACT ','Score','PSC Totals']]
+psc.dropna(axis=0,inplace=True)
+psc.drop_duplicates(inplace=True)
+# Merge
+df = gad7.merge(phq9,on=['PAT_MRN_ID','CONTACT_DATE','AGE AT CONTACT '],how="outer")
+df = df.merge(psc,on=['PAT_MRN_ID','CONTACT_DATE','AGE AT CONTACT '],how="outer")
+# Rename
+df.rename({'PAT_MRN_ID':'ID','CONTACT_DATE':'Date','AGE AT CONTACT ':'Age','GAD-7 Total Score':'GAD-7 Total','GAD-7 Totals':'GAD-7 Group','PHQ-9 Total Score (calculated)':'PHQ-9 Total','PHQ-9 Totals':'PHQ-9 Group','Score':'PSC-17 Total','PSC Totals':'PSC-17 Group'},inplace=True,axis=1)
 ```
 
-```{r}
-skimr::skim(df)
+- On first import, there are 2,646 observations each for GAD-7, PHQ-9, and PSC-17. 
+- After deleting rows missing any any of patient ID, contact date, age at contact, total score, or score group, there were: 
+  - 559 observations for GAD-7
+  - 548 for PHQ-9
+  - 308 for PSC-17
+- After dropping duplicate rows, there are: 
+  - 390 GAD-7 observations
+  - 383 for PHQ-9
+  - 216 for PSC-17
+- After merging these together based on ID, date, and age, there are 613 unique observations with at least one of the three screening measures. 
+
+# Profiling
+
+```{python}
+from pandas_profiling import ProfileReport
+profile = ProfileReport(df, title="Data Profiling Report")
+profile.to_notebook_iframe()
 ```
