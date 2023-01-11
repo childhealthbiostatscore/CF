@@ -20,13 +20,13 @@ library(pracma)
 library(corrplot)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE,warning = FALSE)
-knitr::opts_knit$set(root.dir = "~/Dropbox/Work/Vigers/CF")
+knitr::opts_knit$set(root.dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF")
 ```
 
 ```{r}
 # Import
 df = read.csv("./Christine Chan/Pre-post Trikafta Prospective/Data_Cleaned/trikafta_2022-02-8.csv",
-              na.strings = c(""))
+              na.strings = c("","no serum"))
 # Clean up
 df$Sex = factor(df$Sex..Male.1.)
 levels(df$Sex) = c("F","M")
@@ -480,6 +480,41 @@ kable(table(groups$Change),col.names = c("Change","n"))
 ```{r results='asis'}
 t = tableby(`Age Group`~Change,groups,cat.test="fe")
 summary(t,pfootnote = T)
+```
+
+# Individual plots
+
+```{r}
+# Small cohort
+reduced = df[df$Study.ID %in% keep_dxa,]
+# OGTT plots before and after
+plot_df = reduced %>% pivot_longer(all_of(glu_cols)) %>% select(Study.ID,Event.Name,name,value)
+plot_df$name = as.numeric(gsub("Glucose|\\.|min|minute","",plot_df$name))
+ggplot(plot_df,aes(x = name,y = value,color = Study.ID)) + 
+  geom_line() + geom_point() + 
+  xlab("Time (minutes)") + ylab("Glucose (mg/dL)") + 
+  theme_bw() +
+  theme(legend.position = "none") + 
+  facet_wrap(~Event.Name)
+```
+
+It was difficult to tell which patient was which in grayscale. 
+
+```{r results="asis"}
+plot_vars = c("Weight..kg.","weightz","BMIz","Fat.Mass.Index..FMI...","Fat.Free.Mass.Index...FFMI.","`Glucose iAUC`","c.peptide.0.minute","`C Peptide iAUC`","iAUC_ratio","`C Peptide ODI`","`Adapted Matsuda`","homa2IR","FEV1..","FVC....")
+# Loop through variables and plot
+for (v in plot_vars) {
+  title = ifelse(v %in% names(newlabels),as.character(newlabels[v]),gsub("`","",v))
+  p = ggplot(reduced,aes_string(x="Event.Name",y = v,group="Study.ID")) + 
+    geom_point() + geom_line() + 
+    ylab(as.character(title)) + 
+    theme_bw() + theme(axis.title.x = element_blank())
+  cat("\n")
+  cat("## ",as.character(title))
+  cat("\n")
+  print(p)
+  cat("\n")
+}
 ```
 
 # Notes
