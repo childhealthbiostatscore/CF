@@ -1,0 +1,61 @@
+---
+title: "Body Image and Trikafta"
+author: "Tim Vigers"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+editor: visual
+---
+
+```{r}
+#| include: false
+# Libraries
+library(haven)
+library(tidyverse)
+library(arsenal)
+# Import
+df = read_sav("Z:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Body Image and Trikafta/Data_Raw/TrikaftaBodyImage1.11.23.sav")
+# Format variables
+df$`Percent Adherence` = factor(df$PercentAdherence,levels = 1:11,
+                             labels = paste0(seq(0,100,by=10),"%"),ordered = T)
+df$`FRS Category` = factor(df$FRS_Category,levels = -1:1,
+                           labels = c("want to be larger","neutral",
+                                      "want to be smaller"))
+df$`Doses Missed` = as.numeric(df$DosesMissed)
+df$`Weight/Body Adherence` = factor(df$WeightBody_Adherence,levels = 1:5,
+               labels = c("Strongly Agree","Slightly Agree","Neutral",
+                          "Slightly Disagree","Strongly Disagree"))
+df$`Weight/Body Adherence` = fct_rev(df$`Weight/Body Adherence`)
+df$`Weight/Body Adherence` = factor(df$`Weight/Body Adherence`,ordered = T)
+```
+
+Because we want to keep the ordinal nature of some of these variables rather than simply treating them as categorical (i.e. with percent adherence it's meaningful that 10% \< 20% \< 30% ...), Emma is right in thinking that ordinal logistic regression is the right approach. Unfortunately, this requires estimating a lot of parameters, and we probably don't have the necessary numbers for it (for example, with percent adherence as the outcome we'd need to estimate 12 parameters, and the general rule of thumb is at least 10 observations per parameter).
+
+So, after talking this through with another statistician in our group, I think the best way to approach this is to treat these variables as continuous, but apply non-parametric, rank-based tests between various groups. This keeps the information about the order of the categories but does not assume normal distribution, etc.
+
+```{r results='asis'}
+#| label: tbl-1
+#| tbl-cap: Comparisons by FRS Category
+t1 = tableby(`FRS Category`~kwt(`Percent Adherence`)+`Doses Missed` +
+               kwt(`Weight/Body Adherence`),data = df,
+             control=tableby.control(numeric.stats=c("Nmiss","median","q1q3","range"),
+                                     numeric.test="kwt"))
+summary(t1,pfootnote = T)
+```
+
+```{r}
+#| label: fig-planets
+#| fig-cap: Planets
+
+```
+
+# Questions 
+
+1. Which variables should be considered ordinal and which categorical?
