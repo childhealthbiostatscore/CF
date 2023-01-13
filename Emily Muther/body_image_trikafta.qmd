@@ -17,23 +17,39 @@ editor: visual
 ```{r}
 #| include: false
 # Libraries
+library(knitr)
+library(kableExtra)
 library(haven)
 library(tidyverse)
 library(arsenal)
+library(psych)
+library(ggcorrplot)
 # Import
 df = read_sav("Z:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Body Image and Trikafta/Data_Raw/TrikaftaBodyImage1.11.23.sav")
 # Format variables
 df$`Percent Adherence` = factor(df$PercentAdherence,levels = 1:11,
-                             labels = paste0(seq(0,100,by=10),"%"),ordered = T)
+                                labels = paste0(seq(0,100,by=10),"%"),ordered = T)
 df$`FRS Category` = factor(df$FRS_Category,levels = -1:1,
                            labels = c("want to be larger","neutral",
                                       "want to be smaller"))
 df$`Doses Missed` = as.numeric(df$DosesMissed)
 df$`Weight/Body Adherence` = factor(df$WeightBody_Adherence,levels = 1:5,
-               labels = c("Strongly Agree","Slightly Agree","Neutral",
-                          "Slightly Disagree","Strongly Disagree"))
+                                    labels = c("Strongly Agree","Slightly Agree","Neutral",
+                                               "Slightly Disagree","Strongly Disagree"))
 df$`Weight/Body Adherence` = fct_rev(df$`Weight/Body Adherence`)
 df$`Weight/Body Adherence` = factor(df$`Weight/Body Adherence`,ordered = T)
+df$`Do Not Want Trikafta` = factor(df$DoNotWantTrikafta,levels = 1:6,
+                                   labels = c("Strongly Agree","Slightly Agree",
+                                              "Neutral","Slightly Disagree",
+                                              "Strongly Disagree",NA))
+df$`Do Not Want Trikafta` = fct_rev(df$`Do Not Want Trikafta`)
+df$`Do Not Want Trikafta` = factor(df$`Do Not Want Trikafta`,ordered = T)
+df$`Continue Trikafta` = factor(df$ContinueTrikafta,levels = 0:6,
+                                labels = c(NA,"Strongly Agree",
+                                           "Slightly Agree","Neutral",  
+                                           "Slightly Disagree","Strongly Disagree",NA))
+df$`Continue Trikafta` = fct_rev(df$`Continue Trikafta`)
+df$`Continue Trikafta` = factor(df$`Continue Trikafta`,ordered = T)
 ```
 
 Because we want to keep the ordinal nature of some of these variables rather than simply treating them as categorical (i.e. with percent adherence it's meaningful that 10% \< 20% \< 30% ...), Emma is right in thinking that ordinal logistic regression is the right approach. Unfortunately, this requires estimating a lot of parameters, and we probably don't have the necessary numbers for it (for example, with percent adherence as the outcome we'd need to estimate 12 parameters, and the general rule of thumb is at least 10 observations per parameter).
@@ -43,17 +59,31 @@ So, after talking this through with another statistician in our group, I think t
 ```{r results='asis'}
 #| label: tbl-1
 #| tbl-cap: Comparisons by FRS Category
-t1 = tableby(`FRS Category`~kwt(`Percent Adherence`)+`Doses Missed` +
-               kwt(`Weight/Body Adherence`),data = df,
-             control=tableby.control(numeric.stats=c("Nmiss","median","q1q3","range"),
-                                     numeric.test="kwt"))
+rh = "~kwt(`Percent Adherence`)+`Doses Missed`+kwt(`Weight/Body Adherence`)+kwt(`Do Not Want Trikafta`)+kwt(`Continue Trikafta`)"
+t1 = tableby(as.formula(paste0("`FRS Category`",rh)),data = df,
+             control=tableby.control(numeric.stats=c("Nmiss","median","q1q3","range"),numeric.test="kwt"))
 summary(t1,pfootnote = T)
 ```
 
-```{r}
-#| label: fig-planets
-#| fig-cap: Planets
+```{r results='asis'}
+#| label: tbl-2
+#| tbl-cap: Spearman's Rho
+x = df %>% select(BE_APPEARANCE_MEAN:BE_ATTRIBUTION_MEAN) %>% data.matrix(.)
+y = df %>% select(`Percent Adherence`:`Continue Trikafta`) %>% data.matrix(.)
+r = corr.test(x,y,adjust = "fdr")
+kable(r$r,digits=3)
+```
 
+```{r results='asis'}
+#| label: tbl-3
+#| tbl-cap: Spearman's Rho FDR-Adjusted p-values
+kable(r$p,digits=3)
+```
+
+```{r}
+#| label: fig-heat
+#| fig-cap: Correlation Heatmap
+ggcorrplot(r$r,p.mat = r$p.adj)
 ```
 
 # Questions 
