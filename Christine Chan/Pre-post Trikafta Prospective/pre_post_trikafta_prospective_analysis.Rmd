@@ -38,6 +38,8 @@ df[,c("Kalydeco","Orkambi","Symdeko")] =
     levels(c) = c("No","Yes")
     return(c)
   })
+df$`Any Modulator` = rowSums(df[,c("Kalydeco.1","orkambi.1","tezacaftor.ivacaftor..symdeko..1")]) > 0
+df$`Any Modulator` = factor(df$`Any Modulator`,levels = c(F,T),labels = c("No","Yes"))
 # Genotype
 df$Genotype = apply(df,1,function(r){
   if(tolower(r["CFTR.Mutation.1"]) == "f508del" & tolower(r["CFTR.Mutation.2"]) == "f508del"){
@@ -112,6 +114,7 @@ newlabels["standard_deviation"] = "SD"
 newlabels["cv"] = "CV"
 newlabels["r_mage"] = "MAGE"
 newlabels["trikafta_duration"] = "Modulator Duration"
+newlabels["Data.Access.Group"] = "Site"
 newlabels[dxa_vars] = 
   c("Tissue (g)","Total Fat Mass (%)","Fat Body Mass (g)","Fat Free Mass (g)",
     "Lean Body Mass (g)","Total Mass (kg)","Fat Free Mass %","Fat Mass Index (FMI)",
@@ -125,7 +128,7 @@ newlabels[dxa_vars] =
 ```{r results='asis'}
 t1 = tableby(~Age.at.visit.+Weight..kg.+weightz+trikafta_duration+
                Sex..Male.1.+BMIz+FEV1..+FVC....+trikafta_duration+
-               Genotype+Pancreatic.Status+Kalydeco+Orkambi+Symdeko,
+               Genotype+Pancreatic.Status+Kalydeco+Orkambi+Symdeko+`Any Modulator`+Data.Access.Group,
              control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),
              data = df[df$Event.Name == "Visit 1",])
 summary(t1,digits = 2,labelTranslations = newlabels,pfootnote=TRUE)
@@ -136,7 +139,7 @@ summary(t1,digits = 2,labelTranslations = newlabels,pfootnote=TRUE)
 ```{r results='asis'}
 t1 = tableby(~Age.at.visit.+Weight..kg.+weightz+trikafta_duration+
                Sex..Male.1.+BMIz+FEV1..+FVC....+trikafta_duration+
-               Genotype+Pancreatic.Status+Kalydeco+Orkambi+Symdeko,
+               Genotype+Pancreatic.Status+Kalydeco+Orkambi+Symdeko+`Any Modulator`+Data.Access.Group,
              control = tableby.control(numeric.stats = c(c("Nmiss", "medianq1q3", "range"))),
              data = df[df$Event.Name == "Visit 1" & df$Study.ID %in% keep_dxa,])
 summary(t1,digits = 2,labelTranslations = newlabels,pfootnote=TRUE)
@@ -328,7 +331,8 @@ White text indicates the correlation coefficient $R$, and results are only shown
 ```{r fig.width=10,fig.height=10}
 change_df = df %>% group_by(Study.ID) %>% 
   summarise_at(vars(Weight..kg.,c.peptide.0.minute,`C Peptide Index`,
-                    `Adapted Matsuda`,`C Peptide ODI`,iAUC_ratio,homa2B:homa2IR),
+                    `Adapted Matsuda`,`C Peptide ODI`,iAUC_ratio,homa2B:homa2IR,
+                    Fat.Mass.Index..FMI...),
                .funs = diff) %>%
   rename("Change in Weight (kg)" = Weight..kg.,
          "Change in Fasting C-Peptide (pmol/L)" = c.peptide.0.minute,
@@ -337,9 +341,10 @@ change_df = df %>% group_by(Study.ID) %>%
          "Change in C Peptide ODI" = `C Peptide ODI`,
          "Change in C pep iAUC:Glucose iAUC" = iAUC_ratio,
          "Change in HOMA2 %B" = homa2B, "Change in HOMA2 %S" = homa2S,
-         "Change in HOMA2 IR" = homa2IR)
+         "Change in HOMA2 IR" = homa2IR,
+         "Change in FMI"=Fat.Mass.Index..FMI...)
 
-M = cor(change_df[,2:ncol(change_df)])
+M = cor(change_df[,2:ncol(change_df)],use = "pairwise.complete.obs")
 testRes = cor.mtest(change_df[,2:ncol(change_df)])
 corrplot(M, p.mat = testRes$p, method = 'circle', type = 'lower', insig='blank',
          addCoef.col ='white', number.cex = 0.8, order = 'AOE', diag=FALSE)
@@ -501,7 +506,7 @@ ggplot(plot_df,aes(x = name,y = value,color = Study.ID)) +
 It was difficult to tell which patient was which in grayscale. 
 
 ```{r results="asis"}
-plot_vars = c("Weight..kg.","weightz","BMIz","Fat.Mass.Index..FMI...","Fat.Free.Mass.Index...FFMI.","`Glucose iAUC`","c.peptide.0.minute","`C Peptide iAUC`","iAUC_ratio","`C Peptide ODI`","`Adapted Matsuda`","homa2IR","FEV1..","FVC....")
+plot_vars = c("Weight..kg.","weightz","BMIz","Fat.Mass.Index..FMI...","Fat.Free.Mass.Index...FFMI.","`Glucose iAUC`","c.peptide.0.minute","`C Peptide Index`","`C Peptide iAUC`","iAUC_ratio","`C Peptide ODI`","`Adapted Matsuda`","homa2IR","FEV1..","FVC....")
 # Loop through variables and plot
 for (v in plot_vars) {
   title = ifelse(v %in% names(newlabels),as.character(newlabels[v]),gsub("`","",v))
