@@ -18,6 +18,7 @@ library(cgmanalysis)
 library(AGD)
 library(pracma)
 library(corrplot)
+library(DiagrammeR)
 library(knitr)
 knitr::opts_chunk$set(echo = FALSE,warning = FALSE)
 knitr::opts_knit$set(root.dir = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF")
@@ -520,6 +521,36 @@ for (v in plot_vars) {
   print(p)
   cat("\n")
 }
+```
+
+# Flowchart
+
+```{r}
+nums = df %>% group_by(Event.Name) %>% count(Group)
+ndf <- create_node_df(n=6,
+                        type = paste(nums$Event.Name,nums$Group),
+                        label = paste(nums$Event.Name,nums$Group),
+                        value=nums$n,
+                      shape="rectangle",fixedsize=F)
+edges = df %>% group_by(Study.ID) %>% 
+  summarise(change = paste("Visit 1",Group[Event.Name=="Visit 1"],"->",
+                           "Visit 2",Group[Event.Name=="Visit 2"])) %>%
+  count(change)
+edges$from = match(sapply(strsplit(edges$change," -> "),"[",1),ndf$type)
+edges$to = match(sapply(strsplit(edges$change," -> "),"[",2),ndf$type)
+edf <-
+  create_edge_df(
+    from = edges$from,
+    to = edges$to,
+    rel = "a",
+    label=edges$n)
+
+graph <-
+  create_graph(
+    nodes_df = ndf,
+    edges_df = edf,
+    attr_theme = "lr")
+render_graph(graph)
 ```
 
 # Notes
