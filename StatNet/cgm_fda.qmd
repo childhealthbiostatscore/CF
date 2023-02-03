@@ -6,6 +6,8 @@ format:
     scrollable: true
     smaller: true
 editor: source
+bibliography: FDA.bib
+csl: american-medical-association.csl
 ---
 
 ```{r}
@@ -264,23 +266,44 @@ sleep = na.omit(sleep)
 fosr_mod = bayes_fosr(Glucose ~ Group,data = sleep) 
 ```
 
-```{r}
-data(DTI)
-DTI = subset(DTI, select = c(cca, case, pasat))
-DTI = DTI[complete.cases(DTI),]
-DTI$gender = factor(sample(c("male","female"), dim(DTI)[1], replace = TRUE))
-DTI$status = factor(sample(c("RRMS", "SPMS", "PPMS"), dim(DTI)[1], replace = TRUE))
-## fit models
-dti_fosr_mod = bayes_fosr(cca ~ gender, data = DTI)
-```
+## Clustering and classification
+
+![](clusters.png)
+
+- $k$-means functional clustering is the most common approach. @wangFunctionalDataAnalysis2016
+  - Mean *functions* as cluster centers
+  
+## Clustering via FPCA
+
+- Given $K$ FPCs, FPCA can be represented as: 
+
+$$
+X_{iK}(t)=\mu(t)+\sum_{k=1}^K A_{ik}\phi_{k}(t)
+$$
+- ${A_{ik}}$ are the FPC scores and represent different cluster patterns.
+- Or, if you're using a basis expansion, you can use the projections onto the basis expansion space ${B_{ik}}$
+  - The advantage of FPCA is that the basis functions are determined by the data
+
+## Classification
+
+- Ideally, we would like to extend the clustering analysis to classification.
+- Functional linear discriminant analysis would allow us to apply Bayes' rule to new CGM tracings:
+
+$$
+Pr(Z=k|X_0)=\frac{\pi_k f_k(X_0)}{\sum_{j=1}^K\pi_j f_j(X_0)}
+$$
+
+- James and Hastie (2001) @jamesFunctionalLinearDiscriminant2001 proposed a method for this, @wangFunctionalDataAnalysis2016 but even the paper is difficult to access.
 
 ## Questions for the Group
 
--   Does this even seem like the correct approach?
--   Really what we want to do is classify people based on CGM tracing. Is there a good package for functional discriminant analysis?
--   FoSR in `refund` requires complete data, so how do we deal with irregular sampling across CGM tracings
-    -   There is between and within-subject variability in terms length of sleep and therefore number of glucose measures
--   What does it mean that the FPCA eigenfunctions are essentially flat?
--   I'm having some trouble running the full dataset, even on a relatively beefed up desktop. Any recommendations?
--   Recommendations for easier to use packages?
-    -   Data formatting is a nightmare with the various FDA packages, and unfortunately `tidyfun` is pretty limited.
+- Does this even seem like the correct approach? Is it worth the effort?
+- Is there a good package for functional discriminant analysis? 
+- FoSR in `refund` requires complete data, so how do we deal with irregular sampling across CGM tracings?
+  - There is between and within-subject variability in terms length of sleep and therefore number of glucose measures
+- What does it mean that the FPCA eigenfunctions are essentially flat?
+- I'm having some trouble running the full dataset, even on a relatively beefed up desktop. Any recommendations?
+- Recommendations for easier to use packages?
+  - Data formatting is a nightmare with the various FDA packages, and unfortunately `tidyfun` is pretty limited.
+  
+## References
