@@ -5,7 +5,7 @@ format:
   revealjs:
     scrollable: true
     smaller: true
-editor: visual
+editor: source
 ---
 
 ```{r}
@@ -19,7 +19,7 @@ library(refund)
 library(refund.shiny)
 library(tidyfun)
 # Data import
-sleep = read.csv("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Raw/sleep.csv",
+sleep = read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Christine Chan/CGM and FDA/Data_Raw/sleep.csv",
                  na.strings = "")
 # Get bedtime and wake times
 sleep = sleep %>% 
@@ -52,10 +52,10 @@ sleep$Combined.Group.Category =
 # HC not on insulin
 sleep$CF.Insulin.Use[sleep$Combined.Group.Category == "HC"]="No"
 # CGMs
-# cleandata("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Raw/CGM",
-#           "~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean/CGM",
+# cleandata("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Christine Chan/CGM and FDA/Data_Raw/CGM",
+#           "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean/CGM",
 #           removegaps = F)
-cgms = list.files("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean/CGM",
+cgms = list.files("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Christine Chan/CGM and FDA/Data_Clean/CGM",
                   full.names = T)
 names(cgms) = unlist(lapply(cgms, function(f){
   df = read.csv(f)
@@ -126,7 +126,7 @@ ys = ys[sleep$id_day]
 ydf = do.call(rbind,ys)
 colnames(ydf)[1] = ".id"
 # Save
-save(ydf,file = "~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/R_Objects/ydf.Rdata")
+save(ydf,file = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Christine Chan/CGM and FDA/R_Objects/ydf.Rdata")
 ```
 
 ## What Is Functional Data Analysis (FDA)?
@@ -227,7 +227,7 @@ fda_df %>%
 
 ```{r}
 #| include: false
-load("~/Dropbox/Work/Vigers/CF/Christine Chan/CGM and FDA/R_Objects/fpca_sc_fit.Rdata")
+load("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Christine Chan/CGM and FDA/R_Objects/fpca_sc_fit.Rdata")
 ```
 
 ```{r}
