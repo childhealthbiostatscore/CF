@@ -530,48 +530,28 @@ p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio`,
 summary(p, pfootnote = T, labelTranslations = labels)
 ```
 
-# Chloride groups
+# ROC analyses
 
-We performed receiver operating characteristic (ROC) analysis to find a sweat sodium cutoff that distinguishes between chloride groups. Only the first sweat test from each participant was used. Because the groups are based on chloride value, Na/Cl ratio is correlated with the outcome so Na alone was used instead. Also, ROC analyses generally assume a binary outcome (i.e. looking for a cutoff to distinguish between two groups), so 
+We performed receiver operating characteristic (ROC) analysis to find a sweat sodium to sweat chloride cutoff that distinguishes between groups. Only the first sweat test from each participant was used.
 
-In the following results, "Low" indicates a sweat chloride under 30, "Medium" indicates a sweat chloride of 30 - 59, and "High" indicates a sweat chloride greater than or equal to 60.
+Due to low numbers of people with CFTR-related disorder or CRMS, this analysis focused on CF vs. non-CF until we receive additional data from NJH.
 
-```{r}
-# Three groups
-t1_df$Group <- cut(t1_df$Cl, breaks = c(0, 30, 60, Inf), right = F, labels = c("Low", "Medium", "High"))
-# Low vs. medium or high
-t1_df$Low <- t1_df$Group
-levels(t1_df$Low) <- c("Low", "Medium or High", "Medium or High")
-t1_df$Low <- relevel(t1_df$Low, ref = "Medium or High")
-# High vs. medium or low
-t1_df$High <- t1_df$Group
-levels(t1_df$High) <- c("Low or Medium", "Low or Medium", "High")
-t1_df$High <- relevel(t1_df$High, ref = "Low or Medium")
-```
+## Diagnosis
 
-## ROC analysis
+### All participants
 
 ```{r}
-roc_low <- roc(response = t1_df$Low, predictor = t1_df$Na, quiet = T)
-coords_low <- round(coords(roc_low, "best", best.method = "youden"), 3)
-roc_high <- roc(response = t1_df$High, predictor = t1_df$Na, quiet = T)
-coords_high <- round(coords(roc_high, "best", best.method = "youden"), 3)
+# Exclude those with CFTR-related disorder or CRMS for now
+roc_df = t1_df %>% filter(Diagnosis %in% c("Cystic Fibrosis","Non-CF"))
+roc_df$Diagnosis = factor(roc_df$Diagnosis)
+roc_df$Diagnosis = relevel(roc_df$Diagnosis,ref = "Non-CF")
 
-plot(roc_low, print.auc = TRUE, col = "blue")
-plot(roc_high, print.auc = TRUE, col = "green", print.auc.y = .4, add = TRUE)
+roc_cf <- roc(response = roc_df$Diagnosis, predictor = roc_df$`Na/Cl Ratio`, quiet = T)
+coords_cf <- round(coords(roc_cf, "best", best.method = "youden"), 3)
+
+plot(roc_low, print.auc = T,print.thres=T)
 ```
 
-The blue curve shows the ROC for distinguishing between low vs. medium or high, and the green is the ROC curve for distinguishing between low or medium vs. high. The optimal threshold for distinguishing between low vs. medium or high was `r coords_low$threshold` (sensitivity = `r coords_low$sensitivity`, specificity = `r coords_low$specificity`) based on the Youden index. The optimal threshold for distinguishing between high vs. low or medium was `r coords_high$threshold` (sensitivity = `r coords_high$sensitivity`, specificity = `r coords_high$specificity`) based on the Youden index. The mean AUC for the two curves is `r round(mean(c(roc_low$auc,roc_high$auc)),3)`.
+The optimal Na/Cl threshold for distinguishing between CF and non-CF was `r coords_cf$threshold` (sensitivity = `r coords_cf$sensitivity`, specificity = `r coords_cf$specificity`) based on the Youden index, with and AUC of `r round(as.numeric(roc_cf$auc),3)`.
 
-## Histogram by group
-
-Vertical red lines indicate the thresholds identified above.
-
-```{r warning=FALSE}
-ggplot(t1_df[!is.na(t1_df$Group), ], aes(Na, fill = Group)) +
-  geom_histogram(alpha = 0.3, position = "identity", binwidth = 1) +
-  geom_vline(xintercept = coords_low$threshold, color = "red") +
-  geom_vline(xintercept = coords_high$threshold, color = "red") +
-  ylab("Count") +
-  theme_bw()
-```
+### 
