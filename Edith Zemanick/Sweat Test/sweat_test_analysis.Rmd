@@ -534,9 +534,13 @@ summary(p, pfootnote = T, labelTranslations = labels)
 
 We performed receiver operating characteristic (ROC) analysis to find a sweat sodium to sweat chloride cutoff that distinguishes between groups. Only the first sweat test from each participant was used.
 
-## Diagnosis
+## Full cohort
 
-### ROC
+The full cohort analyses include all participants.
+
+### Diagnosis
+
+#### ROC
 
 ```{r}
 # Re-format diagnosis column
@@ -567,13 +571,148 @@ plot(roc_non_cf, print.auc = TRUE, col = "green", print.auc.y = .4, add = TRUE)
 
 The blue curve shows the ROC for distinguishing between CFTR-related disorder or CRMS vs. CF, and the green is the ROC curve for distinguishing between non-CF vs. CFTR-related disorder or CRMS. The optimal threshold for distinguishing between CFTR-related disorder or CRMS vs. CF was `r coords_cf$threshold` (sensitivity = `r coords_cf$sensitivity`, specificity = `r coords_cf$specificity`) based on the Youden index. The optimal threshold for distinguishing between non-CF vs. CFTR-related disorder or CRMS was `r coords_non_cf$threshold` (sensitivity = `r coords_non_cf$sensitivity`, specificity = `r coords_non_cf$specificity`) based on the Youden index. The mean AUC for the two curves is `r round(mean(c(roc_cf$auc,roc_non_cf$auc)),3)`.
 
-### Histogram by group
+#### Histogram by group
 
 Vertical blue line indicates the threshold for CFTR-related disorder or CRMS vs. CF and green indicates the threshold for non-CF vs. CFTR-related disorder or CRMS. Na/Cl ratio was log-transformed for easier visualization.
 
 ```{r warning=FALSE}
 ggplot(t1_df[!is.na(t1_df$`Combined Diagnosis`), ], 
        aes(log(`Na/Cl Ratio`), fill = `Combined Diagnosis`)) +
+  geom_histogram(alpha = 0.3, position = "identity",bins = 50) +
+  geom_vline(xintercept = log(coords_cf$threshold), color = "blue") +
+  geom_vline(xintercept = log(coords_non_cf$threshold), color = "green") +
+  ylab("Count") + xlab("ln(Na/Cl Ratio)") +
+  theme_bw()
+```
+
+### Genotype
+
+Participants with unknown genotype risk were excluded from this analysis.
+
+#### ROC
+
+```{r}
+# Re-format diagnosis column
+t1_df$`Genotype Risk` <- factor(t1_df$geno_risk,
+                     levels = c("Not CF","Low","High","Unknown"),
+                     ordered = T)
+t1_df$`Genotype Risk`[t1_df$`Genotype Risk`=="Unknown"]= NA
+```
+
+```{r}
+roc_cf <- roc(response= t1_df$`Genotype Risk`,
+              predictor = t1_df$`Na/Cl Ratio`, 
+              levels = c("Low","High"),
+              quiet = T)
+coords_cf <- round(coords(roc_cf, "best", best.method = "youden"), 3)
+
+
+roc_non_cf <- roc(response= t1_df$`Genotype Risk`,
+              predictor = t1_df$`Na/Cl Ratio`, 
+              levels = c("Not CF","Low"),
+              quiet = T)
+coords_non_cf <- round(coords(roc_non_cf, "best", best.method = "youden"), 3)
+
+plot(roc_cf, print.auc = TRUE, col = "blue")
+plot(roc_non_cf, print.auc = TRUE, col = "green", print.auc.y = .4, add = TRUE)
+```
+
+The blue curve shows the ROC for distinguishing between low vs. high risk, and the green is the ROC curve for distinguishing between non-CF vs. low risk. The optimal threshold for distinguishing between low vs. high risk was `r coords_cf$threshold` (sensitivity = `r coords_cf$sensitivity`, specificity = `r coords_cf$specificity`) based on the Youden index. The optimal threshold for distinguishing between non-CF vs. low risk was `r coords_non_cf$threshold` (sensitivity = `r coords_non_cf$sensitivity`, specificity = `r coords_non_cf$specificity`) based on the Youden index. The mean AUC for the two curves is `r round(mean(c(roc_cf$auc,roc_non_cf$auc)),3)`.
+
+#### Histogram by group
+
+Vertical blue line indicates the threshold for low vs. high risk and green indicates the threshold for non-CF vs. low risk. Na/Cl ratio was log-transformed for easier visualization.
+
+```{r warning=FALSE}
+ggplot(t1_df[!is.na(t1_df$`Genotype Risk`), ], 
+       aes(log(`Na/Cl Ratio`), fill = `Genotype Risk`)) +
+  geom_histogram(alpha = 0.3, position = "identity",bins = 50) +
+  geom_vline(xintercept = log(coords_cf$threshold), color = "blue") +
+  geom_vline(xintercept = log(coords_non_cf$threshold), color = "green") +
+  ylab("Count") + xlab("ln(Na/Cl Ratio)") +
+  theme_bw()
+```
+
+## Limited cohort
+
+The limited cohort analyses only included participants with sweat chloride < 60.
+
+### Diagnosis
+
+#### ROC
+
+```{r}
+# Exclude those with Cl >= 60
+t1_df = t1_df %>% filter(Cl < 60)
+```
+
+```{r}
+roc_cf <- roc(response= t1_df$`Combined Diagnosis`,
+              predictor = t1_df$`Na/Cl Ratio`, 
+              levels = c("CFTR-related disorder or CRMS","Cystic Fibrosis"),
+              quiet = T)
+coords_cf <- round(coords(roc_cf, "best", best.method = "youden"), 3)
+
+
+roc_non_cf <- roc(response= t1_df$`Combined Diagnosis`,
+              predictor = t1_df$`Na/Cl Ratio`, 
+              levels = c("Non-CF","CFTR-related disorder or CRMS"),
+              quiet = T)
+coords_non_cf <- round(coords(roc_non_cf, "best", best.method = "youden"), 3)
+
+plot(roc_cf, print.auc = TRUE, col = "blue")
+plot(roc_non_cf, print.auc = TRUE, col = "green", print.auc.y = .4, add = TRUE)
+```
+
+The blue curve shows the ROC for distinguishing between CFTR-related disorder or CRMS vs. CF, and the green is the ROC curve for distinguishing between non-CF vs. CFTR-related disorder or CRMS. The optimal threshold for distinguishing between CFTR-related disorder or CRMS vs. CF was `r coords_cf$threshold` (sensitivity = `r coords_cf$sensitivity`, specificity = `r coords_cf$specificity`) based on the Youden index. The optimal threshold for distinguishing between non-CF vs. CFTR-related disorder or CRMS was `r coords_non_cf$threshold` (sensitivity = `r coords_non_cf$sensitivity`, specificity = `r coords_non_cf$specificity`) based on the Youden index. The mean AUC for the two curves is `r round(mean(c(roc_cf$auc,roc_non_cf$auc)),3)`.
+
+#### Histogram by group
+
+Vertical blue line indicates the threshold for CFTR-related disorder or CRMS vs. CF and green indicates the threshold for non-CF vs. CFTR-related disorder or CRMS. Na/Cl ratio was log-transformed for easier visualization.
+
+```{r warning=FALSE}
+ggplot(t1_df[!is.na(t1_df$`Combined Diagnosis`), ], 
+       aes(log(`Na/Cl Ratio`), fill = `Combined Diagnosis`)) +
+  geom_histogram(alpha = 0.3, position = "identity",bins = 50) +
+  geom_vline(xintercept = log(coords_cf$threshold), color = "blue") +
+  geom_vline(xintercept = log(coords_non_cf$threshold), color = "green") +
+  ylab("Count") + xlab("ln(Na/Cl Ratio)") +
+  theme_bw()
+```
+
+### Genotype
+
+Participants with unknown genotype risk were excluded from this analysis.
+
+#### ROC
+
+```{r}
+roc_cf <- roc(response= t1_df$`Genotype Risk`,
+              predictor = t1_df$`Na/Cl Ratio`, 
+              levels = c("Low","High"),
+              quiet = T)
+coords_cf <- round(coords(roc_cf, "best", best.method = "youden"), 3)
+
+
+roc_non_cf <- roc(response= t1_df$`Genotype Risk`,
+              predictor = t1_df$`Na/Cl Ratio`, 
+              levels = c("Not CF","Low"),
+              quiet = T)
+coords_non_cf <- round(coords(roc_non_cf, "best", best.method = "youden"), 3)
+
+plot(roc_cf, print.auc = TRUE, col = "blue")
+plot(roc_non_cf, print.auc = TRUE, col = "green", print.auc.y = .4, add = TRUE)
+```
+
+The blue curve shows the ROC for distinguishing between low vs. high risk, and the green is the ROC curve for distinguishing between non-CF vs. low risk. The optimal threshold for distinguishing between low vs. high risk was `r coords_cf$threshold` (sensitivity = `r coords_cf$sensitivity`, specificity = `r coords_cf$specificity`) based on the Youden index. The optimal threshold for distinguishing between non-CF vs. low risk was `r coords_non_cf$threshold` (sensitivity = `r coords_non_cf$sensitivity`, specificity = `r coords_non_cf$specificity`) based on the Youden index. The mean AUC for the two curves is `r round(mean(c(roc_cf$auc,roc_non_cf$auc)),3)`.
+
+#### Histogram by group
+
+Vertical blue line indicates the threshold for low vs. high risk and green indicates the threshold for non-CF vs. low risk. Na/Cl ratio was log-transformed for easier visualization.
+
+```{r warning=FALSE}
+ggplot(t1_df[!is.na(t1_df$`Genotype Risk`), ], 
+       aes(log(`Na/Cl Ratio`), fill = `Genotype Risk`)) +
   geom_histogram(alpha = 0.3, position = "identity",bins = 50) +
   geom_vline(xintercept = log(coords_cf$threshold), color = "blue") +
   geom_vline(xintercept = log(coords_non_cf$threshold), color = "green") +
