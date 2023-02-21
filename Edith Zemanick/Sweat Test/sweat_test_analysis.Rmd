@@ -42,7 +42,9 @@ n1 = nrow(df)
 n2 = length(unique(df$PatientID))
 # Remove exclusions from Angela
 df <- df[!(df$PatientID %in% exclude), ]
-df$Diagnosis <- diagnoses$Diagnosis[match(df$PatientID, diagnoses$PatientID)]
+# Diagnosis per Angela
+df$Diagnosis <- factor(diagnoses$Diagnosis[match(df$PatientID, diagnoses$PatientID)])
+levels(df$Diagnosis) = c("CFTR-RD or CRMS","CFTR-RD or CRMS","Cystic Fibrosis","Non-CF")
 # Add modulator info
 cftr <- read.csv("./Data_Raw/Copy of Report CFTR Modulators.csv")
 df$Modulator <- apply(df, 1, function(r) {
@@ -115,10 +117,6 @@ df$Arm <- apply(df[, c("Cl", "Cl_Left", "Cl_Right", "Na", "Na_Left", "Na_Right",
     return(NA)
   }
 })
-
-# Difference between arms
-df$`Cl Diff. Between Left and Right Arm` <- as.numeric(df$Cl_Left) - as.numeric(df$Cl_Right)
-df$`Na Diff. Between Left and Right Arm` <- as.numeric(df$Na_Left) - as.numeric(df$Na_Right)
 # Merge left and right values
 df$Amount <- apply(df[, c("Amount", "Amount_Left", "Amount_Right")], 1, function(r) {
   amt <- suppressWarnings(as.numeric(as.character(r)))
@@ -204,27 +202,9 @@ highnacl -> analysis [style=invis]
 
 For those with two sweat electrolyte measures (left and right), the average of the two was used. Each participants' first sweat test value was used for the following tables.
 
-## By diagnosis
-
 ```{r results='asis'}
 t1 <- tableby(
-  Diagnosis ~ Sex + Age.at.Test.in.Years + fe(geno_risk) + fe(geno_class) +
-    Amount + Cl + Na + K + `Na/Cl Ratio`,
-  data = t1_df, control = mycontrols, simulate.p.value = T
-)
-summary(t1,
-  pfootnote = T,
-  labelTranslations = labels
-)
-```
-
-## By method
-
-```{r results='asis'}
-t1 <- tableby(
-  Method ~ Sex + Age.at.Test.in.Years + Diagnosis + fe(geno_risk) + fe(geno_class) +
-    Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` +
-    `Na Diff. Between Left and Right Arm`,
+  Diagnosis ~ Sex + Age.at.Test.in.Years + Method+ fe(geno_risk) + fe(geno_class),
   data = t1_df, control = mycontrols, simulate.p.value = T
 )
 summary(t1,
@@ -239,9 +219,7 @@ summary(t1,
 
 ```{r results='asis'}
 t1 <- tableby(
-  Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` +
-    `Cl Diff. Between Left and Right Arm` +
-    `Na Diff. Between Left and Right Arm`,
+  Diagnosis ~ Cl + Na + `Na/Cl Ratio` + `Sweat Chloride Group`,
   data = t1_df, control = mycontrols,
 )
 summary(t1,
@@ -250,14 +228,12 @@ summary(t1,
 )
 ```
 
-### Gibson-Cooke only
+## By sweat chloride group
 
 ```{r results='asis'}
 t1 <- tableby(
-  Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` +
-    `Cl Diff. Between Left and Right Arm` +
-    `Na Diff. Between Left and Right Arm`,
-  data = t1_df[t1_df$Method == "Gibson-Cooke", ], control = mycontrols,
+  `Sweat Chloride Group` ~ fe(geno_risk) + fe(Diagnosis)+  Cl + Na + `Na/Cl Ratio`,
+  data = t1_df, control = mycontrols,simulate.p.value = T
 )
 summary(t1,
   pfootnote = T,
@@ -265,42 +241,12 @@ summary(t1,
 )
 ```
 
-### Macroduct only
-
-```{r results='asis'}
-t1 <- tableby(
-  Diagnosis ~ Amount + Cl + Na + K + `Na/Cl Ratio` +
-    `Cl Diff. Between Left and Right Arm` +
-    `Na Diff. Between Left and Right Arm`,
-  data = t1_df[t1_df$Method == "Macroduct", ], control = mycontrols,
-)
-summary(t1,
-  pfootnote = T,
-  labelTranslations = labels
-)
-```
-
-## By genotype risk
-
-```{r results='asis'}
-t1 <- tableby(
-  geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` +
-    `Cl Diff. Between Left and Right Arm` +
-    `Na Diff. Between Left and Right Arm`,
-  data = t1_df, control = mycontrols,
-)
-summary(t1,
-  pfootnote = T,
-  labelTranslations = labels
-)
-```
-
-## By genotype risk and diagnosis
+## By sweat chloride group and diagnosis
 
 ### Cystic fibrosis
 
 ```{r results='asis'}
-t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
+t1 <- tableby(`Sweat Chloride Group` ~ Cl + Na + `Na/Cl Ratio`,
   data = t1_df[t1_df$Diagnosis == "Cystic Fibrosis", ], control = mycontrols
 )
 summary(t1,
@@ -309,23 +255,12 @@ summary(t1,
 )
 ```
 
-### CFTR-related disorder
+### CFTR-RD or CRMS
 
 ```{r results='asis'}
-t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
-  data = t1_df[t1_df$Diagnosis == "CFTR-related disorder", ], control = mycontrols
-)
-summary(t1,
-  pfootnote = T,
-  labelTranslations = labels
-)
-```
-
-### CRMS
-
-```{r results='asis'}
-t1 <- tableby(geno_risk ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
-  data = t1_df[t1_df$Diagnosis == "CRMS", ], control = mycontrols
+t1 <- tableby(`Sweat Chloride Group` ~ Cl + Na + `Na/Cl Ratio`,
+  data = t1_df[t1_df$Diagnosis == "CFTR-RD or CRMS", ], 
+  control = mycontrols
 )
 summary(t1,
   pfootnote = T,
@@ -336,7 +271,7 @@ summary(t1,
 ### Non-CF
 
 ```{r results='asis'}
-t1 <- tableby(~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
+t1 <- tableby(`Sweat Chloride Group` ~ Cl + Na + `Na/Cl Ratio`,
   data = t1_df[t1_df$Diagnosis == "Non-CF", ], control = mycontrols
 )
 summary(t1,
@@ -345,123 +280,15 @@ summary(t1,
 )
 ```
 
-### Plots
+# Variability
 
-```{r warning=FALSE}
-ggplot(df, aes(x = Diagnosis, y = Na)) +
-  geom_boxplot() +
-  theme_bw() +
-  ggtitle("Sweat Sodium")
+## Within occasion
 
-ggplot(df, aes(x = Diagnosis, y = K)) +
-  geom_boxplot() +
-  theme_bw() +
-  ggtitle("Sweat Potassium")
+```{r}
 
-ggplot(df, aes(x = Diagnosis, y = Cl)) +
-  geom_boxplot() +
-  theme_bw() +
-  ggtitle("Sweat Chloride")
-
-ggplot(df, aes(x = Diagnosis, y = `Na/Cl Ratio`)) +
-  geom_boxplot() +
-  theme_bw() +
-  ggtitle("Na/Cl Ratio")
 ```
 
-## By specific genotype
-
-```{r results='asis'}
-t1 <- tableby(
-  geno_class ~ Amount + Cl + Na + K + `Na/Cl Ratio` +
-    `Cl Diff. Between Left and Right Arm` +
-    `Na Diff. Between Left and Right Arm`,
-  data = t1_df, control = mycontrols,
-)
-summary(t1,
-  pfootnote = T,
-  labelTranslations = labels
-)
-```
-
-## By specific genotype and diagnosis
-
-### Cystic fibrosis
-
-```{r results='asis'}
-t1 <- tableby(geno_class ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
-  data = t1_df[t1_df$Diagnosis == "Cystic Fibrosis", ], control = mycontrols
-)
-summary(t1,
-  pfootnote = T,
-  labelTranslations = labels
-)
-```
-
-### CFTR-related disorder
-
-```{r results='asis'}
-t1 <- tableby(geno_class ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
-  data = t1_df[t1_df$Diagnosis == "CFTR-related disorder", ], control = mycontrols
-)
-summary(t1,
-  pfootnote = T,
-  labelTranslations = labels
-)
-```
-
-### CRMS
-
-```{r results='asis'}
-t1 <- tableby(geno_class ~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
-  data = t1_df[t1_df$Diagnosis == "CRMS", ], control = mycontrols
-)
-summary(t1,
-  pfootnote = T,
-  labelTranslations = labels
-)
-```
-
-### Non-CF
-
-```{r results='asis'}
-t1 <- tableby(~ Amount + Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
-  data = t1_df[t1_df$Diagnosis == "Non-CF", ], control = mycontrols
-)
-summary(t1,
-  pfootnote = T,
-  labelTranslations = labels
-)
-```
-
-### Plots
-
-```{r warning=FALSE}
-ggplot(df, aes(x = geno_class, y = Na)) +
-  geom_boxplot() +
-  theme_bw() +
-  xlab("Specific Genotype") +
-  ggtitle("Sweat Sodium")
-
-ggplot(df, aes(x = geno_class, y = K)) +
-  geom_boxplot() +
-  theme_bw() +
-  ggtitle("Sweat Potassium")
-
-ggplot(df, aes(x = geno_class, y = Cl)) +
-  geom_boxplot() +
-  theme_bw() +
-  xlab("Specific Genotype") +
-  ggtitle("Sweat Chloride")
-
-ggplot(df, aes(x = geno_class, y = `Na/Cl Ratio`)) +
-  geom_boxplot() +
-  theme_bw() +
-  xlab("Specific Genotype") +
-  ggtitle("Na/Cl Ratio")
-```
-
-# Between occasion
+## Between occasion
 
 For all participants with more than one sweat test, we compared their first and last values.
 
@@ -480,103 +307,10 @@ mycontrols <- tableby.control(
 )
 ```
 
-## Overall
-
 ```{r results='asis'}
 p <- paired(
-  time ~ Diagnosis + Cl + Na + K + `Na/Cl Ratio` +
-    `Cl Diff. Between Left and Right Arm` +
-    `Na Diff. Between Left and Right Arm`,
+  time ~ Cl + Na + `Na/Cl Ratio`,
   signed.rank.exact = F, data = multiples,
-  id = PatientID, control = mycontrols
-)
-summary(p, pfootnote = T, labelTranslations = labels)
-```
-
-## By diagnosis
-
-Not enough observations in CRMS or CFTR-related disorder groups to calculate p values. Also not enough observations to further break down the table by sweat collection method. 
-
-```{r results='asis'}
-p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
-  signed.rank.exact = F, strata = Diagnosis,
-  data = multiples %>% filter(Diagnosis %in% c("Cystic Fibrosis", "Non-CF")),
-  id = PatientID, control = mycontrols
-)
-summary(p, pfootnote = T, labelTranslations = labels)
-```
-
-## By genotype risk
-
-```{r results='asis'}
-p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio` + `Cl Diff. Between Left and Right Arm` + `Na Diff. Between Left and Right Arm`,
-  signed.rank.exact = F, strata = geno_risk,
-  data = multiples,
-  id = PatientID, control = mycontrols
-)
-summary(p, pfootnote = T, labelTranslations = labels)
-```
-
-## By genotype risk and diagnosis
-
-Not enough paired observations in the CRMS or CFTR-related disorder groups.
-
-### Cystic fibrosis
-
-```{r results='asis'}
-p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio`,
-  signed.rank.exact = F, strata = geno_risk,
-  data = multiples %>% filter(Diagnosis == "Cystic Fibrosis"),
-  id = PatientID, control = mycontrols
-)
-summary(p, pfootnote = T, labelTranslations = labels)
-```
-
-### Non-CF
-
-```{r results='asis'}
-p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio`,
-  signed.rank.exact = F, strata = geno_risk,
-  data = multiples %>% filter(Diagnosis == "Non-CF"),
-  id = PatientID, control = mycontrols
-)
-summary(p, pfootnote = T, labelTranslations = labels)
-```
-
-## By specific genotype
-
-```{r results='asis'}
-p <- paired(
-  time ~ Cl + Na + K + `Na/Cl Ratio` +
-    `Cl Diff. Between Left and Right Arm` +
-    `Na Diff. Between Left and Right Arm`,
-  signed.rank.exact = F, strata = geno_class, numeric.test = "notest",
-  data = multiples, id = PatientID, control = mycontrols
-)
-summary(p, pfootnote = T, labelTranslations = labels)
-```
-
-## By genotype class and diagnosis
-
-Not enough paired observations in the CRMS or CFTR-related disorder groups.
-
-### Cystic fibrosis
-
-```{r results='asis'}
-p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio`,
-  signed.rank.exact = F, strata = geno_class,
-  data = multiples %>% filter(Diagnosis == "Cystic Fibrosis"),
-  id = PatientID, control = mycontrols
-)
-summary(p, pfootnote = T, labelTranslations = labels)
-```
-
-### Non-CF
-
-```{r results='asis'}
-p <- paired(time ~ Cl + Na + K + `Na/Cl Ratio`,
-  signed.rank.exact = F, strata = geno_class,
-  data = multiples %>% filter(Diagnosis == "Non-CF"),
   id = PatientID, control = mycontrols
 )
 summary(p, pfootnote = T, labelTranslations = labels)
@@ -595,25 +329,16 @@ The full cohort analyses include all participants.
 #### ROC
 
 ```{r}
-# Re-format diagnosis column
-t1_df$`Combined Diagnosis` <- factor(t1_df$Diagnosis,
-                     levels = c("Non-CF","CFTR-related disorder","CRMS","Cystic Fibrosis"),
-                     labels = c("Non-CF","CFTR-related disorder or CRMS","CFTR-related disorder or CRMS","Cystic Fibrosis"),
-                     ordered = T)
-
-```
-
-```{r}
-roc_cf <- roc(response= t1_df$`Combined Diagnosis`,
+roc_cf <- roc(response= t1_df$`Diagnosis`,
               predictor = t1_df$`Na/Cl Ratio`, 
-              levels = c("CFTR-related disorder or CRMS","Cystic Fibrosis"),
+              levels = c("CFTR-RD or CRMS","Cystic Fibrosis"),
               quiet = T)
 coords_cf <- round(coords(roc_cf, "best", best.method = "youden"), 3)
 
 
-roc_non_cf <- roc(response= t1_df$`Combined Diagnosis`,
+roc_non_cf <- roc(response= t1_df$`Diagnosis`,
               predictor = t1_df$`Na/Cl Ratio`, 
-              levels = c("Non-CF","CFTR-related disorder or CRMS"),
+              levels = c("Non-CF","CFTR-RD or CRMS"),
               quiet = T)
 coords_non_cf <- round(coords(roc_non_cf, "best", best.method = "youden"), 3)
 
@@ -621,15 +346,15 @@ plot(roc_cf, print.auc = TRUE, col = "blue")
 plot(roc_non_cf, print.auc = TRUE, col = "green", print.auc.y = .4, add = TRUE)
 ```
 
-The blue curve shows the ROC for distinguishing between CFTR-related disorder or CRMS vs. CF, and the green is the ROC curve for distinguishing between non-CF vs. CFTR-related disorder or CRMS. The optimal threshold for distinguishing between CFTR-related disorder or CRMS vs. CF was `r coords_cf$threshold` (sensitivity = `r coords_cf$sensitivity`, specificity = `r coords_cf$specificity`) based on the Youden index. The optimal threshold for distinguishing between non-CF vs. CFTR-related disorder or CRMS was `r coords_non_cf$threshold` (sensitivity = `r coords_non_cf$sensitivity`, specificity = `r coords_non_cf$specificity`) based on the Youden index. The mean AUC for the two curves is `r round(mean(c(roc_cf$auc,roc_non_cf$auc)),3)`.
+The blue curve shows the ROC for distinguishing between CFTR-RD or CRMS vs. CF, and the green is the ROC curve for distinguishing between non-CF vs. CFTR-RD or CRMS. The optimal threshold for distinguishing between CFTR-RD or CRMS vs. CF was `r coords_cf$threshold` (sensitivity = `r coords_cf$sensitivity`, specificity = `r coords_cf$specificity`) based on the Youden index. The optimal threshold for distinguishing between non-CF vs. CFTR-RD or CRMS was `r coords_non_cf$threshold` (sensitivity = `r coords_non_cf$sensitivity`, specificity = `r coords_non_cf$specificity`) based on the Youden index. The mean AUC for the two curves is `r round(mean(c(roc_cf$auc,roc_non_cf$auc)),3)`.
 
 #### Histogram by group
 
-Vertical blue line indicates the threshold for CFTR-related disorder or CRMS vs. CF and green indicates the threshold for non-CF vs. CFTR-related disorder or CRMS. Na/Cl ratio was log-transformed for easier visualization.
+Vertical blue line indicates the threshold for CFTR-RD or CRMS vs. CF and green indicates the threshold for non-CF vs. CFTR-RD or CRMS. Na/Cl ratio was log-transformed for easier visualization.
 
 ```{r warning=FALSE}
-ggplot(t1_df[!is.na(t1_df$`Combined Diagnosis`), ], 
-       aes(log(`Na/Cl Ratio`), fill = `Combined Diagnosis`)) +
+ggplot(t1_df[!is.na(t1_df$`Diagnosis`), ], 
+       aes(log(`Na/Cl Ratio`), fill = `Diagnosis`)) +
   geom_histogram(alpha = 0.3, position = "identity",bins = 50) +
   geom_vline(xintercept = log(coords_cf$threshold), color = "blue") +
   geom_vline(xintercept = log(coords_non_cf$threshold), color = "green") +
@@ -699,16 +424,16 @@ t1_df = t1_df %>% filter(Cl < 60)
 ```
 
 ```{r}
-roc_cf <- roc(response= t1_df$`Combined Diagnosis`,
+roc_cf <- roc(response= t1_df$`Diagnosis`,
               predictor = t1_df$`Na/Cl Ratio`, 
-              levels = c("CFTR-related disorder or CRMS","Cystic Fibrosis"),
+              levels = c("CFTR-RD or CRMS","Cystic Fibrosis"),
               quiet = T)
 coords_cf <- round(coords(roc_cf, "best", best.method = "youden"), 3)
 
 
-roc_non_cf <- roc(response= t1_df$`Combined Diagnosis`,
+roc_non_cf <- roc(response= t1_df$`Diagnosis`,
               predictor = t1_df$`Na/Cl Ratio`, 
-              levels = c("Non-CF","CFTR-related disorder or CRMS"),
+              levels = c("Non-CF","CFTR-RD or CRMS"),
               quiet = T)
 coords_non_cf <- round(coords(roc_non_cf, "best", best.method = "youden"), 3)
 
@@ -716,15 +441,15 @@ plot(roc_cf, print.auc = TRUE, col = "blue")
 plot(roc_non_cf, print.auc = TRUE, col = "green", print.auc.y = .4, add = TRUE)
 ```
 
-The blue curve shows the ROC for distinguishing between CFTR-related disorder or CRMS vs. CF, and the green is the ROC curve for distinguishing between non-CF vs. CFTR-related disorder or CRMS. The optimal threshold for distinguishing between CFTR-related disorder or CRMS vs. CF was `r coords_cf$threshold` (sensitivity = `r coords_cf$sensitivity`, specificity = `r coords_cf$specificity`) based on the Youden index. The optimal threshold for distinguishing between non-CF vs. CFTR-related disorder or CRMS was `r coords_non_cf$threshold` (sensitivity = `r coords_non_cf$sensitivity`, specificity = `r coords_non_cf$specificity`) based on the Youden index. The mean AUC for the two curves is `r round(mean(c(roc_cf$auc,roc_non_cf$auc)),3)`.
+The blue curve shows the ROC for distinguishing between CFTR-RD or CRMS vs. CF, and the green is the ROC curve for distinguishing between non-CF vs. CFTR-RD or CRMS. The optimal threshold for distinguishing between CFTR-RD or CRMS vs. CF was `r coords_cf$threshold` (sensitivity = `r coords_cf$sensitivity`, specificity = `r coords_cf$specificity`) based on the Youden index. The optimal threshold for distinguishing between non-CF vs. CFTR-RD or CRMS was `r coords_non_cf$threshold` (sensitivity = `r coords_non_cf$sensitivity`, specificity = `r coords_non_cf$specificity`) based on the Youden index. The mean AUC for the two curves is `r round(mean(c(roc_cf$auc,roc_non_cf$auc)),3)`.
 
 #### Histogram by group
 
-Vertical blue line indicates the threshold for CFTR-related disorder or CRMS vs. CF and green indicates the threshold for non-CF vs. CFTR-related disorder or CRMS. Na/Cl ratio was log-transformed for easier visualization.
+Vertical blue line indicates the threshold for CFTR-RD or CRMS vs. CF and green indicates the threshold for non-CF vs. CFTR-RD or CRMS. Na/Cl ratio was log-transformed for easier visualization.
 
 ```{r warning=FALSE}
-ggplot(t1_df[!is.na(t1_df$`Combined Diagnosis`), ], 
-       aes(log(`Na/Cl Ratio`), fill = `Combined Diagnosis`)) +
+ggplot(t1_df[!is.na(t1_df$`Diagnosis`), ], 
+       aes(log(`Na/Cl Ratio`), fill = `Diagnosis`)) +
   geom_histogram(alpha = 0.3, position = "identity",bins = 50) +
   geom_vline(xintercept = log(coords_cf$threshold), color = "blue") +
   geom_vline(xintercept = log(coords_non_cf$threshold), color = "green") +
