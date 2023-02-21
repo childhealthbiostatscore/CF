@@ -11,6 +11,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
+library(DiagrammeR)
 library(readxl)
 library(arsenal)
 library(tidyverse)
@@ -37,6 +38,8 @@ diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with C
 exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude)]
 # Import data
 df <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv", na.strings = "")
+n1 = nrow(df)
+n2 = length(unique(df$PatientID))
 # Remove exclusions from Angela
 df <- df[!(df$PatientID %in% exclude), ]
 df$Diagnosis <- diagnoses$Diagnosis[match(df$PatientID, diagnoses$PatientID)]
@@ -58,12 +61,13 @@ num_vars <- c("Amount", "Na", "K", "Cl")
 num_vars <- c(paste0(num_vars, "_Left"), paste0(num_vars, "_Right"))
 df[, num_vars] <- suppressWarnings(lapply(df[, num_vars], as.numeric))
 # Filter per Maxie's code
+exclude2 = c(22, 23, 24, 29, 31, 474, 483, 484, 485, 505, 510, 785, 791, 792, 793)
+no_dem = unique(df$PatientID[df$Demographics.Available!="TRUE" | is.na(df$Demographics.Available) | df$Sex==""])
 df <- df %>%
   mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks * 7) %>%
   filter(
     Age.at.Test.in.Years < 50 & Age.at.Test.in.Days >= 2,
-    !(Diagnosis == "Non-CF" & PatientID %in%
-      c(22, 23, 24, 29, 31, 474, 483, 484, 485, 505, 510, 785, 791, 792, 793)),
+    !(Diagnosis == "Non-CF" & PatientID %in% exclude2),
     Modulator == "None"
   ) %>%
   distinct(.) %>%
@@ -95,7 +99,6 @@ df$geno2_class <- cf_genotype_class_severity(df$Genotypes2, out = "class")
 df$geno2_class[grep("508", df$Genotypes2)] <- "F508del"
 df$geno2_class <- replace(df$geno2_class, df$geno2_class %in% c("I", "II", "III"), "MF")
 df$geno2_class <- replace(df$geno2_class, df$geno2_class %in% c("IV", "V"), "RF")
-
 
 df$geno_class <- factor(paste0(
   pmin(df$geno1_class, df$geno2_class), "/",
@@ -135,6 +138,13 @@ df$K <- apply(df[, c("K", "K_Left", "K_Right")], 1, function(r) {
 })
 # Sodium to chloride ratio
 df$`Na/Cl Ratio` <- df$Na / df$Cl
+high_ratio = unique(which(df$`Na/Cl Ratio`>2))
+high_cl = unique(which(df$Cl>160))
+high_na = unique(which(df$Na>160))
+df = df[-unique(c(high_ratio,high_cl,high_na)),]
+# Sweat chloride group
+df$`Sweat Chloride Group` = cut(df$Cl,c(-Inf,30,60,Inf),right = F,
+                                labels = c("< 30","30-59",">60"))
 # Sort
 df <- df %>% arrange(PatientID, Age.at.Test.in.Weeks)
 # Table options (most variables are not normally distributed)
@@ -143,6 +153,51 @@ labels <- list(
   Age.at.Test.in.Years = "Age (Years)",
   geno_risk = "Genotype Severity", geno_class = "Specific Genotype"
 )
+# First measure for everyone
+t1_df <- df %>%
+  group_by(PatientID) %>%
+  filter(row_number() == 1) 
+```
+
+# Flowchart
+
+```{r}
+grViz("digraph {
+
+# initiate graph
+graph [layout = dot]
+
+# global node settings
+node [shape = rectangle]
+
+# label nodes
+data1 [label = '@@1']
+data2 [label = '@@2']
+ineligible [label = '@@3']
+demo  [label = '@@4']
+highna  [label = '@@5']
+highcl  [label = '@@6']
+highnacl  [label = '@@7']
+review [label = '@@8']
+analysis [label = '@@9']
+
+# edge definitions with the node IDs
+data1  -> data2
+data2 -> ineligible
+ineligible -> {demo,highna,highcl,highnacl,review}
+data2  -> analysis
+highnacl -> analysis [style=invis]
+}
+[1]: paste0('Sweat tests performed \\n ','n = ',n1)
+[2]: paste0('Unique participants \\n ','n = ',n2)
+[3]: paste0('Ineligible \\n ','n = ',n2-nrow(t1_df))
+[4]: paste0('No demographics \\n ','n = ',length(no_dem))
+[5]: paste0('Na > 160 mmol/L \\n ','n = ',length(high_na))
+[6]: paste0('Cl > 160 mmol/L \\n ','n = ',length(high_cl))
+[7]: paste0('Na:Cl > 2 \\n ','n = ',length(high_ratio))
+[8]: paste0('Other \\n ','n = ',1)
+[9]: paste0('Analysis cohort \\n ','n = ',nrow(t1_df))
+")
 ```
 
 # Patient Demographics and Sample Characteristics
@@ -152,9 +207,6 @@ For those with two sweat electrolyte measures (left and right), the average of t
 ## By diagnosis
 
 ```{r results='asis'}
-t1_df <- df %>%
-  group_by(PatientID) %>%
-  filter(row_number() == 1) # First measure for everyone
 t1 <- tableby(
   Diagnosis ~ Sex + Age.at.Test.in.Years + fe(geno_risk) + fe(geno_class) +
     Amount + Cl + Na + K + `Na/Cl Ratio`,
