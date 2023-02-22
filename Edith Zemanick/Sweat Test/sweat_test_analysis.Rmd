@@ -284,13 +284,55 @@ summary(t1,
 
 ## Within occasion
 
-```{r}
+For all participants with more than one sweat test, we used only their first value to calculate the absolute difference (AD) between left and right arm.
 
+```{r}
+t1_df$`Cl AD` = abs(t1_df$Cl_Left-t1_df$Cl_Right)
+t1_df$`Na AD` = abs(t1_df$Na_Left-t1_df$Na_Right)
+```
+
+### By diagnosis
+
+```{r results='asis'}
+t1 <- tableby(
+  Diagnosis ~ `Cl AD`+`Na AD`,
+  data = t1_df, control = mycontrols,
+)
+summary(t1,
+  pfootnote = T,
+  labelTranslations = labels
+)
+```
+
+### By sweat chloride group
+
+```{r results='asis'}
+t1 <- tableby(
+  `Sweat Chloride Group` ~ `Cl AD`+`Na AD`,
+  data = t1_df, control = mycontrols
+)
+summary(t1,
+  pfootnote = T,
+  labelTranslations = labels
+)
+```
+
+### By genotype risk
+
+```{r results='asis'}
+t1 <- tableby(
+  geno_risk ~ `Cl AD`+`Na AD`,
+  data = t1_df, control = mycontrols
+)
+summary(t1,
+  pfootnote = T,
+  labelTranslations = labels
+)
 ```
 
 ## Between occasion
 
-For all participants with more than one sweat test, we compared their first and last values.
+For all participants with more than one sweat test, we compared their first and last values by calculating the absolute difference (AD) between first and last measure.
 
 ```{r results='asis'}
 # Get first and last values for everyone with more than 1
@@ -298,22 +340,50 @@ multiples <- df %>%
   group_by(PatientID) %>%
   filter(n() > 1) %>% # Multiple values only
   filter(row_number() == 1 | row_number() == n()) %>% # First and last
-  mutate(time = row_number())
-multiples$time <- factor(multiples$time, levels = 1:2, labels = c("First", "Last"))
-# Paired testing options
-mycontrols <- tableby.control(
-  numeric.test = "signed.rank", cat.test = "mcnemar",
-  numeric.stats = c("Nmiss", "median", "q1q3")
+  summarise(`Cl AD` = abs(last(Cl) - first(Cl)), # Calculate AD
+            `Na AD` = abs(last(Na) - first(Na)),
+            Diagnosis = first(Diagnosis),
+            `Sweat Chloride Group` = first(`Sweat Chloride Group`),
+            geno_risk = first(geno_risk)) 
+```
+
+### By diagnosis
+
+```{r results='asis'}
+t1 <- tableby(
+  Diagnosis ~ `Cl AD`+`Na AD`,
+  data = multiples, control = mycontrols,
+)
+summary(t1,
+  pfootnote = T,
+  labelTranslations = labels
 )
 ```
 
+### By sweat chloride group
+
 ```{r results='asis'}
-p <- paired(
-  time ~ Cl + Na + `Na/Cl Ratio`,
-  signed.rank.exact = F, data = multiples,
-  id = PatientID, control = mycontrols
+t1 <- tableby(
+  `Sweat Chloride Group` ~ `Cl AD`+`Na AD`,
+  data = multiples, control = mycontrols
 )
-summary(p, pfootnote = T, labelTranslations = labels)
+summary(t1,
+  pfootnote = T,
+  labelTranslations = labels
+)
+```
+
+### By genotype risk
+
+```{r results='asis'}
+t1 <- tableby(
+  geno_risk ~ `Cl AD`+`Na AD`,
+  data = multiples, control = mycontrols
+)
+summary(t1,
+  pfootnote = T,
+  labelTranslations = labels
+)
 ```
 
 # Cutoff analyses
