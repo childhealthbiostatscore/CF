@@ -18,12 +18,14 @@ library(table1)
 library(pROC)
 ```
 
+# Incidence and Prevalence
+
 ```{r}
 # All data
-encounter <- read.csv("Z:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/CFF19_encountersMerged_Del1.csv",
+encounter <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/CFF19_encountersMerged_Del1.csv",
                       na.strings = c("", "N/A")
 )
-annual <- read.csv("Z:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/CFF19_Annualized_Del1.csv",
+annual <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/CFF19_Annualized_Del1.csv",
                    na.strings = c("", "N/A")
 )
 encounter <- encounter %>%
@@ -379,3 +381,44 @@ kable(screen,digits = 3)
 ```
 
 In @tbl-screening_ogtt and @tbl-screening_a1c, people with CFRD (by registry definition) and those under age 10 were excluded. Screening rate is calculated as the number of people with an OGTT divided by the total number of people seen in clinic that year.
+
+# ROC
+
+```{r}
+# Prepare data for ROC
+df$cfrd_ogtt <- factor(df$cfrd_ogtt, levels = c("No", "Yes"), ordered = T)
+cfrd <- df %>%
+  group_by(eDWID) %>%
+  mutate(
+    cfrd_ever = max(cfrd_ogtt),
+    time_from_diag = ReviewYear - first_cfrd
+  ) %>%
+  filter(cfrd_ever == "Yes", time_from_diag <= 0, time_from_diag >= -1) %>%
+  summarise(hba1c = last(na.omit(round(A_hgba1c, 1)))) %>%
+  drop_na()
+non_cfrd <- df %>%
+  group_by(eDWID) %>%
+  mutate(cfrd_ever = max(cfrd_ogtt)) %>%
+  filter(cfrd_ever == "No") %>%
+  summarise(hba1c = last(na.omit(round(A_hgba1c, 1)))) %>%
+  drop_na()
+```
+
+```{r}
+#| label: fig-roc
+#| fig-cap: "ROC Curve"
+r <- roc(
+  cases = cfrd$hba1c, controls = non_cfrd$hba1c, quiet = T, plot = T, auc = T, ci = T,
+  print.auc = TRUE, show.thres = TRUE
+)
+```
+
+Because we do not have exact information regarding HbA1c timing (we only have encounter number within year), the annualized HbA1c from the year of diagnosis or from one year prior to diagnosis was used in the ROC analysis. For those with HbA1c measures the year of diagnosis and one year prior, the value from year of diagnosis was preferred. For those never diagnosed with CFRD, the most recent HbA1c was used. There were a total of `r nrow(cfrd)` HbA1c measures for people with CFRD and `r nrow(non_cfrd)` measures for those without.
+
+The AUC for this ROC curve was 0.61 (see @fig-roc).
+
+```{r}
+#| label: tbl-roc_thresh
+#| tbl-cap: "Best ROC Threshold (Youden Index)"
+kable(coords(r, "best"), digits = 3)
+```
