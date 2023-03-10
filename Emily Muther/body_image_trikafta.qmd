@@ -1,7 +1,7 @@
 ---
 title: "Body Image and Trikafta"
 author: "Tim Vigers"
-date: "`r format(Sys.time(), '%d %B %Y')`"
+date: today
 format:
   html:
     toc: true
@@ -14,78 +14,44 @@ format:
 editor: visual
 ---
 
-```{r}
-#| include: false
-# Libraries
-library(knitr)
-library(kableExtra)
-library(haven)
-library(tidyverse)
-library(arsenal)
-library(psych)
-library(ggcorrplot)
-# Import
-df = read_sav("Z:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Body Image and Trikafta/Data_Raw/TrikaftaBodyImage1.11.23.sav")
-# Format variables
-df$`Percent Adherence` = factor(df$PercentAdherence,levels = 1:11,
-                                labels = paste0(seq(0,100,by=10),"%"),ordered = T)
-df$`FRS Category` = factor(df$FRS_Category,levels = -1:1,
-                           labels = c("want to be larger","neutral",
-                                      "want to be smaller"))
-df$`Doses Missed` = as.numeric(df$DosesMissed)
-df$`Weight/Body Adherence` = factor(df$WeightBody_Adherence,levels = 1:5,
-                                    labels = c("Strongly Agree","Slightly Agree","Neutral",
-                                               "Slightly Disagree","Strongly Disagree"))
-df$`Weight/Body Adherence` = fct_rev(df$`Weight/Body Adherence`)
-df$`Weight/Body Adherence` = factor(df$`Weight/Body Adherence`,ordered = T)
-df$`Do Not Want Trikafta` = factor(df$DoNotWantTrikafta,levels = 1:6,
-                                   labels = c("Strongly Agree","Slightly Agree",
-                                              "Neutral","Slightly Disagree",
-                                              "Strongly Disagree",NA))
-df$`Do Not Want Trikafta` = fct_rev(df$`Do Not Want Trikafta`)
-df$`Do Not Want Trikafta` = factor(df$`Do Not Want Trikafta`,ordered = T)
-df$`Continue Trikafta` = factor(df$ContinueTrikafta,levels = 0:6,
-                                labels = c(NA,"Strongly Agree",
-                                           "Slightly Agree","Neutral",  
-                                           "Slightly Disagree","Strongly Disagree",NA))
-df$`Continue Trikafta` = fct_rev(df$`Continue Trikafta`)
-df$`Continue Trikafta` = factor(df$`Continue Trikafta`,ordered = T)
+```{python}
+# | include: false
+import pandas as pd
+# Read in data
+df = pd.read_spss(
+    "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Body Image and Trikafta/Data_Raw/TrikaftaBodyImage3.6.23.sav")
 ```
 
-Because we want to keep the ordinal nature of some of these variables rather than simply treating them as categorical (i.e. with percent adherence it's meaningful that 10% \< 20% \< 30% ...), Emma is right in thinking that ordinal logistic regression is the right approach. Unfortunately, this requires estimating a lot of parameters, and we probably don't have the necessary numbers for it (for example, with percent adherence as the outcome we'd need to estimate 12 parameters, and the general rule of thumb is at least 10 observations per parameter).
+# Data Cleaning Steps
 
-So, after talking this through with another statistician in our group, I think the best way to approach this is to treat these variables as continuous, but apply non-parametric, rank-based tests between various groups. This keeps the information about the order of the categories but does not assume normal distribution, etc.
+1. Participants who answered "I don't know" or "no" on the variable `TakingTrikafta` were excluded from these analyses.
 
-```{r results='asis'}
-#| label: tbl-1
-#| tbl-cap: Comparisons by FRS Category
-rh = "~kwt(`Percent Adherence`)+`Doses Missed`+kwt(`Weight/Body Adherence`)+kwt(`Do Not Want Trikafta`)+kwt(`Continue Trikafta`)"
-t1 = tableby(as.formula(paste0("`FRS Category`",rh)),data = df,
-             control=tableby.control(numeric.stats=c("Nmiss","median","q1q3","range"),numeric.test="kwt"))
-summary(t1,pfootnote = T)
+```{python}
+# | include: false
+# | eval: false
+from ydata_profiling import ProfileReport
+# EDA
+profile = ProfileReport(df, explorative=True)
+# Saving results to a HTML file
+profile.to_file(
+    "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Body Image and Trikafta/Reports/eda.html")
 ```
 
-```{r results='asis'}
-#| label: tbl-2
-#| tbl-cap: Spearman's Rho
-x = df %>% select(BE_APPEARANCE_MEAN:BE_ATTRIBUTION_MEAN) %>% data.matrix(.)
-y = df %>% select(`Percent Adherence`:`Continue Trikafta`) %>% data.matrix(.)
-r = corr.test(x,y,adjust = "fdr")
-kable(r$r,digits=3)
+```{python}
+# Filter
+df = df[df["TakingTrikafta"] == "yes"]
 ```
 
-```{r results='asis'}
-#| label: tbl-3
-#| tbl-cap: Spearman's Rho FDR-Adjusted p-values
-kable(r$p,digits=3)
+```{python}
+# | label: tbl-planets
+# | tbl-cap: Planets
+
 ```
 
-```{r}
-#| label: fig-heat
-#| fig-cap: Correlation Heatmap
-ggcorrplot(r$r,p.mat = r$p.adj)
+# Figure
+
+```{python}
+# | label: fig-planets
+# | fig-cap: Planets
+
 ```
-
-# Questions 
-
-1. Which variables should be considered ordinal and which categorical?
