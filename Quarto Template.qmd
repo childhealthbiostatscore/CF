@@ -1,7 +1,7 @@
 ---
 title: "Title"
 author: "Tim Vigers"
-date: "`r format(Sys.time(), '%d %B %Y')`"
+date: "today"
 format:
   html:
     toc: true
@@ -11,7 +11,7 @@ format:
     self-contained: true
     fig-cap-location: top
     page-layout: full
-editor: visual
+editor: source
 ---
 
 # Table
