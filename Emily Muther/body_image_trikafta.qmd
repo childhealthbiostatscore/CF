@@ -2,55 +2,64 @@
 title: "Body Image and Trikafta"
 author: "Tim Vigers"
 date: today
+date-format: long
 format:
-  html:
+  pdf:
     toc: true
     toc-depth: 5
-    toc-float: true
-    code-fold: true
-    self-contained: true
-    fig-cap-location: top
-    page-layout: full
-editor: visual
+    lot: true
+    lof: true
+execute:
+  echo: false
+pdf-engine: pdflatex
+editor: source
 ---
-
-```{python}
-# | include: false
-import pandas as pd
-# Read in data
-df = pd.read_spss(
-    "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Body Image and Trikafta/Data_Raw/TrikaftaBodyImage3.6.23.sav")
-```
 
 # Data Cleaning Steps
 
-1. Participants who answered "I don't know" or "no" on the variable `TakingTrikafta` were excluded from these analyses.
+1.  Participants who answered "I don't know" or "no" on the variable `TakingTrikafta` were excluded from these analyses.
 
-```{python}
-# | include: false
-# | eval: false
-from ydata_profiling import ProfileReport
-# EDA
-profile = ProfileReport(df, explorative=True)
-# Saving results to a HTML file
-profile.to_file(
-    "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Body Image and Trikafta/Reports/eda.html")
-```
-
-```{python}
+```{r warning=FALSE}
+#| include: false
+library(tidyverse)
+library(gtsummary)
+library(kableExtra)
+library(foreign)
+# Read in data
+df = read.spss("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Body Image and Trikafta/Data_Raw/TrikaftaBodyImage3.6.23.sav",to.data.frame = T)
 # Filter
-df = df[df["TakingTrikafta"] == "yes"]
+df = df %>% 
+  filter(TakingTrikafta=="yes")
+# Pick relevant columns
+df = df %>% 
+  select(ID,Age,Gender,PercentAdherence,DosesMissed,FeelTrikafta,
+         DifferencesTrikafta,BMI,FEV1,Race,Ethnicity,InsuranceType,
+         WeightBody_Adherence,DoNotWantTrikafta,ContinueTrikafta,
+         FRS_Category,contains("BE_"),contains("PHQ9"),contains("GAD7"),
+         -contains("MEAN"))
 ```
 
-```{python}
-# | label: tbl-planets
-# | tbl-cap: Planets
+# Descriptive analyses
 
+```{r}
+#| label: tbl-1
+#| tbl-cap: Baseline characteristics by FRS category
+#| message: false
+df %>% select(-ID) %>%
+  tbl_summary(by = FRS_Category) %>%
+  as_kable_extra(
+    booktabs = TRUE,
+    longtable = TRUE
+  ) %>% 
+  kable_styling(
+    full_width = T,
+    latex_options = "repeat_header"
+  )
 ```
 
 # Figure
 
-```{python}
+```{r}
 # | label: fig-planets
 # | fig-cap: Planets
 
