@@ -1,0 +1,66 @@
+---
+title: "Changing face of pediatric pulmonary exacerbations in CF"
+author: "Tim Vigers"
+date: "today"
+format:
+  pdf:
+    toc: true
+    lot: true
+    lof: true
+editor: source
+execute: 
+  echo: false
+---
+
+```{r}
+#| include: false
+library(readxl)
+library(tidyverse)
+library(gtsummary)
+source("~/GitHub/CF/genotype_class_severity.R")
+# Import
+chco = read_excel("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Scott Sagel/PEx in CF/Data_Clean/CHCO.xlsx",na = c("","NULL"))
+cnh = read_excel("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Scott Sagel/PEx in CF/Data_Clean/CNH.xlsx")
+# Format factor columns
+chco$`Modulator at Time of Admit` = factor(chco$`Modulator at Time of Admit`,
+                                           levels = c("No","Yes"),ordered = T)
+```
+
+# Data cleaning notes
+
+1. Age at admission and days in hospital were averaged for each person with multiple admissions.
+
+```{r}
+#| label: tbl-chco
+#| tbl-cap: CHCO Summary by Year
+#| message: false
+chco %>% group_by(`Unique number`,Year) %>%
+  summarise(`# of Hospitalizations per Person` = n(),
+            across(Sex:Genotypes2,~first(na.omit(.x))),
+            across(`Modulator at Time of Admit`,~max(.x)),
+            across(all_of(c("Age at Admit","# Days in Admit")),~mean(.x,na.rm=T)),
+            .groups = "drop") %>%
+  mutate(Genotypes1 = case_when(
+    Genotypes1 == "F508del" | Genotypes1 == "delF508" ~ "F508del",
+    .default = "Other"
+  ),
+  Genotypes2 = case_when(
+    Genotypes2 == "F508del" | Genotypes2 == "delF508" ~ "F508del",
+    .default = "Other"
+  )) %>%
+  unite(Genotype,Genotypes1,Genotypes2,sep = "/") %>%
+  mutate(Genotype = factor(Genotype,
+                           levels=c("F508del/F508del","F508del/Other",
+                                             "Other/F508del","Other/Other"),
+                           labels = c("F508del/F508del","F508del/Other",
+                                             "F508del/Other","Other/Other")
+                           )) %>%
+  select(`# of Hospitalizations per Person`,`# Days in Admit`,`Age at Admit`,
+         `Modulator at Time of Admit`,Sex:Genotype,Year) %>%
+  tbl_summary(by=Year) %>%
+  add_p() %>%
+  as_gt()
+```
+
+The number of hospitalizations for PEx decreased from `r sum(chco$Year==2018)` in 2018, involving `r nrow(unique(chco[chco$Year==2018,"Unique number"]))` unique individuals, to `r sum(chco$Year==2022)` in 2022, involving `r nrow(unique(chco[chco$Year==2022,"Unique number"]))` unique individuals. 
+
