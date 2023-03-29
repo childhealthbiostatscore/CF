@@ -4,9 +4,7 @@ author: "Tim Vigers"
 date: "today"
 format:
   html:
-    toc: true
-    toc-depth: 5
-    toc-float: true
+    toc: false
     code-fold: true
     self-contained: true
     fig-cap-location: top
@@ -20,6 +18,7 @@ execute:
 #| include: false
 library(readxl)
 library(tidyverse)
+library(gt)
 library(gtsummary)
 source("~/GitHub/CF/genotype_class_severity.R")
 # Import
@@ -131,11 +130,14 @@ summ = df %>% group_by(`Unique number`,Site,Year) %>%
 1. For each person with multiple admissions, continuous variables were averaged prior to generating summary tables.
 2. If a participant was on a modulators during any admission, they were counted as on modulators for that year. For example, participant 4 from CHOC was hospitalized 3 times in 2018 and was on a modulator during one of those admissions, so they were counted as on modulators in 2018.
 3. CNH only included combined P. aeruginosa information.
+4. Participants were uniquely identified by ID, site, and year.
+
+The number of hospitalizations for PEx decreased from `r sum(df$Year==2018)` in 2018 to `r sum(df$Year==2022)` in 2022.
 
 # Summary Statistics
 
 ```{r}
-#| label: tbl-chco
+#| label: tbl-all
 #| tbl-cap: Summary by Year
 #| message: false
 summ %>%
@@ -154,8 +156,35 @@ summ %>%
     `Change in FEV1`~"t.test"
   )) %>%
   separate_p_footnotes() %>%
-  as_gt()
+  as_gt() %>%
+  as_raw_html()
 ```
 
-The number of hospitalizations for PEx decreased from `r sum(summ$Year==2018)` in 2018 to `r sum(summ$Year==2022)` in 2022.
-
+```{r}
+#| label: tbl-site
+#| tbl-cap: Stratified by Site
+#| message: false
+summ %>%
+  select(-`Unique number`) %>%
+  tbl_strata(
+    strata = Site,
+    .tbl_fun =
+      ~ .x %>%
+      tbl_summary(by=Year,
+              type = list(`# of Hospitalizations per Person` ~ 'continuous'),
+              statistic = list(
+                c("# of Hospitalizations per Person","# Days in Admit") ~ "{median} ({p25}, {p75})",
+                c("Age at Admit","Change in FEV1","FEV1 % Predicted at Admit",
+                  "FEV1 % Predicted at Discharge") ~ "{mean} ({sd})"
+              ),
+              missing_text = "(Missing)") %>%
+  add_ci(pattern = "{stat} [{ci}]") %>%
+  add_p(test = list(
+    `Age at Admit`~"t.test",
+    `Change in FEV1`~"t.test"
+  )) %>%
+  separate_p_footnotes()
+  ) %>%
+  as_gt() %>%
+  as_raw_html()
+```
