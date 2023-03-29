@@ -21,66 +21,75 @@ library(pander)
 library(tidyverse)
 library(caret)
 library(gtsummary)
-df = read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Jordana Hoppe/Home Collection/Data_Clean/clinical.csv",na.strings = "")
-surveys = read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Jordana Hoppe/Home Collection/Data_Clean/surveys.csv",na.strings = "")
+df <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Jordana Hoppe/Home Collection/Data_Clean/clinical.csv", na.strings = "")
+surveys <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Jordana Hoppe/Home Collection/Data_Clean/surveys.csv", na.strings = "")
 # Combined genotype
-df$Mutation.1[df$Mutation.1 != "F508del"]="Other"
-df$Mutation.2[df$Mutation.2 != "F508del"]="Other"
-df$Genotype = paste(df$Mutation.1,df$Mutation.2,sep = "/")
+df$Mutation.1[df$Mutation.1 != "F508del"] <- "Other"
+df$Mutation.2[df$Mutation.2 != "F508del"] <- "Other"
+df$Genotype <- paste(df$Mutation.1, df$Mutation.2, sep = "/")
 # Age
-df$Age = difftime(df$Date.of.clinic.culture.collection, df$Patient.DOB)/365.25
+df$Age <- difftime(df$Date.of.clinic.culture.collection, df$Patient.DOB) / 365.25
 # Combine race columns
-df = df %>% rowwise() %>%
-  mutate(Race = paste(which(c_across(Race..choice.American.Indian.or.Alaska.Native.:
-                                       Race..choice.Unknown.or.not.reported.)== "Checked"),
-                      collapse = "+"),
-         Race = factor(Race,levels = c("","1","5"),labels=c("Unknown","American Indian or Alaska Native","White")))
+df <- df %>%
+  rowwise() %>%
+  mutate(
+    Race = paste(
+      which(c_across(Race..choice.American.Indian.or.Alaska.Native.:
+      Race..choice.Unknown.or.not.reported.) == "Checked"),
+      collapse = "+"
+    ),
+    Race = factor(Race, levels = c("", "1", "5"), labels = c("Unknown", "American Indian or Alaska Native", "White"))
+  )
 # Shorten organism names
-colnames(df) = sub("If.culture.was.positive..select.all.organisms.isolated...choice.","",colnames(df))
+colnames(df) <- sub("If.culture.was.positive..select.all.organisms.isolated...choice.", "", colnames(df))
 ```
 
 # Table 1: Participant Characteristics
 
 ```{r}
 #| label: tbl-1
-df %>% select(Age,FEV1...predicted,FVC...predicted,
-              Sex,Race,Hispanic.or.Latinx,Rural.location.) %>%
+df %>%
+  select(
+    Age, FEV1...predicted, FVC...predicted,
+    Sex, Race, Hispanic.or.Latinx, Rural.location.
+  ) %>%
   tbl_summary(
     label = list(
       Age ~ "Age at clinic culture collection",
-      FEV1...predicted~"ppFEV",FVC...predicted~"ppFVC",
-      Hispanic.or.Latinx~"Hispanic or Latinx",
-      Rural.location. ~"Rural location?"
+      FEV1...predicted ~ "ppFEV", FVC...predicted ~ "ppFVC",
+      Hispanic.or.Latinx ~ "Hispanic or Latinx",
+      Rural.location. ~ "Rural location?"
     ),
     statistic = list(
       all_continuous() ~ "{mean} ({sd})"
-    ))
+    )
+  )
 ```
 
 # Sensitivity and specificity
 
 ```{r}
-sens_spec = function(gold_standard,other_test,bug,type = "Home Collection"){
-  t = table(other_test,gold_standard)
-  if(all(dim(t)==c(1,1))){
+sens_spec <- function(gold_standard, other_test, bug, type = "Home Collection") {
+  t <- table(other_test, gold_standard)
+  if (all(dim(t) == c(1, 1))) {
     cat("\n")
     cat("###", bug)
     cat("\n")
     cat("#### Contingency table")
     cat("\n")
-    cat("All samples marked as",unique(gold_standard))
+    cat("All samples marked as", unique(gold_standard))
     cat("\n")
   } else {
-    sen = sensitivity(data = factor(other_test),reference = factor(gold_standard))
-    spec = specificity(data = factor(other_test),reference = factor(gold_standard))
-    
-    dimnames(t)=lapply(dimnames(t),function(n){
-      n = sub("Checked","Present",n)
-      n = sub("Unchecked","Absent",n)
+    sen <- sensitivity(data = factor(other_test), reference = factor(gold_standard))
+    spec <- specificity(data = factor(other_test), reference = factor(gold_standard))
+
+    dimnames(t) <- lapply(dimnames(t), function(n) {
+      n <- sub("Checked", "Present", n)
+      n <- sub("Unchecked", "Absent", n)
     })
-    dimnames(t)$other_test = paste(type,dimnames(t)$other_test)
-    dimnames(t)$gold_standard = paste("Clinic",dimnames(t)$gold_standard)
-    
+    dimnames(t)$other_test <- paste(type, dimnames(t)$other_test)
+    dimnames(t)$gold_standard <- paste("Clinic", dimnames(t)$gold_standard)
+
     cat("\n")
     cat("###", bug)
     cat("\n")
@@ -88,7 +97,7 @@ sens_spec = function(gold_standard,other_test,bug,type = "Home Collection"){
     cat("\n")
     print(knitr::kable((as.data.frame.matrix(t))))
     cat("\n")
-    cat("Sensitivity of the",tolower(type),"method was",round(sen,3),"and specificity was",round(spec,3))
+    cat("Sensitivity of the", tolower(type), "method was", round(sen, 3), "and specificity was", round(spec, 3))
     cat("\n")
   }
 }
@@ -98,83 +107,98 @@ sens_spec = function(gold_standard,other_test,bug,type = "Home Collection"){
 
 ```{r results='asis'}
 sens_spec(df$Methicillin.sensitive.Staph.aureus.,
-          df$Methicillin.sensitive.Staph.aureus..1,
-          type = "Home Collection",bug = "MSSA")
+  df$Methicillin.sensitive.Staph.aureus..1,
+  type = "Home Collection", bug = "MSSA"
+)
 ```
 
 ```{r results='asis'}
 sens_spec(df$Methicillin.resistant.Staph.aureus.,
-          df$Methicillin.resistant.Staph.aureus..1,
-          type = "Home Collection",bug = "MRSA")
+  df$Methicillin.resistant.Staph.aureus..1,
+  type = "Home Collection", bug = "MRSA"
+)
 ```
 
 ```{r results='asis'}
-sens_spec(df$A..xylosoxidans.,df$A..xylosoxidans..1,
-          type = "Home Collection",bug = "A. xylosoxidans")
+sens_spec(df$A..xylosoxidans., df$A..xylosoxidans..1,
+  type = "Home Collection", bug = "A. xylosoxidans"
+)
 ```
 
 ```{r results='asis'}
-sens_spec(df$Achromobacter.not.xylosoxidans.,df$Achromobacter.not.xylosoxidans..1,
-          type = "Home Collection",bug = "Achromobacter (not xylosoxidans)")
+sens_spec(df$Achromobacter.not.xylosoxidans., df$Achromobacter.not.xylosoxidans..1,
+  type = "Home Collection", bug = "Achromobacter (not xylosoxidans)"
+)
 ```
 
 ```{r results='asis'}
-sens_spec(df$Acinetobacter.,df$Acinetobacter..1,
-          type = "Home Collection",bug = "Acinetobacter")
+sens_spec(df$Acinetobacter., df$Acinetobacter..1,
+  type = "Home Collection", bug = "Acinetobacter"
+)
 ```
 
 ```{r results='asis'}
-sens_spec(df$H..influenzae.,df$H..influenzae..1,
-          type = "Home Collection",bug = "H. influenzae")
+sens_spec(df$H..influenzae., df$H..influenzae..1,
+  type = "Home Collection", bug = "H. influenzae"
+)
 ```
 
 ```{r results='asis'}
-sens_spec(df$P..aeruginosa.,df$P..aeruginosa..1,
-          type = "Home Collection",bug = "P. aeruginosa")
+sens_spec(df$P..aeruginosa., df$P..aeruginosa..1,
+  type = "Home Collection", bug = "P. aeruginosa"
+)
 ```
 
 ```{r results='asis'}
-sens_spec(df$P..aeruginosa..mucoid..,df$P..aeruginosa..mucoid...1,
-          type = "Home Collection",bug = "P. aeruginosa (mucoid)")
+sens_spec(df$P..aeruginosa..mucoid.., df$P..aeruginosa..mucoid...1,
+  type = "Home Collection", bug = "P. aeruginosa (mucoid)"
+)
 ```
 
 ```{r results='asis'}
-sens_spec(df$Pseudomonas.species..not.aeruginosa.,df$Pseudomonas.species..not.aeruginosa..1,
-          type = "Home Collection",bug = "Pseudomonas (not aeruginosa)")
+sens_spec(df$Pseudomonas.species..not.aeruginosa., df$Pseudomonas.species..not.aeruginosa..1,
+  type = "Home Collection", bug = "Pseudomonas (not aeruginosa)"
+)
 ```
 
 ```{r results='asis'}
-sens_spec(df$B..cepacia.complex.,df$B..cepacia.complex..1,
-          type = "Home Collection",bug = "B. cepacia complex")
+sens_spec(df$B..cepacia.complex., df$B..cepacia.complex..1,
+  type = "Home Collection", bug = "B. cepacia complex"
+)
 ```
 
 ```{r results='asis'}
-sens_spec(df$Stenotrophomonas.,df$Stenotrophomonas..1,
-          type = "Home Collection",bug = "Stenotrophomonas")
+sens_spec(df$Stenotrophomonas., df$Stenotrophomonas..1,
+  type = "Home Collection", bug = "Stenotrophomonas"
+)
 ```
 
 ```{r results='asis'}
-sens_spec(df$Aspergillus.,df$Aspergillus..1,
-          type = "Home Collection",bug = "Aspergillus")
+sens_spec(df$Aspergillus., df$Aspergillus..1,
+  type = "Home Collection", bug = "Aspergillus"
+)
 ```
 
 ```{r results='asis'}
-sens_spec(df$Penicillium.species.,df$Penicillium.species..1,
-          type = "Home Collection",bug = "Penicillium species")
+sens_spec(df$Penicillium.species., df$Penicillium.species..1,
+  type = "Home Collection", bug = "Penicillium species"
+)
 ```
 
 ```{r results='asis'}
-sens_spec(df$Sceosporium.species.,df$Sceosporium.species..1,
-          type = "Home Collection",bug = "Sceosporium species")
+sens_spec(df$Sceosporium.species., df$Sceosporium.species..1,
+  type = "Home Collection", bug = "Sceosporium species"
+)
 ```
 
 ```{r results='asis'}
-sens_spec(df$M..avium.complex.,df$M..avium.complex..1,
-          type = "Home Collection",bug = "M. avium complex")
+sens_spec(df$M..avium.complex., df$M..avium.complex..1,
+  type = "Home Collection", bug = "M. avium complex"
+)
 ```
 
 ```{r results='asis'}
-sens_spec(df$M..abscessus.,df$M..abscessus..1,
-          type = "Home Collection",bug = "M. abscessus")
+sens_spec(df$M..abscessus., df$M..abscessus..1,
+  type = "Home Collection", bug = "M. abscessus"
+)
 ```
-
