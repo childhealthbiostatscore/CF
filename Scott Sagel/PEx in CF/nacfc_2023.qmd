@@ -98,11 +98,12 @@ df$Ethnicity = factor(df$Ethnicity,levels = c("FALSE","Hispanic or Latino","HLS"
                                  "Hispanic or Latino","NOT Hispanic or Latino",
                                  "NOT Hispanic or Latino","Hispanic or Latino",
                                  "Unknown"))
-bugs = c("P. aeruginosa","P. aeruginosa mucoid","P. aeruginosa non-mucoid","Staph aureus","MRSA")
+bugs = c("P. aeruginosa","P. aeruginosa mucoid","P. aeruginosa non-mucoid","Staph aureus","MRSA","S. maltophilia")
 df[,bugs] = lapply(df[,bugs],function(c){
   c[is.na(c)] = "No"
   c = factor(c,levels = c("No",TRUE),labels = c("No","Yes"),ordered = T)
 })
+df$`S. maltophilia`[df$Site == "CNH"] = NA
 # Make summary table
 summ = df %>% group_by(`Unique number`,Site,Year) %>%
   mutate(`Change in FEV1` = `FEV1 % Predicted at Discharge` - `FEV1 % Predicted at Admit`) %>%
@@ -165,7 +166,7 @@ summ %>%
 #| tbl-cap: Stratified by Site
 #| message: false
 summ %>%
-  select(-`Unique number`) %>%
+  select(-`Unique number`,-`S. maltophilia`) %>%
   tbl_strata(
     strata = Site,
     .tbl_fun =
