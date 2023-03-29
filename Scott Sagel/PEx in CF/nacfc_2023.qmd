@@ -1,5 +1,5 @@
 ---
-title: "Changing face of pediatric pulmonary exacerbations in CF"
+title: "The Changing Face of Pediatric Pulmonary Exacerbations in CF (NACFC 2023)"
 author: "Tim Vigers"
 date: "today"
 format:
