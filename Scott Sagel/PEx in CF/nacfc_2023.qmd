@@ -3,10 +3,14 @@ title: "Changing face of pediatric pulmonary exacerbations in CF"
 author: "Tim Vigers"
 date: "today"
 format:
-  pdf:
+  html:
     toc: true
-    lot: true
-    lof: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
 editor: source
 execute: 
   echo: false
@@ -21,25 +25,11 @@ source("~/GitHub/CF/genotype_class_severity.R")
 # Import
 chco = read_excel("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Scott Sagel/PEx in CF/Data_Clean/CHCO.xlsx",na = c("","NULL"))
 cnh = read_excel("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Scott Sagel/PEx in CF/Data_Clean/CNH.xlsx")
-# Format factor columns
-chco$`Modulator at Time of Admit` = factor(chco$`Modulator at Time of Admit`,
-                                           levels = c("No","Yes"),ordered = T)
-```
-
-# Data cleaning notes
-
-1. Age at admission and days in hospital were averaged for each person with multiple admissions.
-
-```{r}
-#| label: tbl-chco
-#| tbl-cap: CHCO Summary by Year
-#| message: false
-chco %>% group_by(`Unique number`,Year) %>%
-  summarise(`# of Hospitalizations per Person` = n(),
-            across(Sex:Genotypes2,~first(na.omit(.x))),
-            across(`Modulator at Time of Admit`,~max(.x)),
-            across(all_of(c("Age at Admit","# Days in Admit")),~mean(.x,na.rm=T)),
-            .groups = "drop") %>%
+# Format CHCO columns
+chco$`P. aeruginosa` = coalesce(chco$`P. aeruginosa mucoid`,chco$`P. aeruginosa non-mucoid`)
+chco = chco %>% rename(
+  Race = `Race (White/Black/Other)`,Ethnicity = `Hispanic/Latinx`
+) %>%
   mutate(Genotypes1 = case_when(
     Genotypes1 == "F508del" | Genotypes1 == "delF508" ~ "F508del",
     .default = "Other"
@@ -47,20 +37,125 @@ chco %>% group_by(`Unique number`,Year) %>%
   Genotypes2 = case_when(
     Genotypes2 == "F508del" | Genotypes2 == "delF508" ~ "F508del",
     .default = "Other"
-  )) %>%
-  unite(Genotype,Genotypes1,Genotypes2,sep = "/") %>%
+  ),
+  `FEV1 % Predicted at Admit` = suppressWarnings(as.numeric(`FEV1 % Predicted at Admit`))) %>%
+  unite(Genotype,Genotypes1,Genotypes2,sep = "/")
+# Format CNH to match CHCO
+cnh = cnh %>%
+  rename(`# Days in Admit`=`Total hospitalization days`,
+         `Age at Admit`=`Age at admission`,
+         `FEV1 % Predicted at Discharge`=`End of treamtent ppFEV1`,
+         `Unique number` = `Study ID`) %>%
+  mutate(Site = "CNH",
+         `Modulator at Time of Admit` = case_when(
+           None == "Unchecked" ~ "Yes",
+           None =="Checked" ~"No"
+         ),
+         MRSA = case_when(
+           MRSA == "Unchecked" ~ NA,
+           MRSA =="Checked" ~ TRUE
+         ),
+         `Staph aureus` = case_when(
+           MSSA == "Unchecked" ~ NA,
+           MSSA =="Checked" ~ TRUE
+         ),
+         `P. aeruginosa` = case_when(
+           `P. aeruginosa` == "Unchecked" ~ NA,
+           `P. aeruginosa` =="Checked" ~ TRUE
+         ),
+         Genotype = case_when(
+           `CFTR genotype, groups` =="F508del heterozygous" ~ "F508del/Other",
+           `CFTR genotype, groups` =="F508del homozygous"~"F508del/F508del",
+           `CFTR genotype, groups` =="Other"~"Other/Other"
+         ),
+         `Specific Modulator at Admit` = case_when(
+           `Ivacaftor (Kalydeco)` == "Checked" ~ "Other",
+           `Ivacaftor/lumacaftor (Orkambi)` == "Checked" ~ "Other",
+           `Tezacaftor/ivacaftor (Symdeko)`=="Checked" ~ "Other",
+           `Elexacaftor/tezacaftor/ivacaftor (Trikafta)`=="Checked" ~ "Trikafta",
+           .default = "None"
+         ),
+         `FEV1 % Predicted at Admit` = as.numeric(`PEx ppFEV1`))
+# Merge
+df = full_join(chco,cnh)
+# Format column types
+df$`Modulator at Time of Admit` = factor(df$`Modulator at Time of Admit`,
+                                         levels = c("No","Yes"),ordered = T)
+df$`Specific Modulator at Admit`[df$`Modulator at Time of Admit`=="No"] = "None"
+df$`Specific Modulator at Admit` = factor(tolower(df$`Specific Modulator at Admit`),
+                                          levels = c("kalydeco","none","orkambi","symdeko","trikafta"),
+                                          labels = c("Other","None","Other","Other","Trikafta"))
+df$Race = factor(df$Race,levels = c("Amer. Indian or Alaskan Naitive","Asian",
+                                    "Black","Black or African American","Black/ AA",
+                                    "Decline to Answer","Hispanic","Other",
+                                    "Unknown / Not Reported","White"),
+                 labels = c("Other","Other","Black","Black","Black",
+                            "Unknown / Not Reported","Other","Other",
+                            "Unknown / Not Reported","White"))
+df$Ethnicity = factor(df$Ethnicity,levels = c("FALSE","Hispanic or Latino","HLS",
+                                              "NOT Hispanic or Latino","NOT HLS",
+                                              "TRUE","UNKNOWN"),
+                      labels = c("NOT Hispanic or Latino","Hispanic or Latino",
+                                 "Hispanic or Latino","NOT Hispanic or Latino",
+                                 "NOT Hispanic or Latino","Hispanic or Latino",
+                                 "Unknown"))
+bugs = c("P. aeruginosa","P. aeruginosa mucoid","P. aeruginosa non-mucoid","Staph aureus","MRSA")
+df[,bugs] = lapply(df[,bugs],function(c){
+  c[is.na(c)] = "No"
+  c = factor(c,levels = c("No",TRUE),labels = c("No","Yes"),ordered = T)
+})
+# Make summary table
+summ = df %>% group_by(`Unique number`,Site,Year) %>%
+  mutate(`Change in FEV1` = `FEV1 % Predicted at Discharge` - `FEV1 % Predicted at Admit`) %>%
+  summarise(`# of Hospitalizations per Person` = n(),
+            across(c(Sex:Genotype,`Specific Modulator at Admit`),~first(na.omit(.x))),
+            across(c(`Modulator at Time of Admit`,all_of(bugs)),~max(.x,na.rm = T)),
+            across(all_of(c("Age at Admit","# Days in Admit","Change in FEV1",
+                            "FEV1 % Predicted at Admit","FEV1 % Predicted at Discharge")),
+                   ~mean(.x,na.rm=T)),
+            .groups = "drop")  %>%
   mutate(Genotype = factor(Genotype,
                            levels=c("F508del/F508del","F508del/Other",
-                                             "Other/F508del","Other/Other"),
+                                    "Other/F508del","Other/Other"),
                            labels = c("F508del/F508del","F508del/Other",
-                                             "F508del/Other","Other/Other")
-                           )) %>%
-  select(`# of Hospitalizations per Person`,`# Days in Admit`,`Age at Admit`,
-         `Modulator at Time of Admit`,Sex:Genotype,Year) %>%
-  tbl_summary(by=Year) %>%
-  add_p() %>%
+                                      "F508del/Other","Other/Other")
+  )) %>%
+  select(`Unique number`, `Site`,Year,`# of Hospitalizations per Person`,`# Days in Admit`,`Age at Admit`,
+         `Change in FEV1`,`FEV1 % Predicted at Admit`,`FEV1 % Predicted at Discharge`,
+         `Modulator at Time of Admit`,`Specific Modulator at Admit`,
+         all_of(bugs),Sex:Genotype)
+```
+
+# Data cleaning notes
+
+1. For each person with multiple admissions, continuous variables were averaged prior to generating summary tables.
+2. If a participant was on a modulators during any admission, they were counted as on modulators for that year. For example, participant 4 from CHOC was hospitalized 3 times in 2018 and was on a modulator during one of those admissions, so they were counted as on modulators in 2018.
+3. CNH only included combined P. aeruginosa information.
+
+# Summary Statistics
+
+```{r}
+#| label: tbl-chco
+#| tbl-cap: Summary by Year
+#| message: false
+summ %>%
+  select(-`Unique number`,-Site) %>%
+  tbl_summary(by=Year,
+              type = list(`# of Hospitalizations per Person` ~ 'continuous'),
+              statistic = list(
+                c("# of Hospitalizations per Person","# Days in Admit") ~ "{median} ({p25}, {p75})",
+                c("Age at Admit","Change in FEV1","FEV1 % Predicted at Admit",
+                  "FEV1 % Predicted at Discharge") ~ "{mean} ({sd})"
+              ),
+              missing_text = "(Missing)") %>%
+  add_ci(pattern = "{stat} [{ci}]") %>%
+  add_p(test = list(
+    `Age at Admit`~"t.test",
+    `Change in FEV1`~"t.test"
+  )) %>%
+  separate_p_footnotes() %>%
   as_gt()
 ```
 
-The number of hospitalizations for PEx decreased from `r sum(chco$Year==2018)` in 2018, involving `r nrow(unique(chco[chco$Year==2018,"Unique number"]))` unique individuals, to `r sum(chco$Year==2022)` in 2022, involving `r nrow(unique(chco[chco$Year==2022,"Unique number"]))` unique individuals. 
+The number of hospitalizations for PEx decreased from `r sum(summ$Year==2018)` in 2018 to `r sum(summ$Year==2022)` in 2022.
 
