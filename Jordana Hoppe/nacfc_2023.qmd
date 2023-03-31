@@ -20,6 +20,7 @@ editor: source
 library(pander)
 library(tidyverse)
 library(caret)
+library(irr)
 library(gtsummary)
 df <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Jordana Hoppe/Home Collection/Data_Clean/clinical.csv", na.strings = "")
 surveys <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Jordana Hoppe/Home Collection/Data_Clean/surveys.csv", na.strings = "")
@@ -41,6 +42,9 @@ df <- df %>%
     Race = factor(Race, levels = c("", "1", "5"), labels = c("Unknown", "American Indian or Alaska Native", "White"))
   )
 # Shorten organism names
+bugs = colnames(df)[grep("If.culture.was.positive..select.all.organisms.isolated...choice.",colnames(df))]
+bugs <- sub("If.culture.was.positive..select.all.organisms.isolated...choice.", "", bugs)
+bugs = bugs[1:16]
 colnames(df) <- sub("If.culture.was.positive..select.all.organisms.isolated...choice.", "", colnames(df))
 ```
 
@@ -66,7 +70,21 @@ df %>%
   )
 ```
 
-# Sensitivity and specificity
+# Pairwise Comparisons
+
+Cohen's kappa is an agreement statistic ranging from -1 (perfect disagreement) to 1 (perfect agreement). A rough guideline for interpreting Cohen's kappa is:
+
+
+| Cohen's Kappa | Interpretation         |
+|---------------|------------------------|
+| 0             | No agreement           |
+| 0.10 - 0.20   | Slight agreement       |
+| 0.21 - 0.40   | Fair agreement         |
+| 0.41 - 0.60   | Moderate agreement     |
+| 0.61 - 0.80   | Substantial agreement  |
+| 0.81 - 0.99   | Near perfect agreement |
+| 1             | Perfect agreement      |
+
 
 ```{r}
 sens_spec <- function(gold_standard, other_test, bug, type = "Home Collection") {
@@ -75,14 +93,15 @@ sens_spec <- function(gold_standard, other_test, bug, type = "Home Collection") 
     cat("\n")
     cat("###", bug)
     cat("\n")
-    cat("#### Contingency table")
-    cat("\n")
     cat("All samples marked as", unique(gold_standard))
     cat("\n")
   } else {
+    # Sensitivity and specificity
     sen <- sensitivity(data = factor(other_test), reference = factor(gold_standard))
     spec <- specificity(data = factor(other_test), reference = factor(gold_standard))
-
+    # Kappa
+    k = kappa2(cbind(gold_standard,other_test))
+    # Formatting
     dimnames(t) <- lapply(dimnames(t), function(n) {
       n <- sub("Checked", "Present", n)
       n <- sub("Unchecked", "Absent", n)
@@ -93,11 +112,11 @@ sens_spec <- function(gold_standard, other_test, bug, type = "Home Collection") 
     cat("\n")
     cat("###", bug)
     cat("\n")
-    cat("#### Contingency table")
-    cat("\n")
     print(knitr::kable((as.data.frame.matrix(t))))
     cat("\n")
-    cat("Sensitivity of the", tolower(type), "method was", round(sen, 3), "and specificity was", round(spec, 3))
+    cat("Sensitivity of the", tolower(type), "method was", round(sen, 3), "and specificity was", paste0(round(spec, 3),"."))
+    cat("\n")
+    cat("Cohen's kappa for the two tests was", round(k$value, 3), paste0("(p = ", format.pval(k$p.value,digits = 3, eps = 0.001),")"))
     cat("\n")
   }
 }
@@ -201,4 +220,110 @@ sens_spec(df$M..avium.complex., df$M..avium.complex..1,
 sens_spec(df$M..abscessus., df$M..abscessus..1,
   type = "Home Collection", bug = "M. abscessus"
 )
+```
+
+## Delayed Processing
+
+```{r results='asis'}
+sens_spec(df$Methicillin.sensitive.Staph.aureus.,
+  df$Methicillin.sensitive.Staph.aureus..2,
+  type = "Delayed Processing", bug = "MSSA"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Methicillin.resistant.Staph.aureus.,
+  df$Methicillin.resistant.Staph.aureus..2,
+  type = "Delayed Processing", bug = "MRSA"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$A..xylosoxidans., df$A..xylosoxidans..2,
+  type = "Delayed Processing", bug = "A. xylosoxidans"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Achromobacter.not.xylosoxidans., df$Achromobacter.not.xylosoxidans..2,
+  type = "Delayed Processing", bug = "Achromobacter (not xylosoxidans)"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Acinetobacter., df$Acinetobacter..2,
+  type = "Delayed Processing", bug = "Acinetobacter"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$H..influenzae., df$H..influenzae..2,
+  type = "Delayed Processing", bug = "H. influenzae"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$P..aeruginosa., df$P..aeruginosa..2,
+  type = "Delayed Processing", bug = "P. aeruginosa"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$P..aeruginosa..mucoid.., df$P..aeruginosa..mucoid...2,
+  type = "Delayed Processing", bug = "P. aeruginosa (mucoid)"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Pseudomonas.species..not.aeruginosa., df$Pseudomonas.species..not.aeruginosa..2,
+  type = "Delayed Processing", bug = "Pseudomonas (not aeruginosa)"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$B..cepacia.complex., df$B..cepacia.complex..2,
+  type = "Delayed Processing", bug = "B. cepacia complex"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Stenotrophomonas., df$Stenotrophomonas..2,
+  type = "Delayed Processing", bug = "Stenotrophomonas"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Aspergillus., df$Aspergillus..2,
+  type = "Delayed Processing", bug = "Aspergillus"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Penicillium.species., df$Penicillium.species..2,
+  type = "Delayed Processing", bug = "Penicillium species"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Sceosporium.species., df$Sceosporium.species..2,
+  type = "Delayed Processing", bug = "Sceosporium species"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$M..avium.complex., df$M..avium.complex..2,
+  type = "Delayed Processing", bug = "M. avium complex"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$M..abscessus., df$M..abscessus..2,
+  type = "Delayed Processing", bug = "M. abscessus"
+)
+```
+
+# Agreement between all 3 methods
+
+```{r}
+
 ```
