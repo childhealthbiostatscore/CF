@@ -112,7 +112,7 @@ sens_spec <- function(gold_standard, other_test, bug, type = "Home Collection") 
     cat("\n")
     cat("###", bug)
     cat("\n")
-    print(knitr::kable((as.data.frame.matrix(t))))
+    print(knitr::kable(as.data.frame.matrix(t)))
     cat("\n")
     cat("Sensitivity of the", tolower(type), "method was", round(sen, 3), "and specificity was", paste0(round(spec, 3),"."))
     cat("\n")
@@ -122,208 +122,285 @@ sens_spec <- function(gold_standard, other_test, bug, type = "Home Collection") 
 }
 ```
 
-## Home Collection
-
-```{r results='asis'}
-sens_spec(df$Methicillin.sensitive.Staph.aureus.,
-  df$Methicillin.sensitive.Staph.aureus..1,
-  type = "Home Collection", bug = "MSSA"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$Methicillin.resistant.Staph.aureus.,
-  df$Methicillin.resistant.Staph.aureus..1,
-  type = "Home Collection", bug = "MRSA"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$A..xylosoxidans., df$A..xylosoxidans..1,
-  type = "Home Collection", bug = "A. xylosoxidans"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$Achromobacter.not.xylosoxidans., df$Achromobacter.not.xylosoxidans..1,
-  type = "Home Collection", bug = "Achromobacter (not xylosoxidans)"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$Acinetobacter., df$Acinetobacter..1,
-  type = "Home Collection", bug = "Acinetobacter"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$H..influenzae., df$H..influenzae..1,
-  type = "Home Collection", bug = "H. influenzae"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$P..aeruginosa., df$P..aeruginosa..1,
-  type = "Home Collection", bug = "P. aeruginosa"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$P..aeruginosa..mucoid.., df$P..aeruginosa..mucoid...1,
-  type = "Home Collection", bug = "P. aeruginosa (mucoid)"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$Pseudomonas.species..not.aeruginosa., df$Pseudomonas.species..not.aeruginosa..1,
-  type = "Home Collection", bug = "Pseudomonas (not aeruginosa)"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$B..cepacia.complex., df$B..cepacia.complex..1,
-  type = "Home Collection", bug = "B. cepacia complex"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$Stenotrophomonas., df$Stenotrophomonas..1,
-  type = "Home Collection", bug = "Stenotrophomonas"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$Aspergillus., df$Aspergillus..1,
-  type = "Home Collection", bug = "Aspergillus"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$Penicillium.species., df$Penicillium.species..1,
-  type = "Home Collection", bug = "Penicillium species"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$Sceosporium.species., df$Sceosporium.species..1,
-  type = "Home Collection", bug = "Sceosporium species"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$M..avium.complex., df$M..avium.complex..1,
-  type = "Home Collection", bug = "M. avium complex"
-)
-```
-
-```{r results='asis'}
-sens_spec(df$M..abscessus., df$M..abscessus..1,
-  type = "Home Collection", bug = "M. abscessus"
-)
-```
-
 ## Delayed Processing
 
 ```{r results='asis'}
 sens_spec(df$Methicillin.sensitive.Staph.aureus.,
-  df$Methicillin.sensitive.Staph.aureus..2,
+  df$Methicillin.sensitive.Staph.aureus..1,
   type = "Delayed Processing", bug = "MSSA"
 )
 ```
 
 ```{r results='asis'}
 sens_spec(df$Methicillin.resistant.Staph.aureus.,
-  df$Methicillin.resistant.Staph.aureus..2,
+  df$Methicillin.resistant.Staph.aureus..1,
   type = "Delayed Processing", bug = "MRSA"
 )
 ```
 
 ```{r results='asis'}
-sens_spec(df$A..xylosoxidans., df$A..xylosoxidans..2,
+sens_spec(df$A..xylosoxidans., df$A..xylosoxidans..1,
   type = "Delayed Processing", bug = "A. xylosoxidans"
 )
 ```
 
 ```{r results='asis'}
-sens_spec(df$Achromobacter.not.xylosoxidans., df$Achromobacter.not.xylosoxidans..2,
+sens_spec(df$Achromobacter.not.xylosoxidans., df$Achromobacter.not.xylosoxidans..1,
   type = "Delayed Processing", bug = "Achromobacter (not xylosoxidans)"
 )
 ```
 
 ```{r results='asis'}
-sens_spec(df$Acinetobacter., df$Acinetobacter..2,
+sens_spec(df$Acinetobacter., df$Acinetobacter..1,
   type = "Delayed Processing", bug = "Acinetobacter"
 )
 ```
 
 ```{r results='asis'}
-sens_spec(df$H..influenzae., df$H..influenzae..2,
+sens_spec(df$H..influenzae., df$H..influenzae..1,
   type = "Delayed Processing", bug = "H. influenzae"
 )
 ```
 
 ```{r results='asis'}
-sens_spec(df$P..aeruginosa., df$P..aeruginosa..2,
+sens_spec(df$P..aeruginosa., df$P..aeruginosa..1,
   type = "Delayed Processing", bug = "P. aeruginosa"
 )
 ```
 
 ```{r results='asis'}
-sens_spec(df$P..aeruginosa..mucoid.., df$P..aeruginosa..mucoid...2,
+sens_spec(df$P..aeruginosa..mucoid.., df$P..aeruginosa..mucoid...1,
   type = "Delayed Processing", bug = "P. aeruginosa (mucoid)"
 )
 ```
 
 ```{r results='asis'}
-sens_spec(df$Pseudomonas.species..not.aeruginosa., df$Pseudomonas.species..not.aeruginosa..2,
+sens_spec(df$Pseudomonas.species..not.aeruginosa., df$Pseudomonas.species..not.aeruginosa..1,
   type = "Delayed Processing", bug = "Pseudomonas (not aeruginosa)"
 )
 ```
 
 ```{r results='asis'}
-sens_spec(df$B..cepacia.complex., df$B..cepacia.complex..2,
+sens_spec(df$B..cepacia.complex., df$B..cepacia.complex..1,
   type = "Delayed Processing", bug = "B. cepacia complex"
 )
 ```
 
 ```{r results='asis'}
-sens_spec(df$Stenotrophomonas., df$Stenotrophomonas..2,
+sens_spec(df$Stenotrophomonas., df$Stenotrophomonas..1,
   type = "Delayed Processing", bug = "Stenotrophomonas"
 )
 ```
 
 ```{r results='asis'}
-sens_spec(df$Aspergillus., df$Aspergillus..2,
+sens_spec(df$Aspergillus., df$Aspergillus..1,
   type = "Delayed Processing", bug = "Aspergillus"
 )
 ```
 
 ```{r results='asis'}
-sens_spec(df$Penicillium.species., df$Penicillium.species..2,
+sens_spec(df$Penicillium.species., df$Penicillium.species..1,
   type = "Delayed Processing", bug = "Penicillium species"
 )
 ```
 
 ```{r results='asis'}
-sens_spec(df$Sceosporium.species., df$Sceosporium.species..2,
+sens_spec(df$Sceosporium.species., df$Sceosporium.species..1,
   type = "Delayed Processing", bug = "Sceosporium species"
 )
 ```
 
 ```{r results='asis'}
-sens_spec(df$M..avium.complex., df$M..avium.complex..2,
+sens_spec(df$M..avium.complex., df$M..avium.complex..1,
   type = "Delayed Processing", bug = "M. avium complex"
 )
 ```
 
 ```{r results='asis'}
-sens_spec(df$M..abscessus., df$M..abscessus..2,
+sens_spec(df$M..abscessus., df$M..abscessus..1,
   type = "Delayed Processing", bug = "M. abscessus"
+)
+```
+
+## Home Collection
+
+```{r results='asis'}
+sens_spec(df$Methicillin.sensitive.Staph.aureus.,
+  df$Methicillin.sensitive.Staph.aureus..2,
+  type = "Home Collection", bug = "MSSA"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Methicillin.resistant.Staph.aureus.,
+  df$Methicillin.resistant.Staph.aureus..2,
+  type = "Home Collection", bug = "MRSA"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$A..xylosoxidans., df$A..xylosoxidans..2,
+  type = "Home Collection", bug = "A. xylosoxidans"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Achromobacter.not.xylosoxidans., df$Achromobacter.not.xylosoxidans..2,
+  type = "Home Collection", bug = "Achromobacter (not xylosoxidans)"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Acinetobacter., df$Acinetobacter..2,
+  type = "Home Collection", bug = "Acinetobacter"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$H..influenzae., df$H..influenzae..2,
+  type = "Home Collection", bug = "H. influenzae"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$P..aeruginosa., df$P..aeruginosa..2,
+  type = "Home Collection", bug = "P. aeruginosa"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$P..aeruginosa..mucoid.., df$P..aeruginosa..mucoid...2,
+  type = "Home Collection", bug = "P. aeruginosa (mucoid)"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Pseudomonas.species..not.aeruginosa., df$Pseudomonas.species..not.aeruginosa..2,
+  type = "Home Collection", bug = "Pseudomonas (not aeruginosa)"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$B..cepacia.complex., df$B..cepacia.complex..2,
+  type = "Home Collection", bug = "B. cepacia complex"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Stenotrophomonas., df$Stenotrophomonas..2,
+  type = "Home Collection", bug = "Stenotrophomonas"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Aspergillus., df$Aspergillus..2,
+  type = "Home Collection", bug = "Aspergillus"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Penicillium.species., df$Penicillium.species..2,
+  type = "Home Collection", bug = "Penicillium species"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$Sceosporium.species., df$Sceosporium.species..2,
+  type = "Home Collection", bug = "Sceosporium species"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$M..avium.complex., df$M..avium.complex..2,
+  type = "Home Collection", bug = "M. avium complex"
+)
+```
+
+```{r results='asis'}
+sens_spec(df$M..abscessus., df$M..abscessus..2,
+  type = "Home Collection", bug = "M. abscessus"
 )
 ```
 
 # Agreement between all 3 methods
 
-```{r}
+Fleiss' kappa is interpreted analagously to Cohen's kappa, but applies to more than two tests. Tables with NaN and NAs indicate that all tests had the same values (i.e. all absent or all present).
 
+```{r}
+fleiss = function(bug,bug_name){
+  fk = kappam.fleiss(df[,c(bug,paste0(bug,".1"),paste0(bug,".2"))],detail = T)
+  t = as.data.frame.matrix(fk$detail)
+  t$p.value = format.pval(t$p.value,digits = 3,eps = 0.001)
+  cat("\n")
+    cat("##", bug_name)
+    cat("\n")
+    print(knitr::kable(t))
+    cat("\n")
+    cat("Overall Fleiss' kappa for the three tests was", round(fk$value, 3), paste0("(p = ", format.pval(fk$p.value,digits = 3, eps = 0.001),")"))
+    cat("\n")
+}
+```
+
+```{r results='asis'}
+fleiss(bug = "Methicillin.sensitive.Staph.aureus.",bug_name = "MSSA")
+```
+
+```{r results='asis'}
+fleiss(bug = "Methicillin.resistant.Staph.aureus.",bug_name = "MRSA")
+```
+
+```{r results='asis'}
+fleiss("A..xylosoxidans.", bug_name = "A. xylosoxidans")
+```
+
+```{r results='asis'}
+fleiss("Achromobacter.not.xylosoxidans.",bug_name = "Achromobacter (not xylosoxidans)")
+```
+
+```{r results='asis'}
+fleiss("Acinetobacter.", bug_name = "Acinetobacter")
+```
+
+```{r results='asis'}
+fleiss("H..influenzae.", bug_name = "H. influenzae")
+```
+
+```{r results='asis'}
+fleiss("P..aeruginosa.", bug_name = "P. aeruginosa")
+```
+
+```{r results='asis'}
+fleiss("P..aeruginosa..mucoid..",bug_name = "P. aeruginosa (mucoid)")
+```
+
+```{r results='asis'}
+fleiss("Pseudomonas.species..not.aeruginosa.",bug_name = "Pseudomonas (not aeruginosa)")
+```
+
+```{r results='asis'}
+fleiss("B..cepacia.complex.", bug_name = "B. cepacia complex")
+```
+
+```{r results='asis'}
+fleiss("Stenotrophomonas.", bug_name = "Stenotrophomonas")
+```
+
+```{r results='asis'}
+fleiss("Aspergillus.",bug_name = "Aspergillus")
+```
+
+```{r results='asis'}
+fleiss("Penicillium.species.",bug_name = "Penicillium species")
+```
+
+```{r results='asis'}
+fleiss("Sceosporium.species.",bug_name = "Sceosporium species")
+```
+
+```{r results='asis'}
+fleiss("M..avium.complex.",bug_name = "M. avium complex")
+```
+
+```{r results='asis'}
+fleiss("M..abscessus.", bug_name = "M. abscessus")
 ```
