@@ -1,17 +1,18 @@
 ---
 title: "NTM CT Scoring - Initial Agreement"
 author: "Tim Vigers"
-date: "`r format(Sys.time(), '%d %B %Y')`"
+date: "today"
+date-format: long
 format:
   html:
-    code-fold: true
     toc: true
     toc-depth: 5
     toc-float: true
+    code-fold: true
     self-contained: true
-    fig-height: 8
-    fig-width: 10
-editor: visual
+    fig-cap-location: top
+    page-layout: full
+editor: source
 ---
 
 ```{r}
@@ -23,7 +24,7 @@ library(Hmisc)
 library(DT)
 library(RColorBrewer)
 # Import data
-api <- read.table("~/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt",
+api <- read.table("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt",
   header = F
 )
 rcon <- redcapConnection(
@@ -69,6 +70,32 @@ names(colors) <- vals
 custom_colors <- scale_fill_manual(name = "", values = colors)
 ```
 
+
+```{r}
+# Agresti examples
+agt = matrix(c(22,2,2,0,
+               5,7,14,0,
+               0,2,36,0,
+               0,1,17,10),
+             byrow = T,ncol = 4)
+dimnames(agt) = list("A"=1:4,"B"=1:4)
+# As vectors
+c1 = rep(1:4,times=diag(agt))
+c1 = c(c1,rep(1:4,times=rowSums(agt*lower.tri(agt))))
+c1 = c(c1,rep(1:4,times=rowSums(agt*upper.tri(agt))))
+c2 = rep(1:4,times=diag(agt))
+c2 = c(c2,rep(1:4,times=colSums(agt*lower.tri(agt))))
+c2 = c(c2,rep(1:4,times=colSums(agt*upper.tri(agt))))
+# Check
+table(c1,c2)
+# Data from Agresti Biometrics 1988
+agt=matrix(c(1,1,22,1,2,2,1,3,2,1,4,0,1,5,0,
+2,1,5,2,2,7,2,3,14,2,4,0,2,5,0,
+3,1,0,3,2,2,3,3,36,3,4,0,3,5,0,
+4,1,0,4,2,1,4,3,14,4,4,7,4,5,0,
+5,1,0,5,2,0,5,3,3,5,4,0,5,5,3),byrow = T,ncol = 3)
+```
+
 # All disagreements
 
 The table below is sortable and searchable, and includes only the features and locations where there was some disagreement.
@@ -80,6 +107,7 @@ data %>%
   select(-disagree) %>%
   datatable(., rownames = F)
 ```
+
 # Plots
 
 ## All scans
@@ -273,7 +301,7 @@ data %>%
   facet_wrap(~scan_id)
 ```
 
-Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans. 
+Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
 
 ## Ground Glass
 
