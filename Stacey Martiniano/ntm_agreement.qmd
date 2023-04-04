@@ -404,7 +404,6 @@ perfect_agreement = lapply(df_list,function(d){
     return(NA)
   }
 })
-boot_df = data
 ```
 
 ## Kappa
@@ -421,7 +420,24 @@ Fleiss' $\kappa$ across all features was `r round(ci$t0,3)` (percentile CI: `r p
 ## Tetra/polychoric correlation
 
 ```{r}
+library(psych)
+boot_polychor <- function(df, i) {
+  d <- df[i,c("AF","DL","JW")] # allows boot to select sample
+  d = data.matrix(d)
+  p = suppressWarnings(polychoric(d,global = F,correct = F))
+  p = p$rho[lower.tri(p$rho)]
+  names(p)=c("AF-DL","AF-JW","DL-JW")
+  return(p)
+}
+```
 
+### Overall
+
+```{r}
+pa <- boot(data,boot_polychor,R=1000,strata = interaction(factor(data$scan_id),factor(data$location)))
+ci_af_dl=boot.ci(pa,index = 1,type = c("perc","bca"))
+ci_af_jw=boot.ci(pa,index = 2,type = c("perc","bca"))
+ci_dl_jw=boot.ci(pa,index = 3,type = c("perc","bca"))
 ```
 
 ## Random effects
