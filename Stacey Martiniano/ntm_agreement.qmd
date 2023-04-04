@@ -70,32 +70,6 @@ names(colors) <- vals
 custom_colors <- scale_fill_manual(name = "", values = colors)
 ```
 
-
-```{r}
-# Agresti examples
-agt = matrix(c(22,2,2,0,
-               5,7,14,0,
-               0,2,36,0,
-               0,1,17,10),
-             byrow = T,ncol = 4)
-dimnames(agt) = list("A"=1:4,"B"=1:4)
-# As vectors
-c1 = rep(1:4,times=diag(agt))
-c1 = c(c1,rep(1:4,times=rowSums(agt*lower.tri(agt))))
-c1 = c(c1,rep(1:4,times=rowSums(agt*upper.tri(agt))))
-c2 = rep(1:4,times=diag(agt))
-c2 = c(c2,rep(1:4,times=colSums(agt*lower.tri(agt))))
-c2 = c(c2,rep(1:4,times=colSums(agt*upper.tri(agt))))
-# Check
-table(c1,c2)
-# Data from Agresti Biometrics 1988
-agt=matrix(c(1,1,22,1,2,2,1,3,2,1,4,0,1,5,0,
-2,1,5,2,2,7,2,3,14,2,4,0,2,5,0,
-3,1,0,3,2,2,3,3,36,3,4,0,3,5,0,
-4,1,0,4,2,1,4,3,14,4,4,7,4,5,0,
-5,1,0,5,2,0,5,3,3,5,4,0,5,5,3),byrow = T,ncol = 3)
-```
-
 # All disagreements
 
 The table below is sortable and searchable, and includes only the features and locations where there was some disagreement.
@@ -406,3 +380,72 @@ data %>%
 ```
 
 Fleiss' Kappa for multiple raters was `r ka` (p: `r p`) across all scans.
+
+# Bootstrap
+
+To calculate bootstrap CIs for an kappa, we generated 1000 bootstrap samples clustered by scan ID and location, and calculated Fleiss' $\kappa$ for each bootstrap sample. Percentile and bias-corrected and accelerated (BCa) intervals are presented below.
+
+```{r}
+library(boot)
+boot_fleiss <- function(df, i) {
+  d <- df[i,c("AF","DL","JW")] # allows boot to select sample
+  k = kappam.fleiss(d)
+  return(k$value)
+}
+```
+
+```{r}
+# Remove scans and features with no variability
+df_list = split.data.frame(data,f = ~ scan_id + feature)
+perfect_agreement = lapply(df_list,function(d){
+  if(all(d$disagree==FALSE) | all(d$disagree==TRUE)){
+    return(names(d))
+  } else {
+    return(NA)
+  }
+})
+boot_df = data
+```
+
+## Kappa
+
+### Overall
+
+```{r}
+ka <- boot(data,boot_fleiss,R=1000,strata = interaction(factor(data$scan_id),factor(data$location)))
+ci=boot.ci(ka,type = c("perc","bca"))
+```
+
+Fleiss' $\kappa$ across all features was `r round(ci$t0,3)` (percentile CI: `r paste(round(ci$percent[4],3),"-",round(ci$percent[5],3))`, BCa CI: `r paste(round(ci$bca[4],3),"-",round(ci$bca[5],3))`)
+
+## Tetra/polychoric correlation
+
+```{r}
+
+```
+
+## Random effects
+
+In this scenario we have multiple crossed random effects. Each scan contains every level of feature and region, and each level of feature contains each level of region (or vice versa).
+
+```{r}
+library(lme4)
+library(performance)
+# Long data for lmer
+re_data_no_bronch = data %>% select(-disagree) %>% 
+  filter(feature != "Bronchiectasis") %>% # Remove bronchiectasis because it's on a different scale?
+  pivot_longer(AF:JW)
+re_data_no_bronch$value = factor(as.character(re_data_no_bronch$value),levels = c("Unchecked", "Checked"))
+# Logistic model
+m = glmer(value~name+(1|scan_id)+(1|feature)+(1|location),
+         data = re_data_no_bronch,family="binomial")
+summary(m)
+# Logistic model
+m2 = glmer(value~name+(1|scan_id)+(1|feature),
+         data = re_data_no_bronch,family="binomial")
+summary(m2)
+icc(m2)
+icc(m2,by_group = T)
+```
+
+There is essentially no variability in the random effect for location (which I think is good?).
