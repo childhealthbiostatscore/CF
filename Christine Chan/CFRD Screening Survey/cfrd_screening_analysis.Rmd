@@ -27,7 +27,7 @@ if(Sys.info()["sysname"] == "Windows"){
 }
 knitr::opts_knit$set(root.dir = home_dir)
 rm(home_dir)
-source("~/GitHub/CF/get_genotype_class_severity.R")
+source("~/GitHub/CF/genotype_class_severity.R")
 ```
 
 ```{r}
@@ -35,9 +35,9 @@ endo = read.csv("./Christine Chan/CFRD Screening/Data_Raw/endo.csv",na.strings =
 non_endo = read.csv("./Christine Chan/CFRD Screening/Data_Raw/non_endo.csv",na.strings = "")
 ```
 
-# Hypothesis Tests
+# OGTT Completion Rate
 
-## Centers with at least 50% of patients with state-funded health insurance have less than50% OGTT completion rates (CF center directors survey, questions #4 and #6).
+## Centers with at least 50% of patients with state-funded health insurance have less than 50% OGTT completion rates (CF center directors survey, questions #4 and #6).
 
 ```{r}
 # Combine levels
@@ -245,6 +245,24 @@ kable(tidy(m,exponentiate = T),digits = 3)
 
 There was a significant association between reminders and OGTT completion (p = `r round(summary(m)$coefficients[2,4],3)`). Centers with regular reminders were approximately 5 times more likely to have an over 50% OGTT completion rate.
 
+# Center Age Group
+
+```{r}
+non_endo$age_group = 
+  factor(non_endo$What.patient.group.does.your.CF.center.take.care.of.)
+endo$age_group = 
+  factor(endo$What.age.group.of.CF.patients.do.you.take.care.of...please.select.all.that.apply.)
+levels(endo$age_group) = c("Pediatric","Both","Both","Both","Adult")
+```
+
+## CF center directors
+
+```{r results='asis'}
+t1 = tableby(age_group ~ state_funded+ogtt_completion + endocrinologist + protocol + role + location +reminders,
+             data = non_endo,control = list(cat.test = "fe"))
+summary(t1,pfootnote = T)
+```
+
 # Combined data
 
 ```{r}
@@ -346,3 +364,4 @@ ggplot(plot_df,aes(x = name,y = n,group = type,fill = type)) +
 ```
 
 Center directors and endocrinologists were not significantly different in terms of how often they use alternative screening measures (p = 0.116).
+
