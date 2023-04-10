@@ -46,6 +46,13 @@ bugs = colnames(df)[grep("If.culture.was.positive..select.all.organisms.isolated
 bugs <- sub("If.culture.was.positive..select.all.organisms.isolated...choice.", "", bugs)
 bugs = bugs[1:16]
 colnames(df) <- sub("If.culture.was.positive..select.all.organisms.isolated...choice.", "", colnames(df))
+bug_names=c("Methicillin sensitive Staph aureus", 
+            "Methicillin resistant Staph aureus","A. xylosoxidans", 
+            "Achromobacter (not xylosoxidans)","Acinetobacter","H. influenzae", 
+            "P. aeruginosa", "P. aeruginosa (mucoid)", 
+            "Pseudomonas species (not aeruginosa)", "B. cepacia complex",
+            "Stenotrophomonas", "Aspergillus", "Penicillium species", 
+            "Sceosporium species", "M. avium complex", "M. abscessus" )
 ```
 
 ```{r}
@@ -84,14 +91,14 @@ Fleiss' kappa is interpreted analagously to Cohen's kappa, but applies to more t
 | 1             | Perfect agreement      |
 
 ```{r}
-fleiss = function(bug,bug_name){
+fleiss = function(bug){
   d = df[,c(bug,paste0(bug,".1"),paste0(bug,".2"))]
   colnames(d) = c("Clinic","Delayed","Home")
   d[d=="Checked"] = "Present"
   d[d=="Unchecked"] = "Absent"
   fk = kappam.fleiss(d)
   cat("\n")
-    cat("##", bug_name)
+    cat("##", bug_names[which(bugs==bug)])
     cat("\n")
     print(ftable(d))
     cat("\n")
@@ -101,70 +108,67 @@ fleiss = function(bug,bug_name){
 ```
 
 ```{r}
-fleiss(bug = "Methicillin.sensitive.Staph.aureus.",bug_name = "MSSA")
+fleiss(bug = "Methicillin.sensitive.Staph.aureus.")
 ```
 
 ```{r}
-fleiss(bug = "Methicillin.resistant.Staph.aureus.",
-       bug_name = "MRSA")
+fleiss(bug = "Methicillin.resistant.Staph.aureus.")
 ```
 
 ```{r}
-fleiss("A..xylosoxidans.", bug_name = "A. xylosoxidans")
+fleiss("A..xylosoxidans.")
 ```
 
 ```{r}
-fleiss("Achromobacter.not.xylosoxidans.",
-       bug_name = "Achromobacter (not xylosoxidans)")
+fleiss("Achromobacter.not.xylosoxidans.")
 ```
 
 ```{r}
-fleiss("Acinetobacter.", bug_name = "Acinetobacter")
+fleiss("Acinetobacter.")
 ```
 
 ```{r}
-fleiss("H..influenzae.", bug_name = "H. influenzae")
+fleiss("H..influenzae.")
 ```
 
 ```{r}
-fleiss("P..aeruginosa.", bug_name = "P. aeruginosa")
+fleiss("P..aeruginosa.")
 ```
 
 ```{r}
-fleiss("P..aeruginosa..mucoid..",bug_name = "P. aeruginosa (mucoid)")
+fleiss("P..aeruginosa..mucoid..")
 ```
 
 ```{r}
-fleiss("Pseudomonas.species..not.aeruginosa.",
-       bug_name = "Pseudomonas (not aeruginosa)")
+fleiss("Pseudomonas.species..not.aeruginosa.")
 ```
 
 ```{r}
-fleiss("B..cepacia.complex.", bug_name = "B. cepacia complex")
+fleiss("B..cepacia.complex.")
 ```
 
 ```{r}
-fleiss("Stenotrophomonas.", bug_name = "Stenotrophomonas")
+fleiss("Stenotrophomonas.")
 ```
 
 ```{r}
-fleiss("Aspergillus.",bug_name = "Aspergillus")
+fleiss("Aspergillus.")
 ```
 
 ```{r}
-fleiss("Penicillium.species.",bug_name = "Penicillium species")
+fleiss("Penicillium.species.")
 ```
 
 ```{r}
-fleiss("Sceosporium.species.",bug_name = "Sceosporium species")
+fleiss("Sceosporium.species.")
 ```
 
 ```{r}
-fleiss("M..avium.complex.",bug_name = "M. avium complex")
+fleiss("M..avium.complex.")
 ```
 
 ```{r}
-fleiss("M..abscessus.", bug_name = "M. abscessus")
+fleiss("M..abscessus.")
 ```
 
 ### Figure
@@ -191,6 +195,30 @@ ggplot(counts,aes(x=Bug,y=n,fill=Test,label=n))+
   scale_y_continuous(labels = scales::percent) +
   scale_fill_brewer(palette = "Pastel1")+
   xlab("Pathogen")+ylab("% of Samples")
+```
 
+# No pathogens detected 
+
+Among those with no pathogens detected in clinic (n = 14), 6 had pathogens detected in delayed samples, and 3 had pathogens detected at home.
+
+```{r results='asis'}
+# For those who tested negative for any bugs in clinic, did they also test
+# negative for all at home
+f = df %>% select(Subject.ID,contains (bugs)) %>% 
+  mutate(across(-Subject.ID,
+                ~as.numeric(factor(.x,levels=c("Unchecked","Checked")))-1)) %>%
+  rowwise() %>%
+  mutate(`Clinic % Positive` = mean(c_across(all_of(bugs)))*100,
+         `Delayed % Positive` = mean(c_across(all_of(paste0(bugs,".1"))))*100,
+         `Home % Positive` = mean(c_across(all_of(paste0(bugs,".2"))))*100) %>%
+  select(Subject.ID,`Clinic % Positive`:`Home % Positive`) %>%
+  filter(`Clinic % Positive`==0)
+knitr::kable(f)
+```
+
+```{r}
+f = f %>%
+  mutate(across(c("Clinic % Positive","Delayed % Positive","Home % Positive"),~.x==0))
+kappam.fleiss(f[,2:4])
 ```
 
