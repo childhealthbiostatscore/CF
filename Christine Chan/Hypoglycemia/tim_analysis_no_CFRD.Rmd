@@ -643,15 +643,15 @@ cf_groups <- cf_groups %>%
   unique()
 table_dat <- merge(table_dat, cf_groups)
 
-table_dat$CF_hypo_60[table_dat$CF == "Yes" & table_dat$hypo_60 == "Yes"] <- "CF/Hypo"
-table_dat$CF_hypo_60[table_dat$CF == "Yes" & table_dat$hypo_60 == "No"] <- "CF/No-Hypo"
-table_dat$CF_hypo_60[table_dat$CF == "No" & table_dat$hypo_60 == "Yes"] <- "HC/Hypo"
-table_dat$CF_hypo_60[table_dat$CF == "No" & table_dat$hypo_60 == "No"] <- "HC/No-Hypo"
+table_dat$CF_hypo_60[table_dat$CF == "Yes" & table_dat$hypo_60 == "Yes"] <- "CF/Hypo+"
+table_dat$CF_hypo_60[table_dat$CF == "Yes" & table_dat$hypo_60 == "No"] <- "CF/Hypo-"
+table_dat$CF_hypo_60[table_dat$CF == "No" & table_dat$hypo_60 == "Yes"] <- "HC/Hypo+"
+table_dat$CF_hypo_60[table_dat$CF == "No" & table_dat$hypo_60 == "No"] <- "HC/Hypo-"
 
-table_dat$CF_hypo_70[table_dat$CF == "Yes" & table_dat$hypo_70 == "Yes"] <- "CF/Hypo"
-table_dat$CF_hypo_70[table_dat$CF == "Yes" & table_dat$hypo_70 == "No"] <- "CF/No-Hypo"
-table_dat$CF_hypo_70[table_dat$CF == "No" & table_dat$hypo_70 == "Yes"] <- "HC/Hypo"
-table_dat$CF_hypo_70[table_dat$CF == "No" & table_dat$hypo_70 == "No"] <- "HC/No-Hypo"
+table_dat$CF_hypo_70[table_dat$CF == "Yes" & table_dat$hypo_70 == "Yes"] <- "CF/Hypo+"
+table_dat$CF_hypo_70[table_dat$CF == "Yes" & table_dat$hypo_70 == "No"] <- "CF/Hypo-"
+table_dat$CF_hypo_70[table_dat$CF == "No" & table_dat$hypo_70 == "Yes"] <- "HC/Hypo+"
+table_dat$CF_hypo_70[table_dat$CF == "No" & table_dat$hypo_70 == "No"] <- "HC/Hypo-"
 
 table_dat <- table_dat %>% filter(is.na(cf_pancreatic) | cf_pancreatic == 2)
 table_dat$cf_insulin_use[table_dat$cf_insulin_use == 1] <- "Yes"
@@ -702,12 +702,12 @@ After removing CF Insulin Use:
 - Delta Glucagon pairwise comparison CF/No-Hypo70 vs HC/Hypo70 no longer significant
 - CGM Avg Glucose pairwise comparison CF/No-Hypo70 vs HC/Hypo70 no longer significant
 - CGM Avg Glucose pairwise comparison CF/No-Hypo70 vs HC/No-Hypo70 no longer significant
-- %time over 140 pairwise comparison CF/Hypo70 vs CF/No-Hypo no longer significant
+- %time over 140 pairwise comparison CF/Hypo70 vs CF/Hypo- no longer significant
 
 
 # With CF Insulin
 
-## Table 1 by CF/Hypo < 60
+## Table 1 by CF/Hypo+ < 60
 
 ```{r, results='asis', warning = F, message = F}
 control <- tableby.control(numeric.test = "kwt")
@@ -820,18 +820,18 @@ ptab <- pairwiseTableby(tab)
 
 kbl(ptab, caption = "Pairwise p-values") %>%
   column_spec(2, background = 
-                ifelse(ptab$`CF/Hypo vs CF/No-Hypo` < 0.05, "red", "white")) %>%
+                ifelse(ptab$`CF/Hypo- vs CF/Hypo+` < 0.05, "red", "white")) %>%
   column_spec(3, background = 
-                na.fill(ifelse(ptab$`CF/Hypo vs HC/Hypo` < 0.05, 
+                na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo+` < 0.05, 
                                "red", "white"), "white)")) %>%
   column_spec(4, background = 
-                na.fill(ifelse(ptab$`CF/Hypo vs HC/No-Hypo` < 0.05, 
+                na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo-` < 0.05, 
                                "red", "white"), "white)")) %>%
   column_spec(5, background = 
-                na.fill(ifelse(ptab$`CF/No-Hypo vs HC/Hypo` < 0.05, 
+                na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo+` < 0.05, 
                                "red", "white"), "white)")) %>%
   column_spec(6, background = 
-                na.fill(ifelse(ptab$`CF/No-Hypo vs HC/No-Hypo` < 0.05, 
+                na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo-` < 0.05, 
                                "red", "white"), "white)"))
 ```
 
@@ -860,18 +860,18 @@ ptab <- pairwiseTableby(tab)
 
 kbl(ptab, caption = "Pairwise p-values") %>%
   column_spec(2, background = 
-                ifelse(ptab$`CF/Hypo vs CF/No-Hypo` < 0.05, "red", "white")) %>%
+                ifelse(ptab$`CF/Hypo- vs CF/Hypo+` < 0.05, "red", "white")) %>%
   column_spec(3, background = 
-                na.fill(ifelse(ptab$`CF/Hypo vs HC/Hypo` < 0.05, 
+                na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo+` < 0.05, 
                                "red", "white"), "white)")) %>%
   column_spec(4, background = 
-                na.fill(ifelse(ptab$`CF/Hypo vs HC/No-Hypo` < 0.05, 
+                na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo-` < 0.05, 
                                "red", "white"), "white)")) %>%
   column_spec(5, background = 
-                na.fill(ifelse(ptab$`CF/No-Hypo vs HC/Hypo` < 0.05, 
+                na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo+` < 0.05, 
                                "red", "white"), "white)")) %>%
   column_spec(6, background = 
-                na.fill(ifelse(ptab$`CF/No-Hypo vs HC/No-Hypo` < 0.05, 
+                na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo-` < 0.05, 
                                "red", "white"), "white)"))
 ```
 
@@ -1055,7 +1055,7 @@ p1 <- ggplot(data = table_dat, aes(y = matsuda_ins, x = CF_hypo_60, color = CF_h
   geom_boxplot() +
   labs(y = "Matsuda Index", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo"), c("CF/Hypo", "HC/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-"), c("CF/Hypo+", "HC/Hypo-")),
     color = "black",
     y_position = c(45, 50),
     map_signif_level = function(p) sprintf("p = %.2g", p)
@@ -1069,7 +1069,7 @@ p2 <- ggplot(data = table_dat, aes(y = homa_ir, x = CF_hypo_60, color = CF_hypo_
   geom_boxplot() +
   labs(y = "HOMA IR", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-")),
     color = "black",
     map_signif_level = function(p) sprintf("p = %.2g", p)
   ) +
@@ -1093,7 +1093,7 @@ p1 <- ggplot(data = table_dat, aes(y = matsuda_ins, x = CF_hypo_60)) +
   geom_boxplot() +
   labs(y = "Matsuda Index", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo"), c("CF/Hypo", "HC/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-"), c("CF/Hypo+", "HC/Hypo-")),
     color = "black",
     y_position = c(45, 50),
     map_signif_level = function(p) sprintf("p = %.2g", p)
@@ -1106,7 +1106,7 @@ p2 <- ggplot(data = table_dat, aes(y = homa_ir, x = CF_hypo_60)) +
   geom_boxplot() +
   labs(y = "HOMA IR", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-")),
     color = "black",
     map_signif_level = function(p) sprintf("p = %.2g", p)
   ) +
@@ -1124,7 +1124,7 @@ p1 + p2 + plot_layout(guides = "collect", ncol = 2, nrow = 1) &
 dev.off()
 ```
 
-## Table 1 by CF/Hypo < 70
+## Table 1 by CF/Hypo+ < 70
 
 ```{r, results='asis', warning = F, message = F}
 tab <- tableby(
@@ -1204,11 +1204,11 @@ summary(tab)
 ptab <- pairwiseTableby(tab)
 
 kbl(ptab, caption = "Pairwise p-values") %>%
-  column_spec(2, background = ifelse(ptab$`CF/Hypo vs CF/No-Hypo` < 0.05, "red", "white")) %>%
-  column_spec(3, background = na.fill(ifelse(ptab$`CF/Hypo vs HC/Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(4, background = na.fill(ifelse(ptab$`CF/Hypo vs HC/No-Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(5, background = na.fill(ifelse(ptab$`CF/No-Hypo vs HC/Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(6, background = na.fill(ifelse(ptab$`CF/No-Hypo vs HC/No-Hypo` < 0.05, "red", "white"), "white)"))
+  column_spec(2, background = ifelse(ptab$`CF/Hypo- vs CF/Hypo+` < 0.05, "red", "white")) %>%
+  column_spec(3, background = na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo+` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(4, background = na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo-` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(5, background = na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo+` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(6, background = na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo-` < 0.05, "red", "white"), "white)"))
 ```
 
 ## CGM with Hypo < 70
@@ -1233,11 +1233,11 @@ summary(tab)
 ptab <- pairwiseTableby(tab)
 
 kbl(ptab, caption = "Pairwise p-values") %>%
-  column_spec(2, background = ifelse(ptab$`CF/Hypo vs CF/No-Hypo` < 0.05, "red", "white")) %>%
-  column_spec(3, background = na.fill(ifelse(ptab$`CF/Hypo vs HC/Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(4, background = na.fill(ifelse(ptab$`CF/Hypo vs HC/No-Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(5, background = na.fill(ifelse(ptab$`CF/No-Hypo vs HC/Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(6, background = na.fill(ifelse(ptab$`CF/No-Hypo vs HC/No-Hypo` < 0.05, "red", "white"), "white)"))
+  column_spec(2, background = ifelse(ptab$`CF/Hypo- vs CF/Hypo+` < 0.05, "red", "white")) %>%
+  column_spec(3, background = na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo+` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(4, background = na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo-` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(5, background = na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo+` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(6, background = na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo-` < 0.05, "red", "white"), "white)"))
 ```
 
 
@@ -1396,7 +1396,7 @@ p1 <- ggplot(data = table_dat, aes(y = matsuda_ins, x = CF_hypo_70, color = CF_h
   geom_boxplot() +
   labs(y = "Matsuda Index", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-")),
     color = "black",
     test = "wilcox.test",
     map_signif_level = function(p) sprintf("p = %.2g", p)
@@ -1410,7 +1410,7 @@ p2 <- ggplot(data = table_dat, aes(y = homa_ir, x = CF_hypo_70, color = CF_hypo_
   geom_boxplot() +
   labs(y = "HOMA IR", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-")),
     color = "black",
     test = "wilcox.test",
     map_signif_level = function(p) sprintf("p = %.2g", p)
@@ -1435,7 +1435,7 @@ p1 <- ggplot(data = table_dat, aes(y = matsuda_ins, x = CF_hypo_70)) +
   geom_boxplot() +
   labs(y = "Matsuda Index", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-")),
     color = "black",
     test = "wilcox.test",
     map_signif_level = function(p) sprintf("p = %.2g", p)
@@ -1448,7 +1448,7 @@ p2 <- ggplot(data = table_dat, aes(y = homa_ir, x = CF_hypo_70)) +
   geom_boxplot() +
   labs(y = "HOMA IR", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-")),
     color = "black",
     test = "wilcox.test",
     map_signif_level = function(p) sprintf("p = %.2g", p)
@@ -1665,7 +1665,7 @@ write.csv(table_dat, "analysis_data_no_cfinsulinuse.csv")
 
 # Removed CF Insulin Use
 
-## Table 1 by CF/Hypo < 60
+## Table 1 by CF/Hypo+ < 60
 
 ```{r, results='asis', warning = F, message = F}
 control <- tableby.control(numeric.test = "kwt")
@@ -1746,11 +1746,11 @@ summary(tab)
 ptab <- pairwiseTableby(tab)
 
 kbl(ptab, caption = "Pairwise p-values") %>%
-  column_spec(2, background = ifelse(ptab$`CF/Hypo vs CF/No-Hypo` < 0.05, "red", "white")) %>%
-  column_spec(3, background = na.fill(ifelse(ptab$`CF/Hypo vs HC/Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(4, background = na.fill(ifelse(ptab$`CF/Hypo vs HC/No-Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(5, background = na.fill(ifelse(ptab$`CF/No-Hypo vs HC/Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(6, background = na.fill(ifelse(ptab$`CF/No-Hypo vs HC/No-Hypo` < 0.05, "red", "white"), "white)"))
+  column_spec(2, background = ifelse(ptab$`CF/Hypo- vs CF/Hypo+` < 0.05, "red", "white")) %>%
+  column_spec(3, background = na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo+` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(4, background = na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo-` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(5, background = na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo+` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(6, background = na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo-` < 0.05, "red", "white"), "white)"))
 ```
 
 
@@ -1778,11 +1778,11 @@ summary(tab)
 ptab <- pairwiseTableby(tab)
 
 kbl(ptab, caption = "Pairwise p-values") %>%
-  column_spec(2, background = ifelse(ptab$`CF/Hypo vs CF/No-Hypo` < 0.05, "red", "white")) %>%
-  column_spec(3, background = na.fill(ifelse(ptab$`CF/Hypo vs HC/Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(4, background = na.fill(ifelse(ptab$`CF/Hypo vs HC/No-Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(5, background = na.fill(ifelse(ptab$`CF/No-Hypo vs HC/Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(6, background = na.fill(ifelse(ptab$`CF/No-Hypo vs HC/No-Hypo` < 0.05, "red", "white"), "white)"))
+  column_spec(2, background = ifelse(ptab$`CF/Hypo- vs CF/Hypo+` < 0.05, "red", "white")) %>%
+  column_spec(3, background = na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo+` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(4, background = na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo-` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(5, background = na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo+` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(6, background = na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo-` < 0.05, "red", "white"), "white)"))
 ```
 
 ## OGTT with Hypo < 60
@@ -1940,7 +1940,7 @@ p1 <- ggplot(data = table_dat, aes(y = matsuda_ins, x = CF_hypo_60, color = CF_h
   geom_boxplot() +
   labs(y = "Matsuda Index", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo"), c("CF/Hypo", "HC/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-"), c("CF/Hypo+", "HC/Hypo-")),
     color = "black",
     y_position = c(45, 50),
     map_signif_level = function(p) sprintf("p = %.2g", p)
@@ -1954,7 +1954,7 @@ p2 <- ggplot(data = table_dat, aes(y = homa_ir, x = CF_hypo_60, color = CF_hypo_
   geom_boxplot() +
   labs(y = "HOMA IR", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo"), c("CF/Hypo", "HC/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-"), c("CF/Hypo+", "HC/Hypo-")),
     color = "black",
     y_position = c(4.5, 5),
     map_signif_level = function(p) sprintf("p = %.2g", p)
@@ -1979,7 +1979,7 @@ p1 <- ggplot(data = table_dat, aes(y = matsuda_ins, x = CF_hypo_60)) +
   geom_boxplot() +
   labs(y = "Matsuda Index", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo"), c("CF/Hypo", "HC/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-"), c("CF/Hypo+", "HC/Hypo-")),
     color = "black",
     y_position = c(45, 50),
     map_signif_level = function(p) sprintf("p = %.2g", p)
@@ -1992,7 +1992,7 @@ p2 <- ggplot(data = table_dat, aes(y = homa_ir, x = CF_hypo_60)) +
   geom_boxplot() +
   labs(y = "HOMA IR", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo"), c("CF/Hypo", "HC/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-"), c("CF/Hypo+", "HC/Hypo-")),
     color = "black",
     y_position = c(4.5, 5),
     map_signif_level = function(p) sprintf("p = %.2g", p)
@@ -2011,7 +2011,7 @@ p1 + p2 + plot_layout(guides = "collect", ncol = 2, nrow = 1) &
 dev.off()
 ```
 
-## Table 1 by CF/Hypo < 70
+## Table 1 by CF/Hypo+ < 70
 
 ```{r, results='asis', warning = F, message = F}
 tab <- tableby(
@@ -2091,11 +2091,11 @@ summary(tab)
 ptab <- pairwiseTableby(tab)
 
 kbl(ptab, caption = "Pairwise p-values") %>%
-  column_spec(2, background = ifelse(ptab$`CF/Hypo vs CF/No-Hypo` < 0.05, "red", "white")) %>%
-  column_spec(3, background = na.fill(ifelse(ptab$`CF/Hypo vs HC/Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(4, background = na.fill(ifelse(ptab$`CF/Hypo vs HC/No-Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(5, background = na.fill(ifelse(ptab$`CF/No-Hypo vs HC/Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(6, background = na.fill(ifelse(ptab$`CF/No-Hypo vs HC/No-Hypo` < 0.05, "red", "white"), "white)"))
+  column_spec(2, background = ifelse(ptab$`CF/Hypo- vs CF/Hypo+` < 0.05, "red", "white")) %>%
+  column_spec(3, background = na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo+` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(4, background = na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo-` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(5, background = na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo+` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(6, background = na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo-` < 0.05, "red", "white"), "white)"))
 ```
 
 ## CGM with Hypo < 70
@@ -2120,11 +2120,11 @@ summary(tab)
 ptab <- pairwiseTableby(tab)
 
 kbl(ptab, caption = "Pairwise p-values") %>%
-  column_spec(2, background = ifelse(ptab$`CF/Hypo vs CF/No-Hypo` < 0.05, "red", "white")) %>%
-  column_spec(3, background = na.fill(ifelse(ptab$`CF/Hypo vs HC/Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(4, background = na.fill(ifelse(ptab$`CF/Hypo vs HC/No-Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(5, background = na.fill(ifelse(ptab$`CF/No-Hypo vs HC/Hypo` < 0.05, "red", "white"), "white)")) %>%
-  column_spec(6, background = na.fill(ifelse(ptab$`CF/No-Hypo vs HC/No-Hypo` < 0.05, "red", "white"), "white)"))
+  column_spec(2, background = ifelse(ptab$`CF/Hypo- vs CF/Hypo+` < 0.05, "red", "white")) %>%
+  column_spec(3, background = na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo+` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(4, background = na.fill(ifelse(ptab$`CF/Hypo+ vs HC/Hypo-` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(5, background = na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo+` < 0.05, "red", "white"), "white)")) %>%
+  column_spec(6, background = na.fill(ifelse(ptab$`CF/Hypo- vs HC/Hypo-` < 0.05, "red", "white"), "white)"))
 ```
 
 
@@ -2283,7 +2283,7 @@ p1 <- ggplot(data = table_dat, aes(y = matsuda_ins, x = CF_hypo_70, color = CF_h
   geom_boxplot() +
   labs(y = "Matsuda Index", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo"), c("CF/Hypo", "HC/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-"), c("CF/Hypo+", "HC/Hypo-")),
     color = "black",
     y_position = c(45, 50),
     test = "wilcox.test",
@@ -2298,7 +2298,7 @@ p2 <- ggplot(data = table_dat, aes(y = homa_ir, x = CF_hypo_70, color = CF_hypo_
   geom_boxplot() +
   labs(y = "HOMA IR", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo"), c("CF/Hypo", "HC/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-"), c("CF/Hypo+", "HC/Hypo-")),
     color = "black",
     y_position = c(4.5, 5),
     test = "wilcox.test",
@@ -2324,7 +2324,7 @@ p1 <- ggplot(data = table_dat, aes(y = matsuda_ins, x = CF_hypo_70)) +
   geom_boxplot() +
   labs(y = "Matsuda Index", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo"), c("CF/Hypo", "HC/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-"), c("CF/Hypo+", "HC/Hypo-")),
     color = "black",
     y_position = c(45, 50),
     test = "wilcox.test",
@@ -2338,7 +2338,7 @@ p2 <- ggplot(data = table_dat, aes(y = homa_ir, x = CF_hypo_70)) +
   geom_boxplot() +
   labs(y = "HOMA IR", x = "", color = "") +
   geom_signif(
-    comparisons = list(c("CF/Hypo", "CF/No-Hypo"), c("CF/Hypo", "HC/No-Hypo")),
+    comparisons = list(c("CF/Hypo+", "CF/Hypo-"), c("CF/Hypo+", "HC/Hypo-")),
     color = "black",
     y_position = c(4.5, 5),
     test = "wilcox.test",
