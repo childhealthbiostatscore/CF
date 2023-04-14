@@ -119,12 +119,14 @@ df$Ethnicity <- factor(df$Ethnicity,
     "Unknown"
   )
 )
-bugs <- c("P. aeruginosa", "P. aeruginosa mucoid", "P. aeruginosa non-mucoid", "Staph aureus", "MRSA", "S. maltophilia")
+bugs <- c("Staph aureus", "MRSA", "Haemophilus influenzae", "P. aeruginosa non-mucoid", "P. aeruginosa mucoid", "Pseudomonas not aeruginosa", "Burkholderia", "burkhodescription_other", "A. xylosoxidans", "Achromobacter not xylosoxidans", "S. maltophilia", "Inquilinus limosus", "Pandoraea species", "Other bacteria", "Aspergillus species", "Candida species", "Pencillium species", "Scedosporium species", "Mycobacterium avium complex", "Other mycobacterium", "P. aeruginosa")
 df[, bugs] <- lapply(df[, bugs], function(c) {
   c[is.na(c)] <- "No"
   c <- factor(c, levels = c("No", TRUE), labels = c("No", "Yes"), ordered = T)
 })
 df$`S. maltophilia`[df$Site == "CNH"] <- NA
+# Write cleaned data
+write.csv(df,file = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Scott Sagel/PEx in CF/Data_Clean/pex_merged.csv",row.names = F,na = "")
 # Make summary table
 summ <- df %>%
   group_by(`Unique number`, Site, Year) %>%
