@@ -1,103 +1,63 @@
 ---
 title: "Mental Health Screening in CF"
 author: "Tim Vigers"
-date: last-modified
+date: "today"
+date-format: long
 format:
   html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
     code-fold: true
     self-contained: true
+    fig-cap-location: top
     page-layout: full
-    title-block-banner: true
 editor: source
 ---
 
-# Data Cleaning
+# Data cleaning
 
-```{python}
-import pandas as pd
-# Data import
-gad7 = pd.read_csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Raw/GAD-7_General_Anxiety_Disorder_Full_Data_data_11-15-22.csv")
-gad7 = gad7[['PAT_MRN_ID','CONTACT_DATE','AGE AT CONTACT ','GAD-7 Total Score','GAD-7 Totals']]
-gad7.dropna(axis=0,inplace=True)
-gad7.drop_duplicates(inplace=True)
-phq9 = pd.read_csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Raw/PHQ-9_Full_Data_data_11-11-22.csv")
-phq9 = phq9[['PAT_MRN_ID','CONTACT_DATE','AGE AT CONTACT ','PHQ-9 Total Score (calculated)','PHQ-9 Totals']]
-phq9.dropna(axis=0,inplace=True)
-phq9.drop_duplicates(inplace=True)
-psc = pd.read_csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Raw/PSC_Full_Data_data_11-11-22.csv")
-psc = psc[['PAT_MRN_ID','CONTACT_DATE','AGE AT CONTACT ','Score','PSC Totals']]
-psc.dropna(axis=0,inplace=True)
-psc.drop_duplicates(inplace=True)
-# Merge
-df = gad7.merge(phq9,on=['PAT_MRN_ID','CONTACT_DATE','AGE AT CONTACT '],how="outer")
-df = df.merge(psc,on=['PAT_MRN_ID','CONTACT_DATE','AGE AT CONTACT '],how="outer")
-# Rename
-df.rename({'PAT_MRN_ID':'ID','CONTACT_DATE':'Date','AGE AT CONTACT ':'Age','GAD-7 Total Score':'GAD-7 Total','GAD-7 Totals':'GAD-7 Group','PHQ-9 Total Score (calculated)':'PHQ-9 Total','PHQ-9 Totals':'PHQ-9 Group','Score':'PSC-17 Total','PSC Totals':'PSC-17 Group'},inplace=True,axis=1)
-# Pull in Trikafta data
-eti = pd.read_excel("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Raw/Copy of Trikafta Earliest and Most Recent Dates for Patients Over 12.xlsx",usecols=["MRN","Earliest Trikafta in PortCF"])
-df = pd.merge(df,eti,left_on="ID",right_on="MRN")
-# Pre/post
-df["Post-Trikafta"] = df['Date'] > df['Earliest Trikafta in PortCF']
-df["Post-Trikafta"].replace({False:"Pre",True:"Post"},inplace=True)
-# Sort
-df["Date"] = pd.to_datetime(df["Date"])
-df.sort_values(by=["ID","Date"],inplace=True)
-# Write to CSV
-df.drop(["MRN"],axis=1,inplace=True)
-df.to_csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Cleaned/cf_mental_health_screening.csv",index=False)
-```
+1. For each participant, the first recorded visit was designated as baseline.
 
-- On first import, there are 2,646 observations each for GAD-7, PHQ-9, and PSC-17. 
-- After deleting rows missing any any of patient ID, contact date, age at contact, total score, or score group, there were: 
-  - 559 observations for GAD-7
-  - 548 for PHQ-9
-  - 308 for PSC-17
-- After dropping duplicate rows, there are: 
-  - 390 GAD-7 observations
-  - 383 for PHQ-9
-  - 216 for PSC-17
-- After merging these together based on ID, date, and age, there are 613 unique observations with at least one of the three screening measures. 
-
-# Pre- vs. Post-ETI
-
-```{r}
-#| include: false
+```{r include=FALSE}
 library(tidyverse)
-library(arsenal)
+library(plotly)
+library(gtsummary)
+library(GLMMadaptive)
+# Import
+df = read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Cleaned/MH master data.csv",check.names = F,na.strings = "")
+# Column types
+df$CONTACT_DATE = lubridate::mdy(df$CONTACT_DATE)
+df$`PHQ-9 Total Score (calculated)` = as.integer(df$`PHQ-9 Total Score (calculated)`)
+# Visits
+df = df %>% arrange(MRN,CONTACT_DATE) %>% group_by(MRN) %>%
+  mutate(`Visit Number` = row_number(), 
+         `Days From Baseline` = as.numeric(CONTACT_DATE - CONTACT_DATE[1]))
 ```
 
-```{r results="asis"}
-df = read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Cleaned/cf_mental_health_screening.csv",na.strings ="")
+# Plots
 
-means = df %>% group_by(ID,Post.Trikafta) %>% 
-  summarise(`GAD 7 Total` = mean(GAD.7.Total,na.rm = T),
-            `PHQ 9 Total` = mean(PHQ.9.Total,na.rm = T),
-            `PSC 17 Total` = mean(PSC.17.Total,na.rm = T),.groups = "drop")
+```{r warning=FALSE}
+p_phq9_hist = ggplot(df,aes(x = `PHQ-9 Total Score (calculated)`)) + 
+  geom_histogram(binwidth = 1) +
+  scale_x_continuous(breaks = 0:27) +
+  theme_bw() 
+ggplotly(p_phq9_hist)
 
-means$`GAD 7 Group` = cut(means$`GAD 7 Total`,c(-Inf,5,10,15,Inf),right = F,
-                          labels = c("0-4(Minimal)","5-9(Mild)",
-                          "10-14(Moderate)","15-21(Severe)"))
+p_phq9_days = ggplot(df,aes(x=`Days From Baseline`,y = `PHQ-9 Total Score (calculated)`,group=MRN)) + 
+  geom_line(aes(color=factor(MRN)),alpha=0.2) +
+  theme_bw() +
+  theme(legend.position = "none")
+ggplotly(p_phq9_days)
 
-means$`PHQ 9 Group` = cut(means$`PHQ 9 Total`,c(-Inf,5,10,15,20,Inf),right=F,
-                          labels = c("0-4(None)","5-9(Mild)","10-14(Moderate)",
-                          "15-19(Moderately Severe)","20-27(Severe)"))
-
-means$`PSC 17 Group` = cut(means$`PSC 17 Total`,c(-Inf,15,Inf),right = F,
-                          labels = c("0-14(Low Risk)","15-34(High Risk)"))                      
-
-# Remove missing and drop levels
-keep = means %>% group_by(ID) %>% summarise(n=n()) %>% filter(n==2) %>% pull(ID)
-means = means %>% filter(ID %in% keep)
-means$`GAD 7 Group` = droplevels(means$`GAD 7 Group`)
-means$`PHQ 9 Group` = droplevels(means$`PHQ 9 Group`)
-means$`PSC 17 Group` = droplevels(means$`PSC 17 Group`)    
-# Write 
-write.csv(means,file="/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Cleaned/means.csv",row.names=F)
-
-p <- paired(Post.Trikafta ~ `GAD 7 Total`+`GAD 7 Group`+
-  `PHQ 9 Total`+`PHQ 9 Group`+
-  `PSC 17 Total`+`PSC 17 Group`, 
-            data = means, id = ID,numeric.test = "signed.rank",signed.rank.exact = F,
-            numeric.stats = c("Nmiss","median","q1q3","range"))
-summary(p,pfootnote=T)
+p_phq9_visit = ggplot(df,aes(x=`Visit Number`,y = `PHQ-9 Total Score (calculated)`,group=MRN)) + 
+  geom_line(aes(color=factor(MRN)),alpha=0.2) +
+  theme_bw() +
+  theme(legend.position = "none")
+ggplotly(p_phq9_visit)
 ```
+
+# Methods
+
+Because the PHQ-9 results are right-skewed with lots of 0 scores, we used a zero inflated Poisson mixed model to analyze change in score over time.
+
