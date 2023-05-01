@@ -27,6 +27,9 @@ library(tidyverse)
 library(gtsummary)
 library(kableExtra)
 library(foreign)
+library(plotly)
+library(pscl)
+library(glmnet)
 # Read in data
 df = read.spss("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Body Image and Trikafta/Data_Raw/TrikaftaBodyImage3.6.23.sav",to.data.frame = T)
 # Filter
@@ -37,6 +40,8 @@ df = df %>%
   mutate(across(where(is.character),trimws))
 # Replace blanks with NA
 df[df==""]=NA
+# Categorical variables
+df$FRS_Category = relevel(df$FRS_Category,ref = "neutral")
 ```
 
 # Descriptive analyses
@@ -68,10 +73,48 @@ df %>% select(ChangestoBreathing:MoodChangesSideEf,FeelTrikafta) %>%
   )
 ```
 
-# Figure
+# Mental health scores by FRS category
+
+## PHQ9
+
+### Basic model
+
+Because almost 50% of respondents scored 0 on the PHQ9 and the variance appears to be much larger than the mean, we used a zero-inflated negative binomial (ZINB) model.
 
 ```{r}
-# | label: fig-planets
-# | fig-cap: Planets
-
+# Plot all the zeroes
+p = ggplot(df,aes(x=PHQ9_Total)) + geom_histogram(binwidth = 1) + theme_bw()
+ggplotly(p)
+# Fit ZIP model
+zinb1 <- zeroinfl(PHQ9_Total ~ FRS_Category,data = df,dist = "negbin")
+summary(zinb1)
 ```
+
+The output above suggests that there are no differences between FRS categories in terms of the likelihood of scoring a 0 on the PHQ9, or in terms of score for those with a non-zero score. Because there may be other variables that predict a score of 0, we used the lasso to find a model for 0 scores. Parameters for the lasso were chosen based on 10-fold cross validation (CV).
+
+```{r}
+# Get variables with no missing data, and at least some variance.
+x = df[,which(colSums(is.na(df))==0)]
+x = x[,-caret::nearZeroVar(x)]
+# Remove variables that wouldn't make sense and other mental health variables
+x = x %>% select(-c(ID,DOB),-contains("PHQ9"),-contains("GAD7"),
+                 -contains("FRS"),-contains("bes"),-PercentAdherence)
+preds = colnames(x)
+# Outcome
+df$PHQ9_0 = as.factor(df$PHQ9_Total==0)
+# As a formula
+f = as.formula(paste0("PHQ9_0~",paste0(preds,collapse = "+")))
+# Lasso
+xm = model.matrix(update(f,.~.-1),df)
+y = df$PHQ9_0
+cvfit = cv.glmnet(xm, y,family="binomial",nlambda=1e6)
+# Results
+coef(cvfit, s = "lambda.min")
+coef(cvfit, s = "lambda.1se")
+```
+
+Even with CV on $10^5$ lambda values, no variables are associated with the probability of scoring a 0. 
+
+# Questions
+
+1. For the ZINB model, should we use different predictors for the logistic part of the model (i.e., the part that predicts whether someone will have a non-zero score) based on clinical knowledge? For example, would you expect that certain ages would be more likely to score a 0?
