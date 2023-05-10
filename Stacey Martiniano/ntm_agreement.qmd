@@ -33,21 +33,29 @@ rcon <- redcapConnection(
 )
 data <- exportRecords(rcon, labels = F)
 data <- data.frame(lapply(data, as.character))
+data$scan_id = as.numeric(data$scan_id)
 # Make scorer IDs by initial
 data$scorer <- paste0(
   toupper(substr(data$reader_first_name, 1, 1)),
   toupper(substr(data$reader_last_name, 1, 1))
 )
+# Revert duplicate IDs back to original to match with gold standard
+training = read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
+dups = read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
+data$scan_id[match(dups$duplicated_ssid..dates.shifted..17.days.,data$scan_id)] = dups$original_ssid
+training$Training_id = as.numeric(sub("T00","",training$Training_id))
+data$scan_id[data$scan_id %in% training$Training_id] <- 
+  training$Cffid.Scoring.Set[match(data$scan_id, training$Training_id, nomatch = NA)]
 # Select relevant columns, convert to long data
 data <- data %>%
   arrange(scan_id, scorer) %>%
-  filter(scan_id > 2) %>%
+  filter(as.numeric(scan_id) <= 5) %>%
   select(scorer, scan_id, bronchiectasis_rul:atelectasis___6)
 data <- data %>%
   pivot_longer(bronchiectasis_rul:atelectasis___6,
     names_to = c("feature", "location"),
     names_pattern = "(.*)_(.*)$"
-  ) %>%
+  ) %>% 
   mutate(
     feature = gsub("__", "", feature),
     feature = str_to_title(gsub("_", " ", feature))
@@ -68,6 +76,8 @@ name <- "Accent"
 colors <- brewer.pal(n, name)
 names(colors) <- vals
 custom_colors <- scale_fill_manual(name = "", values = colors)
+# Get gold standard scores
+gold_standard = read_excel("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Raw/gold_standard_scores.xlsx")
 ```
 
 # All disagreements
