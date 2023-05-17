@@ -8,7 +8,7 @@ format:
     toc: true
     toc-depth: 5
     toc-float: true
-    code-fold: false
+    code-fold: true
     self-contained: true
     fig-cap-location: top
     page-layout: full
@@ -18,11 +18,11 @@ editor: source
 ```{r}
 #| include: false
 library(tidyverse)
+library(irr)
 library(redcapAPI)
-library(lmerTest)
-library(performance)
-library(broom.mixed)
-library(knitr)
+library(Hmisc)
+library(DT)
+library(RColorBrewer)
 # Import data
 api <- read.table("~/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt",
                   header = F
@@ -54,12 +54,19 @@ new = training$Cffid.Scoring.Set
 data$scan_id[data$scan_id %in% old] <- new[match(data$scan_id, old, nomatch = 0)]
 ```
 
-# Gold standards
+| Cohen's Kappa | Interpretation         |
+|---------------|------------------------|
+| 0             | No agreement           |
+| 0.10 - 0.20   | Slight agreement       |
+| 0.21 - 0.40   | Fair agreement         |
+| 0.41 - 0.60   | Moderate agreement     |
+| 0.61 - 0.80   | Substantial agreement  |
+| 0.81 - 0.99   | Near perfect agreement |
+| 1             | Perfect agreement      |
 
-## Excluding bronchiectasis
+# Comparison to gold standards
 
 ```{r}
-#| echo: false
 # Gold standard data
 gs = data %>% 
   arrange(scan_id, scorer) %>%
@@ -67,69 +74,306 @@ gs = data %>%
   group_by(scorer,scan_id) %>%
   slice_max(scoresheet_timestamp) %>%
   select(scorer, scan_id, bronchiectasis_rul:atelectasis___6) %>%
-  ungroup() %>% pivot_longer(bronchiectasis_rul:atelectasis___6,
-                             names_to = c("feature", "location"),
-                             names_pattern = "(.*)_(.*)$"
+  ungroup()
+# Plot colors
+name <- "Accent"
+colors <- brewer.pal(6, name)
+names(colors) <- c("Checked","Unchecked","Absent","Cylindric","Varicose",NA)
+custom_colors <- scale_fill_manual(name = "", values = colors)
+# Function
+compare = function(df,scan_num){
+  id = training$Cffid.Scoring.Set[training$Training_id == scan_num]
+  df = df %>% filter(scan_id == id)
+  df = df %>% pivot_longer(bronchiectasis_rul:atelectasis___6,
+                           names_to = c("feature", "location"),
+                           names_pattern = "(.*)_(.*)$"
   ) %>% 
-  mutate(
-    feature = gsub("__", "", feature),
-    feature = str_to_title(gsub("_", " ", feature))
-  ) 
-gs$location <- factor(gs$location,
-                      levels = c("1", "2", "3", "4", "5", "6", "ling", "lll", 
-                                 "lul", "rll", "rml", "rul"),
-                      labels = c("RUL", "RML", "RLL", "LUL", "Ling", "LLL", 
-                                 "Ling", "LLL", "LUL", "RLL", "RML", "RUL")
-)
-# Exclude bronchiectasis
-gs = gs %>% filter(feature != "Bronchiectasis")
-gs$value = factor(gs$value,levels = c("Unchecked","Checked"),
-                  labels = c("Absent","Present"))
-# GS as reference group
-gs$scorer = factor(gs$scorer,levels = c("GS","AF","DL","JW"))
-gs$value = factor(gs$value)
-# Plot
-gs %>%
-  ggplot(., aes(x = scorer, y = location, fill = value)) +
-  geom_tile(color = "black") +
-  theme_bw() +
-  labs(fill = "", x = "Scorer", y = "Location") +
-  facet_grid(rows = vars(scan_id),cols = vars(feature))
+    mutate(
+      feature = gsub("__", "", feature),
+      feature = str_to_title(gsub("_", " ", feature))
+    ) 
+  df$location <- factor(df$location,
+                        levels = c("1", "2", "3", "4", "5", "6", "ling", "lll", 
+                                   "lul", "rll", "rml", "rul"),
+                        labels = c("RUL", "RML", "RLL", "LUL", "Ling", "LLL", 
+                                   "Ling", "LLL", "LUL", "RLL", "RML", "RUL")
+  )
+  df$value <- factor(df$value, levels = c("Checked", "Unchecked", "Absent", "Cylindric", "Varicose"))
+  # One column per scorer
+  df <- df %>% 
+    pivot_wider(names_from = scorer, values_from = value) %>%
+    arrange(feature,location)
+  # Kappa for the whole scan
+  fk = kappam.fleiss(df[,c("AF","DL","GS","JW")])
+  af = kappa2(df[,c("AF","GS")])
+  dl = kappa2(df[,c("DL","GS")])
+  jw = kappa2(df[,c("JW","GS")])
+  cat("\n")
+  cat("### Overall")
+  cat("\n")
+  p = df %>%
+    select(feature, location, AF:JW) %>%
+    pivot_longer(AF:JW) %>%
+    ggplot(., aes(x = name, y = location, fill = value)) +
+    geom_tile(color = "black") +
+    theme_bw() +
+    labs(fill = "", x = "Scorer", y = "Location") +
+    custom_colors +
+    facet_wrap(~feature)
+  cat("\n")
+  print(p)
+  cat("\n")
+  cat("\n")
+  cat("Overall Fleiss' Kappa for this scan was ",round(fk$value,3)," (p = ",
+      format.pval(fk$p.value,eps = 0.001,digits = 3),")",sep = "")
+  cat("\n")
+  cat("\n")
+  cat("Cohen's Kappa for AF vs. the gold standard"," was ",round(af$value,3)," (p = ",
+      format.pval(af$p.value,eps = 0.001,digits = 3),")",sep = "")
+  cat("\n")
+  cat("\n")
+  cat("Cohen's Kappa for DL vs. the gold standard"," was ",round(dl$value,3)," (p = ",
+      format.pval(dl$p.value,eps = 0.001,digits = 3),")",sep = "")
+  cat("\n")
+  cat("\n")
+  cat("Cohen's Kappa for JW vs. the gold standard"," was ",round(jw$value,3)," (p = ",
+      format.pval(jw$p.value,eps = 0.001,digits = 3),")",sep = "")
+  cat("\n")
+  # Analyze by feature
+  cat("\n")
+  cat("### By Feature and Scorer")
+  cat("\n")
+  invisible(lapply(levels(factor(df$feature)), function(f){
+    t = data.frame(df[df$feature == f,c("AF","DL","GS","JW")])
+    rownames(t) = as.character(df$location[df$feature == f])
+    fk = kappam.fleiss(t)
+    af = kappa2(t[,c("AF","GS")])
+    dl = kappa2(t[,c("DL","GS")])
+    jw = kappa2(t[,c("JW","GS")])
+    p = df %>%
+      filter(feature == f) %>%
+      select(location, AF:JW) %>%
+      pivot_longer(AF:JW) %>%
+      ggplot(., aes(x = name, y = location, fill = value)) +
+      geom_tile(color = "black") +
+      theme_bw() +
+      labs(fill = "", x = "Scorer", y = "Location") +
+      custom_colors +
+      ggtitle(f)
+    cat("\n")
+    cat("\n")
+    cat("####",f)
+    cat("\n")
+    cat("\n")
+    print(p)
+    cat("\n")
+    cat("\n")
+    cat("Fleiss' Kappa for ",f," was ",round(fk$value,3)," (p = ",
+        format.pval(fk$p.value,eps = 0.001,digits = 3),")",sep = "")
+    cat("\n")
+    cat("\n")
+    if(is.nan(af$value)){
+      cat("\n")
+      cat("Agreement between AF and the gold standard in",f,"was perfect.")
+      cat("\n")
+    } else {
+      cat("\n")
+      cat("Cohen's Kappa for AF vs. the gold standard in ",f," was ",round(af$value,3)," (p = ",
+          format.pval(af$p.value,eps = 0.001,digits = 3),")",sep = "")
+      cat("\n")
+    }
+    if(is.nan(dl$value)){
+      cat("\n")
+      cat("Agreement between DL and the gold standard in",f,"was perfect.")
+      cat("\n")
+    } else {
+      cat("\n")
+      cat("Cohen's Kappa for DL vs. the gold standard in ",f," was ",round(dl$value,3)," (p = ",
+          format.pval(dl$p.value,eps = 0.001,digits = 3),")",sep = "")
+      cat("\n")
+    }
+    if(is.nan(jw$value)){
+      cat("\n")
+      cat("Agreement between JW and the gold standard in",f,"was perfect.")
+      cat("\n")
+    } else {
+      cat("\n")
+      cat("Cohen's Kappa for JW vs. the gold standard in ",f," was ",round(jw$value,3)," (p = ",
+          format.pval(jw$p.value,eps = 0.001,digits = 3),")",sep = "")
+      cat("\n")
+    }
+  }))
+}
 ```
 
-### Comparison between raters
+## Scan 1
+
+```{r results='asis',warning=FALSE}
+compare(df = gs,scan_num = 1)
+```
+
+## Scan 2
+
+```{r results='asis',warning=FALSE}
+compare(df = gs,scan_num = 2)
+```
+
+## Scan 3
+
+```{r results='asis',warning=FALSE}
+compare(df = gs,scan_num = 3)
+```
+
+## Scan 4
+
+```{r results='asis',warning=FALSE}
+compare(df = gs,scan_num = 4)
+```
+
+## Scan 5
+
+```{r results='asis',warning=FALSE}
+compare(df = gs,scan_num = 5)
+```
 
 ```{r}
-# Mixed model
-mod1 <- glmer(value ~ scorer+(1|scan_id)+(1|feature)+(1|location), 
-              data=gs,family = "binomial")
-res = tidy(mod1,exponentiate = T,effects="fixed")
-kable(res %>% select(-effect),digits = 3)
+# Save dataset
+write.csv(gs,"~/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/gold_standard_comp.csv",row.names = F,na="")
 ```
 
-Across all training scans, JW was significantly different from the gold standard ("Intercept"). Adjusted ICC was `r round(icc(mod1)$ICC_adjusted,3)`, indicating moderate agreement between raters.
+# Duplicates
 
-### Comparison within features
-
-```{r results='asis'}
-invisible(lapply(unique(gs$feature), function(f){
+```{r}
+# Gold standard data
+dup_df = data %>% 
+  arrange(scan_id, scorer) %>%
+  filter(scan_id %in% dups$original_ssid) %>%
+  select(scorer, scan_id, bronchiectasis_rul:atelectasis___6) %>%
+  ungroup()
+# Function
+compare = function(df,scan_num){
+  df = df %>% filter(scan_id == scan_num) %>%
+    group_by(scorer,scan_id) %>%
+    mutate(n = row_number()) %>% ungroup() %>%
+    pivot_longer(bronchiectasis_rul:atelectasis___6,
+                           names_to = c("feature", "location"),
+                           names_pattern = "(.*)_(.*)$"
+  ) %>% 
+    mutate(
+      feature = gsub("__", "", feature),
+      feature = str_to_title(gsub("_", " ", feature))
+    ) 
+  df$location <- factor(df$location,
+                        levels = c("1", "2", "3", "4", "5", "6", "ling", "lll", 
+                                   "lul", "rll", "rml", "rul"),
+                        labels = c("RUL", "RML", "RLL", "LUL", "Ling", "LLL", 
+                                   "Ling", "LLL", "LUL", "RLL", "RML", "RUL")
+  )
+  df$value <- factor(df$value, levels = c("Checked", "Unchecked", "Absent", "Cylindric", "Varicose"))
+  # One column per scorer
+  df <- df %>% 
+    pivot_wider(names_from = scorer, values_from = value) %>%
+    arrange(feature,n,location)
+  # Kappa for the whole scan
+  fk = kappam.fleiss(df[,c("AF","DL","GS","JW")])
+  af = kappa2(df[,c("AF","GS")])
+  dl = kappa2(df[,c("DL","GS")])
+  jw = kappa2(df[,c("JW","GS")])
   cat("\n")
-  cat("###",f)
+  cat("### Overall")
+  cat("\n")
+  p = df %>%
+    select(feature, location, AF:JW) %>%
+    pivot_longer(AF:JW) %>%
+    ggplot(., aes(x = name, y = location, fill = value)) +
+    geom_tile(color = "black") +
+    theme_bw() +
+    labs(fill = "", x = "Scorer", y = "Location") +
+    custom_colors +
+    facet_wrap(~feature)
+  cat("\n")
+  print(p)
   cat("\n")
   cat("\n")
-  mod <- tryCatch(glmer(value ~ scorer+(1|scan_id)+(1|location), 
-                        data=gs[gs$feature==f,],family = "binomial"),
-                  error=function(err) NULL,warning=function(war) NULL)
-  if(!is.null(mod)){
-    res = tidy(mod,exponentiate = T,effects="fixed")
-    print(kable(res %>% select(-effect),digits = 3))
+  cat("Overall Fleiss' Kappa for this scan was ",round(fk$value,3)," (p = ",
+      format.pval(fk$p.value,eps = 0.001,digits = 3),")",sep = "")
+  cat("\n")
+  cat("\n")
+  cat("Cohen's Kappa for AF vs. the gold standard"," was ",round(af$value,3)," (p = ",
+      format.pval(af$p.value,eps = 0.001,digits = 3),")",sep = "")
+  cat("\n")
+  cat("\n")
+  cat("Cohen's Kappa for DL vs. the gold standard"," was ",round(dl$value,3)," (p = ",
+      format.pval(dl$p.value,eps = 0.001,digits = 3),")",sep = "")
+  cat("\n")
+  cat("\n")
+  cat("Cohen's Kappa for JW vs. the gold standard"," was ",round(jw$value,3)," (p = ",
+      format.pval(jw$p.value,eps = 0.001,digits = 3),")",sep = "")
+  cat("\n")
+  # Analyze by feature
+  cat("\n")
+  cat("### By Feature and Scorer")
+  cat("\n")
+  invisible(lapply(levels(factor(df$feature)), function(f){
+    t = data.frame(df[df$feature == f,c("AF","DL","GS","JW")])
+    rownames(t) = as.character(df$location[df$feature == f])
+    fk = kappam.fleiss(t)
+    af = kappa2(t[,c("AF","GS")])
+    dl = kappa2(t[,c("DL","GS")])
+    jw = kappa2(t[,c("JW","GS")])
+    p = df %>%
+      filter(feature == f) %>%
+      select(location, AF:JW) %>%
+      pivot_longer(AF:JW) %>%
+      ggplot(., aes(x = name, y = location, fill = value)) +
+      geom_tile(color = "black") +
+      theme_bw() +
+      labs(fill = "", x = "Scorer", y = "Location") +
+      custom_colors +
+      ggtitle(f)
     cat("\n")
-    cat("Adjusted ICC was",round(icc(mod)$ICC_adjusted,3))
     cat("\n")
-  } else {
+    cat("####",f)
     cat("\n")
-    cat("Model did not converge (likely due to low variability).")
     cat("\n")
-  }
-}))
+    print(p)
+    cat("\n")
+    cat("\n")
+    cat("Fleiss' Kappa for ",f," was ",round(fk$value,3)," (p = ",
+        format.pval(fk$p.value,eps = 0.001,digits = 3),")",sep = "")
+    cat("\n")
+    cat("\n")
+    if(is.nan(af$value)){
+      cat("\n")
+      cat("Agreement between AF and the gold standard in",f,"was perfect.")
+      cat("\n")
+    } else {
+      cat("\n")
+      cat("Cohen's Kappa for AF vs. the gold standard in ",f," was ",round(af$value,3)," (p = ",
+          format.pval(af$p.value,eps = 0.001,digits = 3),")",sep = "")
+      cat("\n")
+    }
+    if(is.nan(dl$value)){
+      cat("\n")
+      cat("Agreement between DL and the gold standard in",f,"was perfect.")
+      cat("\n")
+    } else {
+      cat("\n")
+      cat("Cohen's Kappa for DL vs. the gold standard in ",f," was ",round(dl$value,3)," (p = ",
+          format.pval(dl$p.value,eps = 0.001,digits = 3),")",sep = "")
+      cat("\n")
+    }
+    if(is.nan(jw$value)){
+      cat("\n")
+      cat("Agreement between JW and the gold standard in",f,"was perfect.")
+      cat("\n")
+    } else {
+      cat("\n")
+      cat("Cohen's Kappa for JW vs. the gold standard in ",f," was ",round(jw$value,3)," (p = ",
+          format.pval(jw$p.value,eps = 0.001,digits = 3),")",sep = "")
+      cat("\n")
+    }
+  }))
+}
 ```
+
