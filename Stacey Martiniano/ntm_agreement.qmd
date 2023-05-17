@@ -158,8 +158,7 @@ compare = function(df,scan_num){
       geom_tile(color = "black") +
       theme_bw() +
       labs(fill = "", x = "Scorer", y = "Location") +
-      custom_colors +
-      ggtitle(f)
+      custom_colors
     cat("\n")
     cat("\n")
     cat("####",f)
@@ -273,18 +272,18 @@ compare = function(df,scan_num){
   # One column per scorer
   df <- df %>% 
     pivot_wider(names_from = scorer, values_from = value) %>%
-    arrange(feature,n,location)
+    pivot_wider(names_from = n, values_from = AF:JW) %>%
+    arrange(feature,location)
   # Kappa for the whole scan
-  fk = kappam.fleiss(df[,c("AF","DL","GS","JW")])
-  af = kappa2(df[,c("AF","GS")])
-  dl = kappa2(df[,c("DL","GS")])
-  jw = kappa2(df[,c("JW","GS")])
+  af = kappa2(df[,c("AF_1","AF_2")])
+  dl = kappa2(df[,c("DL_1","DL_2")])
+  jw = kappa2(df[,c("JW_1","JW_2")])
   cat("\n")
   cat("### Overall")
   cat("\n")
   p = df %>%
-    select(feature, location, AF:JW) %>%
-    pivot_longer(AF:JW) %>%
+    select(feature, location, AF_1:JW_2) %>%
+    pivot_longer(AF_1:JW_2) %>%
     ggplot(., aes(x = name, y = location, fill = value)) +
     geom_tile(color = "black") +
     theme_bw() +
@@ -295,19 +294,15 @@ compare = function(df,scan_num){
   print(p)
   cat("\n")
   cat("\n")
-  cat("Overall Fleiss' Kappa for this scan was ",round(fk$value,3)," (p = ",
-      format.pval(fk$p.value,eps = 0.001,digits = 3),")",sep = "")
-  cat("\n")
-  cat("\n")
-  cat("Cohen's Kappa for AF vs. the gold standard"," was ",round(af$value,3)," (p = ",
+  cat("Cohen's Kappa for AF"," was ",round(af$value,3)," (p = ",
       format.pval(af$p.value,eps = 0.001,digits = 3),")",sep = "")
   cat("\n")
   cat("\n")
-  cat("Cohen's Kappa for DL vs. the gold standard"," was ",round(dl$value,3)," (p = ",
+  cat("Cohen's Kappa for DL"," was ",round(dl$value,3)," (p = ",
       format.pval(dl$p.value,eps = 0.001,digits = 3),")",sep = "")
   cat("\n")
   cat("\n")
-  cat("Cohen's Kappa for JW vs. the gold standard"," was ",round(jw$value,3)," (p = ",
+  cat("Cohen's Kappa for JW"," was ",round(jw$value,3)," (p = ",
       format.pval(jw$p.value,eps = 0.001,digits = 3),")",sep = "")
   cat("\n")
   # Analyze by feature
@@ -315,22 +310,20 @@ compare = function(df,scan_num){
   cat("### By Feature and Scorer")
   cat("\n")
   invisible(lapply(levels(factor(df$feature)), function(f){
-    t = data.frame(df[df$feature == f,c("AF","DL","GS","JW")])
+    t = data.frame(df[df$feature == f,c("AF_1","AF_2","DL_1","DL_2","JW_1","JW_2")])
     rownames(t) = as.character(df$location[df$feature == f])
-    fk = kappam.fleiss(t)
-    af = kappa2(t[,c("AF","GS")])
-    dl = kappa2(t[,c("DL","GS")])
-    jw = kappa2(t[,c("JW","GS")])
+    af = kappa2(t[,c("AF_1","AF_2")])
+    dl = kappa2(t[,c("DL_1","DL_2")])
+    jw = kappa2(t[,c("JW_1","JW_2")])
     p = df %>%
       filter(feature == f) %>%
-      select(location, AF:JW) %>%
-      pivot_longer(AF:JW) %>%
+      select(location, AF_1:JW_2) %>%
+      pivot_longer(AF_1:JW_2) %>%
       ggplot(., aes(x = name, y = location, fill = value)) +
       geom_tile(color = "black") +
       theme_bw() +
       labs(fill = "", x = "Scorer", y = "Location") +
-      custom_colors +
-      ggtitle(f)
+      custom_colors
     cat("\n")
     cat("\n")
     cat("####",f)
@@ -339,41 +332,67 @@ compare = function(df,scan_num){
     print(p)
     cat("\n")
     cat("\n")
-    cat("Fleiss' Kappa for ",f," was ",round(fk$value,3)," (p = ",
-        format.pval(fk$p.value,eps = 0.001,digits = 3),")",sep = "")
-    cat("\n")
-    cat("\n")
     if(is.nan(af$value)){
       cat("\n")
-      cat("Agreement between AF and the gold standard in",f,"was perfect.")
+      cat("Agreement within AF",f,"was perfect.")
       cat("\n")
     } else {
       cat("\n")
-      cat("Cohen's Kappa for AF vs. the gold standard in ",f," was ",round(af$value,3)," (p = ",
+      cat("Cohen's Kappa for AF",f," was ",round(af$value,3)," (p = ",
           format.pval(af$p.value,eps = 0.001,digits = 3),")",sep = "")
       cat("\n")
     }
     if(is.nan(dl$value)){
       cat("\n")
-      cat("Agreement between DL and the gold standard in",f,"was perfect.")
+      cat("Agreement within DL",f,"was perfect.")
       cat("\n")
     } else {
       cat("\n")
-      cat("Cohen's Kappa for DL vs. the gold standard in ",f," was ",round(dl$value,3)," (p = ",
+      cat("Cohen's Kappa for DL",f," was ",round(dl$value,3)," (p = ",
           format.pval(dl$p.value,eps = 0.001,digits = 3),")",sep = "")
       cat("\n")
     }
     if(is.nan(jw$value)){
       cat("\n")
-      cat("Agreement between JW and the gold standard in",f,"was perfect.")
+      cat("Agreement within JW in",f,"was perfect.")
       cat("\n")
     } else {
       cat("\n")
-      cat("Cohen's Kappa for JW vs. the gold standard in ",f," was ",round(jw$value,3)," (p = ",
+      cat("Cohen's Kappa for JW",f," was ",round(jw$value,3)," (p = ",
           format.pval(jw$p.value,eps = 0.001,digits = 3),")",sep = "")
       cat("\n")
     }
   }))
 }
+```
+
+## Scan 1
+
+```{r results='asis',warning=FALSE}
+compare(df = dup_df,scan_num = 1062761)
+```
+
+## Scan 2
+
+```{r results='asis',warning=FALSE}
+compare(df = dup_df,scan_num = 1151991)
+```
+
+## Scan 3
+
+```{r results='asis',warning=FALSE}
+compare(df = dup_df,scan_num = 1340551)
+```
+
+## Scan 4
+
+```{r results='asis',warning=FALSE}
+compare(df = dup_df,scan_num = 1419420)
+```
+
+## Scan 5
+
+```{r results='asis',warning=FALSE}
+compare(df = dup_df,scan_num = 1468121)
 ```
 
