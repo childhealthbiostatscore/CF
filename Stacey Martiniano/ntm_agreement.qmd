@@ -127,11 +127,11 @@ gs_bronch %>%
 
 Overall Fleiss' Kappa for all 5 gold standard scans was `r round(fk$value,3)` (p = `r format.pval(fk$p.value,eps = 0.001,digits = 3)`).
 
-Cohen's Kappa for A vs. the gold standard was `r round(A$value,3)` (p = `r format.pval(A$p.value,eps = 0.001,digits = 3)`).
+Overall Cohen's Kappa for A vs. the gold standard was `r round(A$value,3)` (p = `r format.pval(A$p.value,eps = 0.001,digits = 3)`).
 
-Cohen's Kappa for B vs. the gold standard was `r round(B$value,3)` (p = `r format.pval(B$p.value,eps = 0.001,digits = 3)`).
+Overall Cohen's Kappa for B vs. the gold standard was `r round(B$value,3)` (p = `r format.pval(B$p.value,eps = 0.001,digits = 3)`).
 
-Cohen's Kappa for C vs. the gold standard was `r round(C$value,3)` (p = `r format.pval(C$p.value,eps = 0.001,digits = 3)`).
+Overall Cohen's Kappa for C vs. the gold standard was `r round(C$value,3)` (p = `r format.pval(C$p.value,eps = 0.001,digits = 3)`).
 
 ## Other features
 
@@ -235,11 +235,11 @@ dup_bronch %>%
   facet_wrap(~scan_id)
 ```
 
-Cohen's Kappa for A vs. themselves was `r round(A$value,3)` (p = `r format.pval(A$p.value,eps = 0.001,digits = 3)`).
+Overall Cohen's Kappa for A vs. themselves was `r round(A$value,3)` (p = `r format.pval(A$p.value,eps = 0.001,digits = 3)`).
 
-Cohen's Kappa for B vs. themselves was `r round(B$value,3)` (p = `r format.pval(B$p.value,eps = 0.001,digits = 3)`).
+Overall Cohen's Kappa for B vs. themselves was `r round(B$value,3)` (p = `r format.pval(B$p.value,eps = 0.001,digits = 3)`).
 
-Cohen's Kappa for C vs. themselves was `r round(C$value,3)` (p = `r format.pval(C$p.value,eps = 0.001,digits = 3)`).
+Overall Cohen's Kappa for C vs. themselves was `r round(C$value,3)` (p = `r format.pval(C$p.value,eps = 0.001,digits = 3)`).
 
 ## Other features
 
@@ -292,3 +292,108 @@ dup_other %>%
   column_to_rownames("ids") %>%
   pheatmap(.,cluster_rows = F,cluster_cols = F)
 ```
+
+# Singleton scans
+
+```{r}
+# Gold standard data
+df = data %>% 
+  arrange(scan_id, scorer) %>%
+  filter(!(scan_id %in% dups$original_ssid) & 
+           !(scan_id %in% training$Cffid.Scoring.Set)) %>%
+  select(scorer, scan_id,bronchiectasis_rul:atelectasis___6) %>%
+  pivot_longer(bronchiectasis_rul:atelectasis___6,
+                             names_to = c("feature", "location"),
+                             names_pattern = "(.*)_(.*)$"
+  ) %>% 
+  mutate(
+    feature = gsub("__", "", feature),
+    feature = str_to_title(gsub("_", " ", feature))
+  ) 
+df$location <- factor(df$location,
+                       levels = c("1", "2", "3", "4", "5", "6", "ling", "lll", 
+                                  "lul", "rll", "rml", "rul"),
+                       labels = c("RUL", "RML", "RLL", "LUL", "Ling", "LLL", 
+                                  "Ling", "LLL", "LUL", "RLL", "RML", "RUL")
+)
+# One column per scorer
+df <- df %>% 
+  pivot_wider(names_from = scorer, values_from = value) %>%
+  arrange(feature,location)
+```
+
+## Bronciechtasis
+
+```{r}
+df_bronch = df %>% filter(feature=="Bronchiectasis")
+fk = kappam.fleiss(df_bronch[,c("A","B","C")])
+# Plot
+df_bronch %>%
+  select(scan_id,feature, location,A:C) %>%
+  pivot_longer(A:C) %>%
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  custom_colors +
+  facet_wrap(~scan_id)
+```
+
+Overall Fleiss' Kappa for all 15 singleton scans was `r round(fk$value,3)` (p = `r format.pval(fk$p.value,eps = 0.001,digits = 3)`).
+
+## Other features
+
+```{r}
+df_other = df %>% filter(feature!="Bronchiectasis")
+# Check agreement with GS column
+df_other[,c("A","B","C")] = lapply(df_other[,c("A","B","C")],factor,
+                                   levels = c("Unchecked", "Checked"),
+                                   labels = c("Absent","Present"))
+# Three-way agreement
+df_other$`A vs. B`=factor(df_other$A == df_other$B,levels = c(F,T),labels = c("Disagree","Agree"))
+df_other$`A vs. C`=factor(df_other$A == df_other$C,levels = c(F,T),labels = c("Disagree","Agree"))
+df_other$`B vs. C`=factor(df_other$B == df_other$C,levels = c(F,T),labels = c("Disagree","Agree"))
+# Plot
+df_other %>%
+  select(scan_id,feature, location, `A vs. B`:`B vs. C`) %>%
+  pivot_longer(`A vs. B`:`B vs. C`) %>%
+  ggplot(., aes(x = name, y = location, fill = value)) +
+  geom_tile(color = "black") +
+  theme_bw() +
+  labs(fill = "", x = "Scorer", y = "Location") +
+  facet_grid(rows = vars(feature),cols = vars(scan_id))
+# Tables
+df_other %>%
+  summarise(across(`A vs. B`:`B vs. C`,~mean(.x == "Agree",na.rm = T)),.groups = "drop") %>%
+  kable(.,digits=3,caption = "Proportion of agreement with themselves")
+df_other %>%
+  group_by(scan_id) %>%
+  summarise(across(`A vs. B`:`B vs. C`,~mean(.x == "Agree",na.rm = T)),.groups = "drop") %>%
+  kable(.,digits=3,caption = "Proportion of agreement with themselves")
+df_other %>%
+  group_by(feature) %>%
+  summarise(across(`A vs. B`:`B vs. C`,~mean(.x == "Agree",na.rm = T)),.groups = "drop") %>%
+  kable(.,digits=3,caption = "Proportion of agreement with themselves")
+df_other %>%
+  group_by(scan_id,feature) %>%
+  summarise(across(`A vs. B`:`B vs. C`,~mean(.x == "Agree",na.rm = T)),.groups = "drop") %>%
+  kable(.,digits=3,caption = "Proportion of agreement with themselves")
+# Heatmaps
+df_other %>%
+  group_by(scan_id) %>%
+  summarise(across(`A vs. B`:`B vs. C`,~mean(.x == "Agree",na.rm = T)),.groups = "keep") %>%
+  column_to_rownames("scan_id") %>%
+  pheatmap(.,cluster_rows = F,cluster_cols = F)
+df_other %>%
+  group_by(feature) %>%
+  summarise(across(`A vs. B`:`B vs. C`,~mean(.x == "Agree",na.rm = T)),.groups = "keep") %>%
+  column_to_rownames("feature") %>%
+  pheatmap(.,cluster_rows = F,cluster_cols = F)
+df_other %>%
+  group_by(scan_id,feature) %>%
+  summarise(across(`A vs. B`:`B vs. C`,~mean(.x == "Agree",na.rm = T)),.groups = "keep") %>%
+  unite(ids,scan_id,feature,na.rm = T,sep = " ") %>%
+  column_to_rownames("ids") %>%
+  pheatmap(.,cluster_rows = F,cluster_cols = F)
+```
+
