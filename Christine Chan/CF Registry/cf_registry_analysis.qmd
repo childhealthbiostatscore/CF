@@ -22,10 +22,10 @@ library(pROC)
 
 ```{r}
 # All data
-encounter <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/CFF19_encountersMerged_Del1.csv",
+encounter <- read.csv("/Users/timvigers/Documents/Work/Christine Chan/CF registry data/CFF19_encountersMerged_Del1.csv",
                       na.strings = c("", "N/A")
 )
-annual <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/CFF19_Annualized_Del1.csv",
+annual <- read.csv("/Users/timvigers/Documents/Work/Christine Chan/CF registry data/CFF19_Annualized_Del1.csv",
                    na.strings = c("", "N/A")
 )
 encounter <- encounter %>%
@@ -41,9 +41,9 @@ ages <- annual %>%
             Age = Age_YrEnd[1],.groups = "drop")
 encounter = left_join(encounter,ages,by = c("eDWID", "reviewyear"))
 encounter$`Age Group 2018` = cut(encounter$`Age in 2018`,
-                            c(-Inf,10,19,31,Inf),
-                            labels = c("< 10", "10 - 18", "19 - 30", "> 30"),
-                            right=F)
+                                 c(-Inf,10,19,31,Inf),
+                                 labels = c("< 10", "10 - 18", "19 - 30", "> 30"),
+                                 right=F)
 encounter$`Age Group` = cut(encounter$Age,
                             c(-Inf,10,19,31,Inf),
                             labels = c("< 10", "10 - 18", "19 - 30", "> 30"),
@@ -422,3 +422,130 @@ The AUC for this ROC curve was 0.61 (see @fig-roc).
 #| tbl-cap: "Best ROC Threshold (Youden Index)"
 kable(coords(r, "best"), digits = 3)
 ```
+
+# Logistic analyses
+
+Any participants with T1D or T2D were excluded from these analyses.
+
+```{r}
+# Import and clean data
+annual <- read.csv("/Users/timvigers/Documents/Work/Christine Chan/CF registry data/CFF19_Annualized_Del1.csv",
+                   na.strings = c("", "N/A")
+)
+annual = annual %>% filter(cfrd_status_annual != 4,cfrd_status_annual != 5)
+annual$cfrd_status_annual = factor(annual$cfrd_status_annual,levels = 1:3,
+                                   labels = c("CFRD-","CFRD-","CFRD+"))
+
+
+demogs = read.csv("/Users/timvigers/Documents/Work/Christine Chan/CF registry data/CFF19_DemogCFDiag_Del1.csv")
+demogs = demogs %>% select(eDWID,Gender,MutClass)
+
+annual = left_join(annual,demogs,by = join_by(eDWID))
+
+encounter <- read.csv("/Users/timvigers/Documents/Work/Christine Chan/CF registry data/CFF19_encountersMerged_Del1.csv",
+                      na.strings = c("", "N/A")
+)
+# mods = encounter %>% group_by(eDWID,reviewyear) %>%
+#   summarise(across(c(Vx770,Vx809comb),~max(.x,na.rm = T)),.groups = "drop")
+# Analysis function
+log_reg = function(year = 2005){
+  # Clean data
+  df = annual %>% 
+    filter(ReviewYear==year) %>%
+    select(eDWID,Age_YrEnd,Gender,MutClass,A_IsOnEnzymes,A_FEV1_pct_predicted,
+           A_bmivalue,A_bmipercentile,A_height,A_heightpercentile,
+           NumPulmExacerbation,A_feeding2,A_pseudomonasaeruginosa,
+           A_fungalyeast1,A_pulmonarycomplications1,A_mycocultureresults1,
+           A_corticosteroids1,cfrd_status_annual)
+  # Format columns
+  df$MutClass = factor(df$MutClass,levels = c("1-3","4-5","Oth","N/A"),
+                       labels = c("1-3","4-5","Oth",NA))
+  df$NumPulmExacerbation=cut(df$NumPulmExacerbation,labels = c("0","1","2",">=3"),
+                             breaks = c(0,1,2,3,Inf),right = F)
+  df$A_feeding2 = factor(df$A_feeding2,levels = 0:1,labels = c("No","Yes"))
+  df$A_IsOnEnzymes = factor(df$A_IsOnEnzymes,levels = 0:1,labels = c("No","Yes"))
+  df$A_FEV1_pct_predicted = cut(df$A_FEV1_pct_predicted,breaks = c(0,40,80,100,Inf),right = F)
+  df$A_corticosteroids1 = factor(df$A_corticosteroids1,levels = 0:1,labels = c("No","Yes"))
+  df$A_fungalyeast1 = factor(df$A_fungalyeast1,levels = 0:1,labels = c("No","Yes"))
+  df$A_pulmonarycomplications1 = factor(df$A_pulmonarycomplications1,levels = 0:1,labels = c("No","Yes"))
+  df$A_mycocultureresults1 = factor(df$A_mycocultureresults1,levels = 0:1,labels = c("No","Yes"))
+  # Models
+  base_mod = as.formula("cfrd_status_annual~Gender+Age_YrEnd+A_IsOnEnzymes+MutClass+
+                   A_FEV1_pct_predicted+NumPulmExacerbation+A_feeding2")
+  adult_mod = update(base_mod,.~.+A_bmivalue+A_height)
+  peds_mod = update(base_mod,.~.+A_bmipercentile+A_heightpercentile)
+  # Simple models
+  adult_mod1 = glm(adult_mod,data = df,family = "binomial")
+  peds_mod1 = glm(peds_mod,data = df,family = "binomial")
+  # Add bugs
+  # P. aeruginosa
+  adult_mod2 = glm(update(adult_mod,.~.+A_pseudomonasaeruginosa),data = df,family = "binomial")
+  peds_mod2 = glm(update(peds_mod,.~.+A_pseudomonasaeruginosa),data = df,family = "binomial")
+  # Aspergillus
+  adult_mod3 = glm(update(adult_mod,.~.+A_fungalyeast1),data = df,family = "binomial")
+  peds_mod3 = glm(update(peds_mod,.~.+A_fungalyeast1),data = df,family = "binomial")
+  # ABPA
+  adult_mod4 = glm(update(adult_mod,.~.+A_pulmonarycomplications1),data = df,family = "binomial")
+  peds_mod4 = glm(update(peds_mod,.~.+A_pulmonarycomplications1),data = df,family = "binomial")
+  # Mycobacterium
+  adult_mod5 = glm(update(adult_mod,.~.+A_pulmonarycomplications1),data = df,family = "binomial")
+  peds_mod5 = glm(update(peds_mod,.~.+A_pulmonarycomplications1),data = df,family = "binomial")
+  # Print results
+  cat("\n")
+  cat("### Base Models")
+  cat("\n")
+  cat("#### Adult")
+  print(forest_model(adult_mod1))
+  cat("\n")
+  cat("#### Peds")
+  print(forest_model(peds_mod1))
+  cat("\n")
+  cat("\n")
+  cat("### P. aeruginosa")
+  cat("\n")
+  cat("#### Adult")
+  print(forest_model(adult_mod2))
+  cat("\n")
+  cat("#### Peds")
+  print(forest_model(peds_mod2))
+  cat("\n")
+  cat("\n")
+  cat("### Aspergillus")
+  cat("\n")
+  cat("#### Adult")
+  print(forest_model(adult_mod3))
+  cat("\n")
+  cat("#### Peds")
+  print(forest_model(peds_mod3))
+  cat("\n")
+  cat("\n")
+  cat("### ABPA")
+  cat("\n")
+  cat("#### Adult")
+  print(forest_model(adult_mod4))
+  cat("\n")
+  cat("#### Peds")
+  print(forest_model(peds_mod4))
+  cat("\n")
+  cat("\n")
+  cat("### Mycobacterium")
+  cat("\n")
+  cat("#### Adult")
+  print(forest_model(adult_mod5))
+  cat("\n")
+  cat("#### Peds")
+  print(forest_model(peds_mod5))
+  cat("\n")
+}
+```
+
+## 2005
+
+```{r}
+log_reg(2005)
+```
+
+# Questions
+
+1. What variables do we use for B. Cepacia and liver disease?
+2. Do we have CFTR modulator data aside from `Vx770` and `Vx809comb`?
