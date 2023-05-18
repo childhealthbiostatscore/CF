@@ -1,8 +1,7 @@
 ---
 title: "Body Image and Trikafta"
 author: "Tim Vigers"
-date: today
-date-format: long
+date: "May 12, 2023"
 format:
   html:
     toc: true
@@ -28,8 +27,8 @@ library(gtsummary)
 library(kableExtra)
 library(foreign)
 library(plotly)
-library(pscl)
-library(glmnet)
+library(broom)
+library(report)
 # Read in data
 df = read.spss("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Body Image and Trikafta/Data_Raw/TrikaftaBodyImage3.6.23.sav",to.data.frame = T)
 # Filter
@@ -77,44 +76,214 @@ df %>% select(ChangestoBreathing:MoodChangesSideEf,FeelTrikafta) %>%
 
 ## PHQ9
 
-### Basic model
+### Odds of an elevated score
 
-Because almost 50% of respondents scored 0 on the PHQ9 and the variance appears to be much larger than the mean, we used a zero-inflated negative binomial (ZINB) model.
-
-```{r}
-# Plot all the zeroes
-p = ggplot(df,aes(x=PHQ9_Total)) + geom_histogram(binwidth = 1) + theme_bw()
-ggplotly(p)
-# Fit ZIP model
-zinb1 <- zeroinfl(PHQ9_Total ~ FRS_Category,data = df,dist = "negbin")
-summary(zinb1)
-```
-
-The output above suggests that there are no differences between FRS categories in terms of the likelihood of scoring a 0 on the PHQ9, or in terms of score for those with a non-zero score. Because there may be other variables that predict a score of 0, we used the lasso to find a model for 0 scores. Parameters for the lasso were chosen based on 10-fold cross validation (CV).
+Results are reported as odds ratios, with the FRS "neutral" category as the reference group.
 
 ```{r}
-# Get variables with no missing data, and at least some variance.
-x = df[,which(colSums(is.na(df))==0)]
-x = x[,-caret::nearZeroVar(x)]
-# Remove variables that wouldn't make sense and other mental health variables
-x = x %>% select(-c(ID,DOB),-contains("PHQ9"),-contains("GAD7"),
-                 -contains("FRS"),-contains("bes"),-PercentAdherence)
-preds = colnames(x)
-# Outcome
-df$PHQ9_0 = as.factor(df$PHQ9_Total==0)
-# As a formula
-f = as.formula(paste0("PHQ9_0~",paste0(preds,collapse = "+")))
-# Lasso
-xm = model.matrix(update(f,.~.-1),df)
-y = df$PHQ9_0
-cvfit = cv.glmnet(xm, y,family="binomial",nlambda=1e6)
-# Results
-coef(cvfit, s = "lambda.min")
-coef(cvfit, s = "lambda.1se")
+mod = glm(PHQ9_elevated ~ FRS_Category,data = df,family = "binomial")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
 ```
 
-Even with CV on $10^5$ lambda values, no variables are associated with the probability of scoring a 0. 
+`r report(mod)`
 
-# Questions
+### Association with FRS category in those with elevated scores.
 
-1. For the ZINB model, should we use different predictors for the logistic part of the model (i.e., the part that predicts whether someone will have a non-zero score) based on clinical knowledge? For example, would you expect that certain ages would be more likely to score a 0?
+Results are reported as expected counts, with the FRS "neutral" category as the reference group.
+
+```{r}
+mod = glm(PHQ9_Total~ FRS_Category,data = df[df$PHQ9_elevated=="yes",],family = "poisson")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
+
+## GAD7
+
+### Odds of an elevated score
+
+Results are reported as odds ratios, with the FRS "neutral" category as the reference group.
+
+```{r}
+mod = glm(GAD7_elevated ~ FRS_Category,data = df,family = "binomial")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
+
+### Association with FRS category in those with elevated scores.
+
+Results are reported as expected counts, with the FRS "neutral" category as the reference group.
+
+```{r}
+mod = glm(GAD7_Total~ FRS_Category,data = df[df$GAD7_elevated=="yes",],family = "poisson")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
+
+# Mental health scores by BES
+
+## PHQ9
+
+### BE_APPEARANCE_MEAN
+
+#### Odds of an elevated score
+
+Results are reported as odds ratios for a one-unit change in the predictor.
+
+```{r}
+mod = glm(PHQ9_elevated ~ BE_APPEARANCE_MEAN,data = df,family = "binomial")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
+
+#### Association with BE_APPEARANCE_MEAN in those with elevated scores.
+
+Results are reported as expected counts, with the FRS "neutral" category as the reference group.
+
+```{r}
+mod = glm(PHQ9_Total~ BE_APPEARANCE_MEAN,data = df[df$PHQ9_elevated=="yes",],family = "poisson")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
+
+### BE_ATTRIBUTION_MEAN
+
+#### Odds of an elevated score
+
+Results are reported as odds ratios for a one-unit change in the predictor.
+
+```{r}
+mod = glm(PHQ9_elevated ~ BE_ATTRIBUTION_MEAN,data = df,family = "binomial")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
+
+#### Association with BE_ATTRIBUTION_MEAN in those with elevated scores.
+
+Results are reported as expected counts, with the FRS "neutral" category as the reference group.
+
+```{r}
+mod = glm(PHQ9_Total~ BE_ATTRIBUTION_MEAN,data = df[df$PHQ9_elevated=="yes",],family = "poisson")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
+
+### BE_WEIGHT_MEAN
+
+#### Odds of an elevated score
+
+Results are reported as odds ratios for a one-unit change in the predictor.
+
+```{r}
+mod = glm(PHQ9_elevated ~ BE_WEIGHT_MEAN,data = df,family = "binomial")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
+
+#### Association with BE_WEIGHT_MEAN in those with elevated scores.
+
+Results are reported as expected counts, with the FRS "neutral" category as the reference group.
+
+```{r}
+mod = glm(PHQ9_Total~ BE_WEIGHT_MEAN,data = df[df$PHQ9_elevated=="yes",],family = "poisson")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
+
+## GAD7
+
+### BE_APPEARANCE_MEAN
+
+#### Odds of an elevated score
+
+Results are reported as odds ratios for a one-unit change in the predictor.
+
+```{r}
+mod = glm(GAD7_elevated ~ BE_APPEARANCE_MEAN,data = df,family = "binomial")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
+
+#### Association with BE_APPEARANCE_MEAN in those with elevated scores.
+
+Results are reported as expected counts, with the FRS "neutral" category as the reference group.
+
+```{r}
+mod = glm(GAD7_Total~ BE_APPEARANCE_MEAN,data = df[df$GAD7_elevated=="yes",],family = "poisson")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
+
+### BE_ATTRIBUTION_MEAN
+
+#### Odds of an elevated score
+
+Results are reported as odds ratios for a one-unit change in the predictor.
+
+```{r}
+mod = glm(GAD7_elevated ~ BE_ATTRIBUTION_MEAN,data = df,family = "binomial")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
+
+#### Association with BE_ATTRIBUTION_MEAN in those with elevated scores.
+
+Results are reported as expected counts, with the FRS "neutral" category as the reference group.
+
+```{r}
+mod = glm(GAD7_Total~ BE_ATTRIBUTION_MEAN,data = df[df$GAD7_elevated=="yes",],family = "poisson")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
+
+### BE_WEIGHT_MEAN
+
+#### Odds of an elevated score
+
+Results are reported as odds ratios for a one-unit change in the predictor.
+
+```{r}
+mod = glm(GAD7_elevated ~ BE_WEIGHT_MEAN,data = df,family = "binomial")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
+
+#### Association with BE_WEIGHT_MEAN in those with elevated scores.
+
+Results are reported as expected counts, with the FRS "neutral" category as the reference group.
+
+```{r}
+mod = glm(GAD7_Total~ BE_WEIGHT_MEAN,data = df[df$GAD7_elevated=="yes",],family = "poisson")
+res = tidy(mod,exponentiate = T)
+kable(res,digits = 3)
+```
+
+`r report(mod)`
