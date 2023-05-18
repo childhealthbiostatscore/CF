@@ -116,8 +116,8 @@ compare = function(df,scan_num){
   cat("### Overall")
   cat("\n")
   p = df %>%
-    select(feature, location, A:C) %>%
-    pivot_longer(A:C) %>%
+    select(feature, location, A:GS) %>%
+    pivot_longer(A:GS) %>%
     ggplot(., aes(x = name, y = location, fill = value)) +
     geom_tile(color = "black") +
     theme_bw() +
@@ -156,8 +156,8 @@ compare = function(df,scan_num){
     jw = kappa2(t[,c("C","GS")])
     p = df %>%
       filter(feature == f) %>%
-      select(location, A:C) %>%
-      pivot_longer(A:C) %>%
+      select(location, A:GS) %>%
+      pivot_longer(A:GS) %>%
       ggplot(., aes(x = name, y = location, fill = value)) +
       geom_tile(color = "black") +
       theme_bw() +
@@ -338,21 +338,21 @@ compare = function(df,scan_num){
     cat("\n")
     if(is.nan(af$value)){
       cat("\n")
-      cat("Agreement within A",f,"was perfect.")
+      cat("Agreement within A ",f,"was perfect.")
       cat("\n")
     } else {
       cat("\n")
-      cat("Cohen's Kappa for A",f," was ",round(af$value,3)," (p = ",
+      cat("Cohen's Kappa for A ",f," was ",round(af$value,3)," (p = ",
           format.pval(af$p.value,eps = 0.001,digits = 3),")",sep = "")
       cat("\n")
     }
     if(is.nan(dl$value)){
       cat("\n")
-      cat("Agreement within B",f,"was perfect.")
+      cat("Agreement within B ",f,"was perfect.")
       cat("\n")
     } else {
       cat("\n")
-      cat("Cohen's Kappa for B",f," was ",round(dl$value,3)," (p = ",
+      cat("Cohen's Kappa for B ",f," was ",round(dl$value,3)," (p = ",
           format.pval(dl$p.value,eps = 0.001,digits = 3),")",sep = "")
       cat("\n")
     }
@@ -362,7 +362,7 @@ compare = function(df,scan_num){
       cat("\n")
     } else {
       cat("\n")
-      cat("Cohen's Kappa for C",f," was ",round(jw$value,3)," (p = ",
+      cat("Cohen's Kappa for C ",f," was ",round(jw$value,3)," (p = ",
           format.pval(jw$p.value,eps = 0.001,digits = 3),")",sep = "")
       cat("\n")
     }
