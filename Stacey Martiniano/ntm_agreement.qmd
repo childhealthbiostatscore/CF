@@ -25,9 +25,10 @@ library(DT)
 library(RColorBrewer)
 library(knitr)
 library(pheatmap)
+library(arsenal)
 # Import data
 api <- read.table("~/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt",
-  header = F
+                  header = F
 )
 rcon <- redcapConnection(
   url = "https://redcap.ucdenver.edu/api/",
@@ -87,22 +88,22 @@ gs <- data %>%
   select(scorer, scan_id, bronchiectasis_rul:atelectasis___6) %>%
   ungroup() %>%
   pivot_longer(bronchiectasis_rul:atelectasis___6,
-    names_to = c("feature", "location"),
-    names_pattern = "(.*)_(.*)$"
+               names_to = c("feature", "location"),
+               names_pattern = "(.*)_(.*)$"
   ) %>%
   mutate(
     feature = gsub("__", "", feature),
     feature = str_to_title(gsub("_", " ", feature))
   )
 gs$location <- factor(gs$location,
-  levels = c(
-    "1", "2", "3", "4", "5", "6", "ling", "lll",
-    "lul", "rll", "rml", "rul"
-  ),
-  labels = c(
-    "RUL", "RML", "RLL", "LUL", "Ling", "LLL",
-    "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
-  )
+                      levels = c(
+                        "1", "2", "3", "4", "5", "6", "ling", "lll",
+                        "lul", "rll", "rml", "rul"
+                      ),
+                      labels = c(
+                        "RUL", "RML", "RLL", "LUL", "Ling", "LLL",
+                        "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
+                      )
 )
 # One column per scorer
 gs <- gs %>%
@@ -176,18 +177,21 @@ gs_other %>%
   group_by(scan_id) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   column_to_rownames("scan_id") %>%
-  pheatmap(., cluster_rows = F, cluster_cols = F)
+  pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
+           colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
 gs_other %>%
   group_by(feature) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   column_to_rownames("feature") %>%
-  pheatmap(., cluster_rows = F, cluster_cols = F)
+  pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
+           colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
 gs_other %>%
   group_by(scan_id, feature) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   unite(ids, scan_id, feature, na.rm = T, sep = " ") %>%
   column_to_rownames("ids") %>%
-  pheatmap(., cluster_rows = F, cluster_cols = F)
+  pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
+           colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
 ```
 
 # Duplicates
@@ -202,22 +206,22 @@ dup <- data %>%
   select(scorer, scan_id, n, bronchiectasis_rul:atelectasis___6) %>%
   ungroup() %>%
   pivot_longer(bronchiectasis_rul:atelectasis___6,
-    names_to = c("feature", "location"),
-    names_pattern = "(.*)_(.*)$"
+               names_to = c("feature", "location"),
+               names_pattern = "(.*)_(.*)$"
   ) %>%
   mutate(
     feature = gsub("__", "", feature),
     feature = str_to_title(gsub("_", " ", feature))
   )
 dup$location <- factor(dup$location,
-  levels = c(
-    "1", "2", "3", "4", "5", "6", "ling", "lll",
-    "lul", "rll", "rml", "rul"
-  ),
-  labels = c(
-    "RUL", "RML", "RLL", "LUL", "Ling", "LLL",
-    "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
-  )
+                       levels = c(
+                         "1", "2", "3", "4", "5", "6", "ling", "lll",
+                         "lul", "rll", "rml", "rul"
+                       ),
+                       labels = c(
+                         "RUL", "RML", "RLL", "LUL", "Ling", "LLL",
+                         "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
+                       )
 )
 # One column per scorer
 dup <- dup %>%
@@ -289,18 +293,21 @@ dup_other %>%
   group_by(scan_id) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   column_to_rownames("scan_id") %>%
-  pheatmap(., cluster_rows = F, cluster_cols = F)
+  pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
+           colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
 dup_other %>%
   group_by(feature) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   column_to_rownames("feature") %>%
-  pheatmap(., cluster_rows = F, cluster_cols = F)
+  pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
+           colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
 dup_other %>%
   group_by(scan_id, feature) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   unite(ids, scan_id, feature, na.rm = T, sep = " ") %>%
   column_to_rownames("ids") %>%
-  pheatmap(., cluster_rows = F, cluster_cols = F)
+  pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
+           colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
 ```
 
 # Singleton scans
@@ -310,25 +317,25 @@ dup_other %>%
 df <- data %>%
   arrange(scan_id, scorer) %>%
   filter(!(scan_id %in% dups$original_ssid) &
-    !(scan_id %in% training$Cffid.Scoring.Set)) %>%
+           !(scan_id %in% training$Cffid.Scoring.Set)) %>%
   select(scorer, scan_id, bronchiectasis_rul:atelectasis___6) %>%
   pivot_longer(bronchiectasis_rul:atelectasis___6,
-    names_to = c("feature", "location"),
-    names_pattern = "(.*)_(.*)$"
+               names_to = c("feature", "location"),
+               names_pattern = "(.*)_(.*)$"
   ) %>%
   mutate(
     feature = gsub("__", "", feature),
     feature = str_to_title(gsub("_", " ", feature))
   )
 df$location <- factor(df$location,
-  levels = c(
-    "1", "2", "3", "4", "5", "6", "ling", "lll",
-    "lul", "rll", "rml", "rul"
-  ),
-  labels = c(
-    "RUL", "RML", "RLL", "LUL", "Ling", "LLL",
-    "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
-  )
+                      levels = c(
+                        "1", "2", "3", "4", "5", "6", "ling", "lll",
+                        "lul", "rll", "rml", "rul"
+                      ),
+                      labels = c(
+                        "RUL", "RML", "RLL", "LUL", "Ling", "LLL",
+                        "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
+                      )
 )
 # One column per scorer
 df <- df %>%
@@ -361,8 +368,8 @@ Overall Fleiss' Kappa for all 15 singleton scans was `r round(fk$value,3)` (p = 
 df_other <- df %>% filter(feature != "Bronchiectasis")
 # Check agreement with GS column
 df_other[, c("A", "B", "C")] <- lapply(df_other[, c("A", "B", "C")], factor,
-  levels = c("Unchecked", "Checked"),
-  labels = c("Absent", "Present")
+                                       levels = c("Unchecked", "Checked"),
+                                       labels = c("Absent", "Present")
 )
 # Three-way agreement
 df_other$`A vs. B` <- factor(df_other$A == df_other$B, levels = c(F, T), labels = c("Disagree", "Agree"))
@@ -398,18 +405,131 @@ df_other %>%
   group_by(scan_id) %>%
   summarise(across(`A vs. B`:`B vs. C`, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   column_to_rownames("scan_id") %>%
-  pheatmap(., cluster_rows = F, cluster_cols = F)
+  pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
+           colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
 df_other %>%
   group_by(feature) %>%
   summarise(across(`A vs. B`:`B vs. C`, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   column_to_rownames("feature") %>%
-  pheatmap(., cluster_rows = F, cluster_cols = F)
+  pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
+           colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
 df_other %>%
   group_by(scan_id, feature) %>%
   summarise(across(`A vs. B`:`B vs. C`, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   unite(ids, scan_id, feature, na.rm = T, sep = " ") %>%
   column_to_rownames("ids") %>%
-  pheatmap(., cluster_rows = F, cluster_cols = F)
+  pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
+           colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
 ```
 
 # Comparison of scores between groups
+
+For scans that were duplicated, we looked at the first reading and excluded the second. Scores were calculated by considering bronchiectasis as absent = 0, cylindric = 1, varicose = 2, cystic = 3. For all other features absence was counted as 0 and presence as 1. 
+
+```{r}
+# Import disease state
+outcomes = read.csv("~/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/disease.key.csv",na.strings = "")
+outcomes$NTM.PD..Y.N. = factor(outcomes$NTM.PD..Y.N.,
+                               levels = c("No","Yes"),ordered = T)
+# Remove training scans, get first reading of duplicates
+scores = data %>% 
+  filter(scan_id %in% outcomes$cff_registry_id,scorer != "GS") %>%
+  group_by(scorer,scan_id) %>%
+  slice_min(scoresheet_timestamp) %>% 
+  select(scorer, scan_id, bronchiectasis_rul:atelectasis___6) %>%
+  mutate(across(contains("bronchiectasis"),
+                ~as.numeric(factor(.x,levels=c("Absent","Cylindric",
+                                               "Varicose","Cystic")))-1),
+         across(mucoid_impaction___1:atelectasis___6,
+                ~as.numeric(factor(.x,levels=c("Unchecked","Checked")))-1))
+scores = left_join(scores,outcomes %>% select(cff_registry_id,NTM.PD..Y.N.),
+                   by = join_by(scan_id == cff_registry_id)) %>%
+  rename(`NTM-PD` = NTM.PD..Y.N.)
+# Get scores
+majority = scores %>%
+  group_by(scan_id) %>%
+  summarise(across(bronchiectasis_rul:`NTM-PD`,
+                   ~tail(names(sort(table(.x))), 1)))
+max = scores %>%
+  group_by(scan_id) %>%
+  summarise(across(bronchiectasis_rul:`NTM-PD`,
+                   ~max(.x,na.rm = T)))
+```
+
+```{r}
+comp_score = function(df){
+  df = df %>% pivot_longer(bronchiectasis_rul:atelectasis___6,
+                           names_to = c("feature", "location"),
+                           names_pattern = "(.*)_(.*)$"
+  ) %>%
+    mutate(
+      feature = gsub("__", "", feature),
+      feature = str_to_title(gsub("_", " ", feature))
+    )
+  df$location <- factor(df$location,
+                        levels = c(
+                          "1", "2", "3", "4", "5", "6", "ling", "lll",
+                          "lul", "rll", "rml", "rul"
+                        ),
+                        labels = c(
+                          "RUL", "RML", "RLL", "LUL", "Ling", "LLL",
+                          "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
+                        )
+  )
+  df$value = as.numeric(df$value)
+  # Tables
+  sums = df %>% group_by(scan_id,`NTM-PD`) %>%
+    summarise(Total = sum(value),.groups = "drop") 
+  t1 = tableby(`NTM-PD`~Total,data = sums,numeric.test = "kwt",
+               numeric.stats = c("Nmiss2","median","q1q3","range"))
+  
+  sums = df %>% group_by(scan_id,`NTM-PD`,feature) %>%
+    summarise(score = sum(value),.groups = "drop") %>%
+    pivot_wider(names_from = feature,values_from = score)
+  f = as.formula(paste0("`NTM-PD`~",paste0(paste0("`",unique(df$feature),"`"),
+                                           collapse = "+")))
+  t2 = tableby(f,data = sums,numeric.test = "kwt",
+               numeric.stats = c("Nmiss2","median","q1q3","range"))
+  # Plots
+  total_plot = df %>% group_by(scan_id,`NTM-PD`,feature) %>%
+    summarise(score = sum(value),.groups = "drop") %>%
+    ggplot(.,aes(x = `NTM-PD`, y = score,fill = `NTM-PD`)) + 
+    geom_violin() +
+    theme_bw() + 
+    theme(legend.position = "none")
+  feature_plot = total_plot +
+    facet_wrap(~feature,scales = "free") 
+  # Print
+  cat("\n")
+  cat("### Total Scores")
+  cat("\n")
+  cat("\n")
+  print(summary(t1,pfootnote = T))
+  cat("\n")
+  cat("\n")
+  print(total_plot)
+  cat("\n")
+  cat("\n")
+  cat("### Scores by Feature")
+  cat("\n")
+  cat("\n")
+  print(summary(t2,pfootnote = T))
+  cat("\n")
+  cat("\n")
+  print(feature_plot)
+  cat("\n")
+  cat("\n")
+}
+```
+
+## Using majority score for each feature
+
+```{r results='asis'}
+comp_score(majority)
+```
+
+## Using majority score for each feature
+
+```{r results='asis'}
+comp_score(max)
+```
