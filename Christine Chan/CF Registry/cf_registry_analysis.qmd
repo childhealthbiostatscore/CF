@@ -24,7 +24,7 @@ library(forestmodel)
 
 # Logistic analyses
 
-Any participants with T1D or T2D were excluded from these analyses.
+Any participants with T1D or T2D were excluded from these analyses. Variables that were entirely missing in a given year (e.g., `A_Vx770` and `A_VX809comb` in 2005) were excluded from those models.
 
 ```{r}
 # Import and clean data
@@ -52,20 +52,21 @@ log_reg = function(year = 2005){
                        labels = c("1-3","4-5","Oth",NA))
   df$NumPulmExacerbation=cut(df$NumPulmExacerbation,labels = c("0","1","2",">=3"),
                              breaks = c(0,1,2,3,Inf),right = F)
-  df$A_feeding2 = factor(df$A_feeding2,levels = 0:1,labels = c("No","Yes"))
-  df$A_IsOnEnzymes = factor(df$A_IsOnEnzymes,levels = 0:1,labels = c("No","Yes"))
-  df$A_FEV1_pct_predicted = cut(df$A_FEV1_pct_predicted,breaks = c(0,40,80,100,Inf),right = F)
-  df$A_corticosteroids1 = factor(df$A_corticosteroids1,levels = 0:1,labels = c("No","Yes"))
-  df$A_fungalyeast1 = factor(df$A_fungalyeast1,levels = 0:1,labels = c("No","Yes"))
-  df$A_pulmonarycomplications1 = factor(df$A_pulmonarycomplications1,levels = 0:1,labels = c("No","Yes"))
-  df$A_mycocultureresults1 = factor(df$A_mycocultureresults1,levels = 0:1,labels = c("No","Yes"))
-  df$A_Vx770 = factor(df$A_Vx770,levels = 0:1,labels = c("No","Yes"))
-  df$A_VX809comb = factor(df$A_VX809comb,levels = 0:1,labels = c("No","Yes"))
-  # Remove all empty columns
-  df = df[,-which(colSums(is.na(df))==nrow(df))]
+  df$A_FEV1_pct_predicted = cut(df$A_FEV1_pct_predicted,
+                                breaks = c(0,40,80,100,Inf),right = F)
   # Bugs
   bugs = c("A_pseudomonasaeruginosa","A_fungalyeast1",
            "A_pulmonarycomplications1","A_mycocultureresults1")
+  # Yes/No variables
+  yn_vars = c("A_feeding2","A_IsOnEnzymes","A_corticosteroids1",
+              "A_Vx770","A_VX809comb",bugs)
+  
+  df[,yn_vars] = lapply(df[,yn_vars],factor,levels = 0:1,labels = c("No","Yes"))
+  # Remove all empty columns
+  empty = which(colSums(is.na(df))==nrow(df))
+  if(length(empty)>0){
+    df = df[,-empty]
+  }
   # Models
   vars = colnames(df)[which(!colnames(df) %in% 
                               c(bugs,"cfrd_status_annual","eDWID","A_bmivalue",
@@ -175,6 +176,18 @@ log_reg = function(year = 2005){
 
 ```{r results='asis',fig.height=10,fig.width=10}
 log_reg(2005)
+```
+
+## 2013
+
+```{r results='asis',fig.height=10,fig.width=10}
+log_reg(2013)
+```
+
+## 2018
+
+```{r results='asis',fig.height=10,fig.width=10}
+log_reg(2018)
 ```
 
 # Questions
