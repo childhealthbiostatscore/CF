@@ -431,7 +431,7 @@ For scans that were duplicated, we looked at the first reading and excluded the 
 outcomes = read.csv("~/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/disease.key.csv",na.strings = "")
 outcomes$NTM.PD..Y.N. = factor(outcomes$NTM.PD..Y.N.,
                                levels = c("No","Yes"),ordered = T)
-# Remove training scans, get first reading of duplicates
+# Remove training scans, get first reading of duplicates, convert to numeric
 scores = data %>% 
   filter(scan_id %in% outcomes$cff_registry_id,scorer != "GS") %>%
   group_by(scorer,scan_id) %>%
@@ -442,10 +442,11 @@ scores = data %>%
                                                "Varicose","Cystic")))-1),
          across(mucoid_impaction___1:atelectasis___6,
                 ~as.numeric(factor(.x,levels=c("Unchecked","Checked")))-1))
+# Add outcome info
 scores = left_join(scores,outcomes %>% select(cff_registry_id,NTM.PD..Y.N.),
                    by = join_by(scan_id == cff_registry_id)) %>%
   rename(`NTM-PD` = NTM.PD..Y.N.)
-# Get scores
+# Calculate scores
 majority = scores %>%
   group_by(scan_id) %>%
   summarise(across(bronchiectasis_rul:`NTM-PD`,
@@ -478,17 +479,26 @@ comp_score = function(df){
   )
   df$value = as.numeric(df$value)
   # Tables
+  # Total score
   sums = df %>% group_by(scan_id,`NTM-PD`) %>%
     summarise(Total = sum(value),.groups = "drop") 
   t1 = tableby(`NTM-PD`~Total,data = sums,numeric.test = "kwt",
                numeric.stats = c("Nmiss2","median","q1q3","range"))
-  
+  # By feature
   sums = df %>% group_by(scan_id,`NTM-PD`,feature) %>%
     summarise(score = sum(value),.groups = "drop") %>%
     pivot_wider(names_from = feature,values_from = score)
   f = as.formula(paste0("`NTM-PD`~",paste0(paste0("`",unique(df$feature),"`"),
                                            collapse = "+")))
   t2 = tableby(f,data = sums,numeric.test = "kwt",
+               numeric.stats = c("Nmiss2","median","q1q3","range"))
+  # By location
+  sums = df %>% group_by(scan_id,`NTM-PD`,location) %>%
+    summarise(score = sum(value),.groups = "drop") %>%
+    pivot_wider(names_from = location,values_from = score)
+  f = as.formula(paste0("`NTM-PD`~",paste0(paste0("`",unique(df$location),"`"),
+                                           collapse = "+")))
+  t3 = tableby(f,data = sums,numeric.test = "kwt",
                numeric.stats = c("Nmiss2","median","q1q3","range"))
   # Plots
   total_plot = df %>% group_by(scan_id,`NTM-PD`,feature) %>%
@@ -499,6 +509,13 @@ comp_score = function(df){
     theme(legend.position = "none")
   feature_plot = total_plot +
     facet_wrap(~feature,scales = "free") 
+  location_plot = df %>% group_by(scan_id,`NTM-PD`,location) %>%
+    summarise(score = sum(value),.groups = "drop") %>%
+    ggplot(.,aes(x = `NTM-PD`, y = score,fill = `NTM-PD`)) + 
+    geom_violin() +
+    theme_bw() + 
+    theme(legend.position = "none") +
+    facet_wrap(~location,scales = "free") 
   # Print
   cat("\n")
   cat("### Total Scores")
@@ -517,6 +534,15 @@ comp_score = function(df){
   cat("\n")
   cat("\n")
   print(feature_plot)
+  cat("\n")
+  cat("\n")
+  cat("### Scores by Location")
+  cat("\n")
+  cat("\n")
+  print(summary(t3,pfootnote = T))
+  cat("\n")
+  cat("\n")
+  print(location_plot)
   cat("\n")
   cat("\n")
 }
