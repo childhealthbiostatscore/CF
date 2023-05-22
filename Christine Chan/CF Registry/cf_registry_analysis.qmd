@@ -20,6 +20,7 @@ editor: source
 library(knitr)
 library(tidyverse)
 library(forestmodel)
+library(childsds)
 ```
 
 # Logistic analyses
@@ -38,29 +39,44 @@ demogs = read.csv("/Users/timvigers/Documents/Work/Christine Chan/CF registry da
 demogs = demogs %>% select(eDWID,Gender,MutClass)
 annual = left_join(annual,demogs,by = join_by(eDWID))
 # Analysis function
-log_reg = function(year = 2005){
+log_reg = function(year){
   # Clean data
   df = annual %>% 
     filter(ReviewYear==year) %>%
     select(eDWID,Age_YrEnd,Gender,MutClass,A_IsOnEnzymes,A_FEV1_pct_predicted,
-           A_bmivalue,A_bmipercentile,A_height,A_heightpercentile,
-           NumPulmExacerbation,A_feeding2,A_pseudomonasaeruginosa,
+           A_bmivalue,A_bmipercentile,A_height,A_weight,A_heightpercentile,
+           NumPulmExacerbation,A_pseudomonasaeruginosa,
            A_fungalyeast1,A_pulmonarycomplications1,A_mycocultureresults1,
            A_corticosteroids1,cfrd_status_annual,A_Vx770,A_VX809comb)
+  # Calculate percentiles
+  df$bmi = df$A_weight / ((df$A_height/100)^2)
+  df$age_perc = ifelse(df$Age_YrEnd < 20,df$Age_YrEnd,20)
+  df$height_perc = sds(df$A_height,age = df$age_perc,
+                    sex = df$Gender,male = "M",female = "F",
+                    item = "height2_20",ref = cdc.ref,type = "perc")*100
+  df$bmi_perc = sds(df$bmi,age = df$age_perc,
+                    sex = df$Gender,male = "M",female = "F",
+                    item = "bmi",ref = cdc.ref,type = "perc")*100
   # Format columns
   df$MutClass = factor(df$MutClass,levels = c("1-3","4-5","Oth","N/A"),
-                       labels = c("1-3","4-5","Oth",NA))
+                       labels = c("1-3","4-5","Oth","Unknown"))
   df$NumPulmExacerbation=cut(df$NumPulmExacerbation,labels = c("0","1","2",">=3"),
                              breaks = c(0,1,2,3,Inf),right = F)
   df$A_FEV1_pct_predicted = cut(df$A_FEV1_pct_predicted,
                                 breaks = c(0,40,80,100,Inf),right = F)
+  df$A_FEV1_pct_predicted = relevel(df$A_FEV1_pct_predicted,ref = "[100,Inf)")
+  df$height_perc = cut(df$height_perc,breaks = c(0,10,25,50,Inf))
+  df$height_perc = relevel(df$height_perc,ref = "(50,Inf]")
+  df$bmi_perc = cut(df$bmi_perc,breaks = c(0,10,50,85,Inf))
+  df$bmi_perc = relevel(df$bmi_perc,ref = "(50,85]")
+  df$age_group = cut(df$Age_YrEnd,breaks = c(0,10,18,30,Inf))
+  df$age_group = relevel(df$age_group,ref = "(10,18]")
   # Bugs
   bugs = c("A_pseudomonasaeruginosa","A_fungalyeast1",
            "A_pulmonarycomplications1","A_mycocultureresults1")
   # Yes/No variables
-  yn_vars = c("A_feeding2","A_IsOnEnzymes","A_corticosteroids1",
+  yn_vars = c("A_IsOnEnzymes","A_corticosteroids1",
               "A_Vx770","A_VX809comb",bugs)
-  
   df[,yn_vars] = lapply(df[,yn_vars],factor,levels = 0:1,labels = c("No","Yes"))
   # Remove all empty columns
   empty = which(colSums(is.na(df))==nrow(df))
@@ -70,112 +86,61 @@ log_reg = function(year = 2005){
   # Models
   vars = colnames(df)[which(!colnames(df) %in% 
                               c(bugs,"cfrd_status_annual","eDWID","A_bmivalue",
-                                "A_bmipercentile","A_height","A_heightpercentile"))]
+                                "A_bmipercentile","A_height","A_heightpercentile",
+                                "Age_YrEnd","A_weight","bmi", "age_perc"))]
   base_mod = as.formula(paste0("cfrd_status_annual~",paste0(vars,collapse = "+")))
-  adult_mod = update(base_mod,.~.+A_bmivalue+A_height)
-  peds_mod = update(base_mod,.~.+A_bmipercentile+A_heightpercentile)
   # Simple models
-  adult_mod1 = glm(adult_mod,data = df,family = "binomial")
-  peds_mod1 = glm(peds_mod,data = df,family = "binomial")
+  mod1 = glm(base_mod,data = df,family = "binomial")
   # Print results
   cat("\n")
-  cat("### Base Models")
+  cat("### Base Model")
   cat("\n")
   cat("\n")
-  cat("#### Adult")
-  cat("\n")
-  cat("\n")
-  print(forest_model(adult_mod1))
-  cat("\n")
-  cat("\n")
-  cat("#### Peds")
-  cat("\n")
-  cat("\n")
-  print(forest_model(peds_mod1))
+  print(forest_model(mod1))
   cat("\n")
   if ("A_pseudomonasaeruginosa" %in% colnames(df)){
-    adult_mod2 = glm(update(adult_mod,.~.+A_pseudomonasaeruginosa),data = df,family = "binomial")
-    peds_mod2 = glm(update(peds_mod,.~.+A_pseudomonasaeruginosa),data = df,family = "binomial")
+    mod2 = glm(update(base_mod,.~.+A_pseudomonasaeruginosa),data = df,family = "binomial")
     cat("\n")
     cat("### P. aeruginosa")
     cat("\n")
     cat("\n")
-    cat("#### Adult")
-    cat("\n")
-    cat("\n")
-    print(forest_model(adult_mod2))
-    cat("\n")
-    cat("\n")
-    cat("#### Peds")
-    cat("\n")
-    cat("\n")
-    print(forest_model(peds_mod2))
+    print(forest_model(mod2))
     cat("\n")
   }
   if("A_fungalyeast1" %in% colnames(df)){
-    adult_mod3 = glm(update(adult_mod,.~.+A_fungalyeast1),data = df,family = "binomial")
-    peds_mod3 = glm(update(peds_mod,.~.+A_fungalyeast1),data = df,family = "binomial")
+    mod3 = glm(update(base_mod,.~.+A_fungalyeast1),data = df,family = "binomial")
     cat("\n")
     cat("### Aspergillus")
     cat("\n")
     cat("\n")
-    cat("#### Adult")
-    cat("\n")
-    cat("\n")
-    print(forest_model(adult_mod3))
-    cat("\n")
-    cat("\n")
-    cat("#### Peds")
-    cat("\n")
-    cat("\n")
-    print(forest_model(peds_mod3))
+    print(forest_model(mod3))
     cat("\n")
   }
   if("A_pulmonarycomplications1" %in% colnames(df)){
-    adult_mod4 = glm(update(adult_mod,.~.+A_pulmonarycomplications1),data = df,family = "binomial")
-    peds_mod4 = glm(update(peds_mod,.~.+A_pulmonarycomplications1),data = df,family = "binomial")
+    mod4 = glm(update(base_mod,.~.+A_pulmonarycomplications1),data = df,family = "binomial")
     cat("\n")
     cat("### ABPA")
     cat("\n")
     cat("\n")
-    cat("#### Adult")
-    cat("\n")
-    cat("\n")
-    print(forest_model(adult_mod4))
-    cat("\n")
-    cat("\n")
-    cat("#### Peds")
-    cat("\n")
-    cat("\n")
-    print(forest_model(peds_mod4))
+    print(forest_model(mod4))
     cat("\n")
   }
   if("A_mycocultureresults1" %in% colnames(df)){
-    adult_mod5 = glm(update(adult_mod,.~.+A_mycocultureresults1),data = df,family = "binomial")
-    peds_mod5 = glm(update(peds_mod,.~.+A_mycocultureresults1),data = df,family = "binomial")
+    mod5 = glm(update(base_mod,.~.+A_mycocultureresults1),data = df,family = "binomial")
     cat("\n")
     cat("### Mycobacterium")
     cat("\n")
     cat("\n")
-    cat("#### Adult")
-    cat("\n")
-    cat("\n")
-    print(forest_model(adult_mod5))
-    cat("\n")
-    cat("\n")
-    cat("#### Peds")
-    cat("\n")
-    cat("\n")
-    print(forest_model(peds_mod5))
+    print(forest_model(mod5))
     cat("\n")
   }
 }
 ```
 
-## 2005
+## 2006
 
 ```{r results='asis',fig.height=10,fig.width=10}
-log_reg(2005)
+log_reg(2006)
 ```
 
 ## 2013
