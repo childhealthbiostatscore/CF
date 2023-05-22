@@ -554,7 +554,7 @@ comp_score = function(df){
 comp_score(majority)
 ```
 
-## Using majority score for each feature
+## Using maximum score for each feature
 
 ```{r results='asis'}
 comp_score(max)
