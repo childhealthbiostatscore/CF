@@ -29,12 +29,12 @@ Any participants with T1D or T2D were excluded from these analyses. Variables th
 
 ```{r}
 # Import and clean data
-annual <- read.csv("/Users/timvigers/Documents/Work/Christine Chan/CF registry data/CFF19_Annualized_Del1.csv",na.strings = c("", "N/A")
+annual <- read.csv("~/Documents/Work/Christine Chan/CF registry data/CFF19_Annualized_Del1.csv",na.strings = c("", "N/A")
 )
 annual = annual %>% filter(cfrd_status_annual != 4,cfrd_status_annual != 5)
 annual$cfrd_status_annual = factor(annual$cfrd_status_annual,levels = 1:3,
                                    labels = c("CFRD-","CFRD-","CFRD+"))
-demogs = read.csv("/Users/timvigers/Documents/Work/Christine Chan/CF registry data/CFF19_DemogCFDiag_Del1.csv")
+demogs = read.csv("~/Documents/Work/Christine Chan/CF registry data/CFF19_DemogCFDiag_Del1.csv")
 demogs = demogs %>% select(eDWID,Gender,MutClass)
 annual = left_join(annual,demogs,by = join_by(eDWID))
 # Analysis function
@@ -42,7 +42,7 @@ log_reg = function(year){
   # Clean data
   df = annual %>% 
     filter(ReviewYear==year) %>%
-    select(eDWID,Age_YrEnd,Gender,MutClass,A_IsOnEnzymes,A_FEV1_pct_predicted,
+    select(eDWID,Age_YrEnd,Gender,MutClass,A_IsOnEnzymes,A_FEV1,A_FEV1_pct_predicted,
            A_bmivalue,A_bmipercentile,A_height,A_weight,A_heightpercentile,
            A_supplement_feeding,A_feeding2,
            NumPulmExacerbation,A_pseudomonasaeruginosa,
