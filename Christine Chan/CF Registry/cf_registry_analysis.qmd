@@ -12,6 +12,9 @@ format:
     self-contained: true
     fig-cap-location: top
     page-layout: full
+execute:
+  echo: false
+  warning: false
 editor: source
 ---
 
@@ -21,11 +24,12 @@ library(knitr)
 library(tidyverse)
 library(forestmodel)
 library(childsds)
+library(labelled)
 ```
 
 # Logistic analyses
 
-Any participants with T1D or T2D were excluded from these analyses. Variables that were entirely missing in a given year (e.g., `A_Vx770` and `A_VX809comb` in 2005) were excluded from those models.
+Any participants with T1D or T2D were excluded from these analyses. Variables that were entirely missing in a given year (e.g., `A_Vx770` and `A_VX809comb` in 2005) were excluded from those models. Participants under age 10 at year end were also excluded due to missing PFT data.
 
 ```{r}
 # Import and clean data
@@ -41,22 +45,44 @@ annual = left_join(annual,demogs,by = join_by(eDWID))
 log_reg = function(year){
   # Clean data
   df = annual %>% 
-    filter(ReviewYear==year) %>%
+    filter(ReviewYear==year,Age_YrEnd >= 10) %>%
     select(eDWID,Age_YrEnd,Gender,MutClass,A_IsOnEnzymes,A_FEV1,A_FEV1_pct_predicted,
            A_bmivalue,A_bmipercentile,A_height,A_weight,A_heightpercentile,
-           A_supplement_feeding,A_feeding2,
+           A_supplement_feeding,A_feeding2:A_feeding4,
            NumPulmExacerbation,A_pseudomonasaeruginosa,
-           A_fungalyeast1,A_pulmonarycomplications1,A_mycocultureresults1,
-           A_corticosteroids1,cfrd_status_annual,A_Vx770,A_VX809comb)
+           A_fungalyeast1,A_pulmonarycomplications1,A_mycocultureresults3,
+           A_corticosteroids1,cfrd_status_annual,A_Vx770,A_VX809comb,
+           A_hepatobiliary1_3,contains("A_hepatobiliary2_"))
   # If A_supplement_feeding is 0, then A_feeding2 is also 0 because they are not 
   # on any supplemental feeding
+  # Include all kinds of tube feeds
   df$A_feeding2[df$A_supplement_feeding == 0] = 0
+  df$A_feeding3[df$A_supplement_feeding == 0] = 0
+  df$A_feeding4[df$A_supplement_feeding == 0] = 0
+  df$tube_feeding = 
+    apply(df[,c("A_feeding2","A_feeding3","A_feeding4")],1,function(r){
+      if(all(is.na(r))){
+        return(NA)
+      } else {
+        return(max(as.numeric(r),na.rm = T))
+      }
+    })
+  # Liver disease
+  liver = c("A_hepatobiliary1_3",paste0("A_hepatobiliary2_",1:4))
+  df$liver_disease = 
+    apply(df[,liver],1,function(r){
+      if(all(is.na(r))){
+        return(NA)
+      } else {
+        return(max(as.numeric(r),na.rm = T))
+      }
+    })
   # Calculate percentiles
   df$bmi = df$A_weight / ((df$A_height/100)^2)
   df$age_perc = ifelse(df$Age_YrEnd < 20,df$Age_YrEnd,20)
   df$height_perc = sds(df$A_height,age = df$age_perc,
-                    sex = df$Gender,male = "M",female = "F",
-                    item = "height2_20",ref = cdc.ref,type = "perc")*100
+                       sex = df$Gender,male = "M",female = "F",
+                       item = "height2_20",ref = cdc.ref,type = "perc")*100
   df$bmi_perc = sds(df$bmi,age = df$age_perc,
                     sex = df$Gender,male = "M",female = "F",
                     item = "bmi",ref = cdc.ref,type = "perc")*100
@@ -72,15 +98,16 @@ log_reg = function(year){
   df$height_perc = relevel(df$height_perc,ref = "(50,Inf]")
   df$bmi_perc = cut(df$bmi_perc,breaks = c(0,10,50,85,Inf))
   df$bmi_perc = relevel(df$bmi_perc,ref = "(50,85]")
-  df$age_group = cut(df$Age_YrEnd,breaks = c(0,10,18,30,Inf))
-  df$age_group = relevel(df$age_group,ref = "(10,18]")
+  df$age_group = cut(df$Age_YrEnd,breaks = c(10,18,30,Inf),right = F)
+  df$age_group = relevel(df$age_group,ref = "[10,18)")
   # Bugs
   bugs = c("A_pseudomonasaeruginosa","A_fungalyeast1",
-           "A_pulmonarycomplications1","A_mycocultureresults1")
+           "A_pulmonarycomplications1","A_mycocultureresults3")
   # Yes/No variables
   yn_vars = c("A_IsOnEnzymes","A_corticosteroids1","A_feeding2",
-              "A_Vx770","A_VX809comb",bugs)
+              "A_Vx770","A_VX809comb",bugs,"tube_feeding","liver_disease")
   df[,yn_vars] = lapply(df[,yn_vars],factor,levels = 0:1,labels = c("No","Yes"))
+  df$A_IsOnEnzymes = relevel(df$A_IsOnEnzymes,ref = "Yes")
   # Remove all empty columns
   empty = which(colSums(is.na(df))==nrow(df))
   if(length(empty)>0){
@@ -91,8 +118,27 @@ log_reg = function(year){
                               c(bugs,"cfrd_status_annual","eDWID","A_bmivalue",
                                 "A_bmipercentile","A_height","A_heightpercentile",
                                 "Age_YrEnd","A_weight","bmi", "age_perc",
-                                "A_supplement_feeding"))]
+                                "A_supplement_feeding","A_feeding2","A_feeding3",
+                                "A_feeding4","A_FEV1",liver))]
   base_mod = as.formula(paste0("cfrd_status_annual~",paste0(vars,collapse = "+")))
+  # Labels
+  labels = list(cfrd_status_annual = "CFRD Status",MutClass = "Mutation class",
+                Gender = "Sex",A_IsOnEnzymes = "Pancreatic enzyme use",
+                A_FEV1_pct_predicted = "FEV1 percent predicted",
+                tube_feeding = "Enteric feedings",liver_disease = "Liver disease",
+                A_corticosteroids1 = "Use of corticosteroids",
+                NumPulmExacerbation = "Admissions for PEx",age_group = "Age group",
+                height_perc = "Height percentile",bmi_perc = "BMI percentile",
+                A_Vx770 = "Use of CFTR modulator Vx770",
+                A_VX809comb = "Use of CFTR modulator Vx809 combination",
+                A_pseudomonasaeruginosa = "Pseudomonas aeruginosa",
+                A_fungalyeast1 = "Aspergillus (any species)",
+                A_pulmonarycomplications1 = "ABPA",
+                A_mycocultureresults3 = "Microorganisms in myco culture")
+  var_label(df[,vars[which(vars %in% colnames(df))]]) = 
+    as.character(labels[vars[which(vars %in% colnames(df))]])
+  var_label(df[,bugs[which(bugs %in% colnames(df))]]) = 
+    as.character(labels[bugs[which(bugs %in% colnames(df))]])
   # Simple models
   mod1 = glm(base_mod,data = df,family = "binomial")
   # Print results
@@ -100,7 +146,7 @@ log_reg = function(year){
   cat("### Base Model")
   cat("\n")
   cat("\n")
-  print(forest_model(mod1))
+  print(forest_model(mod1,exclude_infinite_cis = F))
   cat("\n")
   if ("A_pseudomonasaeruginosa" %in% colnames(df)){
     mod2 = glm(update(base_mod,.~.+A_pseudomonasaeruginosa),data = df,family = "binomial")
@@ -108,7 +154,7 @@ log_reg = function(year){
     cat("### P. aeruginosa")
     cat("\n")
     cat("\n")
-    print(forest_model(mod2))
+    print(forest_model(mod2,exclude_infinite_cis = F))
     cat("\n")
   }
   if("A_fungalyeast1" %in% colnames(df)){
@@ -117,7 +163,7 @@ log_reg = function(year){
     cat("### Aspergillus")
     cat("\n")
     cat("\n")
-    print(forest_model(mod3))
+    print(forest_model(mod3,exclude_infinite_cis = F))
     cat("\n")
   }
   if("A_pulmonarycomplications1" %in% colnames(df)){
@@ -126,16 +172,16 @@ log_reg = function(year){
     cat("### ABPA")
     cat("\n")
     cat("\n")
-    print(forest_model(mod4))
+    print(forest_model(mod4,exclude_infinite_cis = F))
     cat("\n")
   }
-  if("A_mycocultureresults1" %in% colnames(df)){
-    mod5 = glm(update(base_mod,.~.+A_mycocultureresults1),data = df,family = "binomial")
+  if("A_mycocultureresults3" %in% colnames(df)){
+    mod5 = glm(update(base_mod,.~.+A_mycocultureresults3),data = df,family = "binomial")
     cat("\n")
     cat("### Mycobacterium")
     cat("\n")
     cat("\n")
-    print(forest_model(mod5))
+    print(forest_model(mod5,exclude_infinite_cis = F))
     cat("\n")
   }
 }
