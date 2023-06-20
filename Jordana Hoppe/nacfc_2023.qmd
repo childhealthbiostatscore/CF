@@ -22,8 +22,8 @@ library(tidyverse)
 library(caret)
 library(irr)
 library(gtsummary)
-df <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Jordana Hoppe/Home Collection/Data_Clean/clinical.csv", na.strings = "")
-surveys <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Jordana Hoppe/Home Collection/Data_Clean/surveys.csv", na.strings = "")
+df <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Jordana Hoppe/Home Collection/Data_Clean/clinical_2023-06-20.csv", na.strings = "")
+surveys <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Jordana Hoppe/Home Collection/Data_Clean/surveys_2023-06-20.csv", na.strings = "")
 # Combined genotype
 df$Mutation.1[df$Mutation.1 != "F508del"] <- "Other"
 df$Mutation.2[df$Mutation.2 != "F508del"] <- "Other"
