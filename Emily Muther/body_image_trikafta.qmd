@@ -32,7 +32,7 @@ library(broom)
 library(report)
 library(sjPlot)
 # Read in data
-df = read.spss("/Users/timvigers/Documents/Work/Vigers/CF/Emily Muther/Body Image and Trikafta/Data_Raw/TrikaftaBodyImage3.6.23.sav",to.data.frame = T)
+df = read.spss("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Emily Muther/Body Image and Trikafta/Data_Raw/TrikaftaBodyImage3.6.23.sav",to.data.frame = T)
 # Filter
 df = df %>% 
   filter(TakingTrikafta=="yes")
