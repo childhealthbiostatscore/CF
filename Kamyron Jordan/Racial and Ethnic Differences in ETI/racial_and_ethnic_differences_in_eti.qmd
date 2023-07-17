@@ -16,20 +16,54 @@ editor: source
 ---
 
 ```{r}
-library(DataExplorer)
+library(readxl)
 ```
 
 # EDA
 
 ```{r}
 # Import
-df = read.csv("~/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv")
-# Generate report
-# df %>%
-#   create_report(
-#     output_file = paste0("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Reports/Annualized EDA ", 
-#                          format(Sys.time(), "%Y-%m-%d"),".html"),
-#     report_title = "Annualized EDA - Racial and Ethnic Differences in ETI"
-#   )
-skimr::skim(df)
+df <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv",na.strings = "")
+demo = read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv",na.strings = "")
+dict = read_excel("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
+# Merge demographic data
+
+# Factor variables
+df$smoking <- factor(df$smoking,
+  levels = 1:4,
+  labels = c(
+    "No", "Occasionally",
+    "Yes, Regularly, less than 1 ppd",
+    "Yes, Regularly, 1 ppd or more"
+  )
+)
+df$second_smoke <- factor(df$second_smoke,
+  levels = 1:4,
+  labels = c(
+    "Daily", "Several Times Per Week",
+    "Several Times Per Month or less",
+    "Never"
+  )
+)
+df$cfrd_status_annual <- factor(df$cfrd_status_annual,
+  levels = 1:5,
+  labels = c("NGT", "IGT", "CFRD", "T1D", "T2D")
+)
+df$Transplant_status <- factor(df$Transplant_status,
+  levels = 1:5,
+  labels = c(
+    "Not pertinent",
+    "Accepted, on waiting list",
+    "Evaluated, final decision pending",
+    "Evaluated, rejected",
+    "Had transplantation"
+  )
+)
+# Format binary variables
+bin_vars = c("insurance","employment")
+bin_vars = colnames(df)[which(sub("\\d","",colnames(df)) %in% bin_vars)]
+bin_vars = c(bin_vars,"pregnant")
+df[,bin_vars] = lapply(df[,bin_vars],factor,levels = 0:1,labels = c("No","Yes"))
 ```
+
+
