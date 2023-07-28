@@ -36,7 +36,7 @@ rcon <- redcapConnection(
   url = "https://redcap.ucdenver.edu/api/",
   token = api[1, 1]
 )
-data <- exportRecords(rcon, labels = F)
+data <- exportRecordsTyped(rcon, labels = F)
 data <- data.frame(lapply(data, as.character))
 data$scan_id <- as.numeric(data$scan_id)
 # Make scorer IDs by initial
@@ -67,16 +67,6 @@ colors <- brewer.pal(6, name)
 names(colors) <- c("Checked", "Unchecked", "Absent", "Cylindric", "Varicose", NA)
 custom_colors <- scale_fill_manual(name = "", values = colors)
 ```
-
-| Cohen's Kappa | Interpretation         |
-|---------------|------------------------|
-| 0             | No agreement           |
-| 0.10 - 0.20   | Slight agreement       |
-| 0.21 - 0.40   | Fair agreement         |
-| 0.41 - 0.60   | Moderate agreement     |
-| 0.61 - 0.80   | Substantial agreement  |
-| 0.81 - 0.99   | Near perfect agreement |
-| 1             | Perfect agreement      |
 
 # Comparison to gold standards
 
@@ -111,46 +101,12 @@ gs$location <- factor(gs$location,
 gs <- gs %>%
   pivot_wider(names_from = scorer, values_from = value) %>%
   arrange(feature, location)
-```
-
-## Bronciechtasis
-
-```{r}
-gs_bronch <- gs %>% filter(feature == "Bronchiectasis")
-fk <- kappam.fleiss(gs_bronch[, c("A", "B", "C", "GS")])
-A <- kappa2(gs_bronch[, c("A", "GS")])
-B <- kappa2(gs_bronch[, c("B", "GS")])
-C <- kappa2(gs_bronch[, c("C", "GS")])
-# Plot
-gs_bronch %>%
-  select(scan_id, feature, location, A:GS) %>%
-  pivot_longer(A:GS) %>%
-  ggplot(., aes(x = name, y = location, fill = value)) +
-  geom_tile(color = "black") +
-  theme_bw() +
-  labs(fill = "", x = "Scorer", y = "Location") +
-  custom_colors +
-  facet_wrap(~scan_id)
-```
-
-Overall Fleiss' Kappa for all 5 gold standard scans was `r round(fk$value,3)` (p = `r format.pval(fk$p.value,eps = 0.001,digits = 3)`).
-
-Overall Cohen's Kappa for A vs. the gold standard was `r round(A$value,3)` (p = `r format.pval(A$p.value,eps = 0.001,digits = 3)`).
-
-Overall Cohen's Kappa for B vs. the gold standard was `r round(B$value,3)` (p = `r format.pval(B$p.value,eps = 0.001,digits = 3)`).
-
-Overall Cohen's Kappa for C vs. the gold standard was `r round(C$value,3)` (p = `r format.pval(C$p.value,eps = 0.001,digits = 3)`).
-
-## Other features
-
-```{r}
-gs_other <- gs %>% filter(feature != "Bronchiectasis")
 # Check agreement with GS column
-gs_other$A <- factor(gs_other$A == gs_other$GS, levels = c(F, T), labels = c("Disagree", "Agree"))
-gs_other$B <- factor(gs_other$B == gs_other$GS, levels = c(F, T), labels = c("Disagree", "Agree"))
-gs_other$C <- factor(gs_other$C == gs_other$GS, levels = c(F, T), labels = c("Disagree", "Agree"))
+gs$A <- factor(gs$A == gs$GS, levels = c(F, T), labels = c("Disagree", "Agree"))
+gs$B <- factor(gs$B == gs$GS, levels = c(F, T), labels = c("Disagree", "Agree"))
+gs$C <- factor(gs$C == gs$GS, levels = c(F, T), labels = c("Disagree", "Agree"))
 # Plot
-gs_other %>%
+gs %>%
   select(scan_id, feature, location, A:GS) %>%
   pivot_longer(A:C) %>%
   ggplot(., aes(x = name, y = location, fill = value)) +
@@ -159,39 +115,49 @@ gs_other %>%
   labs(fill = "", x = "Scorer", y = "Location") +
   facet_grid(rows = vars(feature), cols = vars(scan_id))
 # Tables
-gs_other %>%
+gs %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "drop") %>%
   kable(., digits = 3, caption = "Proportion of agreement with GS")
-gs_other %>%
+gs %>%
   group_by(scan_id) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "drop") %>%
   kable(., digits = 3, caption = "Proportion of agreement with GS")
-gs_other %>%
+gs %>%
   group_by(feature) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "drop") %>%
   kable(., digits = 3, caption = "Proportion of agreement with GS")
-gs_other %>%
+gs %>%
   group_by(scan_id, feature) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "drop") %>%
   kable(., digits = 3, caption = "Proportion of agreement with GS")
+gs %>%
+  group_by(location) %>%
+  summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "drop") %>%
+  kable(., digits = 3, caption = "Proportion of agreement with GS")
 # Heatmaps
-gs_other %>%
+gs %>%
   group_by(scan_id) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   column_to_rownames("scan_id") %>%
   pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
            colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
-gs_other %>%
+gs %>%
   group_by(feature) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   column_to_rownames("feature") %>%
   pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
            colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
-gs_other %>%
+gs %>%
   group_by(scan_id, feature) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   unite(ids, scan_id, feature, na.rm = T, sep = " ") %>%
   column_to_rownames("ids") %>%
+  pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
+           colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
+gs %>%
+  group_by(location) %>%
+  summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
+  column_to_rownames("location") %>%
   pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
            colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
 ```
@@ -230,43 +196,12 @@ dup <- dup %>%
   pivot_wider(names_from = scorer, values_from = value) %>%
   pivot_wider(names_from = n, values_from = A:C) %>%
   arrange(feature, location)
-```
-
-## Bronciechtasis
-
-```{r}
-dup_bronch <- dup %>% filter(feature == "Bronchiectasis")
-A <- kappa2(dup_bronch[, c("A_1", "A_2")])
-B <- kappa2(dup_bronch[, c("B_1", "B_2")])
-C <- kappa2(dup_bronch[, c("C_1", "C_2")])
-# Plot
-dup_bronch %>%
-  select(scan_id, feature, location, A_1:C_2) %>%
-  pivot_longer(A_1:C_2) %>%
-  ggplot(., aes(x = name, y = location, fill = value)) +
-  geom_tile(color = "black") +
-  theme_bw() +
-  labs(fill = "", x = "Scorer", y = "Location") +
-  custom_colors +
-  facet_wrap(~scan_id)
-```
-
-Overall Cohen's Kappa for A vs. themselves was `r round(A$value,3)` (p = `r format.pval(A$p.value,eps = 0.001,digits = 3)`).
-
-Overall Cohen's Kappa for B vs. themselves was `r round(B$value,3)` (p = `r format.pval(B$p.value,eps = 0.001,digits = 3)`).
-
-Overall Cohen's Kappa for C vs. themselves was `r round(C$value,3)` (p = `r format.pval(C$p.value,eps = 0.001,digits = 3)`).
-
-## Other features
-
-```{r}
-dup_other <- dup %>% filter(feature != "Bronchiectasis")
 # Check agreement with GS column
-dup_other$A <- factor(dup_other$A_1 == dup_other$A_2, levels = c(F, T), labels = c("Disagree", "Agree"))
-dup_other$B <- factor(dup_other$B_1 == dup_other$B_2, levels = c(F, T), labels = c("Disagree", "Agree"))
-dup_other$C <- factor(dup_other$C_1 == dup_other$C_2, levels = c(F, T), labels = c("Disagree", "Agree"))
+dup$A <- factor(dup$A_1 == dup$A_2, levels = c(F, T), labels = c("Disagree", "Agree"))
+dup$B <- factor(dup$B_1 == dup$B_2, levels = c(F, T), labels = c("Disagree", "Agree"))
+dup$C <- factor(dup$C_1 == dup$C_2, levels = c(F, T), labels = c("Disagree", "Agree"))
 # Plot
-dup_other %>%
+dup %>%
   select(scan_id, feature, location, A:C) %>%
   pivot_longer(A:C) %>%
   ggplot(., aes(x = name, y = location, fill = value)) +
@@ -275,39 +210,49 @@ dup_other %>%
   labs(fill = "", x = "Scorer", y = "Location") +
   facet_grid(rows = vars(feature), cols = vars(scan_id))
 # Tables
-dup_other %>%
+dup %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "drop") %>%
   kable(., digits = 3, caption = "Proportion of agreement with themselves")
-dup_other %>%
+dup %>%
   group_by(scan_id) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "drop") %>%
   kable(., digits = 3, caption = "Proportion of agreement with themselves")
-dup_other %>%
+dup %>%
   group_by(feature) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "drop") %>%
   kable(., digits = 3, caption = "Proportion of agreement with themselves")
-dup_other %>%
+dup %>%
   group_by(scan_id, feature) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "drop") %>%
   kable(., digits = 3, caption = "Proportion of agreement with themselves")
+dup %>%
+  group_by(location) %>%
+  summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "drop") %>%
+  kable(., digits = 3, caption = "Proportion of agreement with themselves")
 # Heatmaps
-dup_other %>%
+dup %>%
   group_by(scan_id) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   column_to_rownames("scan_id") %>%
   pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
            colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
-dup_other %>%
+dup %>%
   group_by(feature) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   column_to_rownames("feature") %>%
   pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
            colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
-dup_other %>%
+dup %>%
   group_by(scan_id, feature) %>%
   summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   unite(ids, scan_id, feature, na.rm = T, sep = " ") %>%
   column_to_rownames("ids") %>%
+  pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
+           colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
+dup %>%
+  group_by(location) %>%
+  summarise(across(A:C, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
+  column_to_rownames("location") %>%
   pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
            colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
 ```
@@ -343,42 +288,21 @@ df$location <- factor(df$location,
 df <- df %>%
   pivot_wider(names_from = scorer, values_from = value) %>%
   arrange(feature, location)
-```
-
-## Bronciechtasis
-
-```{r}
-df_bronch <- df %>% filter(feature == "Bronchiectasis")
-fk <- kappam.fleiss(df_bronch[, c("A", "B", "C")])
-# Plot
-df_bronch %>%
-  select(scan_id, feature, location, A:C) %>%
-  pivot_longer(A:C) %>%
-  ggplot(., aes(x = name, y = location, fill = value)) +
-  geom_tile(color = "black") +
-  theme_bw() +
-  labs(fill = "", x = "Scorer", y = "Location") +
-  custom_colors +
-  facet_wrap(~scan_id)
-```
-
-Overall Fleiss' Kappa for all 15 singleton scans was `r round(fk$value,3)` (p = `r format.pval(fk$p.value,eps = 0.001,digits = 3)`).
-
-## Other features
-
-```{r}
-df_other <- df %>% filter(feature != "Bronchiectasis")
 # Check agreement with GS column
-df_other[, c("A", "B", "C")] <- lapply(df_other[, c("A", "B", "C")], factor,
-                                       levels = c("Unchecked", "Checked"),
-                                       labels = c("Absent", "Present")
+df[, c("A", "B", "C")] <- lapply(df[, c("A", "B", "C")], factor,
+                                       levels = c("Unchecked", "Checked",
+                                                  "Absent","Cylindric","Cystic",
+                                                  "Varicose"),
+                                       labels = c("Absent", "Present",
+                                                  "Absent", "Present", 
+                                                  "Present", "Present")
 )
 # Three-way agreement
-df_other$`A vs. B` <- factor(df_other$A == df_other$B, levels = c(F, T), labels = c("Disagree", "Agree"))
-df_other$`A vs. C` <- factor(df_other$A == df_other$C, levels = c(F, T), labels = c("Disagree", "Agree"))
-df_other$`B vs. C` <- factor(df_other$B == df_other$C, levels = c(F, T), labels = c("Disagree", "Agree"))
+df$`A vs. B` <- factor(df$A == df$B, levels = c(F, T), labels = c("Disagree", "Agree"))
+df$`A vs. C` <- factor(df$A == df$C, levels = c(F, T), labels = c("Disagree", "Agree"))
+df$`B vs. C` <- factor(df$B == df$C, levels = c(F, T), labels = c("Disagree", "Agree"))
 # Plot
-df_other %>%
+df %>%
   select(scan_id, feature, location, `A vs. B`:`B vs. C`) %>%
   pivot_longer(`A vs. B`:`B vs. C`) %>%
   ggplot(., aes(x = name, y = location, fill = value)) +
@@ -387,46 +311,45 @@ df_other %>%
   labs(fill = "", x = "Scorer", y = "Location") +
   facet_grid(rows = vars(feature), cols = vars(scan_id))
 # Tables
-df_other %>%
+df %>%
   summarise(across(`A vs. B`:`B vs. C`, ~ mean(.x == "Agree", na.rm = T)), .groups = "drop") %>%
   kable(., digits = 3, caption = "Proportion of agreement with themselves")
-df_other %>%
+df %>%
   group_by(scan_id) %>%
   summarise(across(`A vs. B`:`B vs. C`, ~ mean(.x == "Agree", na.rm = T)), .groups = "drop") %>%
   kable(., digits = 3, caption = "Proportion of agreement with themselves")
-df_other %>%
+df %>%
   group_by(feature) %>%
   summarise(across(`A vs. B`:`B vs. C`, ~ mean(.x == "Agree", na.rm = T)), .groups = "drop") %>%
   kable(., digits = 3, caption = "Proportion of agreement with themselves")
-df_other %>%
-  group_by(scan_id, feature) %>%
+df %>%
+  group_by(location) %>%
   summarise(across(`A vs. B`:`B vs. C`, ~ mean(.x == "Agree", na.rm = T)), .groups = "drop") %>%
   kable(., digits = 3, caption = "Proportion of agreement with themselves")
 # Heatmaps
-df_other %>%
+df %>%
   group_by(scan_id) %>%
   summarise(across(`A vs. B`:`B vs. C`, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   column_to_rownames("scan_id") %>%
   pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
            colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
-df_other %>%
+df %>%
   group_by(feature) %>%
   summarise(across(`A vs. B`:`B vs. C`, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
   column_to_rownames("feature") %>%
   pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
            colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
-df_other %>%
-  group_by(scan_id, feature) %>%
+df %>%
+  group_by(location) %>%
   summarise(across(`A vs. B`:`B vs. C`, ~ mean(.x == "Agree", na.rm = T)), .groups = "keep") %>%
-  unite(ids, scan_id, feature, na.rm = T, sep = " ") %>%
-  column_to_rownames("ids") %>%
+  column_to_rownames("location") %>%
   pheatmap(., cluster_rows = F, cluster_cols = F,breaks = seq(0.6,1,length.out = 100),
            colorRampPalette((brewer.pal(n = 7, name = "RdYlBu")))(100))
 ```
 
 # Comparison of scores between groups
 
-For scans that were duplicated, we looked at the first reading and excluded the second. Scores were calculated by considering bronchiectasis as absent = 0, cylindric = 1, varicose = 2, cystic = 3. For all other features absence was counted as 0 and presence as 1. 
+For scans that were duplicated, we looked at the first reading and excluded the second. For all features, absence was counted as 0 and presence as 1. Absence and presence refer to all lobes (e.g. bronchiectasis on RUL and RML would score a 1, and so would bronchiectasis on RUL, RML, and LUL). 
 
 ```{r}
 # Import disease state
@@ -438,150 +361,50 @@ scores = data %>%
   filter(scan_id %in% outcomes$cff_registry_id,scorer != "GS") %>%
   group_by(scorer,scan_id) %>%
   slice_min(scoresheet_timestamp) %>% 
-  select(scorer, scan_id, bronchiectasis_rul:atelectasis___6) %>%
+  select(scorer, scan_id,bronchiectasis_rul:atelectasis___6) %>%
   mutate(across(contains("bronchiectasis"),
                 ~as.numeric(factor(.x,levels=c("Absent","Cylindric",
-                                               "Varicose","Cystic")))-1),
+                                               "Varicose","Cystic"),
+                                   labels = c("Unchecked","Checked",
+                                              "Checked","Checked")))-1),
          across(mucoid_impaction___1:atelectasis___6,
                 ~as.numeric(factor(.x,levels=c("Unchecked","Checked")))-1))
-# Add outcome info
-scores = left_join(scores,outcomes %>% select(cff_registry_id,NTM.PD..Y.N.),
-                   by = join_by(scan_id == cff_registry_id)) %>%
-  rename(`NTM-PD` = NTM.PD..Y.N.)
+# Take the maximum across all locations
+scores = scores %>% pivot_longer(bronchiectasis_rul:atelectasis___6,
+               names_to = c("feature", "location"),
+               names_pattern = "(.*)_(.*)$"
+  ) %>%
+  group_by(scorer,scan_id,feature) %>%
+  summarise(value = max(value),.groups = "drop") 
 # Calculate scores
 majority = scores %>%
+  group_by(scan_id,feature) %>%
+  summarise(value = names(sort(-table(value)))[1],.groups = "drop") %>%
   group_by(scan_id) %>%
-  summarise(across(bronchiectasis_rul:`NTM-PD`,
-                   ~tail(names(sort(table(.x))), 1)))
+  summarise(score = sum(as.numeric(value)))
 max = scores %>%
+  group_by(scan_id,feature) %>%
+  summarise(value = max(value),.groups = "drop") %>%
   group_by(scan_id) %>%
-  summarise(across(bronchiectasis_rul:`NTM-PD`,
-                   ~max(.x,na.rm = T)))
-a = scores %>%
-  filter(scorer == "A")
-b = scores %>%
-  filter(scorer == "B") 
-c = scores %>%
-  filter(scorer == "C")
-```
-
-```{r}
-comp_score = function(df){
-  df = df %>% pivot_longer(bronchiectasis_rul:atelectasis___6,
-                           names_to = c("feature", "location"),
-                           names_pattern = "(.*)_(.*)$"
-  ) %>%
-    mutate(
-      feature = gsub("__", "", feature),
-      feature = str_to_title(gsub("_", " ", feature))
-    )
-  df$location <- factor(df$location,
-                        levels = c(
-                          "1", "2", "3", "4", "5", "6", "ling", "lll",
-                          "lul", "rll", "rml", "rul"
-                        ),
-                        labels = c(
-                          "RUL", "RML", "RLL", "LUL", "Ling", "LLL",
-                          "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
-                        )
-  )
-  df$value = as.numeric(df$value)
-  # Tables
-  # Total score
-  sums = df %>% group_by(scan_id,`NTM-PD`) %>%
-    summarise(Total = sum(value),.groups = "drop") 
-  t1 = tableby(`NTM-PD`~Total,data = sums,numeric.test = "kwt",
-               numeric.stats = c("Nmiss2","median","q1q3","range"))
-  # By feature
-  sums = df %>% group_by(scan_id,`NTM-PD`,feature) %>%
-    summarise(score = sum(value),.groups = "drop") %>%
-    pivot_wider(names_from = feature,values_from = score)
-  f = as.formula(paste0("`NTM-PD`~",paste0(paste0("`",unique(df$feature),"`"),
-                                           collapse = "+")))
-  t2 = tableby(f,data = sums,numeric.test = "kwt",
-               numeric.stats = c("Nmiss2","median","q1q3","range"))
-  # By location
-  sums = df %>% group_by(scan_id,`NTM-PD`,location) %>%
-    summarise(score = sum(value),.groups = "drop") %>%
-    pivot_wider(names_from = location,values_from = score)
-  f = as.formula(paste0("`NTM-PD`~",paste0(paste0("`",unique(df$location),"`"),
-                                           collapse = "+")))
-  t3 = tableby(f,data = sums,numeric.test = "kwt",
-               numeric.stats = c("Nmiss2","median","q1q3","range"))
-  # Plots
-  total_plot = df %>% group_by(scan_id,`NTM-PD`,feature) %>%
-    summarise(score = sum(value),.groups = "drop") %>%
-    ggplot(.,aes(x = `NTM-PD`, y = score,fill = `NTM-PD`)) + 
-    geom_violin() +
-    theme_bw() + 
-    theme(legend.position = "none")
-  feature_plot = total_plot +
-    facet_wrap(~feature,scales = "free") 
-  location_plot = df %>% group_by(scan_id,`NTM-PD`,location) %>%
-    summarise(score = sum(value),.groups = "drop") %>%
-    ggplot(.,aes(x = `NTM-PD`, y = score,fill = `NTM-PD`)) + 
-    geom_violin() +
-    theme_bw() + 
-    theme(legend.position = "none") +
-    facet_wrap(~location,scales = "free") 
-  # Print
-  cat("\n")
-  cat("### Total Scores")
-  cat("\n")
-  cat("\n")
-  print(summary(t1,pfootnote = T))
-  cat("\n")
-  cat("\n")
-  print(total_plot)
-  cat("\n")
-  cat("\n")
-  cat("### Scores by Feature")
-  cat("\n")
-  cat("\n")
-  print(summary(t2,pfootnote = T))
-  cat("\n")
-  cat("\n")
-  print(feature_plot)
-  cat("\n")
-  cat("\n")
-  cat("### Scores by Location")
-  cat("\n")
-  cat("\n")
-  print(summary(t3,pfootnote = T))
-  cat("\n")
-  cat("\n")
-  print(location_plot)
-  cat("\n")
-  cat("\n")
-}
+  summarise(score = sum(value))
+# Outcomes
+majority = left_join(majority,outcomes %>% select(cff_registry_id,NTM.PD..Y.N.),
+                   by = join_by(scan_id == cff_registry_id)) %>%
+  rename(`NTM-PD` = NTM.PD..Y.N.)
+max = left_join(max,outcomes %>% select(cff_registry_id,NTM.PD..Y.N.),
+                   by = join_by(scan_id == cff_registry_id)) %>%
+  rename(`NTM-PD` = NTM.PD..Y.N.)
 ```
 
 ## Using majority score for each feature
 
-```{r results='asis'}
-comp_score(majority)
+```{r}
+majority %>% select(score,`NTM-PD`) %>%
+  tbl_summary(by = `NTM-PD`)
 ```
 
 ## Using maximum score for each feature
 
 ```{r results='asis'}
 comp_score(max)
-```
-
-## Scorer A
-
-```{r results='asis'}
-comp_score(a)
-```
-
-## Scorer B
-
-```{r results='asis'}
-comp_score(b)
-```
-
-## Scorer C
-
-```{r results='asis'}
-comp_score(c)
 ```
