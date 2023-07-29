@@ -2,9 +2,27 @@ library(tidyverse)
 library(lubridate)
 library(readxl)
 library(Hmisc)
-# Start with annualized data
+# Import
 annual <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
+encounter <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
 demo <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
+# Categorical variables - encounters
+bugs = c("staphylococcus_aureus", "haemophilus_influenzae",
+         "pseudomonasaeruginosa","burkho_complex","othermicroorganisms1")
+encounter[,bugs] = lapply(encounter[,bugs],function(c){
+  c[!is.na(encounter$bacterialculturedone) & is.na(c)] <- 0
+  return(c)
+})
+bug_types = c("staphyl_type1","staphyl_type2","patype1","patype2")
+encounter[,bug_types] = lapply(encounter[,bug_types],function(c){
+  c[is.na(encounter$bacterialculturedone)] = NA
+  return(c)
+})
+
+
+
+yn_vars <- c()
+
 # Categorical variables - annual
 annual$Lung_Transplants_Ever[is.na(annual$Lung_Transplants_Ever)] <- 0
 yn_vars <- c(
@@ -131,6 +149,48 @@ demo$First_LungTransplantDate <- mdy(demo$First_LungTransplantDate)
 demo$Modulator_trikafta_first_date <- mdy(demo$Modulator_trikafta_first_date)
 # Manage labels (tried to do this programmatically but the data dictionary has
 # some quirks and this ended up being faster)
+encounter_labels <-
+  list(
+    "eDWID" = "eDWID", "reviewyear" = "Year", "encounterid" = "Encounter ID",
+    "encounterdate" = "Encounter Date", "encounternum" = "Encounter Number",
+    "encounterlocation" = "Encounter Location", "encounterage" = "Age",
+    "height" = "Height (cm)", "heightpercentile" = "Height %ile",
+    "htpct_zscore" = "Height Z-Score", "weight" = "Weight (kg)",
+    "weightpercentile" = "Weight %ile", "wtpct_zscore" = "Weight Z-Score",
+    "bmivalue" = "BMI", "bmipercentile" = "BMI %ile",
+    "bacterialculturedone" = "Bacterial Culture Done?",
+    "cultureresults" = "Culture Results",
+    "staphylococcus_aureus" = "S. aureus detected",
+    "staphyl_type1" = "MRSA", "staphyl_type2" = "MSSA",
+    "haemophilus_influenzae" = "H. influenzae detected",
+    "pseudomonasaeruginosa" = "P. aeruginosa detected",
+    "patype1" = "Mucoid P. aeruginosa",
+    "patype2" = "Non-Mucoid P. aeruginosa",
+    "burkho_complex" = "B. cepacia complex",
+    "othermicroorganisms1" = "A. xylosoxidans",
+    "pulmonarymeds_notonany" = "Not on any pulmonary meds",
+    "tobi" = "Tobramycin", "tobifrequency" = "Tobramycin frequency",
+    "aztreonam" = "Aztreonam", "aztreonam_freq" = "Aztreonam frequency",
+    "Vx770" = "Ivacaftor", "Vx809comb" = "Orkambi", "vx661comb" = "Symdeko",
+    "vx445comb" = "Trikafta", "dornasealfa" = "Dornase alfa",
+    "dornase_frequency" = "Dornase alfa frequency",
+    "hypertonicsaline" = "Hypertonic saline",
+    "hypersalineconc" = "Hypertonic saline concentration",
+    "hypersalinefreq" = "Hypertonic saline frequency",
+    "isOnEnzymes" = "Is on enzymes", "FVC" = "FVC",
+    "GLI_FVC_pct_predicted" = "ppFVC", "FEV1" = "FEV1",
+    "GLI_FEV1_pct_predicted" = "ppFEV1", "FEV1FVC" = "FEV1/FVC",
+    "GLI_FEV1FVC_pct_predicted" = "ppFEV1/FVC",
+    "hepatobiliary1_3" = "Liver disease, cirrhosis",
+    "acutehepatitis" = "Acute hepatitis",
+    "acutehepatitis_type2" = "Acute hepatitis type 2",
+    "hepatobiliary2_1" = "Liver disease, non- cirrhosis",
+    "hepatobiliary2_3" = "Liver disease, other",
+    "pulmonarycomplications1" = "ABPA",
+    "pe_assessment" = "Assessment of potential pulmonary exacerbation",
+    "medscurrentepisode6" = "Inhaled antibiotic PLUS an oral quinolone antibiotic",
+    "medscurrentepisode7" = "No medications prescribed during this episode"
+  )
 annual_labels <-
   list(
     "eDWID" = "eDWID", "ReviewYear" = "Review Year", "Age_YrEnd" = "Age at Year End",
@@ -177,6 +237,7 @@ demo_labels <-
 # Apply labels
 label(annual) <- annual_labels[colnames(annual)]
 label(demo) <- demo_labels[colnames(demo)]
+label(encounter) = encounter_labels[colnames(encounter)]
 # Merge
 df <- full_join(demo, annual, by = join_by(eDWID))
 # Save
