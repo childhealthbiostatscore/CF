@@ -6,23 +6,103 @@ library(Hmisc)
 annual <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
 encounter <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
 demo <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
-# Categorical variables - encounters
-bugs = c("staphylococcus_aureus", "haemophilus_influenzae",
-         "pseudomonasaeruginosa","burkho_complex","othermicroorganisms1")
-encounter[,bugs] = lapply(encounter[,bugs],function(c){
+# Fix missing values for specific bacteria
+bugs <- c(
+  "staphylococcus_aureus", "haemophilus_influenzae",
+  "pseudomonasaeruginosa", "burkho_complex", "othermicroorganisms1"
+)
+encounter[, bugs] <- lapply(encounter[, bugs], function(c) {
   c[!is.na(encounter$bacterialculturedone) & is.na(c)] <- 0
   return(c)
 })
-bug_types = c("staphyl_type1","staphyl_type2","patype1","patype2")
-encounter[,bug_types] = lapply(encounter[,bug_types],function(c){
-  c[is.na(encounter$bacterialculturedone)] = NA
+bug_types <- c("staphyl_type1", "staphyl_type2", "patype1", "patype2")
+encounter[, bug_types] <- lapply(encounter[, bug_types], function(c) {
+  c[is.na(encounter$bacterialculturedone)] <- NA
   return(c)
 })
-
-
-
-yn_vars <- c()
-
+# Some variables are either missing or 1
+y_vars <- c(
+  "bacterialculturedone", "pulmonarymeds_notonany", "tobi", "aztreonam",
+  "Vx770", "Vx809comb", "vx661comb", "vx445comb", "dornasealfa",
+  "hypertonicsaline", "acutehepatitis"
+)
+encounter[, y_vars] <- lapply(encounter[, y_vars], function(c) {
+  c[is.na(c)] <- 0
+  return(c)
+})
+yn_vars <- c(
+  bugs, bug_types, y_vars, "hepatobiliary1_3", "acutehepatitis_type2",
+  "hepatobiliary2_1", "hepatobiliary2_3", "pulmonarycomplications1",
+  "medscurrentepisode6", "medscurrentepisode7", "isOnEnzymes"
+)
+encounter[, yn_vars] <- lapply(encounter[, yn_vars], factor, levels = 0:1, labels = c("No", "Yes"))
+# Categorical variables - encounters
+encounter$encounterlocation <- factor(encounter$encounterlocation,
+  levels = 1:4,
+  labels = c(
+    "Clinic", "Hospital", "Home IV",
+    "Other"
+  )
+)
+encounter$cultureresults <- factor(encounter$cultureresults,
+  levels = 1:3,
+  labels = c(
+    "No growth/sterile culture",
+    "Normal flora",
+    "Microorganisms"
+  )
+)
+encounter$tobifrequency <- factor(encounter$tobifrequency,
+  levels = 1:4,
+  labels = c(
+    "300 mg BID alternate month schedule",
+    "300 mg BID continuous",
+    "Other regimen (different dose or freq)",
+    "Eradication"
+  )
+)
+encounter$aztreonam_freq <- factor(encounter$aztreonam_freq,
+  levels = 1:5,
+  labels = c(
+    "75 mg TID",
+    "75 mg TID Alternate Month Schedule",
+    "75 mg TID Continuous",
+    "Other Regimen",
+    "Eradication"
+  )
+)
+encounter$dornase_frequency <- factor(encounter$dornase_frequency,
+  levels = 1:3,
+  labels = c(
+    "2.5 mg qd",
+    "2.5 mg BID",
+    "other regimen (different dose or freq)"
+  )
+)
+encounter$hypersalineconc <- factor(encounter$hypersalineconc,
+  levels = 1:8,
+  labels = c(
+    "3", "4", "5", "6", "7", "8", "9", "10"
+  )
+)
+encounter$hypersalinefreq <- factor(encounter$hypersalinefreq,
+  levels = 1:3,
+  labels = c(
+    "QD",
+    "BID",
+    "Other"
+  )
+)
+encounter$pe_assessment <- factor(encounter$pe_assessment,
+  levels = 1:5,
+  labels = c(
+    "Absent",
+    "Mild exacerbation",
+    "Moderate exacerbation",
+    "Severe exacerbation",
+    "Don't know/unable to answer"
+  )
+)
 # Categorical variables - annual
 annual$Lung_Transplants_Ever[is.na(annual$Lung_Transplants_Ever)] <- 0
 yn_vars <- c(
@@ -147,6 +227,7 @@ demo[, mut_vars] <- lapply(demo[, mut_vars], factor,
 # Dates
 demo$First_LungTransplantDate <- mdy(demo$First_LungTransplantDate)
 demo$Modulator_trikafta_first_date <- mdy(demo$Modulator_trikafta_first_date)
+encounter$encounterdate <- mdy(encounter$encounterdate)
 # Manage labels (tried to do this programmatically but the data dictionary has
 # some quirks and this ended up being faster)
 encounter_labels <-
@@ -237,8 +318,16 @@ demo_labels <-
 # Apply labels
 label(annual) <- annual_labels[colnames(annual)]
 label(demo) <- demo_labels[colnames(demo)]
-label(encounter) = encounter_labels[colnames(encounter)]
+label(encounter) <- encounter_labels[colnames(encounter)]
 # Merge
-df <- full_join(demo, annual, by = join_by(eDWID))
+annual <- full_join(demo, annual, by = join_by(eDWID))
+encounter <- full_join(demo, encounter, by = join_by(eDWID))
 # Save
-save(df, file = "/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
+save(annual,encounter, file = "/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
+# Optional EDA for cleaning help
+# library(SmartEDA)
+# ExpReport(
+#   df,
+#   op_file = "Report.html",
+#   op_dir = getwd()
+# )
