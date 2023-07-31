@@ -29,7 +29,7 @@ library(knitr)
 library(pheatmap)
 library(arsenal)
 # Import data
-api <- read.table("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt",
+api <- read.table("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt",
                   header = F
 )
 rcon <- redcapConnection(
@@ -50,8 +50,8 @@ old <- c("AF", "DL", "JW")
 new <- c("A", "B", "C")
 data$scorer[data$scorer %in% old] <- new[match(data$scorer, old, nomatch = 0)]
 # Revert duplicate IDs back to original to match with gold standard
-training <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
-dups <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
+training <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
+dups <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
 training$Training_id <- as.numeric(sub("T00", "", training$Training_id))
 # Change duplicates to OG IDs
 old <- dups$duplicated_ssid..dates.shifted..17.days.
@@ -353,7 +353,7 @@ For scans that were duplicated, we looked at the first reading and excluded the 
 
 ```{r}
 # Import disease state
-outcomes = read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/disease.key.csv",na.strings = "")
+outcomes = read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/disease.key.csv",na.strings = "")
 outcomes$NTM.PD..Y.N. = factor(outcomes$NTM.PD..Y.N.,
                                levels = c("No","Yes"),ordered = T)
 # Remove training scans, get first reading of duplicates, convert to numeric
