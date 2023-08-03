@@ -3,9 +3,9 @@ library(lubridate)
 library(readxl)
 library(Hmisc)
 # Import
-annual <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
-encounter <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
-demo <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
+annual <- read.csv("/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
+encounter <- read.csv("/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
+demo <- read.csv("/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
 # Fix missing values for specific bacteria
 bugs <- c(
   "staphylococcus_aureus", "haemophilus_influenzae",
@@ -215,7 +215,7 @@ demo$Hispanicrace <- factor(demo$Hispanicrace,
 )
 demo$MutClass <- factor(demo$MutClass)
 # Get long mutation lists
-mutations <- read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
+mutations <- read_excel("/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
 mutations <- mutations %>%
   filter(field_name == "mutation1") %>%
   select(code_value, code_meaning)
@@ -323,7 +323,7 @@ label(encounter) <- encounter_labels[colnames(encounter)]
 annual <- full_join(demo, annual, by = join_by(eDWID))
 encounter <- full_join(demo, encounter, by = join_by(eDWID))
 # Save
-save(annual,encounter, file = "/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
+save(annual,encounter, file = "/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
 # Optional EDA for cleaning help
 # library(SmartEDA)
 # ExpReport(
