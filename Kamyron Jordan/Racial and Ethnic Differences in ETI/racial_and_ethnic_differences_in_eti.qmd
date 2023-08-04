@@ -22,7 +22,7 @@ editor: source
 
 ```{r data cleaning}
 #| include: false
-source("/Users/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_race_eti_analysis_dataset.R")
+# source("/Users/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_race_eti_analysis_dataset.R")
 load("/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
 ```
 
@@ -35,22 +35,31 @@ library(gtsummary)
 
 # Race and ethnicity breakdown
 
-```{r table 1}
-#| label: tbl-1
-#| tbl-cap: Race by year
+## Race by year
+
+```{r t1}
 annual %>%
   select(ReviewYear, race, Hispanicrace) %>%
-  tbl_summary(by = ReviewYear, missing_text = "Missing")
+  tbl_summary(
+    by = ReviewYear, missing_text = "Missing",
+    statistic = list(all_continuous() ~ "{mean} ({sd})")
+  ) %>%
+  modify_header(label = paste0("**Year**")) %>%
+  bold_labels()
 ```
 
-```{r table 2}
-#| label: tbl-2
-#| tbl-cap: Race and ethnicity
+## Race and ethnicity overall
+
+```{r t2}
 demo %>%
   select(race, Hispanicrace) %>%
-  tbl_summary(by = Hispanicrace) %>%
+  tbl_summary(
+    by = Hispanicrace,
+    statistic = list(all_continuous() ~ "{mean} ({sd})")
+  ) %>%
   modify_header(label = paste0("**", label(annual$Hispanicrace), "**")) %>%
-  add_overall()
+  add_overall() %>%
+  bold_labels()
 ```
 
 Based on the above table, I decided to combine race and ethnicity with Hispanic "overriding" other racial identities. So if a participant was reported as both Black and Hispanic, they were consider Hispanic for the following analyses. Those with missing data for Hispanic ethnicity were moved to the "Mixed/Other/Unknown Race" category.
@@ -69,17 +78,66 @@ demo$race <- factor(demo$race,
 label(demo$race) <- "Race/Ethnicity"
 ```
 
-# Participant characteristics
+## Race percentages overall
 
-```{r}
-#| label: tbl-3
-#| tbl-cap: Characteristics by race
+```{r t3}
 demo %>%
   select(race) %>%
-  tbl_summary()
+  tbl_summary(statistic = list(all_continuous() ~ "{mean} ({sd})")) %>%
+  modify_header(label = paste0("**Race**")) %>%
+  bold_labels()
 ```
 
-# Figure
+# Participant characteristics
+
+## Characteristics by race
+
+```{r t4}
+demo %>%
+  select(race, Gender, WasGenotyped, F508) %>%
+  tbl_summary(
+    by = race, missing_text = "Missing",
+    statistic = list(all_continuous() ~ "{mean} ({sd})")
+  ) %>%
+  modify_header(label = paste0("**Race**")) %>%
+  add_overall() %>%
+  bold_labels()
+```
+
+```{r summarise by year}
+#| cache: true
+t5 <- encounter %>%
+  group_by(eDWID, reviewyear) %>%
+  summarise(across(c(race, Gender, WasGenotyped, F508, contains("insurance")), first),
+    `Age at Last Visit` = last(na.omit(encounterage)),
+    `Mean ppFEV` = mean(GLI_FEV1_pct_predicted, na.rm = T),
+    `Weight at Last Visit` = last(na.omit(weight)),
+    `Weight %ile at Last Visit` = last(na.omit(weightpercentile)),
+    `BMI at Last Visit` = last(na.omit(bmivalue)),
+    `BMI %ile at Last Visit` = last(na.omit(bmipercentile)),
+    .groups = "drop"
+  )
+label(t5)[colnames(t5) %in% names(labels)] <- labels[match(colnames(t5), names(labels), nomatch = 0)]
+```
+
+## Characteristics by year
+
+```{r t5}
+#| message: false
+t5 %>%
+  select(
+    -eDWID, reviewyear, race, Gender, WasGenotyped, F508, contains("insurance"),
+    `Age at Last Visit`, `Mean ppFEV`, `Weight at Last Visit`,
+    `Weight %ile at Last Visit`, `BMI at Last Visit`,
+    `BMI %ile at Last Visit`
+  ) %>%
+  tbl_summary(
+    by = reviewyear, missing_text = "Missing",
+    statistic = list(all_continuous() ~ "{mean} ({sd})")
+  ) %>%
+  modify_header(label = paste0("**Year**")) %>%
+  bold_labels()
+```
 
 ```{r}
 #| label: fig-planets
