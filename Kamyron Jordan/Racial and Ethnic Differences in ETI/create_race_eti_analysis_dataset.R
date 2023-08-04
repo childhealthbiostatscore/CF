@@ -348,8 +348,12 @@ label(encounter) <- encounter_labels[colnames(encounter)]
 # Merge
 annual <- full_join(demo, annual, by = join_by(eDWID))
 encounter <- full_join(demo, encounter, by = join_by(eDWID))
+labels = c(annual_labels,encounter_labels,demo_labels)
+# Remove encounters with no year
+encounter = encounter %>% filter(!is.na(reviewyear))
 # Save
-save(annual, encounter, demo, file = "/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
+save(annual, encounter, demo, labels, 
+     file = "/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
 # Clean up
 rm(list = ls())
 # Optional EDA for cleaning help
