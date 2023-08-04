@@ -209,12 +209,13 @@ demo$Patient_Dx <- factor(demo$Patient_Dx,
     "CF, CRMS and CFTR-related disorder all ruled out"
   )
 )
+demo$Hispanicrace[is.na(demo$Hispanicrace)] <- 3
 demo$Hispanicrace <- factor(demo$Hispanicrace,
   levels = 1:3,
   labels = c("Yes", "No", "Unknown")
 )
 demo$MutClass <- factor(demo$MutClass)
-# Get long mutation lists
+# Get long mutation lists - demographics
 mutations <- read_excel("/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
 mutations <- mutations %>%
   filter(field_name == "mutation1") %>%
@@ -223,6 +224,30 @@ mut_vars <- paste0("Mutation", 1:3)
 demo[, mut_vars] <- lapply(demo[, mut_vars], factor,
   levels = mutations$code_value,
   labels = mutations$code_meaning
+)
+# Race
+races <- list(
+  "Race1" = "White",
+  "Race2" = "Black or African American",
+  "Race3" = "American Indian or Alaska Native",
+  "Race4" = "Asian",
+  "Race5" = "Native Hawaiian or Other Pacific Islander",
+  "Race6" = "Some other race"
+)
+demo$race <- apply(demo[, paste0("Race", 1:6)], 1, function(r) {
+  w <- which(r == "Yes")
+  if (length(w) > 1 | 6 %in% w) {
+    return("Mixed/Other/Unknown Race")
+  } else {
+    return(as.character(races[w]))
+  }
+})
+demo$race <- factor(demo$race,
+  levels = c(
+    "White", "Black or African American",
+    "American Indian or Alaska Native", "Asian",
+    "Native Hawaiian or Other Pacific Islander", "Mixed/Other/Unknown Race"
+  )
 )
 # Dates
 demo$First_LungTransplantDate <- mdy(demo$First_LungTransplantDate)
@@ -252,8 +277,8 @@ encounter_labels <-
     "pulmonarymeds_notonany" = "Not on any pulmonary meds",
     "tobi" = "Tobramycin", "tobifrequency" = "Tobramycin frequency",
     "aztreonam" = "Aztreonam", "aztreonam_freq" = "Aztreonam frequency",
-    "Vx770" = "Ivacaftor", "Vx809comb" = "Orkambi", "vx661comb" = "Symdeko",
-    "vx445comb" = "Trikafta", "dornasealfa" = "Dornase alfa",
+    "Vx770" = "Vx770", "Vx809comb" = "Vx809comb", "vx661comb" = "vx661comb",
+    "vx445comb" = "vx445comb", "dornasealfa" = "Dornase alfa",
     "dornase_frequency" = "Dornase alfa frequency",
     "hypertonicsaline" = "Hypertonic saline",
     "hypersalineconc" = "Hypertonic saline concentration",
@@ -305,7 +330,8 @@ demo_labels <-
     "Race1" = "White", "Race2" = "Black or African American",
     "Race3" = "American Indian or Alaska Native", "Race4" = "Asian",
     "Race5" = "Native Hawaiian or Other Pacific Islander",
-    "Race6" = "Some other race", "Hispanicrace" = "Is Patient of Hispanic Origin?",
+    "Race6" = "Some other race", "race" = "Race/Ethnicity",
+    "Hispanicrace" = "Is Patient of Hispanic Origin?",
     "Death_year" = "Year of Death", "Diagnosis_year" = "Year of Diagnosis",
     "Age_Diag" = "Age at Diagnosis", "WasGenotyped" = "Has this patient been genotyped?",
     "MutClass" = "Mutation class", "F508" = "Number of F508del mutations",
@@ -323,7 +349,9 @@ label(encounter) <- encounter_labels[colnames(encounter)]
 annual <- full_join(demo, annual, by = join_by(eDWID))
 encounter <- full_join(demo, encounter, by = join_by(eDWID))
 # Save
-save(annual,encounter, file = "/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
+save(annual, encounter, demo, file = "/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
+# Clean up
+rm(list = ls())
 # Optional EDA for cleaning help
 # library(SmartEDA)
 # ExpReport(

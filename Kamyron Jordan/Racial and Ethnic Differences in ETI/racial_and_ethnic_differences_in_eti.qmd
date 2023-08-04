@@ -20,22 +20,63 @@ csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
-```{r libraries}
-#| include: false
-library(tidyverse)
-```
-
 ```{r data cleaning}
-# Most cleaning performed in GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_race_eti_analysis_dataset.R
+#| include: false
+source("/Users/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_race_eti_analysis_dataset.R")
 load("/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
 ```
 
-# Table
+```{r libraries}
+#| include: false
+library(Hmisc)
+library(tidyverse)
+library(gtsummary)
+```
+
+# Race and ethnicity breakdown
+
+```{r table 1}
+#| label: tbl-1
+#| tbl-cap: Race by year
+annual %>%
+  select(ReviewYear, race, Hispanicrace) %>%
+  tbl_summary(by = ReviewYear, missing_text = "Missing")
+```
+
+```{r table 2}
+#| label: tbl-2
+#| tbl-cap: Race and ethnicity
+demo %>%
+  select(race, Hispanicrace) %>%
+  tbl_summary(by = Hispanicrace) %>%
+  modify_header(label = paste0("**", label(annual$Hispanicrace), "**")) %>%
+  add_overall()
+```
+
+Based on the above table, I decided to combine race and ethnicity with Hispanic "overriding" other racial identities. So if a participant was reported as both Black and Hispanic, they were consider Hispanic for the following analyses. Those with missing data for Hispanic ethnicity were moved to the "Mixed/Other/Unknown Race" category.
+
+```{r combine race and eth}
+demo$race <- as.character(demo$race)
+demo$race[demo$Hispanicrace == "Yes"] <- "Hispanic or Latino"
+demo$race[demo$Hispanicrace == "Unknown"] <- "Hispanic or Latino"
+demo$race <- factor(demo$race,
+  levels = c(
+    "White", "Black or African American", "Hispanic or Latino",
+    "American Indian or Alaska Native", "Asian",
+    "Native Hawaiian or Other Pacific Islander", "Mixed/Other/Unknown Race"
+  )
+)
+label(demo$race) <- "Race/Ethnicity"
+```
+
+# Participant characteristics
 
 ```{r}
-#| label: tbl-planets
-#| tbl-cap: Planets
-
+#| label: tbl-3
+#| tbl-cap: Characteristics by race
+demo %>%
+  select(race) %>%
+  tbl_summary()
 ```
 
 # Figure
@@ -43,5 +84,4 @@ load("/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ET
 ```{r}
 #| label: fig-planets
 #| fig-cap: Planets
-
 ```
