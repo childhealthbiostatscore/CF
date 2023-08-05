@@ -45,7 +45,8 @@ annual %>%
     statistic = list(all_continuous() ~ "{mean} ({sd})")
   ) %>%
   modify_header(label = paste0("**Year**")) %>%
-  bold_labels()
+  bold_labels() %>%
+  as_kable_extra()
 ```
 
 ## Race and ethnicity overall
@@ -59,7 +60,8 @@ demo %>%
   ) %>%
   modify_header(label = paste0("**", label(annual$Hispanicrace), "**")) %>%
   add_overall() %>%
-  bold_labels()
+  bold_labels() %>%
+  as_kable_extra()
 ```
 
 Based on the above table, I decided to combine race and ethnicity with Hispanic "overriding" other racial identities. So if a participant was reported as both Black and Hispanic, they were consider Hispanic for the following analyses. Those with missing data for Hispanic ethnicity were moved to the "Mixed/Other/Unknown Race" category.
@@ -85,7 +87,8 @@ demo %>%
   select(race) %>%
   tbl_summary(statistic = list(all_continuous() ~ "{mean} ({sd})")) %>%
   modify_header(label = paste0("**Race**")) %>%
-  bold_labels()
+  bold_labels() %>%
+  as_kable_extra()
 ```
 
 # Participant characteristics
@@ -101,7 +104,8 @@ demo %>%
   ) %>%
   modify_header(label = paste0("**Race**")) %>%
   add_overall() %>%
-  bold_labels()
+  bold_labels() %>%
+  as_kable_extra()
 ```
 
 ```{r summarise by year}
@@ -136,7 +140,8 @@ t5 %>%
     statistic = list(all_continuous() ~ "{mean} ({sd})")
   ) %>%
   modify_header(label = paste0("**Year**")) %>%
-  bold_labels()
+  bold_labels() %>%
+  as_kable_extra()
 ```
 
 ```{r}
