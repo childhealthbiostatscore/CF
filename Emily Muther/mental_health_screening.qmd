@@ -22,7 +22,10 @@ library(plotly)
 library(gtsummary)
 library(GLMMadaptive)
 library(lmerTest)
+library(broom.mixed)
+library(knitr)
 library(sjPlot)
+library(report)
 ```
 
 # Data cleaning
@@ -32,11 +35,12 @@ library(sjPlot)
 ```{r}
 #| warning: false
 # Import
-df = read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Emily Muther/Mental Health Screening/Data_Cleaned/MH master data.csv",check.names = F,na.strings = "")
+df = read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Emily Muther/Mental Health Screening/Data_Cleaned/MH master data.csv",check.names = F,na.strings = "")
 # Column types
 df$MRN = factor(df$MRN)
 df$CONTACT_DATE = lubridate::mdy(df$CONTACT_DATE)
 df$`PHQ-9 Total Score (calculated)` = as.integer(df$`PHQ-9 Total Score (calculated)`)
+df$`GAD-7 Total Score` = as.integer(df$`GAD-7 Total Score`)
 # Visits
 df = df %>% arrange(MRN,CONTACT_DATE) %>% group_by(MRN) %>%
   mutate(`Visit Number` = row_number(), 
@@ -80,7 +84,7 @@ try(mixed_model(`PHQ-9 Total Score (calculated)` ~ `Days From Baseline`,
                  zi_fixed = ~ 1))
 ```
 
-Because the ZINB models were not converging, we instead tried to use a simpler Poisson mixed model (without accounting for the inflated 0s) with random intercept per participant and visit number treated as a continuous variable.
+Because the ZINB models were not converging, we instead tried to use a simpler Poisson mixed model (without accounting for the inflated 0s) with random intercept per participant. Visit number was treated as a continuous variable because this model would not converge with categorical visit numbers.
 
 ```{r}
 #| warning: false
@@ -89,81 +93,74 @@ plot_model(m2,type="pred",
            terms=c("Visit Number","MRN"),
            pred.type="re", ci.lvl = NA) + 
   theme(legend.position = "none")
+res = tidy(m2,exponentiate = T,effects="fixed")
+kable(res,digits = 3)
 ```
 
 ## Simpler models
 
-Because the complex models were difficult to fit and not particularly informative, we instead modeled the odds of an elevated score for the full cohort, and the change in score over time for those with elevated scores.
+Because the complex models were difficult to fit and not particularly informative, we instead modeled the odds of an elevated score for the full cohort, and the change in score over time for those with elevated scores. Estimates are reported as odds ratios in tables, but are reported on the log scale in the text, just in case both are needed.
 
 ### PHQ9
 
 ```{r}
-df$PHQ9_elevated = factor(df$`PHQ-9 Total Score (calculated)` >= 15,
+df$PHQ9_elevated = factor(df$`PHQ-9 Total Score (calculated)` >= 5,
                           levels = c(F,T),labels = c("No","Yes"))
 ```
 
-A PHQ9 score $\geq$ 15 was considered elevated. 
+A PHQ9 score $\geq$ 5 was considered elevated. 
 
 #### Odds of an elevated score
 
 ```{r}
 mod = glmer(PHQ9_elevated ~ `Visit Number` + (1|MRN),data = df,family = "binomial")
-res = tidy(mod,exponentiate = T)
-kable(res,digits = 3)
-```
-
-
-
-
-
-Results are reported as odds ratios, with the FRS "neutral" category as the reference group.
-
-```{r}
-mod = glm(PHQ9_elevated ~ FRS_Category,data = df,family = "binomial")
-res = tidy(mod,exponentiate = T)
+res = tidy(mod,exponentiate = T,effects="fixed")
 kable(res,digits = 3)
 ```
 
 `r report(mod)`
 
-### Association with FRS category in those with elevated scores.
+#### Association with visit number in those with elevated scores.
 
-Results are reported as expected counts, with the FRS "neutral" category as the reference group.
+Results are reported as expected counts.
 
 ```{r}
-mod = glm(PHQ9_Total~ FRS_Category,data = df[df$PHQ9_elevated=="yes",],family = "poisson")
-res = tidy(mod,exponentiate = T)
+mod = glmer(`PHQ-9 Total Score (calculated)`~ `Visit Number` + (1|MRN),
+            data = df[df$PHQ9_elevated=="Yes",],family = "poisson")
+res = tidy(mod,exponentiate = T,effects="fixed")
 kable(res,digits = 3)
 ```
 
 `r report(mod)`
 
-## GAD7
-
-### Odds of an elevated score
-
-Results are reported as odds ratios, with the FRS "neutral" category as the reference group.
+### GAD7
 
 ```{r}
-mod = glm(GAD7_elevated ~ FRS_Category,data = df,family = "binomial")
-res = tidy(mod,exponentiate = T)
+df$GAD7_elevated = factor(df$`GAD-7 Total Score` >= 4,
+                          levels = c(F,T),labels = c("No","Yes"))
+```
+
+A GAD7 score $\geq$ 4 was considered elevated. 
+
+#### Odds of an elevated score
+
+```{r}
+mod = glmer(GAD7_elevated ~ `Visit Number` + (1|MRN),data = df,family = "binomial")
+res = tidy(mod,exponentiate = T,effects="fixed")
 kable(res,digits = 3)
 ```
 
 `r report(mod)`
 
-### Association with FRS category in those with elevated scores.
+#### Association with visit number in those with elevated scores.
 
-Results are reported as expected counts, with the FRS "neutral" category as the reference group.
+Results are reported as expected counts.
 
 ```{r}
-mod = glm(GAD7_Total~ FRS_Category,data = df[df$GAD7_elevated=="yes",],family = "poisson")
-res = tidy(mod,exponentiate = T)
+mod = glmer(`GAD-7 Total Score`~ `Visit Number` + (1|MRN),
+            data = df[df$GAD7_elevated=="Yes",],family = "poisson")
+res = tidy(mod,exponentiate = T,effects="fixed")
 kable(res,digits = 3)
 ```
 
 `r report(mod)`
-
-# Questions
-
-1. Should we count moderate or severe scores as elevated?
