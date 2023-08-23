@@ -15,26 +15,20 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
+bibliography: /Users/timvigers/Library/CloudStorage/Dropbox/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Library/CloudStorage/Dropbox/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
-```{r}
-#| include: false
+```{r data cleaning}
+#| message: false
 library(tidyverse)
-library(irr)
 library(redcapAPI)
 library(Hmisc)
-library(DT)
-library(RColorBrewer)
+library(irr)
 library(knitr)
-library(pheatmap)
-library(arsenal)
 # Import data
-api <- read.table("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt",
-                  header = F
-)
+api <- read.table("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt", header = F)
 rcon <- redcapConnection(
   url = "https://redcap.ucdenver.edu/api/",
   token = api[1, 1]
@@ -53,8 +47,8 @@ old <- c("AF", "DL", "JW")
 new <- c("A", "B", "C")
 data$scorer[data$scorer %in% old] <- new[match(data$scorer, old, nomatch = 0)]
 # Revert duplicate IDs back to original to match with gold standard
-training <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
-dups <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
+training <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
+dups <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
 training$Training_id <- as.numeric(sub("T00", "", training$Training_id))
 # Change duplicates to OG IDs
 old <- dups$duplicated_ssid..dates.shifted..17.days.
@@ -65,37 +59,167 @@ old <- training$Training_id
 new <- training$Cffid.Scoring.Set
 data$scan_id[data$scan_id %in% old] <- new[na.omit(match(data$scan_id, old))]
 # Convert to long
-data = data %>% select(scan_id,scorer,scoresheet_timestamp,
-                    bronchiectasis_rul:atelectasis___6) %>%
-  arrange(scan_id,scorer,scoresheet_timestamp) %>%
-  group_by(scan_id,scorer) %>%
+data <- data %>%
+  select(
+    scan_id, scorer, scoresheet_timestamp,
+    bronchiectasis_rul:atelectasis___6
+  ) %>%
+  arrange(scan_id, scorer, scoresheet_timestamp) %>%
+  group_by(scan_id, scorer) %>%
   mutate(scorer_repeat = row_number()) %>%
   select(-scoresheet_timestamp) %>%
   pivot_longer(bronchiectasis_rul:atelectasis___6,
-               names_to = c("feature", "location"),
-               names_pattern = "(.*)_(.*)$"
+    names_to = c("feature", "location"),
+    names_pattern = "(.*)_(.*)$"
   ) %>%
   mutate(
     feature = gsub("__", "", feature),
     feature = str_to_title(gsub("_", " ", feature))
   )
 data$location <- factor(data$location,
-                      levels = c(
-                        "1", "2", "3", "4", "5", "6", "ling", "lll",
-                        "lul", "rll", "rml", "rul"
-                      ),
-                      labels = c(
-                        "RUL", "RML", "RLL", "LUL", "Ling", "LLL",
-                        "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
-                      )
+  levels = c(
+    "1", "2", "3", "4", "5", "6", "ling", "lll",
+    "lul", "rll", "rml", "rul"
+  ),
+  labels = c(
+    "RUL", "RML", "RLL", "LUL", "Ling", "LLL",
+    "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
+  )
 )
-# Maybe not quite so long (one column per rater)
-data = data %>% 
-  pivot_wider(names_from = c(scorer,scorer_repeat), values_from = value,
-              names_sep = "_")
+# Format values
+data$value <- factor(data$value,
+  levels = c(
+    "Absent", "Checked", "Cylindric", "Cystic", "Unchecked", "Varicose"
+  ),
+  labels = c("Absent", "Present", "Present", "Present", "Absent", "Present"),
+  ordered = T
+)
+# Separate out gold standards and duplicates
+data_dups <- data %>% filter(scan_id %in% dups$original_ssid)
+data_gs <- data %>% filter(scan_id %in% training$Cffid.Scoring.Set)
+data <- data %>%
+  filter(!scan_id %in% c(dups$original_ssid, training$Cffid.Scoring.Set))
+# Second readings only for comparison to GS
+data_gs <- data_gs %>%
+  group_by(scan_id, scorer, feature, location) %>%
+  slice_max(scorer_repeat)
 ```
 
-Kappa interpretation table @mchughInterraterReliabilityKappa2012:
+# Proprortion of agreement
+
+## Singletons
+
+### By feature
+
+```{r}
+#| message: false
+data %>%
+  group_by(feature, scan_id, scorer) %>%
+  summarise(v = max(value, na.rm = T)) %>%
+  summarise(a = sum(v == "Present")) %>%
+  summarise(
+    agreed = sum(a == 0 | a == 3),
+    disagreed = sum(a == 1 | a == 2),
+    proportion = round(agreed / (agreed + disagreed), 3)
+  ) %>%
+  kable()
+```
+
+### Feature by lobe
+
+```{r}
+#| message: false
+data %>%
+  group_by(feature, location, scan_id) %>%
+  summarise(a = factor(sum(value == "Present", na.rm = T))) %>%
+  summarise(
+    agreed = sum(a == 0 | a == 3),
+    disagreed = sum(a == 1 | a == 2),
+    proportion = round(agreed / (agreed + disagreed), 3)
+  ) %>%
+  kable()
+```
+
+## Duplicates
+
+### By feature
+
+```{r}
+#| message: false
+data_dups %>%
+  group_by(feature, scorer, scan_id, scorer_repeat) %>%
+  summarise(v = max(value, na.rm = T)) %>%
+  summarise(a = v[scorer_repeat == 1] == v[scorer_repeat == 2]) %>%
+  summarise(p = mean(a)) %>%
+  pivot_wider(
+    names_from = scorer, values_from = p,
+    names_prefix = "prop. agreed "
+  ) %>%
+  kable()
+```
+
+### Feature by lobe
+
+```{r}
+#| message: false
+#| warning: false
+data_dups %>%
+  group_by(feature, location, scorer, scan_id, scorer_repeat) %>%
+  summarise(v = max(value, na.rm = T)) %>%
+  summarise(a = v[scorer_repeat == 1] == v[scorer_repeat == 2]) %>%
+  summarise(p = mean(a, na.rm = T)) %>%
+  pivot_wider(
+    names_from = scorer, values_from = p,
+    names_prefix = "prop. agreed "
+  ) %>%
+  kable()
+```
+
+
+## Agreement with gold standard
+
+### By feature
+
+```{r}
+#| message: false
+data_gs %>%
+  group_by(feature, scan_id, scorer) %>%
+  summarise(v = max(value, na.rm = T)) %>%
+  summarise(
+    A = v[scorer == "A"] == v[scorer == "GS"],
+    B = v[scorer == "B"] == v[scorer == "GS"],
+    C = v[scorer == "C"] == v[scorer == "GS"]
+  ) %>%
+  summarise(
+    `prop. agreed A` = sum(A) / n(),
+    `prop. agreed B` = sum(B) / n(),
+    `prop. agreed C` = sum(C) / n()
+  ) %>%
+  kable()
+```
+
+### Feature by lobe
+
+Missing values were ignored in creating the table below. So if a scorer marked a feature and location blank on one scan and agreed with the gold standard on 3, their score will be 0.75 rather than 0.6.
+
+```{r}
+#| message: false
+data_gs %>%
+  group_by(feature, location, scan_id) %>%
+  summarise(
+    A = value[scorer == "A"] == value[scorer == "GS"],
+    B = value[scorer == "B"] == value[scorer == "GS"],
+    C = value[scorer == "C"] == value[scorer == "GS"]
+  ) %>%
+  summarise(
+    `prop. agreed A` = mean(A, na.rm = T),
+    `prop. agreed B` = mean(B, na.rm = T),
+    `prop. agreed C` = mean(C, na.rm = T)
+  ) %>%
+  kable()
+```
+
+# Using Cohen's kappa
 
 | Value of Kappa | Level of Agreement | % of Data that are Reliable |
 | -------------- | ------------------ | --------------------------- |
@@ -106,4 +230,192 @@ Kappa interpretation table @mchughInterraterReliabilityKappa2012:
 | .80–.90        | Strong             | 64–81%                      |
 | Above.90       | Almost Perfect     | 82–100%                     |
 
+: Kappa interpretation table @mchughInterraterReliabilityKappa2012a {#tbl-kappa}
 
+## Singletons
+
+### By feature
+
+```{r}
+#| message: false
+kappa <- data %>%
+  group_by(feature, scan_id, scorer) %>%
+  summarise(v = max(value, na.rm = T), .groups = "drop") %>%
+  pivot_wider(names_from = scorer, values_from = v)
+kappa <- split.data.frame(kappa, ~feature)
+kappas <- lapply(names(kappa), function(n) {
+  d <- kappa[[n]]
+  k <- kappam.fleiss(d[, c("A", "B", "C")])
+  return(c(n, k$value, k$p.value))
+})
+kappas <- data.frame(do.call(rbind, kappas))
+colnames(kappas) <- c("feature", "kappa", "p")
+kappas$kappa <- as.numeric(kappas$kappa)
+kappas$p <- format.pval(as.numeric(kappas$p), digits = 3, eps = 0.001)
+kable(kappas, digits = 3)
+```
+
+### Feature by lobe
+
+Because you technically cannot calculate Cohen's kappa for matrices where every cell is the same, values of `-Inf` can be interpreted as perfect agreement for a feature that had the same value across all scans. For example, none of the 15 scans showed consolidation in the	RML.
+
+```{r}
+#| message: false
+kappa <- data %>%
+  pivot_wider(names_from = scorer, values_from = value)
+kappa <- split.data.frame(kappa, ~ feature + location)
+kappas <- lapply(names(kappa), function(n) {
+  d <- kappa[[n]]
+  k <- kappam.fleiss(d[, c("A", "B", "C")])
+  return(c(strsplit(n, "\\.")[[1]], k$value, k$p.value))
+})
+kappas <- data.frame(do.call(rbind, kappas))
+colnames(kappas) <- c("feature", "location", "kappa", "p")
+kappas$kappa <- as.numeric(kappas$kappa)
+kappas$p <- format.pval(as.numeric(kappas$p), digits = 3, eps = 0.001)
+kable(kappas, digits = 3)
+```
+
+## Duplicates
+
+Unfortunately, because there weren't many duplicate scans it was difficult to calculate kappa for many features.
+
+### By feature
+
+```{r}
+#| message: false
+kappa <- data_dups %>%
+  group_by(feature, scan_id, scorer, scorer_repeat) %>%
+  summarise(v = max(value, na.rm = T), .groups = "drop") %>%
+  pivot_wider(names_from = c(scorer, scorer_repeat), values_from = v)
+kappa <- split.data.frame(kappa, ~feature)
+kappas <- lapply(names(kappa), function(n) {
+  d <- kappa[[n]]
+  ka <- kappa2(d[, c("A_1", "A_2")])
+  kb <- kappa2(d[, c("B_1", "B_2")])
+  kc <- kappa2(d[, c("C_1", "C_2")])
+  return(c(
+    strsplit(n, "\\.")[[1]],
+    ka$value, ka$p.value,
+    kb$value, kb$p.value,
+    kc$value, kb$p.value
+  ))
+})
+kappas <- data.frame(do.call(rbind, kappas))
+colnames(kappas) <- c(
+  "feature", "kappa A", "p A", "kappa B", "p B",
+  "kappa C", "p C"
+)
+kappas[, !grepl("feature", colnames(kappas))] <- lapply(kappas[, !grepl("feature", colnames(kappas))], as.numeric)
+kappas[, grep("p ", colnames(kappas))] <- lapply(kappas[, grep("p ", colnames(kappas))],
+  format.pval,
+  digits = 3, eps = 0.001
+)
+kable(kappas, digits = 3)
+```
+
+### Feature by lobe
+
+```{r}
+#| message: false
+kappa <- data_dups %>%
+  group_by(feature,location, scan_id, scorer, scorer_repeat) %>%
+  pivot_wider(names_from = c(scorer, scorer_repeat), values_from = value)
+kappa <- split.data.frame(kappa, ~feature+location)
+kappas <- lapply(names(kappa), function(n) {
+  d <- kappa[[n]]
+  ka <- kappa2(d[, c("A_1", "A_2")])
+  kb <- kappa2(d[, c("B_1", "B_2")])
+  kc <- kappa2(d[, c("C_1", "C_2")])
+  return(c(
+    strsplit(n, "\\.")[[1]], 
+    ka$value, ka$p.value,
+    kb$value, kb$p.value,
+    kc$value, kb$p.value
+  ))
+})
+kappas <- data.frame(do.call(rbind, kappas))
+colnames(kappas) <- c(
+  "feature", "location","kappa A", "p A", "kappa B", "p B",
+  "kappa C", "p C"
+)
+kappas[, !grepl("feature|location", colnames(kappas))] <- 
+  lapply(kappas[, !grepl("feature|location", colnames(kappas))], as.numeric)
+kappas[, grep("p ", colnames(kappas))] <- lapply(kappas[, grep("p ", colnames(kappas))],
+  format.pval,
+  digits = 3, eps = 0.001
+)
+kable(kappas, digits = 3)
+```
+
+## Agreement with gold standard
+
+Unfortunately, because there weren't many gold standard scans it was difficult to calculate kappa for many features.
+
+### By feature
+
+```{r}
+#| message: false
+kappa <- data_gs %>%
+  group_by(feature, scan_id, scorer) %>%
+  summarise(v = max(value, na.rm = T), .groups = "drop") %>%
+  pivot_wider(names_from = scorer, values_from = v)
+kappa <- split.data.frame(kappa, ~feature)
+kappas <- lapply(names(kappa), function(n) {
+  d <- kappa[[n]]
+  ka <- kappa2(d[, c("A", "GS")])
+  kb <- kappa2(d[, c("B", "GS")])
+  kc <- kappa2(d[, c("C", "GS")])
+  return(c(
+    strsplit(n, "\\.")[[1]],
+    ka$value, ka$p.value,
+    kb$value, kb$p.value,
+    kc$value, kb$p.value
+  ))
+})
+kappas <- data.frame(do.call(rbind, kappas))
+colnames(kappas) <- c(
+  "feature", "kappa A", "p A", "kappa B", "p B",
+  "kappa C", "p C"
+)
+kappas[, !grepl("feature", colnames(kappas))] <- lapply(kappas[, !grepl("feature", colnames(kappas))], as.numeric)
+kappas[, grep("p ", colnames(kappas))] <- lapply(kappas[, grep("p ", colnames(kappas))],
+  format.pval,
+  digits = 3, eps = 0.001
+)
+kable(kappas, digits = 3)
+```
+
+### Feature by lobe
+
+```{r}
+#| message: false
+kappa <- data_gs %>%
+  group_by(feature,location, scan_id, scorer) %>%
+  pivot_wider(names_from = scorer, values_from = value)
+kappa <- split.data.frame(kappa, ~feature+location)
+kappas <- lapply(names(kappa), function(n) {
+  d <- kappa[[n]]
+  ka <- kappa2(d[, c("A", "GS")])
+  kb <- kappa2(d[, c("B", "GS")])
+  kc <- kappa2(d[, c("C", "GS")])
+  return(c(
+    strsplit(n, "\\.")[[1]], 
+    ka$value, ka$p.value,
+    kb$value, kb$p.value,
+    kc$value, kb$p.value
+  ))
+})
+kappas <- data.frame(do.call(rbind, kappas))
+colnames(kappas) <- c(
+  "feature", "location","kappa A", "p A", "kappa B", "p B",
+  "kappa C", "p C"
+)
+kappas[, !grepl("feature|location", colnames(kappas))] <- 
+  lapply(kappas[, !grepl("feature|location", colnames(kappas))], as.numeric)
+kappas[, grep("p ", colnames(kappas))] <- lapply(kappas[, grep("p ", colnames(kappas))],
+  format.pval,
+  digits = 3, eps = 0.001
+)
+kable(kappas, digits = 3)
+```
