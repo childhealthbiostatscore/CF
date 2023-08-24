@@ -25,7 +25,8 @@ editor: source
 library(tidyverse)
 library(redcapAPI)
 library(Hmisc)
-library(irr)
+library(fastDummies)
+library(lmerTest)
 library(knitr)
 # Import data
 api <- read.table("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt", header = F)
@@ -93,7 +94,7 @@ data$value <- factor(data$value,
   ),
   labels = c("Absent", "Present", "Present", "Present", "Absent", "Present")
 )
-data$value = as.numeric(data$value)-1
+data$value <- as.numeric(data$value) - 1
 # Separate out gold standards and duplicates
 data_dups <- data %>% filter(scan_id %in% dups$original_ssid)
 data_gs <- data %>% filter(scan_id %in% training$Cffid.Scoring.Set)
@@ -103,5 +104,33 @@ data <- data %>%
 data_gs <- data_gs %>%
   group_by(scan_id, scorer, feature, location) %>%
   slice_max(scorer_repeat)
+# Dummy variables for scorer, organize columns
+data <- data %>%
+  dummy_cols(select_columns = "scorer") %>%
+  select(scan_id, feature, location, scorer_A, scorer_B, scorer_C, value)
 ```
 
+# Data setup
+
+```{r}
+DT::datatable(data)
+```
+
+# Model
+
+- Readers $r=1,2,3$
+- Scans $s=1,2,...,S$
+- Features $f=1,2,...,F$
+- Lobes $l=1,2,...,6$
+- Outcome $y_{rsfl}$ is binary
+- Model notation: $$y_{rsf=1}=\alpha+\beta X_l + b_1+b_2+b_3+\epsilon_{rs}$$
+
+## Tree in Bud
+
+```{r}
+#| code-fold: false
+df <- data %>% filter(feature == "Tree In Bud")
+model <- glmer(value ~ location + (1 | scorer_A) + (1 | scorer_B) + (1 | scorer_C),
+  family = "binomial", data = df
+)
+```
