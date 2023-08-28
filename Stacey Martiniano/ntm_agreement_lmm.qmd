@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Library/CloudStorage/Dropbox/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Library/CloudStorage/Dropbox/Miscellaneous/american-medical-association.csl
+bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -29,7 +29,7 @@ library(fastDummies)
 library(lmerTest)
 library(knitr)
 # Import data
-api <- read.table("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt", header = F)
+api <- read.table("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt", header = F)
 rcon <- redcapConnection(
   url = "https://redcap.ucdenver.edu/api/",
   token = api[1, 1]
@@ -48,8 +48,8 @@ old <- c("AF", "DL", "JW")
 new <- c("A", "B", "C")
 data$scorer[data$scorer %in% old] <- new[match(data$scorer, old, nomatch = 0)]
 # Revert duplicate IDs back to original to match with gold standard
-training <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
-dups <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
+training <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
+dups <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
 training$Training_id <- as.numeric(sub("T00", "", training$Training_id))
 # Change duplicates to OG IDs
 old <- dups$duplicated_ssid..dates.shifted..17.days.
@@ -125,12 +125,92 @@ DT::datatable(data)
 - Outcome $y_{rsfl}$ is binary
 - Model notation: $$y_{rsf=1}=\alpha+\beta X_l + b_1+b_2+b_3+\epsilon_{rs}$$
 
-## Tree in Bud
+## Bronchiectasis
 
 ```{r}
-#| code-fold: false
+df <- data %>% filter(feature == "Bronchiectasis")
+model <- glmer(value ~ location + (1 | scorer_A) + (1 | scorer_B) + (1 | scorer_C),
+  family = "binomial", data = df
+)
+summary(model)
+```
+
+## Mucoid Impaction
+
+```{r}
+df <- data %>% filter(feature == "Mucoid Impaction")
+model <- glmer(value ~ location + (1 | scorer_A) + (1 | scorer_B) + (1 | scorer_C),
+  family = "binomial", data = df
+)
+summary(model)
+```
+
+## Cyst
+
+```{r}
+df <- data %>% filter(feature == "Cyst")
+model <- glmer(value ~ location + (1 | scorer_A) + (1 | scorer_B) + (1 | scorer_C),
+  family = "binomial", data = df
+)
+summary(model)
+```
+
+## Cavity
+
+```{r}
+df <- data %>% filter(feature == "Cavity")
+model <- glmer(value ~ location + (1 | scorer_A) + (1 | scorer_B) + (1 | scorer_C),
+  family = "binomial", data = df
+)
+summary(model)
+```
+
+## Consolidation
+
+```{r}
+df <- data %>% filter(feature == "Consolidation")
+model <- glmer(value ~ location + (1 | scorer_A) + (1 | scorer_B) + (1 | scorer_C),
+  family = "binomial", data = df
+)
+summary(model)
+```
+
+## Ground Glass
+
+```{r}
+df <- data %>% filter(feature == "Ground Glass")
+model <- glmer(value ~ location + (1 | scorer_A) + (1 | scorer_B) + (1 | scorer_C),
+  family = "binomial", data = df
+)
+summary(model)
+```
+
+## Nodule
+
+```{r}
+df <- data %>% filter(feature == "Nodule")
+model <- glmer(value ~ location + (1 | scorer_A) + (1 | scorer_B) + (1 | scorer_C),
+  family = "binomial", data = df
+)
+summary(model)
+```
+
+## Tree In Bud
+
+```{r}
 df <- data %>% filter(feature == "Tree In Bud")
 model <- glmer(value ~ location + (1 | scorer_A) + (1 | scorer_B) + (1 | scorer_C),
   family = "binomial", data = df
 )
+summary(model)
+```
+
+## Atelectasis
+
+```{r}
+df <- data %>% filter(feature == "Atelectasis")
+model <- glmer(value ~ location + (1 | scorer_A) + (1 | scorer_B) + (1 | scorer_C),
+  family = "binomial", data = df
+)
+summary(model)
 ```
