@@ -3,9 +3,9 @@ library(lubridate)
 library(readxl)
 library(Hmisc)
 # Import
-annual <- read.csv("/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
-encounter <- read.csv("/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
-demo <- read.csv("/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
+annual <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
+encounter <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
+demo <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
 # Fix missing values for specific bacteria
 bugs <- c(
   "staphylococcus_aureus", "haemophilus_influenzae",
@@ -21,9 +21,10 @@ encounter[, bug_types] <- lapply(encounter[, bug_types], function(c) {
   return(c)
 })
 # Some variables are either missing or 1
+encounter <- encounter %>% rename(Vx661comb = vx661comb, Vx445comb = vx445comb)
 y_vars <- c(
   "bacterialculturedone", "pulmonarymeds_notonany", "tobi", "aztreonam",
-  "Vx770", "Vx809comb", "vx661comb", "vx445comb", "dornasealfa",
+  "Vx770", "Vx809comb", "Vx661comb", "Vx445comb", "dornasealfa",
   "hypertonicsaline", "acutehepatitis"
 )
 encounter[, y_vars] <- lapply(encounter[, y_vars], function(c) {
@@ -216,7 +217,7 @@ demo$Hispanicrace <- factor(demo$Hispanicrace,
 )
 demo$MutClass <- factor(demo$MutClass)
 # Get long mutation lists - demographics
-mutations <- read_excel("/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
+mutations <- read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
 mutations <- mutations %>%
   filter(field_name == "mutation1") %>%
   select(code_value, code_meaning)
@@ -224,6 +225,13 @@ mut_vars <- paste0("Mutation", 1:3)
 demo[, mut_vars] <- lapply(demo[, mut_vars], factor,
   levels = mutations$code_value,
   labels = mutations$code_meaning
+)
+demo$F508_num <- apply(demo[, mut_vars], 1, function(r) {
+  sum(r == "F508del", na.rm = T)
+})
+demo$F508_num <- factor(demo$F508_num,
+  levels = 0:3,
+  labels = c("None", "Heterozygous", "Homozygous", "Homozygous")
 )
 # Race
 races <- list(
@@ -277,8 +285,8 @@ encounter_labels <-
     "pulmonarymeds_notonany" = "Not on any pulmonary meds",
     "tobi" = "Tobramycin", "tobifrequency" = "Tobramycin frequency",
     "aztreonam" = "Aztreonam", "aztreonam_freq" = "Aztreonam frequency",
-    "Vx770" = "Vx770", "Vx809comb" = "Vx809comb", "vx661comb" = "vx661comb",
-    "vx445comb" = "vx445comb", "dornasealfa" = "Dornase alfa",
+    "Vx770" = "Vx770", "Vx809comb" = "Vx809comb", "Vx661comb" = "Vx661comb",
+    "Vx445comb" = "Vx445comb", "dornasealfa" = "Dornase alfa",
     "dornase_frequency" = "Dornase alfa frequency",
     "hypertonicsaline" = "Hypertonic saline",
     "hypersalineconc" = "Hypertonic saline concentration",
@@ -334,7 +342,8 @@ demo_labels <-
     "Hispanicrace" = "Is Patient of Hispanic Origin?",
     "Death_year" = "Year of Death", "Diagnosis_year" = "Year of Diagnosis",
     "Age_Diag" = "Age at Diagnosis", "WasGenotyped" = "Has this patient been genotyped?",
-    "MutClass" = "Mutation class", "F508" = "Number of F508del mutations",
+    "MutClass" = "Mutation class",
+    "F508" = "F508", "F508_num" = "F508del Status",
     "Mutation1" = "Name of the first mutation",
     "Mutation2" = "Name of the second mutation",
     "Mutation3" = "Name of the third mutation (if any)",
@@ -348,18 +357,13 @@ label(encounter) <- encounter_labels[colnames(encounter)]
 # Merge
 annual <- full_join(demo, annual, by = join_by(eDWID))
 encounter <- full_join(demo, encounter, by = join_by(eDWID))
-labels = c(annual_labels,encounter_labels,demo_labels)
+labels <- c(annual_labels, encounter_labels, demo_labels)
 # Remove encounters with no year
-encounter = encounter %>% filter(!is.na(reviewyear))
+encounter <- encounter %>% filter(!is.na(reviewyear))
+# Make labels for tidyverse operations (a list to pass to rename())
+tidy_labels <- names(labels)
+names(tidy_labels) <- sapply(labels, "[[", 1)
 # Save
-save(annual, encounter, demo, labels, 
-     file = "/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
-# Clean up
-rm(list = ls())
-# Optional EDA for cleaning help
-# library(SmartEDA)
-# ExpReport(
-#   df,
-#   op_file = "Report.html",
-#   op_dir = getwd()
-# )
+save(annual, encounter, demo, labels, tidy_labels,
+  file = "/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
+)
