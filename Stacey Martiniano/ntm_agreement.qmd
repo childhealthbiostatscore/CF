@@ -1,5 +1,5 @@
 ---
-title: "NTM CT Scoring - Initial Agreement"
+title: "NTM CT Scoring Agreement"
 author: "Tim Vigers"
 date: "today"
 date-format: long
@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Library/CloudStorage/Dropbox/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Library/CloudStorage/Dropbox/Miscellaneous/american-medical-association.csl
+bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -25,10 +25,12 @@ editor: source
 library(tidyverse)
 library(redcapAPI)
 library(Hmisc)
-library(irr)
 library(knitr)
+library(fastDummies)
+library(lmerTest)
+library(performance)
 # Import data
-api <- read.table("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt", header = F)
+api <- read.table("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt", header = F)
 rcon <- redcapConnection(
   url = "https://redcap.ucdenver.edu/api/",
   token = api[1, 1]
@@ -47,8 +49,250 @@ old <- c("AF", "DL", "JW")
 new <- c("A", "B", "C")
 data$scorer[data$scorer %in% old] <- new[match(data$scorer, old, nomatch = 0)]
 # Revert duplicate IDs back to original to match with gold standard
-training <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
-dups <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
+training <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
+dups <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
+training$Training_id <- as.numeric(sub("T00", "", training$Training_id))
+# Change duplicates to OG IDs
+old <- dups$duplicated_ssid..dates.shifted..17.days.
+new <- dups$original_ssid
+data$scan_id[data$scan_id %in% old] <- new[na.omit(match(data$scan_id, old))]
+# Change training IDs to OG IDs
+old <- training$Training_id
+new <- training$Cffid.Scoring.Set
+data$scan_id[data$scan_id %in% old] <- new[na.omit(match(data$scan_id, old))]
+# Convert to long
+data <- data %>%
+  select(
+    scan_id, scorer, scoresheet_timestamp,
+    bronchiectasis_rul:atelectasis___6
+  ) %>%
+  arrange(scan_id, scorer, scoresheet_timestamp) %>%
+  group_by(scan_id, scorer) %>%
+  mutate(scorer_repeat = row_number()) %>%
+  select(-scoresheet_timestamp) %>%
+  pivot_longer(bronchiectasis_rul:atelectasis___6,
+    names_to = c("Feature", "Location"),
+    names_pattern = "(.*)_(.*)$"
+  ) %>%
+  mutate(
+    Feature = gsub("__", "", Feature),
+    Feature = str_to_title(gsub("_", " ", Feature))
+  )
+data$Location <- factor(data$Location,
+  levels = c(
+    "1", "2", "3", "4", "5", "6", "ling", "lll",
+    "lul", "rll", "rml", "rul"
+  ),
+  labels = c(
+    "RUL", "RML", "RLL", "LUL", "Ling", "LLL",
+    "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
+  )
+)
+# Format values
+data$value <- factor(data$value,
+  levels = c(
+    "Absent", "Checked", "Cylindric", "Cystic", "Unchecked", "Varicose"
+  ),
+  labels = c("Absent", "Present", "Present", "Present", "Absent", "Present"),
+  ordered = T
+)
+# Separate out gold standards and duplicates
+data_dups <- data %>% filter(scan_id %in% dups$original_ssid)
+data_gs <- data %>% filter(scan_id %in% training$Cffid.Scoring.Set)
+data <- data %>%
+  filter(!scan_id %in% c(dups$original_ssid, training$Cffid.Scoring.Set))
+# Second readings only for comparison to GS
+data_gs <- data_gs %>%
+  group_by(scan_id, scorer, Feature, Location) %>%
+  slice_max(scorer_repeat)
+```
+
+# Proportion of agreement
+
+## Singletons
+
+### By Feature
+
+```{r}
+#| message: false
+data %>%
+  group_by(Feature, scan_id, scorer) %>%
+  summarise(v = max(value, na.rm = T)) %>%
+  summarise(a = sum(v == "Present")) %>%
+  summarise(
+    `Agreed Feature Was Present` = sum(a == 3),
+    `Agreed Feature Was Absent` = sum(a == 0),
+    agreed = sum(a == 0 | a == 3),
+    disagreed = sum(a == 1 | a == 2),
+    proportion = round(agreed / (agreed + disagreed), 3)
+  ) %>%
+  rename(`Total Agreed` = agreed,`Total Disagreed`=disagreed,
+         `Proportion Agreed`=proportion) %>%
+  kable()
+```
+
+### Feature by lobe
+
+```{r}
+#| message: false
+data %>%
+  group_by(Feature, Location, scan_id) %>%
+  summarise(a = factor(sum(value == "Present", na.rm = T))) %>%
+  summarise(
+    `Agreed Feature Was Present` = sum(a == 3),
+    `Agreed Feature Was Absent` = sum(a == 0),
+    agreed = sum(a == 0 | a == 3),
+    disagreed = sum(a == 1 | a == 2),
+    proportion = round(agreed / (agreed + disagreed), 3)
+  ) %>%
+  rename(`Total Agreed` = agreed,`Total Disagreed`=disagreed,
+         `Proportion Agreed`=proportion) %>%
+  kable()
+```
+
+## Duplicates
+
+### By Feature
+
+```{r}
+#| message: false
+data_dups %>%
+  group_by(Feature, scorer, scan_id, scorer_repeat) %>%
+  summarise(v = max(value, na.rm = T)) %>%
+  summarise(
+    `Agreed Feature Was Present` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] & 
+                                         v[scorer_repeat == 1] == "Present"),
+    `Agreed Feature Was Absent` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] & 
+                                        v[scorer_repeat == 1] == "Absent"),
+    agreed = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2]),
+    disagreed = sum(v[scorer_repeat == 1] != v[scorer_repeat == 2]),
+    proportion = round(agreed / (agreed + disagreed), 3)
+  ) %>% 
+  summarise(across(`Agreed Feature Was Present`:disagreed,~sum(.x,na.rm = T)),
+            proportion=mean(proportion)) %>%
+  rename(`Total Agreed` = agreed,`Total Disagreed`=disagreed,
+         `Proportion Agreed`=proportion) %>%
+  kable()
+```
+
+### Feature by lobe
+
+```{r}
+#| message: false
+#| warning: false
+data_dups %>%
+  group_by(Feature, Location, scorer, scan_id, scorer_repeat) %>%
+  summarise(v = max(value, na.rm = T)) %>%
+  summarise(
+    `Agreed Feature Was Present` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] & 
+                                         v[scorer_repeat == 1] == "Present"),
+    `Agreed Feature Was Absent` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] & 
+                                        v[scorer_repeat == 1] == "Absent"),
+    agreed = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2]),
+    disagreed = sum(v[scorer_repeat == 1] != v[scorer_repeat == 2]),
+    proportion = round(agreed / (agreed + disagreed), 3)
+  ) %>% 
+  summarise(across(`Agreed Feature Was Present`:disagreed,~sum(.x,na.rm = T)),
+            proportion = mean(proportion)) %>%
+  rename(`Total Agreed` = agreed,`Total Disagreed`=disagreed,
+         `Proportion Agreed`=proportion) %>%
+  kable()
+```
+
+
+## Agreement with gold standard
+
+### By Feature
+
+```{r}
+#| message: false
+data_gs %>%
+  group_by(Feature, scan_id, scorer) %>%
+  summarise(v = max(value, na.rm = T)) %>%
+  summarise(
+    ap = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"]=="Present",
+    aa = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"]=="Absent",
+    pa = v[scorer == "A"] == v[scorer == "GS"],
+    bp = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"]=="Present",
+    ba = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"]=="Absent",
+    pb = v[scorer == "B"] == v[scorer == "GS"],
+    cp = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"]=="Present",
+    ca= v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"]=="Absent",
+     pc= v[scorer == "C"] == v[scorer == "GS"]
+  ) %>% 
+  summarise(
+    `A Agreed Feature Was Present` = sum(ap,na.rm=T),
+    `A Agreed Feature Was Absent`=sum(aa,na.rm=T),
+    `Prop. A Agreed`=mean(pa,na.rm=T),
+    `B Agreed Feature Was Present`=sum(bp,na.rm=T),
+    `B Agreed Feature Was Absent`=sum(ba,na.rm=T),
+    `Prop. B Agreed`=mean(pb,na.rm=T),
+    `C Agreed Feature Was Present`=sum(cp,na.rm=T),
+    `C Agreed Feature Was Absent`=sum(ca,na.rm=T),
+    `Prop. C Agreed`=mean(pc,na.rm=T)
+  ) %>%
+  kable()
+```
+
+### Feature by lobe
+
+Missing values were ignored in creating the table below. So if a scorer marked a feature and location blank on one scan and agreed with the gold standard on 3, their score will be 0.75 rather than 0.6.
+
+```{r}
+#| message: false
+data_gs %>%
+  group_by(Feature, Location, scan_id) %>%
+  rename(v=value) %>%
+  summarise(
+    ap = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"]=="Present",
+    aa = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"]=="Absent",
+    pa = v[scorer == "A"] == v[scorer == "GS"],
+    bp = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"]=="Present",
+    ba = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"]=="Absent",
+    pb = v[scorer == "B"] == v[scorer == "GS"],
+    cp = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"]=="Present",
+    ca= v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"]=="Absent",
+     pc= v[scorer == "C"] == v[scorer == "GS"]
+  ) %>% 
+  summarise(
+    `A Agreed Feature Was Present` = sum(ap,na.rm = T),
+    `A Agreed Feature Was Absent`=sum(aa,na.rm = T),
+    `Prop. A Agreed`=mean(pa,na.rm = T),
+    `B Agreed Feature Was Present`=sum(bp,na.rm = T),
+    `B Agreed Feature Was Absent`=sum(ba,na.rm = T),
+    `Prop. B Agreed`=mean(pb,na.rm = T),
+    `C Agreed Feature Was Present`=sum(cp,na.rm = T),
+    `C Agreed Feature Was Absent`=sum(ca,na.rm = T),
+    `Prop. C Agreed`=mean(pc,na.rm=T)
+  ) %>%
+  kable()
+```
+
+# Mixed Model Approach
+
+```{r data cleaning 2}
+# Import data
+api <- read.table("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt", header = F)
+rcon <- redcapConnection(
+  url = "https://redcap.ucdenver.edu/api/",
+  token = api[1, 1]
+)
+data <- exportRecordsTyped(rcon, labels = F)
+data <- data.frame(lapply(data, as.character))
+data$scan_id <- as.numeric(data$scan_id)
+# Make scorer IDs by initial
+data$scorer <- paste0(
+  toupper(substr(data$reader_first_name, 1, 1)),
+  toupper(substr(data$reader_last_name, 1, 1))
+)
+data$scorer[data$scorer == "GG"] <- "GS"
+# Deidentify readers
+old <- c("AF", "DL", "JW")
+new <- c("A", "B", "C")
+data$scorer[data$scorer %in% old] <- new[match(data$scorer, old, nomatch = 0)]
+# Revert duplicate IDs back to original to match with gold standard
+training <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
+dups <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
 training$Training_id <- as.numeric(sub("T00", "", training$Training_id))
 # Change duplicates to OG IDs
 old <- dups$duplicated_ssid..dates.shifted..17.days.
@@ -91,9 +335,9 @@ data$value <- factor(data$value,
   levels = c(
     "Absent", "Checked", "Cylindric", "Cystic", "Unchecked", "Varicose"
   ),
-  labels = c("Absent", "Present", "Present", "Present", "Absent", "Present"),
-  ordered = T
+  labels = c("Absent", "Present", "Present", "Present", "Absent", "Present")
 )
+data$value <- as.numeric(data$value) - 1
 # Separate out gold standards and duplicates
 data_dups <- data %>% filter(scan_id %in% dups$original_ssid)
 data_gs <- data %>% filter(scan_id %in% training$Cffid.Scoring.Set)
@@ -103,319 +347,131 @@ data <- data %>%
 data_gs <- data_gs %>%
   group_by(scan_id, scorer, feature, location) %>%
   slice_max(scorer_repeat)
+# Dummy variables for scorer, organize columns
+data <- data %>%
+  dummy_cols(select_columns = "scorer") %>%
+  select(scan_id, feature, location,scorer, scorer_A, scorer_B, scorer_C, value)
 ```
 
-# Proprortion of agreement
-
-## Singletons
-
-### By feature
+## Data setup
 
 ```{r}
-#| message: false
-data %>%
-  group_by(feature, scan_id, scorer) %>%
-  summarise(v = max(value, na.rm = T)) %>%
-  summarise(a = sum(v == "Present")) %>%
-  summarise(
-    agreed = sum(a == 0 | a == 3),
-    disagreed = sum(a == 1 | a == 2),
-    proportion = round(agreed / (agreed + disagreed), 3)
-  ) %>%
-  kable()
+DT::datatable(data)
 ```
 
-### Feature by lobe
+## Model
+
+- Readers $r=1,2,3$
+- Scans $s=1,2,...,S$
+- Features $f=1,2,...,F$
+- Lobes $l=1,2,...,6$
+- Outcome $y_{rsfl}$ is binary
+- Model notation: $$y_{rsf=1}=\alpha+\beta X_l + b_1+b_2+b_3+\epsilon_{rs}$$
+
+### Bronchiectasis
 
 ```{r}
-#| message: false
-data %>%
-  group_by(feature, location, scan_id) %>%
-  summarise(a = factor(sum(value == "Present", na.rm = T))) %>%
-  summarise(
-    agreed = sum(a == 0 | a == 3),
-    disagreed = sum(a == 1 | a == 2),
-    proportion = round(agreed / (agreed + disagreed), 3)
-  ) %>%
-  kable()
-```
-
-## Duplicates
-
-### By feature
-
-```{r}
-#| message: false
-data_dups %>%
-  group_by(feature, scorer, scan_id, scorer_repeat) %>%
-  summarise(v = max(value, na.rm = T)) %>%
-  summarise(a = v[scorer_repeat == 1] == v[scorer_repeat == 2]) %>%
-  summarise(p = mean(a)) %>%
-  pivot_wider(
-    names_from = scorer, values_from = p,
-    names_prefix = "prop. agreed "
-  ) %>%
-  kable()
-```
-
-### Feature by lobe
-
-```{r}
-#| message: false
-#| warning: false
-data_dups %>%
-  group_by(feature, location, scorer, scan_id, scorer_repeat) %>%
-  summarise(v = max(value, na.rm = T)) %>%
-  summarise(a = v[scorer_repeat == 1] == v[scorer_repeat == 2]) %>%
-  summarise(p = mean(a, na.rm = T)) %>%
-  pivot_wider(
-    names_from = scorer, values_from = p,
-    names_prefix = "prop. agreed "
-  ) %>%
-  kable()
-```
-
-
-## Agreement with gold standard
-
-### By feature
-
-```{r}
-#| message: false
-data_gs %>%
-  group_by(feature, scan_id, scorer) %>%
-  summarise(v = max(value, na.rm = T)) %>%
-  summarise(
-    A = v[scorer == "A"] == v[scorer == "GS"],
-    B = v[scorer == "B"] == v[scorer == "GS"],
-    C = v[scorer == "C"] == v[scorer == "GS"]
-  ) %>%
-  summarise(
-    `prop. agreed A` = sum(A) / n(),
-    `prop. agreed B` = sum(B) / n(),
-    `prop. agreed C` = sum(C) / n()
-  ) %>%
-  kable()
-```
-
-### Feature by lobe
-
-Missing values were ignored in creating the table below. So if a scorer marked a feature and location blank on one scan and agreed with the gold standard on 3, their score will be 0.75 rather than 0.6.
-
-```{r}
-#| message: false
-data_gs %>%
-  group_by(feature, location, scan_id) %>%
-  summarise(
-    A = value[scorer == "A"] == value[scorer == "GS"],
-    B = value[scorer == "B"] == value[scorer == "GS"],
-    C = value[scorer == "C"] == value[scorer == "GS"]
-  ) %>%
-  summarise(
-    `prop. agreed A` = mean(A, na.rm = T),
-    `prop. agreed B` = mean(B, na.rm = T),
-    `prop. agreed C` = mean(C, na.rm = T)
-  ) %>%
-  kable()
-```
-
-# Using Cohen's kappa
-
-| Value of Kappa | Level of Agreement | % of Data that are Reliable |
-| -------------- | ------------------ | --------------------------- |
-| 0–.20          | None               | 0–4%                        |
-| .21–.39        | Minimal            | 4–15%                       |
-| .40–.59        | Weak               | 15–35%                      |
-| .60–.79        | Moderate           | 35–63%                      |
-| .80–.90        | Strong             | 64–81%                      |
-| Above.90       | Almost Perfect     | 82–100%                     |
-
-: Kappa interpretation table @mchughInterraterReliabilityKappa2012a {#tbl-kappa}
-
-## Singletons
-
-### By feature
-
-```{r}
-#| message: false
-kappa <- data %>%
-  group_by(feature, scan_id, scorer) %>%
-  summarise(v = max(value, na.rm = T), .groups = "drop") %>%
-  pivot_wider(names_from = scorer, values_from = v)
-kappa <- split.data.frame(kappa, ~feature)
-kappas <- lapply(names(kappa), function(n) {
-  d <- kappa[[n]]
-  k <- kappam.fleiss(d[, c("A", "B", "C")])
-  return(c(n, k$value, k$p.value))
-})
-kappas <- data.frame(do.call(rbind, kappas))
-colnames(kappas) <- c("feature", "kappa", "p")
-kappas$kappa <- as.numeric(kappas$kappa)
-kappas$p <- format.pval(as.numeric(kappas$p), digits = 3, eps = 0.001)
-kable(kappas, digits = 3)
-```
-
-### Feature by lobe
-
-Because you technically cannot calculate Cohen's kappa for matrices where every cell is the same, values of `-Inf` can be interpreted as perfect agreement for a feature that had the same value across all scans. For example, none of the 15 scans showed consolidation in the	RML.
-
-```{r}
-#| message: false
-kappa <- data %>%
-  pivot_wider(names_from = scorer, values_from = value)
-kappa <- split.data.frame(kappa, ~ feature + location)
-kappas <- lapply(names(kappa), function(n) {
-  d <- kappa[[n]]
-  k <- kappam.fleiss(d[, c("A", "B", "C")])
-  return(c(strsplit(n, "\\.")[[1]], k$value, k$p.value))
-})
-kappas <- data.frame(do.call(rbind, kappas))
-colnames(kappas) <- c("feature", "location", "kappa", "p")
-kappas$kappa <- as.numeric(kappas$kappa)
-kappas$p <- format.pval(as.numeric(kappas$p), digits = 3, eps = 0.001)
-kable(kappas, digits = 3)
-```
-
-## Duplicates
-
-Unfortunately, because there weren't many duplicate scans it was difficult to calculate kappa for many features.
-
-### By feature
-
-```{r}
-#| message: false
-kappa <- data_dups %>%
-  group_by(feature, scan_id, scorer, scorer_repeat) %>%
-  summarise(v = max(value, na.rm = T), .groups = "drop") %>%
-  pivot_wider(names_from = c(scorer, scorer_repeat), values_from = v)
-kappa <- split.data.frame(kappa, ~feature)
-kappas <- lapply(names(kappa), function(n) {
-  d <- kappa[[n]]
-  ka <- kappa2(d[, c("A_1", "A_2")])
-  kb <- kappa2(d[, c("B_1", "B_2")])
-  kc <- kappa2(d[, c("C_1", "C_2")])
-  return(c(
-    strsplit(n, "\\.")[[1]],
-    ka$value, ka$p.value,
-    kb$value, kb$p.value,
-    kc$value, kb$p.value
-  ))
-})
-kappas <- data.frame(do.call(rbind, kappas))
-colnames(kappas) <- c(
-  "feature", "kappa A", "p A", "kappa B", "p B",
-  "kappa C", "p C"
+#| code-fold: show
+df <- data %>% filter(feature == "Bronchiectasis")
+model <- glmer(value ~ location + (1 | scorer),
+  family = "binomial", data = df
 )
-kappas[, !grepl("feature", colnames(kappas))] <- lapply(kappas[, !grepl("feature", colnames(kappas))], as.numeric)
-kappas[, grep("p ", colnames(kappas))] <- lapply(kappas[, grep("p ", colnames(kappas))],
-  format.pval,
-  digits = 3, eps = 0.001
-)
-kable(kappas, digits = 3)
+summary(model)
+icc(model)
 ```
 
-### Feature by lobe
+### Mucoid Impaction
 
 ```{r}
-#| message: false
-kappa <- data_dups %>%
-  group_by(feature,location, scan_id, scorer, scorer_repeat) %>%
-  pivot_wider(names_from = c(scorer, scorer_repeat), values_from = value)
-kappa <- split.data.frame(kappa, ~feature+location)
-kappas <- lapply(names(kappa), function(n) {
-  d <- kappa[[n]]
-  ka <- kappa2(d[, c("A_1", "A_2")])
-  kb <- kappa2(d[, c("B_1", "B_2")])
-  kc <- kappa2(d[, c("C_1", "C_2")])
-  return(c(
-    strsplit(n, "\\.")[[1]], 
-    ka$value, ka$p.value,
-    kb$value, kb$p.value,
-    kc$value, kb$p.value
-  ))
-})
-kappas <- data.frame(do.call(rbind, kappas))
-colnames(kappas) <- c(
-  "feature", "location","kappa A", "p A", "kappa B", "p B",
-  "kappa C", "p C"
+#| code-fold: show
+df <- data %>% filter(feature == "Mucoid Impaction")
+model <- glmer(value ~ location + (1 | scorer),
+  family = "binomial", data = df
 )
-kappas[, !grepl("feature|location", colnames(kappas))] <- 
-  lapply(kappas[, !grepl("feature|location", colnames(kappas))], as.numeric)
-kappas[, grep("p ", colnames(kappas))] <- lapply(kappas[, grep("p ", colnames(kappas))],
-  format.pval,
-  digits = 3, eps = 0.001
-)
-kable(kappas, digits = 3)
+summary(model)
+icc(model)
 ```
 
-## Agreement with gold standard
-
-Unfortunately, because there weren't many gold standard scans it was difficult to calculate kappa for many features.
-
-### By feature
+### Cyst
 
 ```{r}
-#| message: false
-kappa <- data_gs %>%
-  group_by(feature, scan_id, scorer) %>%
-  summarise(v = max(value, na.rm = T), .groups = "drop") %>%
-  pivot_wider(names_from = scorer, values_from = v)
-kappa <- split.data.frame(kappa, ~feature)
-kappas <- lapply(names(kappa), function(n) {
-  d <- kappa[[n]]
-  ka <- kappa2(d[, c("A", "GS")])
-  kb <- kappa2(d[, c("B", "GS")])
-  kc <- kappa2(d[, c("C", "GS")])
-  return(c(
-    strsplit(n, "\\.")[[1]],
-    ka$value, ka$p.value,
-    kb$value, kb$p.value,
-    kc$value, kb$p.value
-  ))
-})
-kappas <- data.frame(do.call(rbind, kappas))
-colnames(kappas) <- c(
-  "feature", "kappa A", "p A", "kappa B", "p B",
-  "kappa C", "p C"
+#| code-fold: show
+df <- data %>% filter(feature == "Cyst")
+model <- glmer(value ~ location + (1 | scorer),
+  family = "binomial", data = df
 )
-kappas[, !grepl("feature", colnames(kappas))] <- lapply(kappas[, !grepl("feature", colnames(kappas))], as.numeric)
-kappas[, grep("p ", colnames(kappas))] <- lapply(kappas[, grep("p ", colnames(kappas))],
-  format.pval,
-  digits = 3, eps = 0.001
-)
-kable(kappas, digits = 3)
+summary(model)
+icc(model)
 ```
 
-### Feature by lobe
+### Cavity
 
 ```{r}
-#| message: false
-kappa <- data_gs %>%
-  group_by(feature,location, scan_id, scorer) %>%
-  pivot_wider(names_from = scorer, values_from = value)
-kappa <- split.data.frame(kappa, ~feature+location)
-kappas <- lapply(names(kappa), function(n) {
-  d <- kappa[[n]]
-  ka <- kappa2(d[, c("A", "GS")])
-  kb <- kappa2(d[, c("B", "GS")])
-  kc <- kappa2(d[, c("C", "GS")])
-  return(c(
-    strsplit(n, "\\.")[[1]], 
-    ka$value, ka$p.value,
-    kb$value, kb$p.value,
-    kc$value, kb$p.value
-  ))
-})
-kappas <- data.frame(do.call(rbind, kappas))
-colnames(kappas) <- c(
-  "feature", "location","kappa A", "p A", "kappa B", "p B",
-  "kappa C", "p C"
+#| code-fold: show
+df <- data %>% filter(feature == "Cavity")
+model <- glmer(value ~ location + (1 | scorer),
+  family = "binomial", data = df
 )
-kappas[, !grepl("feature|location", colnames(kappas))] <- 
-  lapply(kappas[, !grepl("feature|location", colnames(kappas))], as.numeric)
-kappas[, grep("p ", colnames(kappas))] <- lapply(kappas[, grep("p ", colnames(kappas))],
-  format.pval,
-  digits = 3, eps = 0.001
+summary(model)
+icc(model)
+```
+
+### Consolidation
+
+```{r}
+#| code-fold: show
+df <- data %>% filter(feature == "Consolidation")
+model <- glmer(value ~ location + (1 | scorer),
+  family = "binomial", data = df
 )
-kable(kappas, digits = 3)
+summary(model)
+icc(model)
+```
+
+### Ground Glass
+
+```{r}
+#| code-fold: show
+df <- data %>% filter(feature == "Ground Glass")
+model <- glmer(value ~ location + (1 | scorer),
+  family = "binomial", data = df
+)
+summary(model)
+icc(model)
+```
+
+### Nodule
+
+```{r}
+#| code-fold: show
+df <- data %>% filter(feature == "Nodule")
+model <- glmer(value ~ location + (1 | scorer),
+  family = "binomial", data = df
+)
+summary(model)
+icc(model)
+```
+
+### Tree In Bud
+
+```{r}
+#| code-fold: show
+df <- data %>% filter(feature == "Tree In Bud")
+model <- glmer(value ~ location + (1 | scorer),
+  family = "binomial", data = df
+)
+summary(model)
+icc(model)
+```
+
+### Atelectasis
+
+```{r}
+#| code-fold: show
+df <- data %>% filter(feature == "Atelectasis")
+model <- glmer(value ~ location + (1 | scorer),
+  family = "binomial", data = df
+)
+summary(model)
+icc(model)
 ```
