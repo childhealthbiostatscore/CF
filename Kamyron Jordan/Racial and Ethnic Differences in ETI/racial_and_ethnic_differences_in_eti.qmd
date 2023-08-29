@@ -20,73 +20,92 @@ csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
-```{r data cleaning}
-#| include: false
-# source("/Users/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_race_eti_analysis_dataset.R")
-load("/Volumes/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
-```
-
 ```{r libraries}
 #| include: false
 library(Hmisc)
 library(tidyverse)
+library(multidplyr)
 library(gtsummary)
+library(lmerTest)
+library(broom.mixed)
+library(emmeans)
+library(knitr)
+```
+
+```{r data cleaning}
+#| include: false
+# source("/Users/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_race_eti_analysis_dataset.R")
+load("~/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
+# Make modulators ordered factors
+encounter <- encounter %>%
+  mutate(across(contains("vx"), ~ factor(.x, ordered = T)))
 ```
 
 # Race and ethnicity breakdown
 
-## Race by year
-
-```{r t1}
-annual %>%
-  select(ReviewYear, race, Hispanicrace) %>%
-  tbl_summary(
-    by = ReviewYear, missing_text = "Missing",
-    statistic = list(all_continuous() ~ "{mean} ({sd})")
-  ) %>%
-  modify_header(label = paste0("**Year**")) %>%
-  bold_labels() %>%
-  as_kable_extra()
-```
+In the tables below, race and ethnicity are considered separately, so some participants may be double counted. For example, a participant identifying as Black and Hispanic would contribute to both categories.
 
 ## Race and ethnicity overall
 
-```{r t2}
+The table below shows the race and ethnicity proportions for the entire cohort included in the CFFPR dataset.
+
+```{r}
 demo %>%
   select(race, Hispanicrace) %>%
   tbl_summary(
     by = Hispanicrace,
     statistic = list(all_continuous() ~ "{mean} ({sd})")
   ) %>%
-  modify_header(label = paste0("**", label(annual$Hispanicrace), "**")) %>%
   add_overall() %>%
   bold_labels() %>%
   as_kable_extra()
 ```
 
-Based on the above table, I decided to combine race and ethnicity with Hispanic "overriding" other racial identities. So if a participant was reported as both Black and Hispanic, they were consider Hispanic for the following analyses. Those with missing data for Hispanic ethnicity were moved to the "Mixed/Other/Unknown Race" category.
+## Race by year
 
-```{r combine race and eth}
+The table below shows the proportions of race and ethnicities included in the dataset in a given year. Most people are seen at least once a year, but this table serves as a sanity check to make sure that groups were generally seen equal amounts each year.
+
+```{r}
+annual %>%
+  select(ReviewYear, race, Hispanicrace) %>%
+  tbl_summary(
+    by = ReviewYear, missing_text = "Missing",
+    statistic = list(all_continuous() ~ "{mean} ({sd})")
+  ) %>%
+  bold_labels() %>%
+  as_kable_extra()
+```
+
+## Race percentages overall
+
+Based on the above tables, I decided to combine race and ethnicity with Hispanic "overriding" other racial identities. So if a participant was reported as both Black and Hispanic, they were consider Hispanic for the following analyses. Those with missing data for Hispanic ethnicity were moved to the "Indigenous/Mixed/Other/Unknown Race" category.
+
+```{r}
 demo$race <- as.character(demo$race)
 demo$race[demo$Hispanicrace == "Yes"] <- "Hispanic or Latino"
 demo$race[demo$Hispanicrace == "Unknown"] <- "Hispanic or Latino"
 demo$race <- factor(demo$race,
   levels = c(
-    "White", "Black or African American", "Hispanic or Latino",
-    "American Indian or Alaska Native", "Asian",
+    "White", "Black or African American", "Hispanic or Latino", "Asian",
+    "American Indian or Alaska Native",
     "Native Hawaiian or Other Pacific Islander", "Mixed/Other/Unknown Race"
+  ),
+  labels = c(
+    "White", "Black or African American", "Hispanic or Latino", "Asian",
+    "Indigenous/Mixed/Other/Unknown Race",
+    "Indigenous/Mixed/Other/Unknown Race", "Indigenous/Mixed/Other/Unknown Race"
   )
 )
+encounter$race <- NULL
+encounter <- left_join(encounter, demo[, c("eDWID", "race")], by = join_by(eDWID))
+label(encounter$race) <- "Race/Ethnicity"
 label(demo$race) <- "Race/Ethnicity"
 ```
 
-## Race percentages overall
-
-```{r t3}
+```{r}
 demo %>%
   select(race) %>%
   tbl_summary(statistic = list(all_continuous() ~ "{mean} ({sd})")) %>%
-  modify_header(label = paste0("**Race**")) %>%
   bold_labels() %>%
   as_kable_extra()
 ```
@@ -95,56 +114,147 @@ demo %>%
 
 ## Characteristics by race
 
-```{r t4}
+```{r}
 demo %>%
-  select(race, Gender, WasGenotyped, F508) %>%
+  select(race, Gender, WasGenotyped, F508_num) %>%
   tbl_summary(
     by = race, missing_text = "Missing",
     statistic = list(all_continuous() ~ "{mean} ({sd})")
   ) %>%
-  modify_header(label = paste0("**Race**")) %>%
   add_overall() %>%
   bold_labels() %>%
   as_kable_extra()
 ```
 
-```{r summarise by year}
+## Characteristics by year
+
+```{r}
 #| cache: true
-t5 <- encounter %>%
+encounter %>%
   group_by(eDWID, reviewyear) %>%
-  summarise(across(c(race, Gender, WasGenotyped, F508, contains("insurance")), first),
+  summarise(across(c(race, Gender, WasGenotyped, F508_num, contains("insurance")), first),
     `Age at Last Visit` = last(na.omit(encounterage)),
     `Mean ppFEV` = mean(GLI_FEV1_pct_predicted, na.rm = T),
     `Weight at Last Visit` = last(na.omit(weight)),
     `Weight %ile at Last Visit` = last(na.omit(weightpercentile)),
     `BMI at Last Visit` = last(na.omit(bmivalue)),
     `BMI %ile at Last Visit` = last(na.omit(bmipercentile)),
+    across(contains("Vx"), ~ max(.x)),
     .groups = "drop"
-  )
-label(t5)[colnames(t5) %in% names(labels)] <- labels[match(colnames(t5), names(labels), nomatch = 0)]
-```
-
-## Characteristics by year
-
-```{r t5}
-#| message: false
-t5 %>%
+  ) %>%
   select(
-    -eDWID, reviewyear, race, Gender, WasGenotyped, F508, contains("insurance"),
+    -eDWID, reviewyear, race, Gender, WasGenotyped, F508_num, contains("insurance"),
     `Age at Last Visit`, `Mean ppFEV`, `Weight at Last Visit`,
     `Weight %ile at Last Visit`, `BMI at Last Visit`,
-    `BMI %ile at Last Visit`
+    `BMI %ile at Last Visit`, contains("Vx")
   ) %>%
+  rename(any_of(tidy_labels)) %>%
   tbl_summary(
-    by = reviewyear, missing_text = "Missing",
+    by = Year, missing_text = "Missing",
     statistic = list(all_continuous() ~ "{mean} ({sd})")
   ) %>%
-  modify_header(label = paste0("**Year**")) %>%
   bold_labels() %>%
   as_kable_extra()
 ```
 
+# Potential COVID effects
+
+## Spaghetti plot
+
 ```{r}
-#| label: fig-planets
-#| fig-cap: Planets
+#| warning: false
+ggplot(encounter, aes(
+  y = GLI_FEV1_pct_predicted, x = encounterdate,
+  group = eDWID, color = factor(eDWID)
+)) +
+  geom_line(alpha = 0.02) +
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+## Visits prior to and after March 11, 2020
+
+The table below is limited to visits 2019 - 2021.
+
+```{r}
+encounter %>%
+  filter(encounterdate >= "2019-01-01") %>%
+  mutate(post_covid = encounterdate > "2020-03-11") %>%
+  group_by(eDWID) %>%
+  summarise(
+    `Number of Visits Pre-COVID` = sum(!post_covid),
+    `Number of Visits Post-COVID` = sum(post_covid),
+    race = first(race),
+    .groups = "drop"
+  ) %>%
+  rename(any_of(tidy_labels)) %>%
+  select(-eDWID) %>%
+  tbl_summary(by = `Race/Ethnicity`, missing_text = "Missing") %>%
+  bold_labels() %>%
+  as_kable_extra()
+```
+
+# Lung function over time
+
+## Annualized averages
+
+```{r}
+mod_df <- encounter %>%
+  group_by(eDWID, reviewyear) %>%
+  summarise(
+    across(
+      c(GLI_FEV1_pct_predicted, GLI_FVC_pct_predicted),
+      ~ mean(.x, na.rm = T)
+    ),
+    race = first(race),
+    .groups = "drop"
+  )
+```
+
+FEV1 and FVC percent predicted (based on GLI equations) were averaged by year for each person. 
+
+```{r}
+#| warning: false
+encounter %>%
+  group_by(eDWID, reviewyear) %>%
+  summarise(across(c(GLI_FEV1_pct_predicted, GLI_FVC_pct_predicted), ~ mean(.x, na.rm = T)),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(c("GLI_FEV1_pct_predicted", "GLI_FVC_pct_predicted")) %>%
+  ggplot(aes(x = reviewyear, y = value, color = factor(eDWID), group = eDWID)) +
+  geom_line(alpha = 0.01) +
+  theme_bw() +
+  theme(legend.position = "none") +
+  facet_wrap(~name)
+```
+
+```{r}
+#| cache: true
+# Most basic model of lung function over time by race
+mod <- lmer(
+  GLI_FEV1_pct_predicted ~ factor(reviewyear) * race + (1 | eDWID),
+  data = encounter %>% group_by(eDWID, reviewyear) %>%
+    summarise(across(c(GLI_FEV1_pct_predicted, GLI_FVC_pct_predicted), ~ mean(.x, na.rm = T)),
+      race = first(race),
+      .groups = "drop"
+    )
+)
+res <- tidy(mod, effects = "fixed")
+means <- data.frame(emmeans(mod, ~ race + reviewyear,
+  lmerTest.limit = 1e6,
+  pbkrtest.limit = 1e6
+))
+kable(means)
+```
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+ggplot(means, aes(x = reviewyear, y = emmean, color = race)) +
+  geom_line() +
+  geom_point() +
+  xlab("Year") +
+  ylab("LS Mean FEV1") +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = .2) +
+  theme_bw()
 ```
