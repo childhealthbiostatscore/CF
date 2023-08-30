@@ -22,10 +22,8 @@ editor: source
 
 ```{r libraries}
 #| include: false
-library(Hmisc)
 library(tidyverse)
-library(multidplyr)
-library(gtsummary)
+library(table1)
 library(lmerTest)
 library(broom.mixed)
 library(emmeans)
@@ -36,9 +34,6 @@ library(knitr)
 #| include: false
 # source("/Users/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_race_eti_analysis_dataset.R")
 load("~/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
-# Make modulators ordered factors
-encounter <- encounter %>%
-  mutate(across(contains("vx"), ~ factor(.x, ordered = T)))
 ```
 
 # Race and ethnicity breakdown
@@ -50,15 +45,7 @@ In the tables below, race and ethnicity are considered separately, so some parti
 The table below shows the race and ethnicity proportions for the entire cohort included in the CFFPR dataset.
 
 ```{r}
-demo %>%
-  select(race, Hispanicrace) %>%
-  tbl_summary(
-    by = Hispanicrace,
-    statistic = list(all_continuous() ~ "{mean} ({sd})")
-  ) %>%
-  add_overall() %>%
-  bold_labels() %>%
-  as_kable_extra()
+table1(~ race | Hispanicrace, data=demo)
 ```
 
 ## Race by year
@@ -66,14 +53,7 @@ demo %>%
 The table below shows the proportions of race and ethnicities included in the dataset in a given year. Most people are seen at least once a year, but this table serves as a sanity check to make sure that groups were generally seen equal amounts each year.
 
 ```{r}
-annual %>%
-  select(ReviewYear, race, Hispanicrace) %>%
-  tbl_summary(
-    by = ReviewYear, missing_text = "Missing",
-    statistic = list(all_continuous() ~ "{mean} ({sd})")
-  ) %>%
-  bold_labels() %>%
-  as_kable_extra()
+table1(~race+Hispanicrace|factor(ReviewYear),data = annual)
 ```
 
 ## Race percentages overall
@@ -103,11 +83,7 @@ label(demo$race) <- "Race/Ethnicity"
 ```
 
 ```{r}
-demo %>%
-  select(race) %>%
-  tbl_summary(statistic = list(all_continuous() ~ "{mean} ({sd})")) %>%
-  bold_labels() %>%
-  as_kable_extra()
+table1(~race,data = demo)
 ```
 
 # Participant characteristics
@@ -115,22 +91,14 @@ demo %>%
 ## Characteristics by race
 
 ```{r}
-demo %>%
-  select(race, Gender, WasGenotyped, F508_num) %>%
-  tbl_summary(
-    by = race, missing_text = "Missing",
-    statistic = list(all_continuous() ~ "{mean} ({sd})")
-  ) %>%
-  add_overall() %>%
-  bold_labels() %>%
-  as_kable_extra()
+table1(~Gender+WasGenotyped+F508_num|race,data=demo)
 ```
 
 ## Characteristics by year
 
 ```{r}
 #| cache: true
-encounter %>%
+by_year = encounter %>%
   group_by(eDWID, reviewyear) %>%
   summarise(across(c(race, Gender, WasGenotyped, F508_num, contains("insurance")), first),
     `Age at Last Visit` = last(na.omit(encounterage)),
@@ -155,6 +123,31 @@ encounter %>%
   ) %>%
   bold_labels() %>%
   as_kable_extra()
+```
+
+# ETI eligibility
+
+Trikafta originally approved October 21, 2019 for patients 12+ years of age. Approved for ages 6 - 11 on June 9, 2021.
+
+```{r}
+encounter %>%
+  mutate(eti_elig = factor(eti_elig, ordered = T)) %>%
+  group_by(eDWID, reviewyear) %>%
+  summarise(
+    eti_elig = max(eti_elig), race = first(na.omit(race)),
+    .groups = "drop"
+  ) %>%
+  select(-eDWID) %>%
+  rename(any_of(tidy_labels)) %>%
+  tbl_summary(by = `Race/Ethnicity`, missing = "Missing") %>%
+        bold_labels() %>%
+        as_kable_extra()
+  tbl_strata(
+    strata = Year,
+    .tbl_fun =
+      ~ .x %>%
+        
+  )
 ```
 
 # Potential COVID effects
@@ -215,12 +208,8 @@ FEV1 and FVC percent predicted (based on GLI equations) were averaged by year fo
 
 ```{r}
 #| warning: false
-encounter %>%
-  group_by(eDWID, reviewyear) %>%
-  summarise(across(c(GLI_FEV1_pct_predicted, GLI_FVC_pct_predicted), ~ mean(.x, na.rm = T)),
-    .groups = "drop"
-  ) %>%
-  pivot_longer(c("GLI_FEV1_pct_predicted", "GLI_FVC_pct_predicted")) %>%
+mod_df
+pivot_longer(c("GLI_FEV1_pct_predicted", "GLI_FVC_pct_predicted")) %>%
   ggplot(aes(x = reviewyear, y = value, color = factor(eDWID), group = eDWID)) +
   geom_line(alpha = 0.01) +
   theme_bw() +
@@ -233,11 +222,7 @@ encounter %>%
 # Most basic model of lung function over time by race
 mod <- lmer(
   GLI_FEV1_pct_predicted ~ factor(reviewyear) * race + (1 | eDWID),
-  data = encounter %>% group_by(eDWID, reviewyear) %>%
-    summarise(across(c(GLI_FEV1_pct_predicted, GLI_FVC_pct_predicted), ~ mean(.x, na.rm = T)),
-      race = first(race),
-      .groups = "drop"
-    )
+  data = mod_df
 )
 res <- tidy(mod, effects = "fixed")
 means <- data.frame(emmeans(mod, ~ race + reviewyear,

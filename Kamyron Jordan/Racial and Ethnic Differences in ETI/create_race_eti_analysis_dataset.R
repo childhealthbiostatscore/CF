@@ -6,6 +6,17 @@ library(Hmisc)
 annual <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
 encounter <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
 demo <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
+# Dates
+demo$First_LungTransplantDate <- mdy(demo$First_LungTransplantDate)
+demo$Modulator_trikafta_first_date <- mdy(demo$Modulator_trikafta_first_date)
+encounter$encounterdate <- mdy(encounter$encounterdate)
+# ETI eligibility
+encounter$eti_elig <- "No"
+encounter$eti_elig[encounter$encounterdate >= ("2019-10-21") &
+  encounter$encounterage >= 12] <- "Yes"
+encounter$eti_elig[encounter$encounterdate >= ("2021-06-09") &
+  encounter$encounterage >= 6] <- "Yes"
+encounter$eti_elig <- factor(encounter$eti_elig, levels = c("No", "Yes"))
 # Fix missing values for specific bacteria
 bugs <- c(
   "staphylococcus_aureus", "haemophilus_influenzae",
@@ -257,10 +268,6 @@ demo$race <- factor(demo$race,
     "Native Hawaiian or Other Pacific Islander", "Mixed/Other/Unknown Race"
   )
 )
-# Dates
-demo$First_LungTransplantDate <- mdy(demo$First_LungTransplantDate)
-demo$Modulator_trikafta_first_date <- mdy(demo$Modulator_trikafta_first_date)
-encounter$encounterdate <- mdy(encounter$encounterdate)
 # Manage labels (tried to do this programmatically but the data dictionary has
 # some quirks and this ended up being faster)
 encounter_labels <-
@@ -303,7 +310,8 @@ encounter_labels <-
     "pulmonarycomplications1" = "ABPA",
     "pe_assessment" = "Assessment of potential pulmonary exacerbation",
     "medscurrentepisode6" = "Inhaled antibiotic PLUS an oral quinolone antibiotic",
-    "medscurrentepisode7" = "No medications prescribed during this episode"
+    "medscurrentepisode7" = "No medications prescribed during this episode",
+    "eti_elig" = "Eligible for ETI"
   )
 annual_labels <-
   list(
