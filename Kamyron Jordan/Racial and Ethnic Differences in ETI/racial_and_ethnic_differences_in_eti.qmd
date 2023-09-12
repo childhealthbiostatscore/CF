@@ -116,13 +116,12 @@ by_year = encounter %>%
     `Weight %ile at Last Visit`, `BMI at Last Visit`,
     `BMI %ile at Last Visit`, contains("Vx")
   ) %>%
-  rename(any_of(tidy_labels)) %>%
-  tbl_summary(
-    by = Year, missing_text = "Missing",
-    statistic = list(all_continuous() ~ "{mean} ({sd})")
-  ) %>%
-  bold_labels() %>%
-  as_kable_extra()
+  rename(any_of(tidy_labels))
+
+```
+
+```{r}
+table1(~Gender+WasGenotyped+F508_num|race,data=by_year)
 ```
 
 # ETI eligibility
