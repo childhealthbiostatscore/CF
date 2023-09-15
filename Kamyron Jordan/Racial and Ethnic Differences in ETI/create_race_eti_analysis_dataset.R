@@ -17,6 +17,10 @@ encounter$eti_elig[encounter$encounterdate >= ("2019-10-21") &
 encounter$eti_elig[encounter$encounterdate >= ("2021-06-09") &
   encounter$encounterage >= 6] <- "Yes"
 encounter$eti_elig <- factor(encounter$eti_elig, levels = c("No", "Yes"))
+annual$eti_elig <- "No"
+annual$eti_elig[annual$ReviewYear >= 2019 & annual$Age_YrEnd >= 12] <- "Yes"
+annual$eti_elig[annual$ReviewYear >= 2021 & annual$Age_YrEnd >= 6] <- "Yes"
+annual$eti_elig <- factor(annual$eti_elig, levels = c("No", "Yes"))
 # Fix missing values for specific bacteria
 bugs <- c(
   "staphylococcus_aureus", "haemophilus_influenzae",
@@ -277,23 +281,19 @@ demo$race <- factor(demo$race,
 )
 # Create some of our own annualized variables
 by_year <- encounter %>%
-  mutate(
-    eti_elig = factor(eti_elig, ordered = T),
-    across(contains("Vx"), ~ factor(.x, ordered = T))
-  ) %>%
+  mutate(across(contains("Vx"), ~ factor(.x, ordered = T))) %>%
   group_by(eDWID, reviewyear) %>%
   summarise(
     mean_ppFEV = mean(GLI_FEV1_pct_predicted, na.rm = T),
+    mean_ppFVC = mean(GLI_FVC_pct_predicted, na.rm = T),
     weight_last = last(na.omit(weight)),
     weight_perc_last = last(na.omit(weightpercentile)),
     bmi_last = last(na.omit(bmivalue)),
     bmi_perc_last = last(na.omit(bmipercentile)),
-    eti_elig = max(eti_elig),
     across(contains("Vx"), ~ max(.x)),
     .groups = "drop"
   ) %>%
   mutate(
-    eti_elig = factor(eti_elig, ordered = F),
     across(contains("Vx"), ~ factor(.x, ordered = F))
   )
 annual <- full_join(annual, by_year, by = join_by(eDWID, ReviewYear == reviewyear))
@@ -380,20 +380,24 @@ labels <-
     "Mutation3" = "Name of the third mutation (if any)",
     "First_LungTransplantDate" = "Date of First Lung Transplant",
     "Modulator_trikafta_first_date" = "Date of Trikafta Start",
-    "mean_ppFEV" = "Mean ppFEV", "weight_last" = "Weight at Last Visit",
+    "mean_ppFEV" = "Mean ppFEV", "mean_ppFVC" = "Mean ppFVC",
+    "weight_last" = "Weight at Last Visit",
     "weight_perc_last" = "Weight %ile at Last Visit",
     "bmi_last" = "BMI at Last Visit", "bmi_perc_last" = "BMI %ile at Last Visit"
   )
-# Apply labels
-label(annual) <- labels[colnames(annual)]
-label(demo) <- labels[colnames(demo)]
-label(encounter) <- labels[colnames(encounter)]
 # Merge
 annual <- full_join(demo, annual, by = join_by(eDWID))
 encounter <- full_join(demo, encounter, by = join_by(eDWID))
 # Remove encounters with no year
 encounter <- encounter %>% filter(!is.na(reviewyear))
+# Labels
+label(annual) <- labels[colnames(annual)]
+label(demo) <- labels[colnames(demo)]
+label(encounter) <- labels[colnames(encounter)]
+# Make labels for tidyverse operations (a list to pass to rename())
+tidy_labels <- names(labels)
+names(tidy_labels) <- sapply(labels, "[[", 1)
 # Save
-save(annual, encounter, demo, labels,
+save(annual, encounter, demo, labels, tidy_labels, by_year,
   file = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
 )

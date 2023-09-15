@@ -15,15 +15,17 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
+bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Dropbox/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
-```{r libraries}
+```{r setup}
 #| include: false
+# Libraries
+library(Hmisc)
 library(tidyverse)
-library(table1)
+library(gtsummary)
 library(lmerTest)
 library(broom.mixed)
 library(emmeans)
@@ -41,7 +43,10 @@ load("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyr
 The table below shows the race and ethnicity proportions for the entire cohort included in the CFFPR dataset. I decided to combine race and ethnicity with Hispanic "overriding" other racial identities. So if a participant was reported as both Black and Hispanic, they were consider Hispanic for the following analyses. Those with missing data for Hispanic ethnicity were moved to the "Indigenous/Mixed/Other/Unknown Race" category.
 
 ```{r}
-table1(~race, data = demo)
+demo %>%
+  select(race) %>%
+  tbl_summary(missing_text = "Missing") %>%
+  bold_labels()
 ```
 
 ## Race by year
@@ -49,7 +54,10 @@ table1(~race, data = demo)
 The table below shows the proportions of race and ethnicities included in the dataset in a given year. Most people are seen at least once a year, but this table serves as a sanity check to make sure that groups were generally seen equal amounts each year.
 
 ```{r}
-table1(~ race | factor(ReviewYear), data = annual)
+annual %>%
+  select(race, ReviewYear) %>%
+  tbl_summary(by = ReviewYear, missing_text = "Missing") %>%
+  bold_labels()
 ```
 
 # Participant characteristics
@@ -60,19 +68,35 @@ t1_vars <- c(
   "mean_ppFEV", "weight_last", "weight_perc_last", "bmi_last",
   "bmi_perc_last", "Vx770", "Vx809comb", "Vx661comb", "Vx445comb"
 )
-t1_form <- as.formula(paste("~", paste(t1_vars, collapse = "+"), "|factor(ReviewYear)"))
 ```
 
 ## Characteristics by race
 
 ```{r}
-table1(~ Gender + WasGenotyped + F508_num | race, data = demo)
+demo %>%
+  select(Gender, WasGenotyped, F508_num, race) %>%
+  tbl_summary(by = race, missing_text = "Missing") %>%
+  bold_labels()
 ```
 
 ## Characteristics by year
 
-```{r}
-table1(t1_form, data = annual)
+```{r results='asis'}
+set_gtsummary_theme(theme_gtsummary_compact(), quiet = T)
+years <- split.data.frame(annual, annual$ReviewYear)
+invisible(lapply(names(years), function(n) {
+  cat("\n")
+  cat("###", n)
+  cat("\n")
+  d <- years[[n]]
+  t <- d %>%
+    select(all_of(t1_vars), race) %>%
+    tbl_summary(by = race, missing_text = "Missing") %>%
+    bold_labels()
+  print(t)
+  cat("\n")
+}))
+reset_gtsummary_theme()
 ```
 
 # ETI eligibility
@@ -82,14 +106,62 @@ Trikafta originally approved October 21, 2019 for patients 12+ years of age. App
 ## Overall by year
 
 ```{r}
-table1(~ eti_elig | factor(ReviewYear), data = annual, overall = F)
+annual %>%
+  select(eti_elig, ReviewYear) %>%
+  tbl_summary(
+    by = ReviewYear, missing_text = "Missing",
+    type = all_dichotomous() ~ "categorical"
+  ) %>%
+  bold_labels()
 ```
 
 ## By race and year
 
-```{r}
-
+```{r results='asis'}
+invisible(lapply(names(years), function(n) {
+  cat("\n")
+  cat("###", n)
+  cat("\n")
+  d <- years[[n]]
+  t <- d %>%
+    select(eti_elig, race) %>%
+    tbl_summary(
+      by = race, missing_text = "Missing",
+      type = all_dichotomous() ~ "categorical"
+    ) %>%
+    bold_labels()
+  print(t)
+  cat("\n")
+}))
 ```
+
+# People without visits in a given year
+
+```{r}
+# Which are missing from encounters data?
+a <- as.data.frame.matrix(table(annual$eDWID, annual$ReviewYear))
+a <- a %>% rownames_to_column("eDWID")
+e <- as.data.frame.matrix(table(by_year$eDWID, by_year$reviewyear))
+e <- e %>% rownames_to_column("eDWID")
+rowdiff_a <- setdiff(a, e)
+rowdiff_a$data <- "annual"
+rowdiff_e <- setdiff(e, a)
+rowdiff_e$data <- "encounter"
+diffs <- rbind(rowdiff_a, rowdiff_e)
+diffs <- diffs %>%
+  arrange(eDWID, desc(data)) %>%
+  select(-data)
+diffs <- diffs %>%
+  group_by(eDWID) %>%
+  reframe(across(`2015`:`2021`, ~ diff(as.numeric(.x))))
+diffs %>%
+  reframe(across(`2015`:`2021`, ~ sum(.x == 1))) %>%
+  kable()
+```
+
+There were a total of `r length(setdiff(a$eDWID,e$eDWID))` included in the annual dataset that did not appear in the encounter-level dataset at all. There were an additional `r nrow(diffs)` patients who were included in both datasets, but had at least one year with no encounters. The table above shows the number of people missing an encounter in each year.
+
+If someone was not seen a given year, do we count them as eligible for that year? I am assuming they will be eligible but obviously will not have started any modulators.
 
 # Potential COVID effects
 
@@ -121,37 +193,23 @@ encounter %>%
     race = first(race),
     .groups = "drop"
   ) %>%
-  rename(any_of(tidy_labels)) %>%
   select(-eDWID) %>%
-  tbl_summary(by = `Race/Ethnicity`, missing_text = "Missing") %>%
-  bold_labels() %>%
-  as_kable_extra()
+  tbl_summary(by = race, missing_text = "Missing") %>%
+  bold_labels()
 ```
 
 # Lung function over time
 
 ## Annualized averages
 
-```{r}
-mod_df <- encounter %>%
-  group_by(eDWID, reviewyear) %>%
-  summarise(
-    across(
-      c(GLI_FEV1_pct_predicted, GLI_FVC_pct_predicted),
-      ~ mean(.x, na.rm = T)
-    ),
-    race = first(race),
-    .groups = "drop"
-  )
-```
-
 FEV1 and FVC percent predicted (based on GLI equations) were averaged by year for each person. 
 
 ```{r}
 #| warning: false
-mod_df
-pivot_longer(c("GLI_FEV1_pct_predicted", "GLI_FVC_pct_predicted")) %>%
-  ggplot(aes(x = reviewyear, y = value, color = factor(eDWID), group = eDWID)) +
+annual %>%
+  mutate(mean_ppFEV = as.numeric(mean_ppFEV), mean_ppFVC = as.numeric(mean_ppFVC)) %>%
+  pivot_longer(c("mean_ppFEV", "mean_ppFVC")) %>%
+  ggplot(aes(x = ReviewYear, y = value, color = factor(eDWID), group = eDWID)) +
   geom_line(alpha = 0.01) +
   theme_bw() +
   theme(legend.position = "none") +
@@ -162,11 +220,11 @@ pivot_longer(c("GLI_FEV1_pct_predicted", "GLI_FVC_pct_predicted")) %>%
 #| cache: true
 # Most basic model of lung function over time by race
 mod <- lmer(
-  GLI_FEV1_pct_predicted ~ factor(reviewyear) * race + (1 | eDWID),
-  data = mod_df
+  mean_ppFEV ~ factor(ReviewYear) * race + (1 | eDWID),
+  data = annual
 )
 res <- tidy(mod, effects = "fixed")
-means <- data.frame(emmeans(mod, ~ race + reviewyear,
+means <- data.frame(emmeans(mod, ~ race + ReviewYear,
   lmerTest.limit = 1e6,
   pbkrtest.limit = 1e6
 ))
@@ -174,9 +232,7 @@ kable(means)
 ```
 
 ```{r}
-#| fig-width: 10
-#| fig-height: 10
-ggplot(means, aes(x = reviewyear, y = emmean, color = race)) +
+ggplot(means, aes(x = ReviewYear, y = emmean, color = race)) +
   geom_line() +
   geom_point() +
   xlab("Year") +
