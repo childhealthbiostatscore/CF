@@ -33,19 +33,15 @@ library(knitr)
 ```{r data cleaning}
 #| include: false
 # source("/Users/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_race_eti_analysis_dataset.R")
-load("~/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
+load("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
 ```
 
 # Race and ethnicity breakdown
 
-In the tables below, race and ethnicity are considered separately, so some participants may be double counted. For example, a participant identifying as Black and Hispanic would contribute to both categories.
-
-## Race and ethnicity overall
-
-The table below shows the race and ethnicity proportions for the entire cohort included in the CFFPR dataset.
+The table below shows the race and ethnicity proportions for the entire cohort included in the CFFPR dataset. I decided to combine race and ethnicity with Hispanic "overriding" other racial identities. So if a participant was reported as both Black and Hispanic, they were consider Hispanic for the following analyses. Those with missing data for Hispanic ethnicity were moved to the "Indigenous/Mixed/Other/Unknown Race" category.
 
 ```{r}
-table1(~ race | Hispanicrace, data=demo)
+table1(~race, data = demo)
 ```
 
 ## Race by year
@@ -53,100 +49,46 @@ table1(~ race | Hispanicrace, data=demo)
 The table below shows the proportions of race and ethnicities included in the dataset in a given year. Most people are seen at least once a year, but this table serves as a sanity check to make sure that groups were generally seen equal amounts each year.
 
 ```{r}
-table1(~race+Hispanicrace|factor(ReviewYear),data = annual)
-```
-
-## Race percentages overall
-
-Based on the above tables, I decided to combine race and ethnicity with Hispanic "overriding" other racial identities. So if a participant was reported as both Black and Hispanic, they were consider Hispanic for the following analyses. Those with missing data for Hispanic ethnicity were moved to the "Indigenous/Mixed/Other/Unknown Race" category.
-
-```{r}
-demo$race <- as.character(demo$race)
-demo$race[demo$Hispanicrace == "Yes"] <- "Hispanic or Latino"
-demo$race[demo$Hispanicrace == "Unknown"] <- "Hispanic or Latino"
-demo$race <- factor(demo$race,
-  levels = c(
-    "White", "Black or African American", "Hispanic or Latino", "Asian",
-    "American Indian or Alaska Native",
-    "Native Hawaiian or Other Pacific Islander", "Mixed/Other/Unknown Race"
-  ),
-  labels = c(
-    "White", "Black or African American", "Hispanic or Latino", "Asian",
-    "Indigenous/Mixed/Other/Unknown Race",
-    "Indigenous/Mixed/Other/Unknown Race", "Indigenous/Mixed/Other/Unknown Race"
-  )
-)
-encounter$race <- NULL
-encounter <- left_join(encounter, demo[, c("eDWID", "race")], by = join_by(eDWID))
-label(encounter$race) <- "Race/Ethnicity"
-label(demo$race) <- "Race/Ethnicity"
-```
-
-```{r}
-table1(~race,data = demo)
+table1(~ race | factor(ReviewYear), data = annual)
 ```
 
 # Participant characteristics
 
+```{r}
+t1_vars <- c(
+  "Gender", "WasGenotyped", "F508_num", "mean_ppFEV", "Age_YrEnd",
+  "mean_ppFEV", "weight_last", "weight_perc_last", "bmi_last",
+  "bmi_perc_last", "Vx770", "Vx809comb", "Vx661comb", "Vx445comb"
+)
+t1_form <- as.formula(paste("~", paste(t1_vars, collapse = "+"), "|factor(ReviewYear)"))
+```
+
 ## Characteristics by race
 
 ```{r}
-table1(~Gender+WasGenotyped+F508_num|race,data=demo)
+table1(~ Gender + WasGenotyped + F508_num | race, data = demo)
 ```
 
 ## Characteristics by year
 
 ```{r}
-#| cache: true
-by_year = encounter %>%
-  group_by(eDWID, reviewyear) %>%
-  summarise(across(c(race, Gender, WasGenotyped, F508_num, contains("insurance")), first),
-    `Age at Last Visit` = last(na.omit(encounterage)),
-    `Mean ppFEV` = mean(GLI_FEV1_pct_predicted, na.rm = T),
-    `Weight at Last Visit` = last(na.omit(weight)),
-    `Weight %ile at Last Visit` = last(na.omit(weightpercentile)),
-    `BMI at Last Visit` = last(na.omit(bmivalue)),
-    `BMI %ile at Last Visit` = last(na.omit(bmipercentile)),
-    across(contains("Vx"), ~ max(.x)),
-    .groups = "drop"
-  ) %>%
-  select(
-    -eDWID, reviewyear, race, Gender, WasGenotyped, F508_num, contains("insurance"),
-    `Age at Last Visit`, `Mean ppFEV`, `Weight at Last Visit`,
-    `Weight %ile at Last Visit`, `BMI at Last Visit`,
-    `BMI %ile at Last Visit`, contains("Vx")
-  ) %>%
-  rename(any_of(tidy_labels))
-
-```
-
-```{r}
-table1(~Gender+WasGenotyped+F508_num|race,data=by_year)
+table1(t1_form, data = annual)
 ```
 
 # ETI eligibility
 
 Trikafta originally approved October 21, 2019 for patients 12+ years of age. Approved for ages 6 - 11 on June 9, 2021.
 
+## Overall by year
+
 ```{r}
-encounter %>%
-  mutate(eti_elig = factor(eti_elig, ordered = T)) %>%
-  group_by(eDWID, reviewyear) %>%
-  summarise(
-    eti_elig = max(eti_elig), race = first(na.omit(race)),
-    .groups = "drop"
-  ) %>%
-  select(-eDWID) %>%
-  rename(any_of(tidy_labels)) %>%
-  tbl_summary(by = `Race/Ethnicity`, missing = "Missing") %>%
-        bold_labels() %>%
-        as_kable_extra()
-  tbl_strata(
-    strata = Year,
-    .tbl_fun =
-      ~ .x %>%
-        
-  )
+table1(~ eti_elig | factor(ReviewYear), data = annual, overall = F)
+```
+
+## By race and year
+
+```{r}
+
 ```
 
 # Potential COVID effects

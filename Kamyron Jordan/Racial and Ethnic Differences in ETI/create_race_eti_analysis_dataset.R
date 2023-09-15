@@ -3,9 +3,9 @@ library(lubridate)
 library(readxl)
 library(Hmisc)
 # Import
-annual <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
-encounter <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
-demo <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
+annual <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
+encounter <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
+demo <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
 # Dates
 demo$First_LungTransplantDate <- mdy(demo$First_LungTransplantDate)
 demo$Modulator_trikafta_first_date <- mdy(demo$Modulator_trikafta_first_date)
@@ -228,7 +228,7 @@ demo$Hispanicrace <- factor(demo$Hispanicrace,
 )
 demo$MutClass <- factor(demo$MutClass)
 # Get long mutation lists - demographics
-mutations <- read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
+mutations <- read_excel("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
 mutations <- mutations %>%
   filter(field_name == "mutation1") %>%
   select(code_value, code_meaning)
@@ -261,16 +261,45 @@ demo$race <- apply(demo[, paste0("Race", 1:6)], 1, function(r) {
     return(as.character(races[w]))
   }
 })
+demo$race[demo$Hispanicrace == "Yes"] <- "Hispanic or Latino"
+demo$race[demo$Hispanicrace == "Unknown"] <- "Mixed/Other/Unknown Race"
 demo$race <- factor(demo$race,
   levels = c(
-    "White", "Black or African American",
-    "American Indian or Alaska Native", "Asian",
+    "White", "Black or African American", "Hispanic or Latino", "Asian",
+    "American Indian or Alaska Native",
     "Native Hawaiian or Other Pacific Islander", "Mixed/Other/Unknown Race"
+  ),
+  labels = c(
+    "White", "Black or African American", "Hispanic or Latino", "Asian",
+    "Indigenous/Mixed/Other/Unknown Race",
+    "Indigenous/Mixed/Other/Unknown Race", "Indigenous/Mixed/Other/Unknown Race"
   )
 )
+# Create some of our own annualized variables
+by_year <- encounter %>%
+  mutate(
+    eti_elig = factor(eti_elig, ordered = T),
+    across(contains("Vx"), ~ factor(.x, ordered = T))
+  ) %>%
+  group_by(eDWID, reviewyear) %>%
+  summarise(
+    mean_ppFEV = mean(GLI_FEV1_pct_predicted, na.rm = T),
+    weight_last = last(na.omit(weight)),
+    weight_perc_last = last(na.omit(weightpercentile)),
+    bmi_last = last(na.omit(bmivalue)),
+    bmi_perc_last = last(na.omit(bmipercentile)),
+    eti_elig = max(eti_elig),
+    across(contains("Vx"), ~ max(.x)),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    eti_elig = factor(eti_elig, ordered = F),
+    across(contains("Vx"), ~ factor(.x, ordered = F))
+  )
+annual <- full_join(annual, by_year, by = join_by(eDWID, ReviewYear == reviewyear))
 # Manage labels (tried to do this programmatically but the data dictionary has
 # some quirks and this ended up being faster)
-encounter_labels <-
+labels <-
   list(
     "eDWID" = "eDWID", "reviewyear" = "Year", "encounterid" = "Encounter ID",
     "encounterdate" = "Encounter Date", "encounternum" = "Encounter Number",
@@ -311,11 +340,8 @@ encounter_labels <-
     "pe_assessment" = "Assessment of potential pulmonary exacerbation",
     "medscurrentepisode6" = "Inhaled antibiotic PLUS an oral quinolone antibiotic",
     "medscurrentepisode7" = "No medications prescribed during this episode",
-    "eti_elig" = "Eligible for ETI"
-  )
-annual_labels <-
-  list(
-    "eDWID" = "eDWID", "ReviewYear" = "Review Year", "Age_YrEnd" = "Age at Year End",
+    "eti_elig" = "Eligible for ETI",
+    "ReviewYear" = "Year", "Age_YrEnd" = "Age at Year End",
     "smoking" = "Did patient smoke cigarettes?",
     "second_smoke" = "How often was this patient exposed to secondhand smoke?",
     "smoking_household" = "Does anyone in the patient's household smoke cigarettes?",
@@ -337,11 +363,8 @@ annual_labels <-
     "employment1" = "Part Time", "employment2" = "Full time homemaker",
     "employment3" = "Full time employment", "employment4" = "Unemployed",
     "employment5" = "Student", "employment6" = "Disabled", "employment7" = "Retired",
-    "pregnant" = "Was patient pregnant during the reporting year?"
-  )
-demo_labels <-
-  list(
-    "eDWID" = "eDWID", "Patient_Dx" = "Patient Diagnosis", "DOB_Year" = "Year of Birth",
+    "pregnant" = "Was patient pregnant during the reporting year?",
+    "Patient_Dx" = "Patient Diagnosis", "DOB_Year" = "Year of Birth",
     "Gender" = "Gender",
     "Race1" = "White", "Race2" = "Black or African American",
     "Race3" = "American Indian or Alaska Native", "Race4" = "Asian",
@@ -356,22 +379,21 @@ demo_labels <-
     "Mutation2" = "Name of the second mutation",
     "Mutation3" = "Name of the third mutation (if any)",
     "First_LungTransplantDate" = "Date of First Lung Transplant",
-    "Modulator_trikafta_first_date" = "Date of Trikafta Start"
+    "Modulator_trikafta_first_date" = "Date of Trikafta Start",
+    "mean_ppFEV" = "Mean ppFEV", "weight_last" = "Weight at Last Visit",
+    "weight_perc_last" = "Weight %ile at Last Visit",
+    "bmi_last" = "BMI at Last Visit", "bmi_perc_last" = "BMI %ile at Last Visit"
   )
 # Apply labels
-label(annual) <- annual_labels[colnames(annual)]
-label(demo) <- demo_labels[colnames(demo)]
-label(encounter) <- encounter_labels[colnames(encounter)]
+label(annual) <- labels[colnames(annual)]
+label(demo) <- labels[colnames(demo)]
+label(encounter) <- labels[colnames(encounter)]
 # Merge
 annual <- full_join(demo, annual, by = join_by(eDWID))
 encounter <- full_join(demo, encounter, by = join_by(eDWID))
-labels <- c(annual_labels, encounter_labels, demo_labels)
 # Remove encounters with no year
 encounter <- encounter %>% filter(!is.na(reviewyear))
-# Make labels for tidyverse operations (a list to pass to rename())
-tidy_labels <- names(labels)
-names(tidy_labels) <- sapply(labels, "[[", 1)
 # Save
-save(annual, encounter, demo, labels, tidy_labels,
-  file = "/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
+save(annual, encounter, demo, labels,
+  file = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
 )
