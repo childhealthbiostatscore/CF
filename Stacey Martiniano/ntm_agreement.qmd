@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
+bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Dropbox/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -30,7 +30,7 @@ library(fastDummies)
 library(lmerTest)
 library(performance)
 # Import data
-api <- read.table("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt", header = F)
+api <- read.table("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt", header = F)
 rcon <- redcapConnection(
   url = "https://redcap.ucdenver.edu/api/",
   token = api[1, 1]
@@ -49,8 +49,8 @@ old <- c("AF", "DL", "JW")
 new <- c("A", "B", "C")
 data$scorer[data$scorer %in% old] <- new[match(data$scorer, old, nomatch = 0)]
 # Revert duplicate IDs back to original to match with gold standard
-training <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
-dups <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
+training <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
+dups <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
 training$Training_id <- as.numeric(sub("T00", "", training$Training_id))
 # Change duplicates to OG IDs
 old <- dups$duplicated_ssid..dates.shifted..17.days.
@@ -88,6 +88,16 @@ data$Location <- factor(data$Location,
     "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
   )
 )
+# Add tree in bud OR nodule variable
+data <- data %>%
+  pivot_wider(names_from = Feature) %>%
+  mutate(
+    `Tree In Bud OR Nodule` =
+      factor(Nodule == "Checked" | `Tree In Bud` == "Checked",
+        levels = c(F, T), labels = c("Unchecked", "Checked")
+      )
+  ) %>%
+  pivot_longer(Bronchiectasis:last_col(), names_to = "Feature")
 # Format values
 data$value <- factor(data$value,
   levels = c(
@@ -111,6 +121,18 @@ data_gs <- data_gs %>%
 
 ## Singletons
 
+```{r}
+# Find scans with disagreement on certain features, so Stacey can discuss them with radiologists
+t <- data %>%
+  group_by(scan_id, Feature, scorer) %>%
+  summarise(v = max(value, na.rm = T)) %>%
+  summarise(a = sum(v == "Present")) %>%
+  filter(
+    Feature %in% c("Atelectasis", "Cavity", "Consolidation", "Ground Glass", "Nodule"),
+    a == 2
+  )
+```
+
 ### By Feature
 
 ```{r}
@@ -126,8 +148,10 @@ data %>%
     disagreed = sum(a == 1 | a == 2),
     proportion = round(agreed / (agreed + disagreed), 3)
   ) %>%
-  rename(`Total Agreed` = agreed,`Total Disagreed`=disagreed,
-         `Proportion Agreed`=proportion) %>%
+  rename(
+    `Total Agreed` = agreed, `Total Disagreed` = disagreed,
+    `Proportion Agreed` = proportion
+  ) %>%
   kable()
 ```
 
@@ -145,8 +169,10 @@ data %>%
     disagreed = sum(a == 1 | a == 2),
     proportion = round(agreed / (agreed + disagreed), 3)
   ) %>%
-  rename(`Total Agreed` = agreed,`Total Disagreed`=disagreed,
-         `Proportion Agreed`=proportion) %>%
+  rename(
+    `Total Agreed` = agreed, `Total Disagreed` = disagreed,
+    `Proportion Agreed` = proportion
+  ) %>%
   kable()
 ```
 
@@ -160,18 +186,21 @@ data_dups %>%
   group_by(Feature, scorer, scan_id, scorer_repeat) %>%
   summarise(v = max(value, na.rm = T)) %>%
   summarise(
-    `Agreed Feature Was Present` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] & 
-                                         v[scorer_repeat == 1] == "Present"),
-    `Agreed Feature Was Absent` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] & 
-                                        v[scorer_repeat == 1] == "Absent"),
+    `Agreed Feature Was Present` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] &
+      v[scorer_repeat == 1] == "Present"),
+    `Agreed Feature Was Absent` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] &
+      v[scorer_repeat == 1] == "Absent"),
     agreed = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2]),
     disagreed = sum(v[scorer_repeat == 1] != v[scorer_repeat == 2]),
     proportion = round(agreed / (agreed + disagreed), 3)
-  ) %>% 
-  summarise(across(`Agreed Feature Was Present`:disagreed,~sum(.x,na.rm = T)),
-            proportion=mean(proportion)) %>%
-  rename(`Total Agreed` = agreed,`Total Disagreed`=disagreed,
-         `Proportion Agreed`=proportion) %>%
+  ) %>%
+  summarise(across(`Agreed Feature Was Present`:disagreed, ~ sum(.x, na.rm = T)),
+    proportion = mean(proportion)
+  ) %>%
+  rename(
+    `Total Agreed` = agreed, `Total Disagreed` = disagreed,
+    `Proportion Agreed` = proportion
+  ) %>%
   kable()
 ```
 
@@ -184,18 +213,21 @@ data_dups %>%
   group_by(Feature, Location, scorer, scan_id, scorer_repeat) %>%
   summarise(v = max(value, na.rm = T)) %>%
   summarise(
-    `Agreed Feature Was Present` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] & 
-                                         v[scorer_repeat == 1] == "Present"),
-    `Agreed Feature Was Absent` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] & 
-                                        v[scorer_repeat == 1] == "Absent"),
+    `Agreed Feature Was Present` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] &
+      v[scorer_repeat == 1] == "Present"),
+    `Agreed Feature Was Absent` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] &
+      v[scorer_repeat == 1] == "Absent"),
     agreed = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2]),
     disagreed = sum(v[scorer_repeat == 1] != v[scorer_repeat == 2]),
     proportion = round(agreed / (agreed + disagreed), 3)
-  ) %>% 
-  summarise(across(`Agreed Feature Was Present`:disagreed,~sum(.x,na.rm = T)),
-            proportion = mean(proportion)) %>%
-  rename(`Total Agreed` = agreed,`Total Disagreed`=disagreed,
-         `Proportion Agreed`=proportion) %>%
+  ) %>%
+  summarise(across(`Agreed Feature Was Present`:disagreed, ~ sum(.x, na.rm = T)),
+    proportion = mean(proportion)
+  ) %>%
+  rename(
+    `Total Agreed` = agreed, `Total Disagreed` = disagreed,
+    `Proportion Agreed` = proportion
+  ) %>%
   kable()
 ```
 
@@ -210,26 +242,26 @@ data_gs %>%
   group_by(Feature, scan_id, scorer) %>%
   summarise(v = max(value, na.rm = T)) %>%
   summarise(
-    ap = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"]=="Present",
-    aa = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"]=="Absent",
+    ap = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"] == "Present",
+    aa = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"] == "Absent",
     pa = v[scorer == "A"] == v[scorer == "GS"],
-    bp = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"]=="Present",
-    ba = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"]=="Absent",
+    bp = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"] == "Present",
+    ba = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"] == "Absent",
     pb = v[scorer == "B"] == v[scorer == "GS"],
-    cp = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"]=="Present",
-    ca= v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"]=="Absent",
-     pc= v[scorer == "C"] == v[scorer == "GS"]
-  ) %>% 
+    cp = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"] == "Present",
+    ca = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"] == "Absent",
+    pc = v[scorer == "C"] == v[scorer == "GS"]
+  ) %>%
   summarise(
-    `A Agreed Feature Was Present` = sum(ap,na.rm=T),
-    `A Agreed Feature Was Absent`=sum(aa,na.rm=T),
-    `Prop. A Agreed`=mean(pa,na.rm=T),
-    `B Agreed Feature Was Present`=sum(bp,na.rm=T),
-    `B Agreed Feature Was Absent`=sum(ba,na.rm=T),
-    `Prop. B Agreed`=mean(pb,na.rm=T),
-    `C Agreed Feature Was Present`=sum(cp,na.rm=T),
-    `C Agreed Feature Was Absent`=sum(ca,na.rm=T),
-    `Prop. C Agreed`=mean(pc,na.rm=T)
+    `A Agreed Feature Was Present` = sum(ap, na.rm = T),
+    `A Agreed Feature Was Absent` = sum(aa, na.rm = T),
+    `Prop. A Agreed` = mean(pa, na.rm = T),
+    `B Agreed Feature Was Present` = sum(bp, na.rm = T),
+    `B Agreed Feature Was Absent` = sum(ba, na.rm = T),
+    `Prop. B Agreed` = mean(pb, na.rm = T),
+    `C Agreed Feature Was Present` = sum(cp, na.rm = T),
+    `C Agreed Feature Was Absent` = sum(ca, na.rm = T),
+    `Prop. C Agreed` = mean(pc, na.rm = T)
   ) %>%
   kable()
 ```
@@ -242,28 +274,28 @@ Missing values were ignored in creating the table below. So if a scorer marked a
 #| message: false
 data_gs %>%
   group_by(Feature, Location, scan_id) %>%
-  rename(v=value) %>%
+  rename(v = value) %>%
   summarise(
-    ap = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"]=="Present",
-    aa = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"]=="Absent",
+    ap = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"] == "Present",
+    aa = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"] == "Absent",
     pa = v[scorer == "A"] == v[scorer == "GS"],
-    bp = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"]=="Present",
-    ba = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"]=="Absent",
+    bp = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"] == "Present",
+    ba = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"] == "Absent",
     pb = v[scorer == "B"] == v[scorer == "GS"],
-    cp = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"]=="Present",
-    ca= v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"]=="Absent",
-     pc= v[scorer == "C"] == v[scorer == "GS"]
-  ) %>% 
+    cp = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"] == "Present",
+    ca = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"] == "Absent",
+    pc = v[scorer == "C"] == v[scorer == "GS"]
+  ) %>%
   summarise(
-    `A Agreed Feature Was Present` = sum(ap,na.rm = T),
-    `A Agreed Feature Was Absent`=sum(aa,na.rm = T),
-    `Prop. A Agreed`=mean(pa,na.rm = T),
-    `B Agreed Feature Was Present`=sum(bp,na.rm = T),
-    `B Agreed Feature Was Absent`=sum(ba,na.rm = T),
-    `Prop. B Agreed`=mean(pb,na.rm = T),
-    `C Agreed Feature Was Present`=sum(cp,na.rm = T),
-    `C Agreed Feature Was Absent`=sum(ca,na.rm = T),
-    `Prop. C Agreed`=mean(pc,na.rm=T)
+    `A Agreed Feature Was Present` = sum(ap, na.rm = T),
+    `A Agreed Feature Was Absent` = sum(aa, na.rm = T),
+    `Prop. A Agreed` = mean(pa, na.rm = T),
+    `B Agreed Feature Was Present` = sum(bp, na.rm = T),
+    `B Agreed Feature Was Absent` = sum(ba, na.rm = T),
+    `Prop. B Agreed` = mean(pb, na.rm = T),
+    `C Agreed Feature Was Present` = sum(cp, na.rm = T),
+    `C Agreed Feature Was Absent` = sum(ca, na.rm = T),
+    `Prop. C Agreed` = mean(pc, na.rm = T)
   ) %>%
   kable()
 ```
@@ -272,7 +304,7 @@ data_gs %>%
 
 ```{r data cleaning 2}
 # Import data
-api <- read.table("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt", header = F)
+api <- read.table("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt", header = F)
 rcon <- redcapConnection(
   url = "https://redcap.ucdenver.edu/api/",
   token = api[1, 1]
@@ -291,8 +323,8 @@ old <- c("AF", "DL", "JW")
 new <- c("A", "B", "C")
 data$scorer[data$scorer %in% old] <- new[match(data$scorer, old, nomatch = 0)]
 # Revert duplicate IDs back to original to match with gold standard
-training <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
-dups <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
+training <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
+dups <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
 training$Training_id <- as.numeric(sub("T00", "", training$Training_id))
 # Change duplicates to OG IDs
 old <- dups$duplicated_ssid..dates.shifted..17.days.
@@ -350,7 +382,7 @@ data_gs <- data_gs %>%
 # Dummy variables for scorer, organize columns
 data <- data %>%
   dummy_cols(select_columns = "scorer") %>%
-  select(scan_id, feature, location,scorer, scorer_A, scorer_B, scorer_C, value)
+  select(scan_id, feature, location, scorer, scorer_A, scorer_B, scorer_C, value)
 ```
 
 ## Data setup
