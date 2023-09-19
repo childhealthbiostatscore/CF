@@ -1,6 +1,7 @@
 library(tidyverse)
 library(lubridate)
 library(readxl)
+library(rspiro)
 library(Hmisc)
 # Import
 annual <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
@@ -293,6 +294,9 @@ by_year <- encounter %>%
     across(contains("Vx"), ~ max(.x)),
     .groups = "drop"
   ) %>%
+  group_by(eDWID) %>%
+  mutate(baseline_FEV = first(na.omit(mean_ppFEV)),
+         baseline_FVC = first(na.omit(mean_ppFVC))) %>% ungroup() %>%
   mutate(
     across(contains("Vx"), ~ factor(.x, ordered = F))
   )
@@ -383,7 +387,8 @@ labels <-
     "mean_ppFEV" = "Mean ppFEV", "mean_ppFVC" = "Mean ppFVC",
     "weight_last" = "Weight at Last Visit",
     "weight_perc_last" = "Weight %ile at Last Visit",
-    "bmi_last" = "BMI at Last Visit", "bmi_perc_last" = "BMI %ile at Last Visit"
+    "bmi_last" = "BMI at Last Visit", "bmi_perc_last" = "BMI %ile at Last Visit",
+    "baseline_FEV"="Baseline FEV1", "baseline_FVC" = "Baseline FVC"
   )
 # Merge
 annual <- full_join(demo, annual, by = join_by(eDWID))
