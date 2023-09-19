@@ -27,9 +27,12 @@ library(Hmisc)
 library(tidyverse)
 library(gtsummary)
 library(lmerTest)
+library(nlme)
 library(broom.mixed)
 library(emmeans)
-library(knitr)
+library(gt)
+library(performance)
+library(mcp)
 ```
 
 ```{r data cleaning}
@@ -156,7 +159,7 @@ diffs <- diffs %>%
   reframe(across(`2015`:`2021`, ~ diff(as.numeric(.x))))
 diffs %>%
   reframe(across(`2015`:`2021`, ~ sum(.x == 1))) %>%
-  kable()
+  gt()
 ```
 
 There were a total of `r length(setdiff(a$eDWID,e$eDWID))` included in the annual dataset that did not appear in the encounter-level dataset at all. There were an additional `r nrow(diffs)` patients who were included in both datasets, but had at least one year with no encounters. The table above shows the number of people missing an encounter in each year.
@@ -202,23 +205,18 @@ encounter %>%
 
 ## Annualized averages
 
-FEV1 and FVC percent predicted (based on GLI equations) were averaged by year for each person. 
+FEV1 and FVC percent predicted (based on GLI equations) were averaged by year for each person.
 
-```{r}
-#| warning: false
-annual %>%
-  mutate(mean_ppFEV = as.numeric(mean_ppFEV), mean_ppFVC = as.numeric(mean_ppFVC)) %>%
-  pivot_longer(c("mean_ppFEV", "mean_ppFVC")) %>%
-  ggplot(aes(x = ReviewYear, y = value, color = factor(eDWID), group = eDWID)) +
-  geom_line(alpha = 0.01) +
-  theme_bw() +
-  theme(legend.position = "none") +
-  facet_wrap(~name)
-```
+### FEV1
+
+#### Basic model
+
+The most basic model we can fit to these data uses the average values as the outcome, with terms for review year, race, and their interaction and a random intercept for each patient.
 
 ```{r}
 #| cache: true
 # Most basic model of lung function over time by race
+# Try a few different models
 mod <- lmer(
   mean_ppFEV ~ factor(ReviewYear) * race + (1 | eDWID),
   data = annual
@@ -228,15 +226,42 @@ means <- data.frame(emmeans(mod, ~ race + ReviewYear,
   lmerTest.limit = 1e6,
   pbkrtest.limit = 1e6
 ))
-kable(means)
+label(means) = list("Race/Ethnicity","Year","Mean ppFEV","SE","df","Lower CL", "Upper CL")
+gt(means) %>% fmt_number(emmean:last_col(),decimals = 3)
 ```
 
 ```{r}
-ggplot(means, aes(x = ReviewYear, y = emmean, color = race)) +
-  geom_line() +
-  geom_point() +
+ggplot(left_join(annual, means, by = join_by(race, ReviewYear))) +
+  geom_line(mapping = aes(x = ReviewYear, y = mean_ppFEV, group = eDWID),alpha=0.005,linewidth=0.5) +
+  geom_point(mapping = aes(x = ReviewYear, y = emmean,color=race)) +
+  geom_line(mapping = aes(x = ReviewYear, y = emmean,group = race,color=race)) +
+  geom_errorbar(mapping=aes(x = ReviewYear,ymin = emmean - SE, ymax = emmean + SE,color=race), width = .2) +
   xlab("Year") +
   ylab("LS Mean FEV1") +
-  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = .2) +
-  theme_bw()
+  theme_bw() +
+  scale_color_discrete(name = "Race/Ethnicity")
+```
+
+```{r}
+ggplot(left_join(annual, means, by = join_by(race, ReviewYear))) +
+  geom_line(mapping = aes(x = ReviewYear, y = mean_ppFEV, group = eDWID),alpha=0.005,linewidth=0.5) +
+  geom_point(mapping = aes(x = ReviewYear, y = emmean,color=race)) +
+  geom_line(mapping = aes(x = ReviewYear, y = emmean,group = race,color=race)) +
+  geom_errorbar(mapping=aes(x = ReviewYear,ymin = emmean - SE, ymax = emmean + SE,color=race), width = .2) +
+  xlab("Year") +
+  ylab("LS Mean FEV1") +
+  theme_bw() +
+  scale_color_discrete(name = "Race/Ethnicity") +
+  facet_wrap(~race)
+```
+
+#### Change point model
+
+```{r}
+#| eval: false
+t = annual %>% select(eDWID,ReviewYear,mean_ppFEV) %>% na.omit(.)
+model = list(mean_ppFEV ~ 0 + ReviewYear, 
+              ~ 0 + ReviewYear)
+fit = mcp(model,data = t,cores=4,chains = 4)
+plot(fit)
 ```
