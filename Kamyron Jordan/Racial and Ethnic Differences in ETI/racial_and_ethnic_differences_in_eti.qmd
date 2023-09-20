@@ -258,7 +258,7 @@ ggplot(left_join(annual, means, by = join_by(race, ReviewYear))) +
 #### Change point model
 
 ```{r}
-#| eval: false
+#| cache: true
 t = annual %>% select(eDWID,ReviewYear,mean_ppFEV) %>% na.omit(.)
 model = list(mean_ppFEV ~ 0 + ReviewYear, 
               ~ 0 + ReviewYear)
