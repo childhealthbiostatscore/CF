@@ -22,6 +22,31 @@ annual$eti_elig <- "No"
 annual$eti_elig[annual$ReviewYear >= 2019 & annual$Age_YrEnd >= 12] <- "Yes"
 annual$eti_elig[annual$ReviewYear >= 2021 & annual$Age_YrEnd >= 6] <- "Yes"
 annual$eti_elig <- factor(annual$eti_elig, levels = c("No", "Yes"))
+# Find exact dates of eligibility (exact as their DOB estimate anyway)
+encounter$approx_dob <- encounter$encounterdate %m-%
+  months(as.integer(encounter$encounterage) * 12 +
+    as.integer((encounter$encounterage * 12) %% 12))
+encounter <- encounter %>%
+  group_by(eDWID) %>%
+  mutate(approx_dob = mean.Date(approx_dob))
+encounter$eti_elig_date <- NA
+# If 12 years or older on 2019-10-21, eligible right away
+encounter$eti_elig_date[encounter$approx_dob <= "2007-10-21"] <- as.numeric(ymd("2019-10-21"))
+# If they turned 12 between 2019-10-21 and 2021-06-09, eligible on their birthday
+# i.e. if they were born between 2007-10-21 and 2009-06-09
+encounter$eti_elig_date[encounter$approx_dob <= "2009-06-09" &
+  encounter$approx_dob > "2007-10-21"] <-
+  encounter$approx_dob[encounter$approx_dob <= "2009-06-09" &
+    encounter$approx_dob > "2007-10-21"] + years(12)
+# Anyone between the ages of 6 and 12 on 2021-06-09 became eligible that day
+encounter$eti_elig_date[encounter$approx_dob > "2009-06-09" &
+  encounter$approx_dob <= "2015-06-09"] <- as.numeric(ymd("2021-06-09"))
+# Anyone who turned 6 after 2021-06-09 became eligible on their 6th birthday
+encounter$eti_elig_date[encounter$approx_dob > "2015-06-09"] <-
+  encounter$approx_dob[encounter$approx_dob > "2015-06-09"] + years(6)
+# Convert back to date from numeric
+encounter$eti_elig_date = as.Date(encounter$eti_elig_date,origin ="1970-01-01")
+
 # Fix missing values for specific bacteria
 bugs <- c(
   "staphylococcus_aureus", "haemophilus_influenzae",
@@ -295,8 +320,11 @@ by_year <- encounter %>%
     .groups = "drop"
   ) %>%
   group_by(eDWID) %>%
-  mutate(baseline_FEV = first(na.omit(mean_ppFEV)),
-         baseline_FVC = first(na.omit(mean_ppFVC))) %>% ungroup() %>%
+  mutate(
+    baseline_FEV = first(na.omit(mean_ppFEV)),
+    baseline_FVC = first(na.omit(mean_ppFVC))
+  ) %>%
+  ungroup() %>%
   mutate(
     across(contains("Vx"), ~ factor(.x, ordered = F))
   )
@@ -388,12 +416,12 @@ labels <-
     "weight_last" = "Weight at Last Visit",
     "weight_perc_last" = "Weight %ile at Last Visit",
     "bmi_last" = "BMI at Last Visit", "bmi_perc_last" = "BMI %ile at Last Visit",
-    "baseline_FEV"="Baseline FEV1", "baseline_FVC" = "Baseline FVC"
+    "baseline_FEV" = "Baseline FEV1", "baseline_FVC" = "Baseline FVC"
   )
 # Merge
 annual <- full_join(demo, annual, by = join_by(eDWID))
 encounter <- full_join(demo, encounter, by = join_by(eDWID))
-# Remove encounters with no year
+# Remove encounters with no date
 encounter <- encounter %>% filter(!is.na(reviewyear))
 # Labels
 label(annual) <- labels[colnames(annual)]
