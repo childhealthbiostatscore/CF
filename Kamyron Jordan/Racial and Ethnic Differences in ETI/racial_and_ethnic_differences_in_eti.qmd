@@ -106,11 +106,15 @@ reset_gtsummary_theme()
 
 Trikafta originally approved October 21, 2019 for patients 12+ years of age. Approved for ages 6 - 11 on June 9, 2021.
 
-## Overall by year
+The following tables have been aggregated by year, and therefore may miss some information regarding eligibility and ETI start. For example, if someone turned 12 on 12/30/2019, they would technically be considered eligible for ETI, even though realistically we probably wouldn't expect them to start that year.
+
+## Proportions
+
+### Overall by year
 
 ```{r}
 annual %>%
-  select(eti_elig, ReviewYear) %>%
+  select(eti_elig, contains("Vx"), ReviewYear) %>%
   tbl_summary(
     by = ReviewYear, missing_text = "Missing",
     type = all_dichotomous() ~ "categorical"
@@ -118,7 +122,7 @@ annual %>%
   bold_labels()
 ```
 
-## By race and year
+### By race and year
 
 ```{r results='asis'}
 invisible(lapply(names(years), function(n) {
@@ -127,7 +131,7 @@ invisible(lapply(names(years), function(n) {
   cat("\n")
   d <- years[[n]]
   t <- d %>%
-    select(eti_elig, race) %>%
+    select(eti_elig, contains("Vx"), race) %>%
     tbl_summary(
       by = race, missing_text = "Missing",
       type = all_dichotomous() ~ "categorical"
@@ -136,6 +140,30 @@ invisible(lapply(names(years), function(n) {
   print(t)
   cat("\n")
 }))
+```
+
+## Survival analysis
+
+For the following analysis, the start time ($t=0$) was the approximate date that each person became eligible for ETI. Because we don't have exact dates of birth, I calculated an approximate DOB based on age and encounter dates.
+
+```{r}
+# Create survival dataset
+surv_dat <- encounter %>%
+  mutate(stop = as.numeric(encounterdate - eti_elig_date)) %>%
+  filter(stop >= 0) %>%
+  group_by(eDWID) %>%
+  mutate(start = lag(stop)) %>%
+  select(eDWID, race, encounterdate, encounterage, eti_elig_date, Vx445comb, start, stop) %>%
+  filter(stop <= first(stop[Vx445comb == "Yes"]))
+surv_dat$Vx445comb <- as.numeric(factor(surv_dat$Vx445comb, levels = c("No", "Yes")))
+# Filter for KM
+km_dat <- surv_dat %>%
+  group_by(eDWID) %>%
+  slice_max(stop)
+kmfit <- survfit(Surv(stop, Vx445comb) ~ race, data = km_dat[km_dat$race != "Asian", ])
+autoplot(kmfit) + theme_bw()
+# Cox PH model
+fit <- coxph(Surv(start, stop, Vx445comb) ~ race, id = eDWID, data = surv_dat)
 ```
 
 # People without visits in a given year
@@ -226,16 +254,15 @@ means <- data.frame(emmeans(mod, ~ race + ReviewYear,
   lmerTest.limit = 1e6,
   pbkrtest.limit = 1e6
 ))
-label(means) = list("Race/Ethnicity","Year","Mean ppFEV","SE","df","Lower CL", "Upper CL")
-gt(means) %>% fmt_number(emmean:last_col(),decimals = 3)
+label(means) <- list("Race/Ethnicity", "Year", "Mean ppFEV", "SE", "df", "Lower CL", "Upper CL")
+gt(means) %>% fmt_number(emmean:last_col(), decimals = 3)
 ```
 
 ```{r}
 ggplot(left_join(annual, means, by = join_by(race, ReviewYear))) +
-  geom_line(mapping = aes(x = ReviewYear, y = mean_ppFEV, group = eDWID),alpha=0.005,linewidth=0.5) +
-  geom_point(mapping = aes(x = ReviewYear, y = emmean,color=race)) +
-  geom_line(mapping = aes(x = ReviewYear, y = emmean,group = race,color=race)) +
-  geom_errorbar(mapping=aes(x = ReviewYear,ymin = emmean - SE, ymax = emmean + SE,color=race), width = .2) +
+  geom_point(mapping = aes(x = ReviewYear, y = emmean, color = race)) +
+  geom_line(mapping = aes(x = ReviewYear, y = emmean, group = race, color = race)) +
+  geom_errorbar(mapping = aes(x = ReviewYear, ymin = emmean - SE, ymax = emmean + SE, color = race), width = .2) +
   xlab("Year") +
   ylab("LS Mean FEV1") +
   theme_bw() +
@@ -244,10 +271,22 @@ ggplot(left_join(annual, means, by = join_by(race, ReviewYear))) +
 
 ```{r}
 ggplot(left_join(annual, means, by = join_by(race, ReviewYear))) +
-  geom_line(mapping = aes(x = ReviewYear, y = mean_ppFEV, group = eDWID),alpha=0.005,linewidth=0.5) +
-  geom_point(mapping = aes(x = ReviewYear, y = emmean,color=race)) +
-  geom_line(mapping = aes(x = ReviewYear, y = emmean,group = race,color=race)) +
-  geom_errorbar(mapping=aes(x = ReviewYear,ymin = emmean - SE, ymax = emmean + SE,color=race), width = .2) +
+  geom_line(mapping = aes(x = ReviewYear, y = mean_ppFEV, group = eDWID), alpha = 0.005, linewidth = 0.5) +
+  geom_point(mapping = aes(x = ReviewYear, y = emmean, color = race)) +
+  geom_line(mapping = aes(x = ReviewYear, y = emmean, group = race, color = race)) +
+  geom_errorbar(mapping = aes(x = ReviewYear, ymin = emmean - SE, ymax = emmean + SE, color = race), width = .2) +
+  xlab("Year") +
+  ylab("LS Mean FEV1") +
+  theme_bw() +
+  scale_color_discrete(name = "Race/Ethnicity")
+```
+
+```{r}
+ggplot(left_join(annual, means, by = join_by(race, ReviewYear))) +
+  geom_line(mapping = aes(x = ReviewYear, y = mean_ppFEV, group = eDWID), alpha = 0.005, linewidth = 0.5) +
+  geom_point(mapping = aes(x = ReviewYear, y = emmean, color = race)) +
+  geom_line(mapping = aes(x = ReviewYear, y = emmean, group = race, color = race)) +
+  geom_errorbar(mapping = aes(x = ReviewYear, ymin = emmean - SE, ymax = emmean + SE, color = race), width = .2) +
   xlab("Year") +
   ylab("LS Mean FEV1") +
   theme_bw() +
@@ -259,9 +298,14 @@ ggplot(left_join(annual, means, by = join_by(race, ReviewYear))) +
 
 ```{r}
 #| cache: true
-t = annual %>% select(eDWID,ReviewYear,mean_ppFEV) %>% na.omit(.)
-model = list(mean_ppFEV ~ 0 + ReviewYear, 
-              ~ 0 + ReviewYear)
-fit = mcp(model,data = t,cores=4,chains = 4)
+#| eval: false
+t <- annual %>%
+  select(eDWID, ReviewYear, mean_ppFEV) %>%
+  na.omit(.)
+model <- list(
+  mean_ppFEV ~ 0 + ReviewYear,
+  ~ 0 + ReviewYear
+)
+fit <- mcp(model, data = t, cores = 4, chains = 4)
 plot(fit)
 ```

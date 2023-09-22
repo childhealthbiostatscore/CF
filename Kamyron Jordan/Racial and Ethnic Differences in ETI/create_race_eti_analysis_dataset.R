@@ -28,7 +28,8 @@ encounter$approx_dob <- encounter$encounterdate %m-%
     as.integer((encounter$encounterage * 12) %% 12))
 encounter <- encounter %>%
   group_by(eDWID) %>%
-  mutate(approx_dob = mean.Date(approx_dob))
+  mutate(approx_dob = mean.Date(approx_dob)) %>%
+  ungroup()
 encounter$eti_elig_date <- NA
 # If 12 years or older on 2019-10-21, eligible right away
 encounter$eti_elig_date[encounter$approx_dob <= "2007-10-21"] <- as.numeric(ymd("2019-10-21"))
@@ -45,8 +46,8 @@ encounter$eti_elig_date[encounter$approx_dob > "2009-06-09" &
 encounter$eti_elig_date[encounter$approx_dob > "2015-06-09"] <-
   encounter$approx_dob[encounter$approx_dob > "2015-06-09"] + years(6)
 # Convert back to date from numeric
-encounter$eti_elig_date = as.Date(encounter$eti_elig_date,origin ="1970-01-01")
-
+encounter$eti_elig_date <- as.Date(encounter$eti_elig_date, origin = "1970-01-01")
+encounter$approx_dob <- NULL
 # Fix missing values for specific bacteria
 bugs <- c(
   "staphylococcus_aureus", "haemophilus_influenzae",
@@ -416,7 +417,8 @@ labels <-
     "weight_last" = "Weight at Last Visit",
     "weight_perc_last" = "Weight %ile at Last Visit",
     "bmi_last" = "BMI at Last Visit", "bmi_perc_last" = "BMI %ile at Last Visit",
-    "baseline_FEV" = "Baseline FEV1", "baseline_FVC" = "Baseline FVC"
+    "baseline_FEV" = "Baseline FEV1", "baseline_FVC" = "Baseline FVC",
+    "eti_elig_date" = "Approximate Date of ETI Eligibility"
   )
 # Merge
 annual <- full_join(demo, annual, by = join_by(eDWID))
