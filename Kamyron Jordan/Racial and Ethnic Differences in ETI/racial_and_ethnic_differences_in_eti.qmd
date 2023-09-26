@@ -39,8 +39,7 @@ library(ggsurvfit)
 ```{r data cleaning}
 #| include: false
 # source("/Users/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_race_eti_analysis_dataset.R")
-# load("UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
-load("/Users/timvigers/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
+load("UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
 ```
 
 # Race and ethnicity breakdown

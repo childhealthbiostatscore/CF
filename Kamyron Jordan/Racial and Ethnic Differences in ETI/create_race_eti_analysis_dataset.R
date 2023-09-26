@@ -4,9 +4,9 @@ library(readxl)
 library(rspiro)
 library(Hmisc)
 # Import
-annual <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
-encounter <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
-demo <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
+annual <- read.csv("UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
+encounter <- read.csv("UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
+demo <- read.csv("UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
 # Dates
 demo$First_LungTransplantDate <- mdy(demo$First_LungTransplantDate)
 demo$Modulator_trikafta_first_date <- mdy(demo$Modulator_trikafta_first_date)
@@ -17,7 +17,7 @@ encounter$eti_elig[encounter$encounterdate >= ("2019-10-21") &
   encounter$encounterage >= 12] <- "Yes"
 encounter$eti_elig[encounter$encounterdate >= ("2021-06-09") &
   encounter$encounterage >= 6] <- "Yes"
-encounter$eti_elig <- factor(encounter$eti_elig, levels = c("No", "Yes"))
+encounter$eti_elig <- factor(encounter$eti_elig, levels = c("No", "Yes"),ordered = T)
 annual$eti_elig <- "No"
 annual$eti_elig[annual$ReviewYear >= 2019 & annual$Age_YrEnd >= 12] <- "Yes"
 annual$eti_elig[annual$ReviewYear >= 2021 & annual$Age_YrEnd >= 6] <- "Yes"
@@ -259,7 +259,7 @@ demo$Hispanicrace <- factor(demo$Hispanicrace,
 )
 demo$MutClass <- factor(demo$MutClass)
 # Get long mutation lists - demographics
-mutations <- read_excel("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
+mutations <- read_excel("UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
 mutations <- mutations %>%
   filter(field_name == "mutation1") %>%
   select(code_value, code_meaning)
@@ -434,5 +434,5 @@ tidy_labels <- names(labels)
 names(tidy_labels) <- sapply(labels, "[[", 1)
 # Save
 save(annual, encounter, demo, labels, tidy_labels, by_year,
-  file = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
+  file = "UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
 )
