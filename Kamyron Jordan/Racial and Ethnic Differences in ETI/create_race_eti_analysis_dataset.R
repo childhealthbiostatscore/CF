@@ -275,30 +275,6 @@ demo$race <- factor(demo$race,
     "Indigenous/Mixed/Other/Unknown Race", "Indigenous/Mixed/Other/Unknown Race"
   )
 )
-# Create some of our own annualized variables
-by_year <- encounter %>%
-  mutate(across(contains("Vx"), ~ factor(.x, ordered = T))) %>%
-  group_by(eDWID, reviewyear) %>%
-  summarise(
-    mean_ppFEV = mean(GLI_FEV1_pct_predicted, na.rm = T),
-    mean_ppFVC = mean(GLI_FVC_pct_predicted, na.rm = T),
-    weight_last = last(na.omit(weight)),
-    weight_perc_last = last(na.omit(weightpercentile)),
-    bmi_last = last(na.omit(bmivalue)),
-    bmi_perc_last = last(na.omit(bmipercentile)),
-    across(contains("Vx"), ~ max(.x)),
-    .groups = "drop"
-  ) %>%
-  group_by(eDWID) %>%
-  mutate(
-    baseline_FEV = first(na.omit(mean_ppFEV)),
-    baseline_FVC = first(na.omit(mean_ppFVC))
-  ) %>%
-  ungroup() %>%
-  mutate(
-    across(contains("Vx"), ~ factor(.x, ordered = F))
-  )
-annual <- full_join(annual, by_year, by = join_by(eDWID, ReviewYear == reviewyear))
 # Manage labels (tried to do this programmatically but the data dictionary has
 # some quirks and this ended up being faster)
 labels <-
@@ -323,8 +299,10 @@ labels <-
     "pulmonarymeds_notonany" = "Not on any pulmonary meds",
     "tobi" = "Tobramycin", "tobifrequency" = "Tobramycin frequency",
     "aztreonam" = "Aztreonam", "aztreonam_freq" = "Aztreonam frequency",
-    "Vx770" = "Vx770", "Vx809comb" = "Vx809comb", "Vx661comb" = "Vx661comb",
-    "Vx445comb" = "Vx445comb", "dornasealfa" = "Dornase alfa",
+    "Vx770" = "Prescribed Ivacaftor", "Vx809comb" = "Prescribed Lumacaftor/Ivacaftor", 
+    "Vx661comb" = "Prescribed Tezacaftor/Ivacaftor",
+    "Vx445comb" = "Prescribed Elexacaftor/Tezacaftor/Ivacaftor", 
+    "dornasealfa" = "Dornase alfa",
     "dornase_frequency" = "Dornase alfa frequency",
     "hypertonicsaline" = "Hypertonic saline",
     "hypersalineconc" = "Hypertonic saline concentration",
@@ -414,73 +392,69 @@ encounter$eti_elig <- apply(encounter, 1, function(r) {
   }
   return(elig)
 }, simplify = T)
-# Same thing again but by year
-annual$eti_elig <- apply(annual, 1, function(r) {
+# Find approximate date of eligibility for survival analysis
+# Find approximate DOB
+encounter <- encounter %>%
+  mutate(approx_dob = encounterdate %m-% months(as.integer(encounterage) * 12 +
+    as.integer((encounterage * 12) %% 12))) %>%
+  group_by(eDWID) %>%
+  mutate(approx_dob = mean.Date(approx_dob)) %>%
+  ungroup()
+app_dobs = encounter %>% group_by(eDWID) %>% filter(row_number()==1) %>%
+  select(eDWID,approx_dob,contains("Mutation"))
+# For each person, get date they became eligible 
+app_dobs$eti_elig_date <- apply(app_dobs, 1, function(r) {
   # Start with not eligible by default
-  elig <- "No"
+  date_elig <- NA
   # Get mutations
   muts <- r[grep("Mutation", names(r))]
-  # Start with first approval
-  if (r["ReviewYear"] >= year(eti_12_up) & r["Age_YrEnd"] >= 12 & "F508del" %in% muts) {
-    elig <- "Yes"
+  # F508del logic first
+  if("F508del" %in% muts){
+    # If they were age 12 or older at first approval, they became eligible that day
+    if (r["approx_dob"] <= (eti_12_up-years(12))) {
+      date_elig <- eti_12_up
+    }
+    # If they turned 12 between first approval and 6 years and up approval, eligible on borthday
+    if(r["approx_dob"] > (eti_12_up-years(12)) & r["approx_dob"] < (eti_6_up-years(12)))
+  }
+  
+  
+  if (r["approx_dob"] <= (eti_12_up-years(12)) & "F508del" %in% muts) {
+    date_elig <- eti_12_up
+  }
+  # If they have a rarer mutation and were 12 at expansion date, they became eligible that day
+  else if (r["approx_dob"] <= (eti_12_up_expansion-years(12)) & any(muts %in% responsive_mutations)) {
+    date_elig <- eti_12_up_expansion
+  }
+  # If they have an F508del and turned 12 after 2019-10-21, eligible on their birthday
+  else if (r["approx_dob"] > (eti_12_up-years(12)) & any(muts %in% responsive_mutations)) {
+    date_elig <- eti_12_up_expansion
   }
   # Next, eligible if over 12 and mutation in expanded list
-  else if (r["ReviewYear"] >= year(eti_12_up_expansion) & r["Age_YrEnd"] >= 12 & any(muts %in% responsive_mutations)) {
+  else if (r["encounterdate"] >= eti_12_up_expansion & r["encounterage"] >= 12 & any(muts %in% responsive_mutations)) {
     elig <- "Yes"
   }
   # Next approved for 6 and up with F508del or other responsive mutation
-  else if (r["ReviewYear"] >= year(eti_6_up) & r["Age_YrEnd"] >= 6 & any(muts %in% responsive_mutations)) {
+  else if (r["encounterdate"] >= eti_6_up & r["encounterage"] >= 6 & any(muts %in% responsive_mutations)) {
     elig <- "Yes"
   }
   return(elig)
-}, simplify = T)
-# # Find approximate date of eligibility for survival analysis
-# # Find approximate DOB
-# encounter <- encounter %>%
-#   mutate(approx_dob = encounterdate %m-% months(as.integer(encounterage) * 12 +
-#     as.integer((encounterage * 12) %% 12))) %>%
-#   group_by(eDWID) %>%
-#   mutate(approx_dob = mean.Date(approx_dob)) %>%
-#   ungroup()
-# app_dobs = encounter %>% group_by(eDWID) %>% filter(row_number()==1) %>% 
-#   select(eDWID,contains("Mutation"),approx_dob)
-# # For each person, get date they became eligible
-# app_dobs$eti_elig_date <- apply(app_dobs, 1, function(r) {
-#   # Start with not eligible by default
-#   date = NA
-#   # Get mutations
-#   muts <- r[grep("Mutation", names(r))]
-#   # If 12 years or older on 2019-10-21 and one F508del, eligible right away
-#   if ("F508del" %in% muts & r["approx_dob"] <= (eti_12_up - years(12))) {
-#     date = eti_12_up
-#   }
-#   # Next, eligible if over 12 and mutation in expanded list
-#   else if (any(muts %in% responsive_mutations) & r["approx_dob"] <= (eti_12_up_expansion - years(12))) {
-#     date = eti_12_up_expansion
-#   }
-#   # If they have expansion mutation but weren't 12 by approval date, eligible on 12th birthday
-#   else if (any(muts %in% responsive_mutations) & r["approx_dob"]  > (eti_12_up_expansion - years(12))){}
-#   # Next approved for 6 and up with F508del or other responsive mutation
-#   else if (r["encounterdate"] >= eti_6_up & r["encounterage"] >= 6 & any(muts %in% responsive_mutations)) {
-#     elig <- "Yes"
-#   }
-#   return(date)
-# })
-# # If they turned 12 between 2019-10-21 and 2021-06-09, eligible on their birthday
-# # i.e. if they were born between 2007-10-21 and 2009-06-09
-# encounter$eti_elig_date[encounter$approx_dob <= "2009-06-09" &
-#   encounter$approx_dob > "2007-10-21"] <-
-#   encounter$approx_dob[encounter$approx_dob <= "2009-06-09" &
-#     encounter$approx_dob > "2007-10-21"] + years(12)
-# # Anyone between the ages of 6 and 12 on 2021-06-09 became eligible that day
-# encounter$eti_elig_date[encounter$approx_dob > "2009-06-09" &
-#   encounter$approx_dob <= "2015-06-09"] <- as.numeric(eti_6_up)
-# # Anyone who turned 6 after 2021-06-09 became eligible on their 6th birthday
-# encounter$eti_elig_date[encounter$approx_dob > "2015-06-09"] <-
-#   encounter$approx_dob[encounter$approx_dob > "2015-06-09"] + years(6)
-# # Convert back to date from numeric
-# encounter$eti_elig_date <- as.Date(encounter$eti_elig_date, origin = "1970-01-01")
-# encounter$approx_dob <- NULL
+},simplify = T)
+# If they turned 12 between 2019-10-21 and 2021-06-09, eligible on their birthday
+# i.e. if they were born between 2007-10-21 and 2009-06-09
+encounter$eti_elig_date[encounter$approx_dob <= "2009-06-09" &
+  encounter$approx_dob > "2007-10-21"] <-
+  encounter$approx_dob[encounter$approx_dob <= "2009-06-09" &
+    encounter$approx_dob > "2007-10-21"] + years(12)
+# Anyone between the ages of 6 and 12 on 2021-06-09 became eligible that day
+encounter$eti_elig_date[encounter$approx_dob > "2009-06-09" &
+  encounter$approx_dob <= "2015-06-09"] <- as.numeric(eti_6_up)
+# Anyone who turned 6 after 2021-06-09 became eligible on their 6th birthday
+encounter$eti_elig_date[encounter$approx_dob > "2015-06-09"] <-
+  encounter$approx_dob[encounter$approx_dob > "2015-06-09"] + years(6)
+# Convert back to date from numeric
+encounter$eti_elig_date <- as.Date(encounter$eti_elig_date, origin = "1970-01-01")
+encounter$approx_dob <- NULL
 # Labels
 label(annual) <- labels[colnames(annual)]
 label(demo) <- labels[colnames(demo)]
