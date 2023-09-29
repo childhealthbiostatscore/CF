@@ -4,50 +4,19 @@ library(readxl)
 library(rspiro)
 library(Hmisc)
 # Import
-annual <- read.csv("UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
-encounter <- read.csv("UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
-demo <- read.csv("UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
+annual <- read.csv("/Users/timvigers/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
+encounter <- read.csv("/Users/timvigers/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
+demo <- read.csv("/Users/timvigers/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
+# Import responsive mutations list
+responsive_mutations <- read.csv("/Users/timvigers/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/eti_responsive_mutations.csv", header = F)
+responsive_mutations <- unique(responsive_mutations$V1)
 # Dates
 demo$First_LungTransplantDate <- mdy(demo$First_LungTransplantDate)
 demo$Modulator_trikafta_first_date <- mdy(demo$Modulator_trikafta_first_date)
 encounter$encounterdate <- mdy(encounter$encounterdate)
-# ETI eligibility
-encounter$eti_elig <- "No"
-encounter$eti_elig[encounter$encounterdate >= ("2019-10-21") &
-  encounter$encounterage >= 12] <- "Yes"
-encounter$eti_elig[encounter$encounterdate >= ("2021-06-09") &
-  encounter$encounterage >= 6] <- "Yes"
-encounter$eti_elig <- factor(encounter$eti_elig, levels = c("No", "Yes"),ordered = T)
-annual$eti_elig <- "No"
-annual$eti_elig[annual$ReviewYear >= 2019 & annual$Age_YrEnd >= 12] <- "Yes"
-annual$eti_elig[annual$ReviewYear >= 2021 & annual$Age_YrEnd >= 6] <- "Yes"
-annual$eti_elig <- factor(annual$eti_elig, levels = c("No", "Yes"))
-# Find exact dates of eligibility (exact as their DOB estimate anyway)
-encounter$approx_dob <- encounter$encounterdate %m-%
-  months(as.integer(encounter$encounterage) * 12 +
-    as.integer((encounter$encounterage * 12) %% 12))
-encounter <- encounter %>%
-  group_by(eDWID) %>%
-  mutate(approx_dob = mean.Date(approx_dob)) %>%
-  ungroup()
-encounter$eti_elig_date <- NA
-# If 12 years or older on 2019-10-21, eligible right away
-encounter$eti_elig_date[encounter$approx_dob <= "2007-10-21"] <- as.numeric(ymd("2019-10-21"))
-# If they turned 12 between 2019-10-21 and 2021-06-09, eligible on their birthday
-# i.e. if they were born between 2007-10-21 and 2009-06-09
-encounter$eti_elig_date[encounter$approx_dob <= "2009-06-09" &
-  encounter$approx_dob > "2007-10-21"] <-
-  encounter$approx_dob[encounter$approx_dob <= "2009-06-09" &
-    encounter$approx_dob > "2007-10-21"] + years(12)
-# Anyone between the ages of 6 and 12 on 2021-06-09 became eligible that day
-encounter$eti_elig_date[encounter$approx_dob > "2009-06-09" &
-  encounter$approx_dob <= "2015-06-09"] <- as.numeric(ymd("2021-06-09"))
-# Anyone who turned 6 after 2021-06-09 became eligible on their 6th birthday
-encounter$eti_elig_date[encounter$approx_dob > "2015-06-09"] <-
-  encounter$approx_dob[encounter$approx_dob > "2015-06-09"] + years(6)
-# Convert back to date from numeric
-encounter$eti_elig_date <- as.Date(encounter$eti_elig_date, origin = "1970-01-01")
-encounter$approx_dob <- NULL
+eti_12_up <- ymd("2019-10-21")
+eti_12_up_expansion <- ymd("2020-12-21")
+eti_6_up <- ymd("2021-06-09")
 # Fix missing values for specific bacteria
 bugs <- c(
   "staphylococcus_aureus", "haemophilus_influenzae",
@@ -259,7 +228,7 @@ demo$Hispanicrace <- factor(demo$Hispanicrace,
 )
 demo$MutClass <- factor(demo$MutClass)
 # Get long mutation lists - demographics
-mutations <- read_excel("UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
+mutations <- read_excel("/Users/timvigers/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
 mutations <- mutations %>%
   filter(field_name == "mutation1") %>%
   select(code_value, code_meaning)
@@ -425,6 +394,93 @@ annual <- full_join(demo, annual, by = join_by(eDWID))
 encounter <- full_join(demo, encounter, by = join_by(eDWID))
 # Remove encounters with no date
 encounter <- encounter %>% filter(!is.na(reviewyear))
+# ETI eligibility
+encounter$eti_elig <- apply(encounter, 1, function(r) {
+  # Start with not eligible by default
+  elig <- "No"
+  # Get mutations
+  muts <- r[grep("Mutation", names(r))]
+  # Start with first approval
+  if (r["encounterdate"] >= eti_12_up & r["encounterage"] >= 12 & "F508del" %in% muts) {
+    elig <- "Yes"
+  }
+  # Next, eligible if over 12 and mutation in expanded list
+  else if (r["encounterdate"] >= eti_12_up_expansion & r["encounterage"] >= 12 & any(muts %in% responsive_mutations)) {
+    elig <- "Yes"
+  }
+  # Next approved for 6 and up with F508del or other responsive mutation
+  else if (r["encounterdate"] >= eti_6_up & r["encounterage"] >= 6 & any(muts %in% responsive_mutations)) {
+    elig <- "Yes"
+  }
+  return(elig)
+}, simplify = T)
+# Same thing again but by year
+annual$eti_elig <- apply(annual, 1, function(r) {
+  # Start with not eligible by default
+  elig <- "No"
+  # Get mutations
+  muts <- r[grep("Mutation", names(r))]
+  # Start with first approval
+  if (r["ReviewYear"] >= year(eti_12_up) & r["Age_YrEnd"] >= 12 & "F508del" %in% muts) {
+    elig <- "Yes"
+  }
+  # Next, eligible if over 12 and mutation in expanded list
+  else if (r["ReviewYear"] >= year(eti_12_up_expansion) & r["Age_YrEnd"] >= 12 & any(muts %in% responsive_mutations)) {
+    elig <- "Yes"
+  }
+  # Next approved for 6 and up with F508del or other responsive mutation
+  else if (r["ReviewYear"] >= year(eti_6_up) & r["Age_YrEnd"] >= 6 & any(muts %in% responsive_mutations)) {
+    elig <- "Yes"
+  }
+  return(elig)
+}, simplify = T)
+# # Find approximate date of eligibility for survival analysis
+# # Find approximate DOB
+# encounter <- encounter %>%
+#   mutate(approx_dob = encounterdate %m-% months(as.integer(encounterage) * 12 +
+#     as.integer((encounterage * 12) %% 12))) %>%
+#   group_by(eDWID) %>%
+#   mutate(approx_dob = mean.Date(approx_dob)) %>%
+#   ungroup()
+# app_dobs = encounter %>% group_by(eDWID) %>% filter(row_number()==1) %>% 
+#   select(eDWID,contains("Mutation"),approx_dob)
+# # For each person, get date they became eligible
+# app_dobs$eti_elig_date <- apply(app_dobs, 1, function(r) {
+#   # Start with not eligible by default
+#   date = NA
+#   # Get mutations
+#   muts <- r[grep("Mutation", names(r))]
+#   # If 12 years or older on 2019-10-21 and one F508del, eligible right away
+#   if ("F508del" %in% muts & r["approx_dob"] <= (eti_12_up - years(12))) {
+#     date = eti_12_up
+#   }
+#   # Next, eligible if over 12 and mutation in expanded list
+#   else if (any(muts %in% responsive_mutations) & r["approx_dob"] <= (eti_12_up_expansion - years(12))) {
+#     date = eti_12_up_expansion
+#   }
+#   # If they have expansion mutation but weren't 12 by approval date, eligible on 12th birthday
+#   else if (any(muts %in% responsive_mutations) & r["approx_dob"]  > (eti_12_up_expansion - years(12))){}
+#   # Next approved for 6 and up with F508del or other responsive mutation
+#   else if (r["encounterdate"] >= eti_6_up & r["encounterage"] >= 6 & any(muts %in% responsive_mutations)) {
+#     elig <- "Yes"
+#   }
+#   return(date)
+# })
+# # If they turned 12 between 2019-10-21 and 2021-06-09, eligible on their birthday
+# # i.e. if they were born between 2007-10-21 and 2009-06-09
+# encounter$eti_elig_date[encounter$approx_dob <= "2009-06-09" &
+#   encounter$approx_dob > "2007-10-21"] <-
+#   encounter$approx_dob[encounter$approx_dob <= "2009-06-09" &
+#     encounter$approx_dob > "2007-10-21"] + years(12)
+# # Anyone between the ages of 6 and 12 on 2021-06-09 became eligible that day
+# encounter$eti_elig_date[encounter$approx_dob > "2009-06-09" &
+#   encounter$approx_dob <= "2015-06-09"] <- as.numeric(eti_6_up)
+# # Anyone who turned 6 after 2021-06-09 became eligible on their 6th birthday
+# encounter$eti_elig_date[encounter$approx_dob > "2015-06-09"] <-
+#   encounter$approx_dob[encounter$approx_dob > "2015-06-09"] + years(6)
+# # Convert back to date from numeric
+# encounter$eti_elig_date <- as.Date(encounter$eti_elig_date, origin = "1970-01-01")
+# encounter$approx_dob <- NULL
 # Labels
 label(annual) <- labels[colnames(annual)]
 label(demo) <- labels[colnames(demo)]
@@ -434,5 +490,5 @@ tidy_labels <- names(labels)
 names(tidy_labels) <- sapply(labels, "[[", 1)
 # Save
 save(annual, encounter, demo, labels, tidy_labels, by_year,
-  file = "UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
+  file = "/Users/timvigers/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
 )
