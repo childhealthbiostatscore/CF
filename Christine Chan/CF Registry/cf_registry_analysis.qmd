@@ -20,111 +20,115 @@ editor: source
 
 ```{r}
 #| include: false
-library(knitr)
+library(Hmisc)
 library(tidyverse)
 library(forestmodel)
 library(childsds)
+library(gt)
+library(labelled)
 ```
 
-# Logistic analyses
-
-Any participants with T1D or T2D were excluded from these analyses. Variables that were entirely missing in a given year (e.g., `A_Vx770` and `A_VX809comb` in 2005) were excluded from those models. Participants under age 10 at year end were also excluded due to missing PFT data.
-
 ```{r}
-# Import and clean data
-annual <- read.csv("/Users/timvigers/Dropbox/Work/Christine Chan/CF registry data/Data_Raw/CFF19_Annualized_Del1.csv",
+# Import data and codebook
+annual <- read.csv("/Users/timvigers/Documents/Work/Christine Chan/CF registry data/Data_Raw/CFF19_Annualized_Del1.csv",
   na.strings = c("", "N/A")
 )
+data_dict <- readxl::read_excel("/Users/timvigers/Documents/Work/Christine Chan/CF registry data/Data_Raw/Copy of Codes for CFFPR_2018.xlsx")
+data_dict$var <- paste(data_dict$field_name, data_dict$code_value, sep = "_")
+# Remove those with T1D or T2D
 annual <- annual %>% filter(cfrd_status_annual != 4, cfrd_status_annual != 5)
 annual$cfrd_status_annual <- factor(annual$cfrd_status_annual,
   levels = 1:3,
   labels = c("CFRD-", "CFRD-", "CFRD+")
 )
-demogs <- read.csv("/Users/timvigers/Dropbox/Work/Christine Chan/CF registry data/Data_Raw/CFF19_DemogCFDiag_Del1.csv")
+# Get mutations
+demogs <- read.csv("/Users/timvigers/Documents/Work/Christine Chan/CF registry data/Data_Raw/CFF19_DemogCFDiag_Del1.csv")
 demogs <- demogs %>% select(eDWID, Gender, MutClass)
 annual <- left_join(annual, demogs, by = join_by(eDWID))
+# Variable formatting
+# If A_supplement_feeding is 0, then A_feeding2 is also 0 because they are not
+# on any supplemental feeding
+# Include all kinds of tube feeds
+annual$A_feeding2[annual$A_supplement_feeding == 0] <- 0
+annual$A_feeding3[annual$A_supplement_feeding == 0] <- 0
+annual$A_feeding4[annual$A_supplement_feeding == 0] <- 0
+tube_fields <- c("A_feeding2", "A_feeding3", "A_feeding4")
+annual$tube_feeding <-
+  apply(annual[, tube_fields], 1, function(r) {
+    if (all(is.na(r))) {
+      return(NA)
+    } else {
+      return(max(as.numeric(r), na.rm = T))
+    }
+  })
+# Liver disease
+liver_fields <- c("A_hepatobiliary1_3", paste0("A_hepatobiliary2_", 1:4))
+annual$liver_disease <-
+  apply(annual[, liver_fields], 1, function(r) {
+    if (all(is.na(r))) {
+      return(NA)
+    } else {
+      return(max(as.numeric(r), na.rm = T))
+    }
+  })
+# Calculate percentiles
+annual$bmi <- annual$A_weight / ((annual$A_height / 100)^2)
+annual$age_perc <- ifelse(annual$Age_YrEnd < 20, annual$Age_YrEnd, 20)
+annual$height_perc <- sds(annual$A_height,
+  age = annual$age_perc,
+  sex = annual$Gender, male = "M", female = "F",
+  item = "height2_20", ref = cdc.ref, type = "perc"
+) * 100
+annual$bmi_perc <- sds(annual$bmi,
+  age = annual$age_perc,
+  sex = annual$Gender, male = "M", female = "F",
+  item = "bmi", ref = cdc.ref, type = "perc"
+) * 100
+# Format columns
+annual$MutClass <- factor(annual$MutClass,
+  levels = c("1-3", "4-5", "Oth", "N/A"),
+  labels = c("1-3", "4-5", "Oth", "Unknown")
+)
+annual$NumPulmExacerbation <- cut(annual$NumPulmExacerbation,
+  labels = c("0", "1", "2", ">=3"),
+  breaks = c(0, 1, 2, 3, Inf), right = F
+)
+annual$A_FEV1_pct_predicted <- cut(annual$A_FEV1_pct_predicted,
+  breaks = c(0, 40, 80, 100, Inf), right = F
+)
+annual$A_FEV1_pct_predicted <- relevel(annual$A_FEV1_pct_predicted, ref = "[100,Inf)")
+annual$height_perc <- cut(annual$height_perc, breaks = c(0, 10, 25, 50, Inf))
+annual$height_perc <- relevel(annual$height_perc, ref = "(50,Inf]")
+annual$bmi_perc <- cut(annual$bmi_perc, breaks = c(0, 10, 50, 85, Inf))
+annual$bmi_perc <- relevel(annual$bmi_perc, ref = "(50,85]")
+annual$age_group <- cut(annual$Age_YrEnd, breaks = c(10, 18, 30, Inf), right = F)
+annual$age_group <- relevel(annual$age_group, ref = "[10,18)")
+# Bugs
+bugs <- c(
+  "A_pseudomonasaeruginosa", "A_fungalyeast1",
+  "A_pulmonarycomplications1", "A_mycocultureresults3"
+)
+# Yes/No variables
+yn_vars <- c(
+  "A_IsOnEnzymes", "A_corticosteroids1", "A_feeding2",
+  "A_Vx770", "A_VX809comb", bugs, "tube_feeding", "liver_disease"
+)
+annual[, yn_vars] <- lapply(annual[, yn_vars], factor, levels = 0:1, labels = c("No", "Yes"))
+annual$A_IsOnEnzymes <- relevel(annual$A_IsOnEnzymes, ref = "Yes")
 # Analysis function
-log_reg <- function(year) {
+log_reg <- function(year, missingness = F) {
   # Clean data
   df <- annual %>%
     filter(ReviewYear == year, Age_YrEnd >= 10) %>%
     select(
       eDWID, Age_YrEnd, Gender, MutClass, A_IsOnEnzymes, A_FEV1, A_FEV1_pct_predicted,
       A_bmivalue, A_bmipercentile, A_height, A_weight, A_heightpercentile,
-      A_supplement_feeding, A_feeding2:A_feeding4,
+      A_supplement_feeding, tube_feeding,
       NumPulmExacerbation, A_pseudomonasaeruginosa,
       A_fungalyeast1, A_pulmonarycomplications1, A_mycocultureresults3,
       A_corticosteroids1, cfrd_status_annual, A_Vx770, A_VX809comb,
-      A_hepatobiliary1_3, contains("A_hepatobiliary2_")
+      liver_disease
     )
-  # If A_supplement_feeding is 0, then A_feeding2 is also 0 because they are not
-  # on any supplemental feeding
-  # Include all kinds of tube feeds
-  df$A_feeding2[df$A_supplement_feeding == 0] <- 0
-  df$A_feeding3[df$A_supplement_feeding == 0] <- 0
-  df$A_feeding4[df$A_supplement_feeding == 0] <- 0
-  df$tube_feeding <-
-    apply(df[, c("A_feeding2", "A_feeding3", "A_feeding4")], 1, function(r) {
-      if (all(is.na(r))) {
-        return(NA)
-      } else {
-        return(max(as.numeric(r), na.rm = T))
-      }
-    })
-  # Liver disease
-  liver <- c("A_hepatobiliary1_3", paste0("A_hepatobiliary2_", 1:4))
-  df$liver_disease <-
-    apply(df[, liver], 1, function(r) {
-      if (all(is.na(r))) {
-        return(NA)
-      } else {
-        return(max(as.numeric(r), na.rm = T))
-      }
-    })
-  # Calculate percentiles
-  df$bmi <- df$A_weight / ((df$A_height / 100)^2)
-  df$age_perc <- ifelse(df$Age_YrEnd < 20, df$Age_YrEnd, 20)
-  df$height_perc <- sds(df$A_height,
-    age = df$age_perc,
-    sex = df$Gender, male = "M", female = "F",
-    item = "height2_20", ref = cdc.ref, type = "perc"
-  ) * 100
-  df$bmi_perc <- sds(df$bmi,
-    age = df$age_perc,
-    sex = df$Gender, male = "M", female = "F",
-    item = "bmi", ref = cdc.ref, type = "perc"
-  ) * 100
-  # Format columns
-  df$MutClass <- factor(df$MutClass,
-    levels = c("1-3", "4-5", "Oth", "N/A"),
-    labels = c("1-3", "4-5", "Oth", "Unknown")
-  )
-  df$NumPulmExacerbation <- cut(df$NumPulmExacerbation,
-    labels = c("0", "1", "2", ">=3"),
-    breaks = c(0, 1, 2, 3, Inf), right = F
-  )
-  df$A_FEV1_pct_predicted <- cut(df$A_FEV1_pct_predicted,
-    breaks = c(0, 40, 80, 100, Inf), right = F
-  )
-  df$A_FEV1_pct_predicted <- relevel(df$A_FEV1_pct_predicted, ref = "[100,Inf)")
-  df$height_perc <- cut(df$height_perc, breaks = c(0, 10, 25, 50, Inf))
-  df$height_perc <- relevel(df$height_perc, ref = "(50,Inf]")
-  df$bmi_perc <- cut(df$bmi_perc, breaks = c(0, 10, 50, 85, Inf))
-  df$bmi_perc <- relevel(df$bmi_perc, ref = "(50,85]")
-  df$age_group <- cut(df$Age_YrEnd, breaks = c(10, 18, 30, Inf), right = F)
-  df$age_group <- relevel(df$age_group, ref = "[10,18)")
-  # Bugs
-  bugs <- c(
-    "A_pseudomonasaeruginosa", "A_fungalyeast1",
-    "A_pulmonarycomplications1", "A_mycocultureresults3"
-  )
-  # Yes/No variables
-  yn_vars <- c(
-    "A_IsOnEnzymes", "A_corticosteroids1", "A_feeding2",
-    "A_Vx770", "A_VX809comb", bugs, "tube_feeding", "liver_disease"
-  )
-  df[, yn_vars] <- lapply(df[, yn_vars], factor, levels = 0:1, labels = c("No", "Yes"))
-  df$A_IsOnEnzymes <- relevel(df$A_IsOnEnzymes, ref = "Yes")
   # Remove all empty columns
   empty <- which(colSums(is.na(df)) == nrow(df))
   if (length(empty) > 0) {
@@ -137,7 +141,7 @@ log_reg <- function(year) {
       "A_bmipercentile", "A_height", "A_heightpercentile",
       "Age_YrEnd", "A_weight", "bmi", "age_perc",
       "A_supplement_feeding", "A_feeding2", "A_feeding3",
-      "A_feeding4", "A_FEV1", liver
+      "A_feeding4", "A_FEV1", liver_fields
     ))]
   base_mod <- as.formula(paste0("cfrd_status_annual~", paste0(vars, collapse = "+")))
   # Labels
@@ -160,6 +164,15 @@ log_reg <- function(year) {
     as.character(labels[vars[which(vars %in% colnames(df))]])
   var_label(df[, bugs[which(bugs %in% colnames(df))]]) <-
     as.character(labels[bugs[which(bugs %in% colnames(df))]])
+  # Visualize missingness if required
+  if (missingness) {
+    cat("\n")
+    cat("### Missingness")
+    cat("\n")
+    cat("\n")
+    naniar::vis_miss(df)
+    cat("\n")
+  }
   # Simple models
   mod1 <- glm(base_mod, data = df, family = "binomial")
   # Print results
@@ -206,6 +219,68 @@ log_reg <- function(year) {
     cat("\n")
   }
 }
+```
+
+# Data cleaning
+
+Registry fields included in our liver disease yes/no variable were:
+
+```{r}
+data.frame(data_dict$code_meaning[data_dict$var %in% sub("A_", "", liver_fields)]) %>%
+  gt() %>%
+  tab_options(column_labels.hidden = TRUE)
+```
+
+Registry fields included in our tube feeding yes/no variable were:
+
+```{r}
+data.frame(data_dict$code_meaning[
+  paste0(data_dict$field_name, data_dict$code_value) %in%
+    sub("A_", "", tube_fields)
+]) %>%
+  gt() %>%
+  tab_options(column_labels.hidden = TRUE)
+```
+
+# CFRD validity check
+
+```{r}
+annual %>%
+  mutate(cfrd = as.numeric(cfrd_status_annual == "CFRD+")) %>%
+  group_by(eDWID) %>%
+  summarise(
+    `CFRD Status` = any(rle(cfrd)$lengths[rle(cfrd)$values == 1] >= 2),
+    .groups = "drop"
+  ) %>%
+  mutate(`CFRD Status` = factor(`CFRD Status`,
+    levels = c(F, T),
+    labels = c("CFRD-", "CFRD+")
+  )) %>%
+  count(`CFRD Status`) %>%
+  gt()
+```
+
+# HbA1c by year
+
+```{r}
+annual %>%
+  group_by(ReviewYear) %>%
+  summarise(
+    `Num. HbA1c Tests` = sum(!is.na(A_hgba1c)),
+    `Total n` = n(),
+    `Percent with HbA1c` = round(sum(!is.na(A_hgba1c)) / n() * 100, 2)
+  ) %>%
+  gt()
+```
+
+# Logistic analyses
+
+Any participants with T1D or T2D were excluded from these analyses. Variables that were entirely missing in a given year (e.g., `A_Vx770` and `A_VX809comb` in 2005) were excluded from those models. Participants under age 10 at year end were also excluded due to missing PFT data.
+
+## 2004
+
+```{r results='asis',fig.height=10,fig.width=10}
+log_reg(2004,missingness = T)
 ```
 
 ## 2006
