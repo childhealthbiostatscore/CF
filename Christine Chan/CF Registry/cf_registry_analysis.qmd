@@ -30,10 +30,10 @@ library(labelled)
 
 ```{r}
 # Import data and codebook
-annual <- read.csv("/Users/timvigers/Documents/Work/Christine Chan/CF registry data/Data_Raw/CFF19_Annualized_Del1.csv",
+annual <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/Data_Raw/CFF19_Annualized_Del1.csv",
   na.strings = c("", "N/A")
 )
-data_dict <- readxl::read_excel("/Users/timvigers/Documents/Work/Christine Chan/CF registry data/Data_Raw/Copy of Codes for CFFPR_2018.xlsx")
+data_dict <- readxl::read_excel("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/Data_Raw/Copy of Codes for CFFPR_2018.xlsx")
 data_dict$var <- paste(data_dict$field_name, data_dict$code_value, sep = "_")
 # Remove those with T1D or T2D
 annual <- annual %>% filter(cfrd_status_annual != 4, cfrd_status_annual != 5)
@@ -42,7 +42,7 @@ annual$cfrd_status_annual <- factor(annual$cfrd_status_annual,
   labels = c("CFRD-", "CFRD-", "CFRD+")
 )
 # Get mutations
-demogs <- read.csv("/Users/timvigers/Documents/Work/Christine Chan/CF registry data/Data_Raw/CFF19_DemogCFDiag_Del1.csv")
+demogs <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/Data_Raw/CFF19_DemogCFDiag_Del1.csv")
 demogs <- demogs %>% select(eDWID, Gender, MutClass)
 annual <- left_join(annual, demogs, by = join_by(eDWID))
 # Variable formatting
