@@ -4,11 +4,11 @@ library(readxl)
 library(rspiro)
 library(Hmisc)
 # Import
-annual <- read.csv("/Users/timvigers/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
-encounter <- read.csv("/Users/timvigers/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
-demo <- read.csv("/Users/timvigers/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
+annual <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
+encounter <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
+demo <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
 # Import responsive mutations list
-responsive_mutations <- read.csv("/Users/timvigers/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/eti_responsive_mutations.csv", header = F)
+responsive_mutations <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/eti_responsive_mutations.csv", header = F)
 responsive_mutations <- unique(responsive_mutations$V1)
 # Dates
 demo$First_LungTransplantDate <- mdy(demo$First_LungTransplantDate)
@@ -228,7 +228,7 @@ demo$Hispanicrace <- factor(demo$Hispanicrace,
 )
 demo$MutClass <- factor(demo$MutClass)
 # Get long mutation lists - demographics
-mutations <- read_excel("/Users/timvigers/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
+mutations <- read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
 mutations <- mutations %>%
   filter(field_name == "mutation1") %>%
   select(code_value, code_meaning)
@@ -299,9 +299,9 @@ labels <-
     "pulmonarymeds_notonany" = "Not on any pulmonary meds",
     "tobi" = "Tobramycin", "tobifrequency" = "Tobramycin frequency",
     "aztreonam" = "Aztreonam", "aztreonam_freq" = "Aztreonam frequency",
-    "Vx770" = "Prescribed Ivacaftor", "Vx809comb" = "Prescribed Lumacaftor/Ivacaftor", 
+    "Vx770" = "Prescribed Ivacaftor", "Vx809comb" = "Prescribed Lumacaftor/Ivacaftor",
     "Vx661comb" = "Prescribed Tezacaftor/Ivacaftor",
-    "Vx445comb" = "Prescribed Elexacaftor/Tezacaftor/Ivacaftor", 
+    "Vx445comb" = "Prescribed Elexacaftor/Tezacaftor/Ivacaftor",
     "dornasealfa" = "Dornase alfa",
     "dornase_frequency" = "Dornase alfa frequency",
     "hypertonicsaline" = "Hypertonic saline",
@@ -372,89 +372,121 @@ annual <- full_join(demo, annual, by = join_by(eDWID))
 encounter <- full_join(demo, encounter, by = join_by(eDWID))
 # Remove encounters with no date
 encounter <- encounter %>% filter(!is.na(reviewyear))
+# Remove lung transplant, those who were lost to f/u, and those who were not genotyped
+encounter <- encounter %>% filter(WasGenotyped == "Yes", is.na(First_LungTransplantDate))
+annual <- annual %>% filter(WasGenotyped == "Yes", is.na(First_LungTransplantDate))
 # ETI eligibility
 encounter$eti_elig <- apply(encounter, 1, function(r) {
+  # Format variables
+  age = as.numeric(r["encounterage"])
+  date = r["encounterdate"]
   # Start with not eligible by default
   elig <- "No"
   # Get mutations
   muts <- r[grep("Mutation", names(r))]
   # Start with first approval
-  if (r["encounterdate"] >= eti_12_up & r["encounterage"] >= 12 & "F508del" %in% muts) {
+  if (date >= eti_12_up & age >= 12 & "F508del" %in% muts) {
     elig <- "Yes"
   }
   # Next, eligible if over 12 and mutation in expanded list
-  else if (r["encounterdate"] >= eti_12_up_expansion & r["encounterage"] >= 12 & any(muts %in% responsive_mutations)) {
+  else if (date >= eti_12_up_expansion & age >= 12 & any(muts %in% responsive_mutations)) {
     elig <- "Yes"
   }
   # Next approved for 6 and up with F508del or other responsive mutation
-  else if (r["encounterdate"] >= eti_6_up & r["encounterage"] >= 6 & any(muts %in% responsive_mutations)) {
+  else if (date >= eti_6_up & age >= 6 & any(muts %in% responsive_mutations)) {
     elig <- "Yes"
   }
   return(elig)
 }, simplify = T)
-# Find approximate date of eligibility for survival analysis
-# Find approximate DOB
+# Find approximate date of eligibility for survival analysis - approximate DOB first
 encounter <- encounter %>%
   mutate(approx_dob = encounterdate %m-% months(as.integer(encounterage) * 12 +
     as.integer((encounterage * 12) %% 12))) %>%
   group_by(eDWID) %>%
   mutate(approx_dob = mean.Date(approx_dob)) %>%
   ungroup()
-app_dobs = encounter %>% group_by(eDWID) %>% filter(row_number()==1) %>%
-  select(eDWID,approx_dob,contains("Mutation"))
-# For each person, get date they became eligible 
+app_dobs <- encounter %>%
+  group_by(eDWID) %>%
+  filter(row_number() == 1) %>%
+  select(eDWID, approx_dob, contains("Mutation"))
+app_dobs$age_at_first = as.numeric(eti_12_up - app_dobs$approx_dob)/365.25
+app_dobs$age_at_expansion = as.numeric(eti_12_up_expansion - app_dobs$approx_dob)/365.25
+app_dobs$age_at_second = as.numeric(eti_6_up - app_dobs$approx_dob)/365.25
+# For each person, get date they became eligible
 app_dobs$eti_elig_date <- apply(app_dobs, 1, function(r) {
+  # Format date
+  dob = ymd(r["approx_dob"])
+  age_first = as.numeric(r["age_at_first"])
+  age_expansion = as.numeric(r["age_at_expansion"])
+  age_second = as.numeric(r["age_at_second"])
   # Start with not eligible by default
   date_elig <- NA
   # Get mutations
   muts <- r[grep("Mutation", names(r))]
   # F508del logic first
-  if("F508del" %in% muts){
+  if ("F508del" %in% muts) {
     # If they were age 12 or older at first approval, they became eligible that day
-    if (r["approx_dob"] <= (eti_12_up-years(12))) {
+    if (age_first >= 12) {
       date_elig <- eti_12_up
     }
-    # If they turned 12 between first approval and 6 years and up approval, eligible on borthday
-    if(r["approx_dob"] > (eti_12_up-years(12)) & r["approx_dob"] < (eti_6_up-years(12)))
+    # If they turned 12 between first and second approvals, eligible on birthday
+    else if (age_first < 12 & age_second > 12) {
+      date_elig <- dob + years(12)
+    }
+    # If they were under 12 and >= 6 on second approval, eligible on that day
+    else if (age_second < 12 & age_second >= 6) {
+      date_elig <- eti_6_up
+    }
+    # If they were under 6 at second approval, become eligible on 6th birthday
+    else if (age_second < 6) {
+      date_elig <- dob + years(6)
+    }
   }
-  
-  
-  if (r["approx_dob"] <= (eti_12_up-years(12)) & "F508del" %in% muts) {
-    date_elig <- eti_12_up
+  # Rare mutation logic
+  else if (any(muts %in% responsive_mutations)) {
+    # If they were age 12 or older at expansion, they became eligible that day
+    if (age_expansion >= 12) {
+      date_elig <- eti_12_up_expansion
+    }
+    # If they turned 12 between expansion and second approval, eligible on birthday
+    else if (age_expansion < 12 & age_second > 12) {
+      date_elig <- dob + years(12)
+    }
+    # If they were under 12 and >= 6 on second approval, eligible on that day
+    else if (age_expansion < 12 & age_second >= 6) {
+      date_elig <- eti_6_up
+    }
+    # If they were under 6 at second approval, become eligible on 6th birthday
+    else if (age_second < 6) {
+      date_elig <- dob + years(6)
+    }
   }
-  # If they have a rarer mutation and were 12 at expansion date, they became eligible that day
-  else if (r["approx_dob"] <= (eti_12_up_expansion-years(12)) & any(muts %in% responsive_mutations)) {
-    date_elig <- eti_12_up_expansion
-  }
-  # If they have an F508del and turned 12 after 2019-10-21, eligible on their birthday
-  else if (r["approx_dob"] > (eti_12_up-years(12)) & any(muts %in% responsive_mutations)) {
-    date_elig <- eti_12_up_expansion
-  }
-  # Next, eligible if over 12 and mutation in expanded list
-  else if (r["encounterdate"] >= eti_12_up_expansion & r["encounterage"] >= 12 & any(muts %in% responsive_mutations)) {
-    elig <- "Yes"
-  }
-  # Next approved for 6 and up with F508del or other responsive mutation
-  else if (r["encounterdate"] >= eti_6_up & r["encounterage"] >= 6 & any(muts %in% responsive_mutations)) {
-    elig <- "Yes"
-  }
-  return(elig)
-},simplify = T)
-# If they turned 12 between 2019-10-21 and 2021-06-09, eligible on their birthday
-# i.e. if they were born between 2007-10-21 and 2009-06-09
-encounter$eti_elig_date[encounter$approx_dob <= "2009-06-09" &
-  encounter$approx_dob > "2007-10-21"] <-
-  encounter$approx_dob[encounter$approx_dob <= "2009-06-09" &
-    encounter$approx_dob > "2007-10-21"] + years(12)
-# Anyone between the ages of 6 and 12 on 2021-06-09 became eligible that day
-encounter$eti_elig_date[encounter$approx_dob > "2009-06-09" &
-  encounter$approx_dob <= "2015-06-09"] <- as.numeric(eti_6_up)
-# Anyone who turned 6 after 2021-06-09 became eligible on their 6th birthday
-encounter$eti_elig_date[encounter$approx_dob > "2015-06-09"] <-
-  encounter$approx_dob[encounter$approx_dob > "2015-06-09"] + years(6)
+  return(date_elig)
+}, simplify = T)
 # Convert back to date from numeric
-encounter$eti_elig_date <- as.Date(encounter$eti_elig_date, origin = "1970-01-01")
-encounter$approx_dob <- NULL
+app_dobs$eti_elig_date = as.Date(app_dobs$eti_elig_date, origin = "1970-01-01")
+# Checking
+f508 = app_dobs %>% filter(Mutation1 == "F508del" | Mutation2 == "F508del" | Mutation3 == "F508del")
+rare = app_dobs %>% filter(Mutation1 != "F508del" & Mutation2 != "F508del" & Mutation3 != "F508del")
+# Add approximate eligibility date to encounters
+app_dobs = app_dobs %>% select(eDWID,eti_elig_date)
+encounter = full_join(encounter,app_dobs,by = join_by(eDWID))
+encounter$approx_dob = NULL
+# Create some of our own annualized variables
+by_year <- encounter %>%
+  group_by(eDWID, reviewyear) %>%
+  summarise(
+    mean_ppFEV = mean(GLI_FEV1_pct_predicted, na.rm = T),
+    mean_ppFVC = mean(GLI_FVC_pct_predicted, na.rm = T),
+    weight_last = last(na.omit(weight)),
+    weight_perc_last = last(na.omit(weightpercentile)),
+    bmi_last = last(na.omit(bmivalue)),
+    bmi_perc_last = last(na.omit(bmipercentile)),
+    Vx445comb = case_when("Yes" %in% Vx445comb ~ "Yes",.default = "No"),
+    eti_elig = case_when("Yes" %in% eti_elig ~ "Yes",.default = "No"),
+    .groups = "drop"
+  )
+annual <- full_join(annual, by_year, by = join_by(eDWID, ReviewYear == reviewyear))
 # Labels
 label(annual) <- labels[colnames(annual)]
 label(demo) <- labels[colnames(demo)]
@@ -463,6 +495,6 @@ label(encounter) <- labels[colnames(encounter)]
 tidy_labels <- names(labels)
 names(tidy_labels) <- sapply(labels, "[[", 1)
 # Save
-save(annual, encounter, demo, labels, tidy_labels, by_year,
-  file = "/Users/timvigers/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
+save(annual, encounter, demo, labels, tidy_labels,f508,rare,
+  file = "/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
 )

@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Dropbox/Miscellaneous/american-medical-association.csl
+bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -39,7 +39,7 @@ library(ggsurvfit)
 ```{r data cleaning}
 #| include: false
 # source("/Users/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_race_eti_analysis_dataset.R")
-load("/Users/timvigers/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
+load("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
 ```
 
 # Race and ethnicity breakdown
@@ -68,9 +68,9 @@ annual %>%
 
 ```{r}
 t1_vars <- c(
-  "Gender", "WasGenotyped", "F508_num", "mean_ppFEV", "Age_YrEnd",
+  "Gender", "F508_num", "mean_ppFEV", "Age_YrEnd",
   "mean_ppFEV", "weight_last", "weight_perc_last", "bmi_last",
-  "bmi_perc_last", "Vx770", "Vx809comb", "Vx661comb", "Vx445comb"
+  "bmi_perc_last","Vx445comb"
 )
 ```
 
@@ -78,7 +78,7 @@ t1_vars <- c(
 
 ```{r}
 demo %>%
-  select(Gender, WasGenotyped, F508_num, race) %>%
+  select(Gender, F508_num, race) %>%
   tbl_summary(by = race, missing_text = "Missing") %>%
   bold_labels()
 ```
@@ -144,59 +144,59 @@ invisible(lapply(names(years), function(n) {
 }))
 ```
 
-<!-- ## Survival analysis -->
+## Survival analysis
 
-<!-- For the following analysis, the start time ($t=0$) was the approximate date that each person became eligible for ETI. Because we don't have exact dates of birth, I calculated an approximate DOB based on age and encounter dates. Encounters prior to ETI eligibility were excluded, and only time to first encounter on ETI was considered (i.e. we did not fit a multi-state model to account for those who started and then stopped the medication). -->
+For the following analysis, the start time ($t=0$) was the approximate date that each person became eligible for ETI. Because we don't have exact dates of birth, I calculated an approximate DOB based on age and encounter dates. Encounters prior to ETI eligibility were excluded, and only time to first encounter on ETI was considered (i.e. we did not fit a multi-state model to account for those who started and then stopped the medication).
 
-<!-- ```{r} -->
-<!-- # Create survival dataset -->
-<!-- surv_dat <- encounter %>% -->
-<!--   mutate(stop = as.numeric(encounterdate - eti_elig_date)) %>% -->
-<!--   filter(stop >= 0) %>% -->
-<!--   group_by(eDWID) %>% -->
-<!--   mutate(start = lag(stop, default = 0)) %>% -->
-<!--   select(eDWID, race, encounterdate, encounterage, eti_elig_date, Vx445comb, start, stop) %>% -->
-<!--   filter(stop <= first(stop[Vx445comb == "Yes"])) -->
-<!-- surv_dat$Vx445comb <- as.numeric(factor(surv_dat$Vx445comb, levels = c("No", "Yes"))) - 1 -->
-<!-- # Fit -->
-<!-- fit <- survfit(Surv(start, stop, Vx445comb, type = "interval") ~ race, -->
-<!--   id = eDWID, data = surv_dat -->
-<!-- ) -->
-<!-- # Plot -->
-<!-- names(fit$strata) <- gsub("race=", "", names(fit$strata)) -->
-<!-- fit %>% -->
-<!--   ggsurvfit(type = "risk") + -->
-<!--   add_confidence_interval() + -->
-<!--   add_risktable( -->
-<!--     risktable_stats = -->
-<!--       c("{round(n.risk)}", "{round(cum.event)}"), -->
-<!--     stats_label = c("Eligible", "Num. Started") -->
-<!--   ) + -->
-<!--   add_risktable_strata_symbol() + -->
-<!--   add_quantile() + -->
-<!--   ylab("Proportion on Vx445comb") + xlab("Days From Eligibility") -->
-<!-- ``` -->
+```{r}
+# Create survival dataset
+surv_dat <- encounter %>%
+  mutate(stop = as.numeric(encounterdate - eti_elig_date)) %>%
+  filter(stop >= 0) %>%
+  group_by(eDWID) %>%
+  mutate(start = lag(stop, default = 0)) %>%
+  select(eDWID, race, encounterdate, encounterage, eti_elig_date, Vx445comb, start, stop) %>%
+  filter(stop <= first(stop[Vx445comb == "Yes"]))
+surv_dat$Vx445comb <- as.numeric(factor(surv_dat$Vx445comb, levels = c("No", "Yes"))) - 1
+# Fit
+fit <- survfit(Surv(start, stop, Vx445comb, type = "interval") ~ race,
+  id = eDWID, data = surv_dat
+)
+# Plot
+names(fit$strata) <- gsub("race=", "", names(fit$strata))
+fit %>%
+  ggsurvfit(type = "risk") +
+  add_confidence_interval() +
+  add_risktable(
+    risktable_stats =
+      c("{round(n.risk)}", "{round(cum.event)}"),
+    stats_label = c("Eligible", "Num. Started")
+  ) +
+  add_risktable_strata_symbol() +
+  add_quantile() +
+  ylab("Proportion on Vx445comb") + xlab("Days From Eligibility")
+```
 
-<!-- Without Asian subgroup for clearer plot: -->
+Without Asian subgroup for clearer plot:
 
-<!-- ```{r} -->
-<!-- fit <- survfit(Surv(start, stop, Vx445comb, type = "interval") ~ race, -->
-<!--   id = eDWID, data = surv_dat[surv_dat$race != "Asian", ] -->
-<!-- ) -->
-<!-- # Plot -->
-<!-- names(fit$strata) <- gsub("race=", "", names(fit$strata)) -->
-<!-- fit %>% -->
-<!--   ggsurvfit(type = "risk") + -->
-<!--   add_confidence_interval() + -->
-<!--   add_risktable( -->
-<!--     risktable_stats = -->
-<!--       c("{round(n.risk)}", "{round(cum.event)}"), -->
-<!--     stats_label = c("Eligible", "Num. Started") -->
-<!--   ) + -->
-<!--   add_risktable_strata_symbol() + -->
-<!--   add_quantile() + -->
-<!--   ylab("Proportion on Vx445comb") + xlab("Days From Eligibility") -->
-<!-- ``` -->
+```{r}
+fit <- survfit(Surv(start, stop, Vx445comb, type = "interval") ~ race,
+  id = eDWID, data = surv_dat[surv_dat$race != "Asian", ]
+)
+# Plot
+names(fit$strata) <- gsub("race=", "", names(fit$strata))
+fit %>%
+  ggsurvfit(type = "risk") +
+  add_confidence_interval() +
+  add_risktable(
+    risktable_stats =
+      c("{round(n.risk)}", "{round(cum.event)}"),
+    stats_label = c("Eligible", "Num. Started")
+  ) +
+  add_risktable_strata_symbol() +
+  add_quantile() +
+  ylab("Proportion on Vx445comb") + xlab("Days From Eligibility")
+```
 
 # People without visits in a given year
 
