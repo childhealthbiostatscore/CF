@@ -22,8 +22,8 @@ library(gt)
 library(gtsummary)
 source("~/GitHub/CF/genotype_class_severity.R")
 # Import
-chco <- read_excel("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Scott Sagel/PEx in CF/Data_Clean/CHCO.xlsx", na = c("", "NULL"))
-cnh <- read_excel("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Scott Sagel/PEx in CF/Data_Clean/CNH.xlsx")
+chco <- read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Clean/CHCO.xlsx", na = c("", "NULL"))
+cnh <- read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Clean/CNH.xlsx")
 # Format CHCO columns
 chco$`P. aeruginosa` <- coalesce(chco$`P. aeruginosa mucoid`, chco$`P. aeruginosa non-mucoid`)
 chco <- chco %>%
@@ -126,7 +126,7 @@ df[, bugs] <- lapply(df[, bugs], function(c) {
 })
 df$`S. maltophilia`[df$Site == "CNH"] <- NA
 # Write cleaned data
-write.csv(df,file = "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Scott Sagel/PEx in CF/Data_Clean/pex_merged.csv",row.names = F,na = "")
+write.csv(df, file = "/Users/timvigers/Documents/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Clean/pex_merged.csv", row.names = F, na = "")
 # Make summary table
 summ <- df %>%
   group_by(`Unique number`, Site, Year) %>%
@@ -160,6 +160,10 @@ summ <- df %>%
     `Modulator at Time of Admit`, `Specific Modulator at Admit`,
     all_of(bugs), Sex:Genotype
   )
+# Import REDCap data from Eli
+data = read.csv("~/Documents/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Raw/ExacerbationsInCF222_DATA_2023-10-04_1459.csv",na.strings = "")
+# Demographics
+demo = data %>% filter(redcap_event_name == "demographics_arm_1")
 ```
 
 # Data cleaning notes
