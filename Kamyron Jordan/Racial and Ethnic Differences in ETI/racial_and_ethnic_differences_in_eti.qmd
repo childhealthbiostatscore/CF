@@ -70,7 +70,7 @@ annual %>%
 t1_vars <- c(
   "Gender", "F508_num", "mean_ppFEV", "Age_YrEnd",
   "mean_ppFEV", "weight_last", "weight_perc_last", "bmi_last",
-  "bmi_perc_last","Vx445comb"
+  "bmi_perc_last", "Vx445comb"
 )
 ```
 
@@ -127,7 +127,7 @@ annual %>%
 ### By race and year
 
 ```{r results='asis'}
-invisible(lapply(names(years), function(n) {
+invisible(lapply(c("2019", "2020", "2021"), function(n) {
   cat("\n")
   cat("###", n)
   cat("\n")

@@ -378,8 +378,8 @@ annual <- annual %>% filter(WasGenotyped == "Yes", is.na(First_LungTransplantDat
 # ETI eligibility
 encounter$eti_elig <- apply(encounter, 1, function(r) {
   # Format variables
-  age = as.numeric(r["encounterage"])
-  date = r["encounterdate"]
+  age <- as.numeric(r["encounterage"])
+  date <- r["encounterdate"]
   # Start with not eligible by default
   elig <- "No"
   # Get mutations
@@ -409,16 +409,16 @@ app_dobs <- encounter %>%
   group_by(eDWID) %>%
   filter(row_number() == 1) %>%
   select(eDWID, approx_dob, contains("Mutation"))
-app_dobs$age_at_first = as.numeric(eti_12_up - app_dobs$approx_dob)/365.25
-app_dobs$age_at_expansion = as.numeric(eti_12_up_expansion - app_dobs$approx_dob)/365.25
-app_dobs$age_at_second = as.numeric(eti_6_up - app_dobs$approx_dob)/365.25
+app_dobs$age_at_first <- as.numeric(eti_12_up - app_dobs$approx_dob) / 365.25
+app_dobs$age_at_expansion <- as.numeric(eti_12_up_expansion - app_dobs$approx_dob) / 365.25
+app_dobs$age_at_second <- as.numeric(eti_6_up - app_dobs$approx_dob) / 365.25
 # For each person, get date they became eligible
 app_dobs$eti_elig_date <- apply(app_dobs, 1, function(r) {
   # Format date
-  dob = ymd(r["approx_dob"])
-  age_first = as.numeric(r["age_at_first"])
-  age_expansion = as.numeric(r["age_at_expansion"])
-  age_second = as.numeric(r["age_at_second"])
+  dob <- ymd(r["approx_dob"])
+  age_first <- as.numeric(r["age_at_first"])
+  age_expansion <- as.numeric(r["age_at_expansion"])
+  age_second <- as.numeric(r["age_at_second"])
   # Start with not eligible by default
   date_elig <- NA
   # Get mutations
@@ -464,14 +464,14 @@ app_dobs$eti_elig_date <- apply(app_dobs, 1, function(r) {
   return(date_elig)
 }, simplify = T)
 # Convert back to date from numeric
-app_dobs$eti_elig_date = as.Date(app_dobs$eti_elig_date, origin = "1970-01-01")
+app_dobs$eti_elig_date <- as.Date(app_dobs$eti_elig_date, origin = "1970-01-01")
 # Checking
-f508 = app_dobs %>% filter(Mutation1 == "F508del" | Mutation2 == "F508del" | Mutation3 == "F508del")
-rare = app_dobs %>% filter(Mutation1 != "F508del" & Mutation2 != "F508del" & Mutation3 != "F508del")
+f508 <- app_dobs %>% filter(Mutation1 == "F508del" | Mutation2 == "F508del" | Mutation3 == "F508del")
+rare <- app_dobs %>% filter(Mutation1 != "F508del" & Mutation2 != "F508del" & Mutation3 != "F508del")
 # Add approximate eligibility date to encounters
-app_dobs = app_dobs %>% select(eDWID,eti_elig_date)
-encounter = full_join(encounter,app_dobs,by = join_by(eDWID))
-encounter$approx_dob = NULL
+app_dobs <- app_dobs %>% select(eDWID, eti_elig_date)
+encounter <- full_join(encounter, app_dobs, by = join_by(eDWID))
+encounter$approx_dob <- NULL
 # Create some of our own annualized variables
 by_year <- encounter %>%
   group_by(eDWID, reviewyear) %>%
@@ -482,8 +482,8 @@ by_year <- encounter %>%
     weight_perc_last = last(na.omit(weightpercentile)),
     bmi_last = last(na.omit(bmivalue)),
     bmi_perc_last = last(na.omit(bmipercentile)),
-    Vx445comb = case_when("Yes" %in% Vx445comb ~ "Yes",.default = "No"),
-    eti_elig = case_when("Yes" %in% eti_elig ~ "Yes",.default = "No"),
+    Vx445comb = case_when("Yes" %in% Vx445comb ~ "Yes", .default = "No"),
+    eti_elig = case_when("Yes" %in% eti_elig ~ "Yes", .default = "No"),
     .groups = "drop"
   )
 annual <- full_join(annual, by_year, by = join_by(eDWID, ReviewYear == reviewyear))
@@ -495,6 +495,6 @@ label(encounter) <- labels[colnames(encounter)]
 tidy_labels <- names(labels)
 names(tidy_labels) <- sapply(labels, "[[", 1)
 # Save
-save(annual, encounter, demo, labels, tidy_labels,f508,rare,
+save(annual, encounter, demo, labels, tidy_labels, by_year,
   file = "/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
 )
