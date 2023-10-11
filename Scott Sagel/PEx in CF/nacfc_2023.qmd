@@ -18,7 +18,8 @@ execute:
 #| include: false
 library(tidyverse)
 library(gtsummary)
-load("/Users/timvigers/Dropbox/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Cleaned/analysis_dataset.RData")
+# source("~/GitHub/CF/Scott Sagel/PEx in CF/create_pex_analysis_dataset.R")
+load("~/Dropbox/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Cleaned/analysis_dataset.RData")
 ```
 
 # Data cleaning notes
@@ -26,39 +27,8 @@ load("/Users/timvigers/Dropbox/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Cleaned
 1. FEV1 % predicted at discharge was calculated using the `rspiro` package and GLI-2012 equations.
   - We did not distinguish between NE and SE Asian when capturing race, so all Asian participants were assumed to be NE Asian for these calculations (this was picked randomly).
   - Some participants are under age 3 and/or under 1 meter in height, so the ppFEV1 calculations may not be exactly accurate for these people.
-
-```{r}
-# Make summary table
-summ <- df %>%
-  group_by(sid,redcap_data_access_group,admit_year) %>%
-  mutate(`Change in FEV1` = ppfev1_discharge - ppfev1_admit) %>%
-  summarise(
-    `# of Hospitalizations` = n(),
-    across(c(sex:genotype), ~ first(na.omit(.x))),
-    across(c(`Modulator at Time of Admit`, all_of(bugs)), ~ max(.x, na.rm = T)),
-    across(
-      all_of(c(
-        "Age at Admit", "# Days in Admit", "Change in FEV1",
-        "FEV1 % Predicted at Admit", "FEV1 % Predicted at Discharge"
-      )),
-      ~ mean(.x, na.rm = T)
-    ),
-    .groups = "drop"
-  ) %>%
-  select(
-    `Unique number`, `Site`, Year, `# of Hospitalizations per Person`, `# Days in Admit`, `Age at Admit`,
-    `Change in FEV1`, `FEV1 % Predicted at Admit`, `FEV1 % Predicted at Discharge`,
-    `Modulator at Time of Admit`, `Specific Modulator at Admit`,
-    all_of(bugs), Sex:Genotype
-  )
-```
-
-# Data cleaning notes
-
-1. For each person with multiple admissions, continuous variables were averaged prior to generating summary tables.
-2. If a participant was on a modulators during any admission, they were counted as on modulators for that year. For example, participant 4 from CHOC was hospitalized 3 times in 2018 and was on a modulator during one of those admissions, so they were counted as on modulators in 2018.
-3. CNH only included combined P. aeruginosa information.
-4. Participants were uniquely identified by ID, site, and year.
+2. For each person with multiple admissions, continuous variables were averaged prior to generating summary tables.
+3. If a participant was on a modulators during any admission, they were counted as on modulators for that year.
 
 The number of hospitalizations for PEx decreased from `r sum(df$Year==2018)` in 2018 to `r sum(df$Year==2022)` in 2022.
 
@@ -68,59 +38,43 @@ The number of hospitalizations for PEx decreased from `r sum(df$Year==2018)` in 
 #| label: tbl-all
 #| tbl-cap: Summary by Year
 #| message: false
-summ %>%
-  select(-`Unique number`, -Site) %>%
+summary_table %>%
+  select(-sid, -redcap_data_access_group) %>%
+  select(num_hosp, days_admit:ppfev1_diff, age_at_admit, everything()) %>%
   tbl_summary(
-    by = Year,
-    type = list(`# of Hospitalizations per Person` ~ "continuous"),
+    by = admit_year,
+    type = list(num_hosp ~ "continuous"),
     statistic = list(
-      c("# of Hospitalizations per Person", "# Days in Admit") ~ "{median} ({p25}, {p75})",
-      c(
-        "Age at Admit", "Change in FEV1", "FEV1 % Predicted at Admit",
-        "FEV1 % Predicted at Discharge"
-      ) ~ "{mean} ({sd})"
+      all_continuous() ~ "{mean} ({sd})",
+      num_hosp ~ "{median} [{p25}, {p75}]",
+      days_admit ~ "{median} [{p25}, {p75}]"
     ),
-    missing_text = "(Missing)"
-  ) %>%
-  add_ci(pattern = "{stat} [{ci}]") %>%
-  add_p(test = list(
-    `Age at Admit` ~ "t.test",
-    `Change in FEV1` ~ "t.test"
-  )) %>%
-  separate_p_footnotes() %>%
-  as_gt() %>%
-  as_raw_html()
+    missing_text = "(Missing)",
+    label = labels
+  )
 ```
 
 ```{r}
 #| label: tbl-site
 #| tbl-cap: Stratified by Site
 #| message: false
-summ %>%
-  select(-`Unique number`, -`S. maltophilia`) %>%
+summary_table %>%
+  select(-sid, -cftr_mod_spec) %>%
+  select(num_hosp, days_admit:ppfev1_diff, age_at_admit, everything()) %>%
   tbl_strata(
-    strata = Site,
+    strata = redcap_data_access_group,
     .tbl_fun =
       ~ .x %>%
         tbl_summary(
-          by = Year,
-          type = list(`# of Hospitalizations per Person` ~ "continuous"),
+          by = admit_year,
+          type = list(num_hosp ~ "continuous"),
           statistic = list(
-            c("# of Hospitalizations per Person", "# Days in Admit") ~ "{median} ({p25}, {p75})",
-            c(
-              "Age at Admit", "Change in FEV1", "FEV1 % Predicted at Admit",
-              "FEV1 % Predicted at Discharge"
-            ) ~ "{mean} ({sd})"
+            all_continuous() ~ "{mean} ({sd})",
+            num_hosp ~ "{median} [{p25}, {p75}]",
+            days_admit ~ "{median} [{p25}, {p75}]"
           ),
-          missing_text = "(Missing)"
-        ) %>%
-        add_ci(pattern = "{stat} [{ci}]") %>%
-        add_p(test = list(
-          `Age at Admit` ~ "t.test",
-          `Change in FEV1` ~ "t.test"
-        )) %>%
-        separate_p_footnotes()
-  ) %>%
-  as_gt() %>%
-  as_raw_html()
+          missing_text = "(Missing)",
+          label = labels
+        )
+  )
 ```
