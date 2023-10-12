@@ -1,11 +1,20 @@
 library(tidyverse)
 library(rspiro)
 # Import REDCap data
-redcap <- read.csv("~/Dropbox/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Raw/ExacerbationsInCF222_DATA_2023-10-04_1459.csv", na.strings = "")
-# Separate demographics dataset
-demo <- redcap %>%
+df <- readxl::read_excel("~/Library/CloudStorage/Dropbox/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Raw/ExacerbationsInCF222_DATA_2023-10-11_1252 All Data.xlsx")
+# Separate datasets
+demo <- df %>%
   filter(redcap_event_name == "demographics_arm_1") %>%
   select(sid, redcap_data_access_group, sex, race, ethnicity, mutation1, mutation2)
+fevs <- c("fev1_admit", "fev1_discharge", paste0("fev1_baseline", 1:6))
+df <- df %>%
+  filter(redcap_event_name != "demographics_arm_1") %>%
+  select(
+    sid, redcap_repeat_instance, cftr_mod, cftr_mod_spec,
+    admit_year:age_at_admit, height, height_baseline1,
+    all_of(fevs),
+    admit_cx_results___1:admit_cx_results___9
+  )
 # Format columns - race and sex should be formatted for ppFEV1 calculations
 demo$sex <- factor(demo$sex, levels = c(2, 1), labels = c("Male", "Female"))
 demo$race <- factor(demo$race,
@@ -27,56 +36,43 @@ demo$genotype <- factor(demo$genotype,
   labels = c("No F508del", "F508del heterozygous", "F508del homozygous")
 )
 demo[, c("mutation1", "mutation2")] <- NULL
-# Remove CHCO REDCap data - there is some weird issue with the year of admission
-# field, so Elin sent a complete file separately
-chco <- redcap %>%
-  filter(
-    redcap_data_access_group == "chco",
-    redcap_event_name != "demographics_arm_1"
-  ) %>%
-  select(
-    sid, redcap_data_access_group, redcap_repeat_instance,
-    admit_cx_results___1:admit_cx_results___9
-  )
-redcap <- redcap %>%
-  filter(redcap_data_access_group != "chco") %>%
-  # Also remove demographics
-  filter(redcap_event_name != "demographics_arm_1") %>%
-  # Limit data to necessary columns
-  select(
-    sid, redcap_data_access_group, redcap_repeat_instance,
-    cftr_mod_spec, cftr_mod,
-    admit_year:age_at_admit, height, fev1_admit, fev1_discharge,
-    admit_cx_results___1:admit_cx_results___9
-  )
-# Import supplemental data from Elin
-supplement <- readxl::read_excel("~/Dropbox/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Raw/ExacerbationsInCF222-Admissions and Inpatient Meds All Fields 2023 09 29.xlsx")
-supplement <- supplement %>% select(
-  sid, redcap_repeat_instance, cftr_mod_spec, cftr_mod,
-  admit_year:age_at_admit, height, fev1_admit, fev1_discharge
-)
-# Merge everything together and sort columns
-chco <- left_join(chco, supplement, by = join_by(sid, redcap_repeat_instance))
-df <- bind_rows(chco, redcap)
-df <- left_join(df, demo)
+# Merge everything back together and sort columns
+df <- left_join(df, demo, join_by(sid))
 df <- df %>% select(all_of(colnames(demo)), admit_year, everything())
-# Calculate FEV1 % predicted
-df$ppfev1_admit <- pctpred_GLI(
-  age = as.numeric(df$age_at_admit),
-  height = as.numeric(df$height / 100),
-  gender = as.numeric(df$sex),
-  ethnicity = as.numeric(df$race),
-  FEV1 = as.numeric(df$fev1_admit)
+# Calculate baseline FEV1 % predicted
+fevs <- paste0("fev1_baseline", 1:6)
+ppfevs <- paste0("pp", fevs)
+df[, ppfevs] <- lapply(df[, fevs], function(c) {
+  ppfev <- pctpred_GLI(
+    age = as.numeric(df$age_at_admit),
+    height = as.numeric(df$height_baseline1 / 100),
+    gender = as.numeric(df$sex),
+    ethnicity = as.numeric(df$race),
+    FEV1 = as.numeric(c)
+  )
+  return(ppfev)
+})
+# Calculate admission and discharge FEV1 % predicted
+fevs <- c("fev1_admit", "fev1_discharge")
+ppfevs <- paste0("pp", fevs)
+df[, ppfevs] <- lapply(df[, fevs], function(c) {
+  ppfev <- pctpred_GLI(
+    age = as.numeric(df$age_at_admit),
+    height = as.numeric(df$height / 100),
+    gender = as.numeric(df$sex),
+    ethnicity = as.numeric(df$race),
+    FEV1 = as.numeric(c)
+  )
+  return(ppfev)
+})
+# Average FEV1 at baseline
+df$ppfev1_baseline <- rowMeans(df[, paste0("ppfev1_baseline", 1:6)], na.rm = T)
+# Remove unnecessary columns
+df <- df %>% select(
+  -fev1_admit, -fev1_discharge, -height, -height_baseline1,
+  -all_of(paste0("fev1_baseline", 1:6)),
+  -all_of(paste0("ppfev1_baseline", 1:6))
 )
-df$fev1_admit <- NULL
-df$ppfev1_discharge <- pctpred_GLI(
-  age = as.numeric(df$age_at_admit),
-  height = as.numeric(df$height / 100),
-  gender = as.numeric(df$sex),
-  ethnicity = as.numeric(df$race),
-  FEV1 = as.numeric(df$fev1_discharge)
-)
-df$fev1_discharge <- NULL
 # Microbiology
 bugs <- paste0("admit_cx_results___", 1:9)
 df[, bugs] <- lapply(df[, bugs], function(c) {
@@ -85,7 +81,7 @@ df[, bugs] <- lapply(df[, bugs], function(c) {
 # Site
 df$redcap_data_access_group <- factor(df$redcap_data_access_group,
   levels = c("chco", "childrens_national", "orange_county", "rady", "seattle"),
-  labels = c("CHCO", "Children's National", "Orange County", "Rady", "Seattle")
+  labels = c("Colorado", "CNH", "CHOC", "Rady", "Seattle")
 )
 # CFTR modulators
 df$cftr_mod_spec[df$cftr_mod == 0] <- 0
@@ -94,8 +90,6 @@ df$cftr_mod_spec <- factor(df$cftr_mod_spec,
   levels = 0:4,
   labels = c("None", "Kalydeco", "Orkambi", "Symdeko", "Trikafta")
 )
-# Remove rows with no admission year
-df <- df %>% filter(!is.na(admit_year))
 # Create summary dataset
 summary_table <- df %>%
   mutate(ppfev1_diff = ppfev1_discharge - ppfev1_admit) %>%
@@ -109,10 +103,19 @@ summary_table <- df %>%
     across(c(age_at_admit, days_admit, ppfev1_admit:ppfev1_diff), ~ mean(.x, na.rm = T)),
     .groups = "drop"
   )
-summary_table$cftr_mod <- factor(summary_table$cftr_mod, levels = c(F, T), labels = c("No", "Yes"))
+summary_table$cftr_mod <- factor(summary_table$cftr_mod,
+  levels = c(F, T),
+  labels = c("No", "Yes")
+)
 summary_table$cftr_mod_spec[summary_table$cftr_mod_spec == ""] <- NA
-summary_table[, bugs] <- lapply(summary_table[, bugs], factor, levels = c(F, T), labels = c("Absent", "Present"))
+summary_table[, bugs] <- lapply(summary_table[, bugs], factor,
+  levels = c(F, T), labels = c("Absent", "Present")
+)
 # Remove NaN values
+df <- data.frame(lapply(df, function(c) {
+  c[is.nan(c)] <- NA
+  return(c)
+}))
 summary_table <- data.frame(lapply(summary_table, function(c) {
   c[is.nan(c)] <- NA
   return(c)
@@ -139,6 +142,8 @@ labels <- list(
   "cftr_mod" = "CFTR modulator (any)", "cftr_mod_spec" = "CFTR modulator",
   "num_hosp" = "Number of Hospitalizations"
 )
+# Remove rows with no admission year
+df <- df %>% filter(!is.na(admit_year))
 # Save
 save(df, summary_table, labels,
   file = "~/Dropbox/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Cleaned/analysis_dataset.RData"

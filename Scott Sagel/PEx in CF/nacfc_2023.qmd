@@ -10,8 +10,6 @@ format:
     fig-cap-location: top
     page-layout: full
 editor: source
-execute: 
-  echo: false
 ---
 
 ```{r}
@@ -20,6 +18,11 @@ library(tidyverse)
 library(gtsummary)
 # source("~/GitHub/CF/Scott Sagel/PEx in CF/create_pex_analysis_dataset.R")
 load("~/Dropbox/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Cleaned/analysis_dataset.RData")
+# Colors for plots
+yellow <- "#f8b80a"
+red <- "#e30022"
+purple <- "#7b2670"
+blue <- "#022451"
 ```
 
 # Data cleaning notes
@@ -30,9 +33,7 @@ load("~/Dropbox/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Cleaned/analysis_datas
 2. For each person with multiple admissions, continuous variables were averaged prior to generating summary tables.
 3. If a participant was on a modulators during any admission, they were counted as on modulators for that year.
 
-The number of hospitalizations for PEx decreased from `r sum(df$Year==2018)` in 2018 to `r sum(df$Year==2022)` in 2022.
-
-# Summary Statistics
+# Summary Statistics (Per Person)
 
 ```{r}
 #| label: tbl-all
@@ -51,7 +52,16 @@ summary_table %>%
     ),
     missing_text = "(Missing)",
     label = labels
-  )
+  ) %>%
+  add_p(
+    test = list(
+      all_continuous() ~ "t.test",
+      num_hosp ~ "wilcox.test",
+      days_admit ~ "wilcox.test"
+    ),
+    test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
+  ) %>%
+  separate_p_footnotes()
 ```
 
 ```{r}
@@ -75,6 +85,180 @@ summary_table %>%
           ),
           missing_text = "(Missing)",
           label = labels
-        )
+        ) %>%
+        add_p(
+          test = list(
+            all_continuous() ~ "t.test",
+            num_hosp ~ "wilcox.test",
+            days_admit ~ "wilcox.test"
+          ),
+          test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
+        ) %>%
+        separate_p_footnotes()
   )
+```
+
+# Plots
+
+## Slide 9
+
+```{r}
+# Number of hospitalizations
+df %>%
+  group_by(redcap_data_access_group, admit_year) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  ggplot(aes(x = redcap_data_access_group, y = n, fill = factor(admit_year))) +
+  geom_bar(position = "dodge", stat = "identity") +
+  xlab("Site") +
+  ylab("Num. of Hospitalizations") +
+  theme_bw() +
+  theme(legend.title = element_blank()) +
+  scale_fill_manual(values = c(purple, yellow))
+# % hospitalized 2 or more times in both years
+df %>%
+  group_by(sid, redcap_data_access_group, admit_year) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(redcap_data_access_group, admit_year) %>%
+  summarise(perc = mean(n >= 2) * 100, .groups = "drop") %>%
+  ggplot(aes(x = redcap_data_access_group, y = perc, fill = factor(admit_year))) +
+  geom_bar(position = "dodge", stat = "identity") +
+  xlab("Site") +
+  ylab("Percent With >= 2 Hospitalizations") +
+  theme_bw() +
+  theme(legend.title = element_blank()) +
+  scale_fill_manual(values = c(purple, yellow))
+```
+
+## Slide 10 
+
+For the box and whisker plot of age at admission, we used the average age for people who were admitted more than once in a given year. 
+
+```{r}
+#| message: false
+#| warning: false
+# Age
+df %>%
+  group_by(sid, redcap_data_access_group, admit_year) %>%
+  summarise(age_at_admit = mean(age_at_admit, na.rm = T), .groups = "drop") %>%
+  ggplot(aes(x = redcap_data_access_group, y = age_at_admit, 
+             fill = factor(admit_year))) +
+  geom_boxplot() +
+  xlab("Site") +
+  ylab("Age at Admission") +
+  theme_bw() +
+  theme(legend.title = element_blank()) +
+  scale_fill_manual(values = c(purple, red))
+# Sex
+df %>%
+  group_by(redcap_data_access_group, admit_year, sid) %>%
+  summarise(sex = unique(sex)) %>%
+  summarise(Male = mean(sex == "Male") * 100, Female = mean(sex == "Female") * 100) %>%
+  pivot_longer(c(Male, Female), names_to = "sex", values_to = "perc") %>%
+  ggplot(aes(x = factor(admit_year), y = perc, fill = factor(sex))) +
+  geom_bar(position = "stack", stat = "identity") +
+  geom_text(aes(label = paste(round(perc, 1), "%")),
+    position = position_stack(vjust = 0.5), size = 2
+  ) +
+  ylab("%") +
+  facet_grid(~redcap_data_access_group) +
+  theme_bw() +
+  theme(legend.title = element_blank(), axis.title.x = element_blank()) +
+  scale_fill_manual(values = c(yellow, red))
+# Race
+df %>%
+  group_by(redcap_data_access_group, admit_year, sid) %>%
+  summarise(race = unique(race)) %>%
+  summarise(
+    White = mean(race == "White") * 100,
+    `Black or African-American` = mean(race == "Black or African-American") * 100,
+    Asian = mean(race == "NE Asian") * 100,
+    `Other/mixed` = mean(race == "Other/mixed") * 100
+  ) %>%
+  pivot_longer(c(
+    White, `Black or African-American`,
+    Asian, `Other/mixed`
+  ), names_to = "race", values_to = "perc") %>%
+  ggplot(aes(x = factor(admit_year), y = perc, fill = factor(race))) +
+  geom_bar(position = "stack", stat = "identity") +
+  geom_text(aes(label = paste(round(perc, 1), "%")),
+    position = position_stack(vjust = 0.5), size = 2
+  ) +
+  ylab("%") +
+  facet_grid(~redcap_data_access_group) +
+  theme_bw() +
+  theme(legend.title = element_blank(), axis.title.x = element_blank()) +
+  scale_fill_manual(values = c(red, purple, blue, yellow))
+# Ethnicity
+df %>%
+  group_by(redcap_data_access_group, admit_year, sid) %>%
+  summarise(ethnicity = unique(ethnicity)) %>%
+  summarise(
+    `Hispanic or Latino` = mean(ethnicity == "Hispanic or Latino") * 100,
+    `Not Hispanic or Latino` = mean(ethnicity == "Not Hispanic or Latino") * 100,
+    `Unknown or not reported` = mean(ethnicity == "Unknown or not reported") * 100
+  ) %>%
+  pivot_longer(c(
+    `Hispanic or Latino`, `Not Hispanic or Latino`, `Unknown or not reported`
+  ), names_to = "ethnicity", values_to = "perc") %>%
+  ggplot(aes(x = factor(admit_year), y = perc, fill = factor(ethnicity))) +
+  geom_bar(position = "stack", stat = "identity") +
+  geom_text(aes(label = paste(round(perc, 1), "%")),
+    position = position_stack(vjust = 0.5), size = 2
+  ) +
+  ylab("%") +
+  facet_grid(~redcap_data_access_group) +
+  theme_bw() +
+  theme(legend.title = element_blank(), axis.title.x = element_blank()) +
+  scale_fill_manual(values = c(red, purple, yellow))
+```
+
+## Slide 11
+
+```{r}
+#| message: false
+# Ethnicity
+df %>%
+  group_by(redcap_data_access_group, admit_year, sid) %>%
+  summarise(genotype = unique(genotype)) %>%
+  summarise(
+    `No F508del` = mean(genotype == "No F508del") * 100,
+    `F508del heterozygous` = mean(genotype == "F508del heterozygous") * 100,
+    `F508del homozygous` = mean(genotype == "F508del homozygous") * 100
+  ) %>%
+  pivot_longer(c(
+    `No F508del`, `F508del heterozygous`, `F508del homozygous`
+  ), names_to = "genotype", values_to = "perc") %>%
+  ggplot(aes(x = factor(admit_year), y = perc, fill = factor(genotype))) +
+  geom_bar(position = "stack", stat = "identity") +
+  geom_text(aes(label = paste(round(perc, 1), "%")),
+    position = position_stack(vjust = 0.5), size = 2
+  ) +
+  ylab("%") +
+  facet_grid(~redcap_data_access_group) +
+  theme_bw() +
+  theme(legend.title = element_blank(), axis.title.x = element_blank()) +
+  scale_fill_manual(values = c(red, purple, yellow))
+```
+
+## Slide 12
+
+For people with multiple admissions, FEV1 % predicted was averaged at admission and at discharge. Baseline FEV1 % predicted is the average of up to 6 months of FEV1 measures prior to first admission.
+
+```{r}
+#| warning: false
+df %>% group_by(redcap_data_access_group,admit_year,sid) %>%
+  summarise(across(ppfev1_admit:ppfev1_baseline,~mean(.x,na.rm=T)),
+            .groups = "drop") %>%
+  rename(Admission = ppfev1_admit,Discharge = ppfev1_discharge,
+         Baseline = ppfev1_baseline) %>%
+  pivot_longer(c(Admission, Discharge, Baseline)) %>%
+  mutate(name = factor(name,levels=c("Baseline","Admission", "Discharge"))) %>%
+  ggplot(aes(x = name, y = value, 
+             fill = factor(admit_year))) +
+  geom_boxplot() + ylab("FEV1 % predicted") +
+  facet_wrap(~redcap_data_access_group)+
+  theme_bw() +
+  theme(legend.title = element_blank(),legend.position = "bottom",
+        axis.title.x = element_blank()) +
+  scale_fill_manual(values = c(purple, yellow))
 ```
