@@ -16,8 +16,9 @@ editor: source
 #| include: false
 library(tidyverse)
 library(gtsummary)
-# source("~/GitHub/CF/Scott Sagel/PEx in CF/create_pex_analysis_dataset.R")
-load("~/Dropbox/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Cleaned/analysis_dataset.RData")
+library(ggpubr)
+source("~/GitHub/CF/Scott Sagel/PEx in CF/create_pex_analysis_dataset.R")
+load("~/Library/CloudStorage/Dropbox/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Cleaned/analysis_dataset.RData")
 # Colors for plots
 yellow <- "#f8b80a"
 red <- "#e30022"
@@ -105,27 +106,29 @@ summary_table %>%
 ```{r}
 # Number of hospitalizations
 df %>%
-  group_by(redcap_data_access_group, admit_year) %>%
-  summarise(n = n(), .groups = "drop") %>%
-  ggplot(aes(x = redcap_data_access_group, y = n, fill = factor(admit_year))) +
-  geom_bar(position = "dodge", stat = "identity") +
+  ggplot(aes(x = factor(admit_year), fill = factor(admit_year))) +
+  geom_bar() +
   xlab("Site") +
   ylab("Num. of Hospitalizations") +
   theme_bw() +
-  theme(legend.title = element_blank()) +
+  theme(legend.position = "none") +
   scale_fill_manual(values = c(purple, yellow))
 # % hospitalized 2 or more times in both years
 df %>%
-  group_by(sid, redcap_data_access_group, admit_year) %>%
+  group_by(sid, admit_year) %>%
   summarise(n = n(), .groups = "drop") %>%
-  group_by(redcap_data_access_group, admit_year) %>%
+  group_by(admit_year) %>%
   summarise(perc = mean(n >= 2) * 100, .groups = "drop") %>%
-  ggplot(aes(x = redcap_data_access_group, y = perc, fill = factor(admit_year))) +
+  ggplot(aes(x = factor(admit_year), y = perc, fill = factor(admit_year))) +
   geom_bar(position = "dodge", stat = "identity") +
+  geom_signif(
+    xmin = 1, xmax = 2, y_position = 50, map_signif_level = T,
+    annotation = "<0.001"
+  ) +
   xlab("Site") +
   ylab("Percent With >= 2 Hospitalizations") +
   theme_bw() +
-  theme(legend.title = element_blank()) +
+  theme(legend.position = "none") +
   scale_fill_manual(values = c(purple, yellow))
 ```
 
@@ -134,39 +137,42 @@ df %>%
 For the box and whisker plot of age at admission, we used the average age for people who were admitted more than once in a given year. 
 
 ```{r}
-#| message: false
 #| warning: false
+#| message: false
 # Age
 df %>%
   group_by(sid, redcap_data_access_group, admit_year) %>%
   summarise(age_at_admit = mean(age_at_admit, na.rm = T), .groups = "drop") %>%
-  ggplot(aes(x = redcap_data_access_group, y = age_at_admit, 
-             fill = factor(admit_year))) +
+  ggplot(aes(x = factor(admit_year), y = age_at_admit, fill = factor(admit_year))) +
   geom_boxplot() +
+  geom_signif(
+    xmin = 1, xmax = 2, y_position = 28, map_signif_level = T,
+    annotation = 0.15
+  ) +
   xlab("Site") +
   ylab("Age at Admission") +
   theme_bw() +
-  theme(legend.title = element_blank()) +
+  theme(legend.position = "none") +
   scale_fill_manual(values = c(purple, red))
 # Sex
 df %>%
-  group_by(redcap_data_access_group, admit_year, sid) %>%
+  group_by(admit_year, sid) %>%
   summarise(sex = unique(sex)) %>%
   summarise(Male = mean(sex == "Male") * 100, Female = mean(sex == "Female") * 100) %>%
   pivot_longer(c(Male, Female), names_to = "sex", values_to = "perc") %>%
   ggplot(aes(x = factor(admit_year), y = perc, fill = factor(sex))) +
   geom_bar(position = "stack", stat = "identity") +
-  geom_text(aes(label = paste(round(perc, 1), "%")),
-    position = position_stack(vjust = 0.5), size = 2
+  geom_signif(
+    xmin = 1, xmax = 2, y_position = 105, map_signif_level = T,
+    annotation = 0.12
   ) +
   ylab("%") +
-  facet_grid(~redcap_data_access_group) +
   theme_bw() +
   theme(legend.title = element_blank(), axis.title.x = element_blank()) +
   scale_fill_manual(values = c(yellow, red))
 # Race
 df %>%
-  group_by(redcap_data_access_group, admit_year, sid) %>%
+  group_by(admit_year, sid) %>%
   summarise(race = unique(race)) %>%
   summarise(
     White = mean(race == "White") * 100,
@@ -180,17 +186,17 @@ df %>%
   ), names_to = "race", values_to = "perc") %>%
   ggplot(aes(x = factor(admit_year), y = perc, fill = factor(race))) +
   geom_bar(position = "stack", stat = "identity") +
-  geom_text(aes(label = paste(round(perc, 1), "%")),
-    position = position_stack(vjust = 0.5), size = 2
+  geom_signif(
+    xmin = 1, xmax = 2, y_position = 105, map_signif_level = T,
+    annotation = 0.012
   ) +
   ylab("%") +
-  facet_grid(~redcap_data_access_group) +
   theme_bw() +
   theme(legend.title = element_blank(), axis.title.x = element_blank()) +
   scale_fill_manual(values = c(red, purple, blue, yellow))
 # Ethnicity
 df %>%
-  group_by(redcap_data_access_group, admit_year, sid) %>%
+  group_by(admit_year, sid) %>%
   summarise(ethnicity = unique(ethnicity)) %>%
   summarise(
     `Hispanic or Latino` = mean(ethnicity == "Hispanic or Latino") * 100,
@@ -202,11 +208,11 @@ df %>%
   ), names_to = "ethnicity", values_to = "perc") %>%
   ggplot(aes(x = factor(admit_year), y = perc, fill = factor(ethnicity))) +
   geom_bar(position = "stack", stat = "identity") +
-  geom_text(aes(label = paste(round(perc, 1), "%")),
-    position = position_stack(vjust = 0.5), size = 2
+  geom_signif(
+    xmin = 1, xmax = 2, y_position = 105, map_signif_level = T,
+    annotation = 0.088
   ) +
   ylab("%") +
-  facet_grid(~redcap_data_access_group) +
   theme_bw() +
   theme(legend.title = element_blank(), axis.title.x = element_blank()) +
   scale_fill_manual(values = c(red, purple, yellow))
@@ -216,9 +222,9 @@ df %>%
 
 ```{r}
 #| message: false
-# Ethnicity
+# Genotype
 df %>%
-  group_by(redcap_data_access_group, admit_year, sid) %>%
+  group_by(admit_year, sid) %>%
   summarise(genotype = unique(genotype)) %>%
   summarise(
     `No F508del` = mean(genotype == "No F508del") * 100,
@@ -230,11 +236,11 @@ df %>%
   ), names_to = "genotype", values_to = "perc") %>%
   ggplot(aes(x = factor(admit_year), y = perc, fill = factor(genotype))) +
   geom_bar(position = "stack", stat = "identity") +
-  geom_text(aes(label = paste(round(perc, 1), "%")),
-    position = position_stack(vjust = 0.5), size = 2
+  geom_signif(
+    xmin = 1, xmax = 2, y_position = 105, map_signif_level = T,
+    annotation = "<0.001"
   ) +
   ylab("%") +
-  facet_grid(~redcap_data_access_group) +
   theme_bw() +
   theme(legend.title = element_blank(), axis.title.x = element_blank()) +
   scale_fill_manual(values = c(red, purple, yellow))
@@ -246,19 +252,67 @@ For people with multiple admissions, FEV1 % predicted was averaged at admission 
 
 ```{r}
 #| warning: false
-df %>% group_by(redcap_data_access_group,admit_year,sid) %>%
-  summarise(across(ppfev1_admit:ppfev1_baseline,~mean(.x,na.rm=T)),
-            .groups = "drop") %>%
-  rename(Admission = ppfev1_admit,Discharge = ppfev1_discharge,
-         Baseline = ppfev1_baseline) %>%
+df %>%
+  group_by(admit_year, sid) %>%
+  summarise(across(ppfev1_admit:ppfev1_baseline, ~ mean(.x, na.rm = T)),
+    .groups = "drop"
+  ) %>%
+  rename(
+    Admission = ppfev1_admit, Discharge = ppfev1_discharge,
+    Baseline = ppfev1_baseline
+  ) %>%
   pivot_longer(c(Admission, Discharge, Baseline)) %>%
-  mutate(name = factor(name,levels=c("Baseline","Admission", "Discharge"))) %>%
-  ggplot(aes(x = name, y = value, 
-             fill = factor(admit_year))) +
-  geom_boxplot() + ylab("FEV1 % predicted") +
-  facet_wrap(~redcap_data_access_group)+
+  mutate(name = factor(name, levels = c("Baseline", "Admission", "Discharge"))) %>%
+  ggplot(aes(
+    x = name, y = value,
+    fill = factor(admit_year)
+  )) +
+  geom_boxplot() +
+  geom_pwc(
+    aes(group = admit_year),
+    tip.length = 0.01,
+    method = "t_test", label = "p.format"
+  ) +
+  ylab("FEV1 % predicted") +
   theme_bw() +
-  theme(legend.title = element_blank(),legend.position = "bottom",
-        axis.title.x = element_blank()) +
+  theme(
+    legend.title = element_blank(), legend.position = "bottom",
+    axis.title.x = element_blank()
+  ) +
   scale_fill_manual(values = c(purple, yellow))
 ```
+
+```{r}
+# Proportions who returned to >= 90% and >= 100% at discharge
+df %>%
+  mutate(
+    returned_90 = ppfev1_discharge >= ppfev1_baseline * 0.9,
+    returned_100 = ppfev1_discharge >= ppfev1_baseline
+  ) %>%
+  select(sid, admit_year, redcap_repeat_instance, contains("returned")) %>%
+  group_by(admit_year) %>%
+  summarise(
+    returned_90 = mean(returned_90, na.rm = T) * 100,
+    returned_100 = mean(returned_100, na.rm = T) * 100
+  ) %>%
+  pivot_longer(c(returned_90, returned_100)) %>%
+  mutate(name = factor(name,
+    levels = c("returned_90", "returned_100"),
+    labels = c(
+      "Returned to 90% of Baseline",
+      "Returned to 100% of Baseline"
+    )
+  )) %>%
+  ggplot(aes(x = factor(name), y = value, fill = factor(admit_year))) +
+  geom_bar(position = "dodge", stat = "identity") +
+  geom_signif(
+    xmin = c(0.75, 1.75), xmax = c(1.25, 2.25), y_position = 95, map_signif_level = T,
+    annotation = c(0.7, 0.2)
+  ) +
+  ylab("Percent of Admissions") +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), legend.title = element_blank()) +
+  scale_fill_manual(values = c(purple, yellow))
+```
+
+The above plot represents the proportion of admissions where the patient returned to close to baseline lung function, and was not aggregated by patient. In other words, multiple admissions for the same patient were considered independent in this case. 

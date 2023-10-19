@@ -5,7 +5,10 @@ df <- readxl::read_excel("~/Library/CloudStorage/Dropbox/Work/Vigers/CF/Scott Sa
 # Separate datasets
 demo <- df %>%
   filter(redcap_event_name == "demographics_arm_1") %>%
-  select(sid, redcap_data_access_group, sex, race, ethnicity, mutation1, mutation2)
+  select(
+    sid, redcap_data_access_group, sex, race, ethnicity,
+    mutation1, mutation2, contains("insurance")
+  )
 fevs <- c("fev1_admit", "fev1_discharge", paste0("fev1_baseline", 1:6))
 df <- df %>%
   filter(redcap_event_name != "demographics_arm_1") %>%
@@ -36,6 +39,19 @@ demo$genotype <- factor(demo$genotype,
   labels = c("No F508del", "F508del heterozygous", "F508del homozygous")
 )
 demo[, c("mutation1", "mutation2")] <- NULL
+# Combine insurance columns
+ins <- c(
+  "Private insurance", "Medicare", "Medicaid",
+  "State special needs program (e.g. CHP+)",
+  "Tricare/other military health plan", "Indian Health Service", "Other", "None"
+)
+demo$insurance <- apply(demo[, grep("insurance", colnames(demo))], 1, function(r) {
+  i <- which(r == 1)
+  if(all(r == 0)){i = length(ins)}
+  return(paste0(ins[i], collapse = "/"))
+})
+demo$insurance <- as.factor(demo$insurance)
+demo[, paste0("insurance___", 1:8)] <- NULL
 # Merge everything back together and sort columns
 df <- left_join(df, demo, join_by(sid))
 df <- df %>% select(all_of(colnames(demo)), admit_year, everything())
@@ -96,7 +112,7 @@ summary_table <- df %>%
   group_by(sid, redcap_data_access_group, admit_year) %>%
   summarise(
     num_hosp = n(),
-    across(c(sex:genotype), ~ first(na.omit(.x))),
+    across(c(sex:insurance), ~ first(na.omit(.x))),
     across(admit_cx_results___1:admit_cx_results___9, ~ any(.x == "Present")),
     cftr_mod = any(cftr_mod == "Yes"),
     cftr_mod_spec = paste0(sort(unique(cftr_mod_spec)), collapse = "/"),
@@ -138,9 +154,11 @@ labels <- list(
   "age_at_admit" = "Age", "height" = "Height",
   "ppfev1_admit" = "FEV1 % Predicted at Admit",
   "ppfev1_discharge" = "FEV1 % Predicted at Discharge",
+  "ppfev1_baseline" = "Baseline FEV1 % Predicted",
   "ppfev1_diff" = "Change in FEV1 % Predicted",
   "cftr_mod" = "CFTR modulator (any)", "cftr_mod_spec" = "CFTR modulator",
-  "num_hosp" = "Number of Hospitalizations"
+  "num_hosp" = "Number of Hospitalizations",
+  "insurance" = "Insurance"
 )
 # Remove rows with no admission year
 df <- df %>% filter(!is.na(admit_year))
