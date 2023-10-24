@@ -343,3 +343,8 @@ model <- list(
 fit <- mcp(model, data = t, cores = 4, chains = 4)
 plot(fit)
 ```
+
+```{r}
+ggplot(annual,aes(x=Age_YrEnd,y = mean_ppFEV)) + 
+  geom_smooth(aes(color = race),se = F)
+```
