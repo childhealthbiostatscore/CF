@@ -483,10 +483,32 @@ by_year <- encounter %>%
     bmi_last = last(na.omit(bmivalue)),
     bmi_perc_last = last(na.omit(bmipercentile)),
     Vx445comb = case_when("Yes" %in% Vx445comb ~ "Yes", .default = "No"),
-    eti_elig = case_when("Yes" %in% eti_elig ~ "Yes", .default = "No"),
     .groups = "drop"
   )
 annual <- full_join(annual, by_year, by = join_by(eDWID, ReviewYear == reviewyear))
+# ETI eligibility by year
+annual$eti_elig <- apply(annual, 1, function(r) {
+  # Format variables
+  age <- as.numeric(r["Age_YrEnd"])
+  date <- r["ReviewYear"]
+  # Start with not eligible by default
+  elig <- "No"
+  # Get mutations
+  muts <- r[grep("Mutation", names(r))]
+  # Start with first approval
+  if (date >= year(eti_12_up) & age >= 12 & "F508del" %in% muts) {
+    elig <- "Yes"
+  }
+  # Next, eligible if over 12 and mutation in expanded list
+  else if (date >= year(eti_12_up_expansion) & age >= 12 & any(muts %in% responsive_mutations)) {
+    elig <- "Yes"
+  }
+  # Next approved for 6 and up with F508del or other responsive mutation
+  else if (date >= year(eti_6_up) & age >= 6 & any(muts %in% responsive_mutations)) {
+    elig <- "Yes"
+  }
+  return(elig)
+}, simplify = T)
 # Labels
 label(annual) <- labels[colnames(annual)]
 label(demo) <- labels[colnames(demo)]

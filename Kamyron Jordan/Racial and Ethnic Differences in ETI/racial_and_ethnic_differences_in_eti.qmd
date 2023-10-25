@@ -39,7 +39,7 @@ library(ggsurvfit)
 ```{r data cleaning}
 #| include: false
 # source("/Users/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_race_eti_analysis_dataset.R")
-load("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
+load("~/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
 ```
 
 # Race and ethnicity breakdown
@@ -114,9 +114,24 @@ The following tables have been aggregated by year, and therefore may miss some i
 
 ### Overall by year
 
+#### All patients
+
 ```{r}
 annual %>%
   select(eti_elig, contains("Vx"), ReviewYear) %>%
+  tbl_summary(
+    by = ReviewYear, missing_text = "Missing",
+    type = all_dichotomous() ~ "categorical"
+  ) %>%
+  bold_labels()
+```
+
+#### Eligible only
+
+```{r}
+annual %>%
+  filter(eti_elig == "Yes") %>%
+  select(contains("Vx"), ReviewYear) %>%
   tbl_summary(
     by = ReviewYear, missing_text = "Missing",
     type = all_dichotomous() ~ "categorical"
@@ -131,9 +146,25 @@ invisible(lapply(c("2019", "2020", "2021"), function(n) {
   cat("\n")
   cat("###", n)
   cat("\n")
+  cat("\n")
+  cat("#### All patients")
+  cat("\n")
   d <- years[[n]]
   t <- d %>%
     select(eti_elig, contains("Vx"), race) %>%
+    tbl_summary(
+      by = race, missing_text = "Missing",
+      type = all_dichotomous() ~ "categorical"
+    ) %>%
+    bold_labels()
+  print(t)
+  cat("\n")
+  cat("\n")
+  cat("#### Eligible only")
+  cat("\n")
+  t <- d %>%
+    filter(eti_elig == "Yes") %>%
+    select(contains("Vx"), race) %>%
     tbl_summary(
       by = race, missing_text = "Missing",
       type = all_dichotomous() ~ "categorical"
@@ -345,6 +376,6 @@ plot(fit)
 ```
 
 ```{r}
-ggplot(annual,aes(x=Age_YrEnd,y = mean_ppFEV)) + 
-  geom_smooth(aes(color = race),se = F)
+ggplot(annual, aes(x = Age_YrEnd, y = mean_ppFEV)) +
+  geom_smooth(aes(color = race), se = F)
 ```
