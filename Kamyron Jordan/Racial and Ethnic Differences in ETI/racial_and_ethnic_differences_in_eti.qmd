@@ -8,6 +8,7 @@ format:
     toc: true
     toc-depth: 5
     toc-float: true
+    number-sections: true
     code-fold: true
     self-contained: true
     fig-cap-location: top
@@ -126,16 +127,19 @@ annual %>%
   bold_labels()
 ```
 
-#### Eligible only
+#### Eligible and prescribed off-label only
 
 ```{r}
 annual %>%
-  filter(eti_elig == "Yes") %>%
-  select(contains("Vx"), ReviewYear) %>%
+  filter(eti_elig == "Yes" | Vx445comb == "Yes") %>%
+  select(eti_elig, contains("Vx"), ReviewYear) %>%
   tbl_summary(
     by = ReviewYear, missing_text = "Missing",
     type = all_dichotomous() ~ "categorical"
   ) %>%
+  add_ci() %>%
+  add_p(test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)) %>%
+  separate_p_footnotes() %>%
   bold_labels()
 ```
 
@@ -156,23 +160,58 @@ invisible(lapply(c("2019", "2020", "2021"), function(n) {
       by = race, missing_text = "Missing",
       type = all_dichotomous() ~ "categorical"
     ) %>%
+    add_p(test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)) %>%
+    separate_p_footnotes() %>%
     bold_labels()
   print(t)
   cat("\n")
   cat("\n")
-  cat("#### Eligible only")
+  cat("#### Eligible and prescribed off-label only")
   cat("\n")
   t <- d %>%
-    filter(eti_elig == "Yes") %>%
-    select(contains("Vx"), race) %>%
+    filter(eti_elig == "Yes" | Vx445comb == "Yes") %>%
+    select(eti_elig, contains("Vx"), race) %>%
     tbl_summary(
       by = race, missing_text = "Missing",
       type = all_dichotomous() ~ "categorical"
     ) %>%
+    add_ci() %>%
+    add_p(test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)) %>%
+    separate_p_footnotes() %>%
     bold_labels()
   print(t)
   cat("\n")
 }))
+```
+
+### Figure
+
+The figure below includes those eligible for ETI and anyone who may have been prescribed ETI off label. Error bars represent 95% confidence intervals.
+
+```{r}
+annual %>%
+  filter(eti_elig == "Yes" | Vx445comb == "Yes") %>%
+  select(eDWID, race, ReviewYear, contains("Vx")) %>%
+  group_by(ReviewYear, race) %>%
+  summarise(
+    perc = mean(Vx445comb == "Yes", na.rm = T),
+    se = sqrt(perc * (1 - perc) / n()),
+    lower = perc - (1.96 * se), upper = perc + (1.96 * se),
+    .groups = "drop"
+  ) %>%
+  ggplot(aes(x = ReviewYear, y = perc * 100, fill = race)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  geom_errorbar(aes(ymin = lower * 100, ymax = upper * 100),
+    position = "dodge", linewidth = 0.7
+  ) +
+  xlab("Year") +
+  ylab("Percentage Prescribed ETI") +
+  theme_bw() +
+  theme(legend.title = element_blank()) +
+  scale_fill_manual(values = c(
+    "#264653", "#2A9D8F", "#E9C46A",
+    "#F4A261", "#E76F51"
+  ))
 ```
 
 ## Survival analysis
