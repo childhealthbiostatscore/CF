@@ -4,11 +4,11 @@ library(readxl)
 library(rspiro)
 library(Hmisc)
 # Import
-annual <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
-encounter <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
-demo <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
+annual <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
+encounter <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
+demo <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
 # Import responsive mutations list
-responsive_mutations <- read.csv("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/eti_responsive_mutations.csv", header = F)
+responsive_mutations <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/eti_responsive_mutations.csv", header = F)
 responsive_mutations <- unique(responsive_mutations$V1)
 # Dates
 demo$First_LungTransplantDate <- mdy(demo$First_LungTransplantDate)
@@ -228,7 +228,7 @@ demo$Hispanicrace <- factor(demo$Hispanicrace,
 )
 demo$MutClass <- factor(demo$MutClass)
 # Get long mutation lists - demographics
-mutations <- read_excel("/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
+mutations <- read_excel("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
 mutations <- mutations %>%
   filter(field_name == "mutation1") %>%
   select(code_value, code_meaning)
@@ -518,5 +518,5 @@ tidy_labels <- names(labels)
 names(tidy_labels) <- sapply(labels, "[[", 1)
 # Save
 save(annual, encounter, demo, labels, tidy_labels, by_year,
-  file = "/Users/timvigers/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
+  file = "/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
 )

@@ -16,8 +16,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
+bibliography: /Users/timvigers/Library/CloudStorage/Dropbox/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Library/CloudStorage/Dropbox/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -40,7 +40,7 @@ library(ggsurvfit)
 ```{r data cleaning}
 #| include: false
 # source("/Users/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_race_eti_analysis_dataset.R")
-load("~/Documents/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
+load("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
 ```
 
 # Race and ethnicity breakdown
