@@ -30,10 +30,10 @@ library(labelled)
 
 ```{r}
 # Import data and codebook
-annual <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/Data_Raw/CFF19_Annualized_Del1.csv",
+annual <- read.csv("~/Documents/Work/Christine Chan/CF registry data/Data_Raw/CFF19_Annualized_Del1.csv",
   na.strings = c("", "N/A")
 )
-data_dict <- readxl::read_excel("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/Data_Raw/Copy of Codes for CFFPR_2018.xlsx")
+data_dict <- readxl::read_excel("~/Documents/Work/Christine Chan/CF registry data/Data_Raw/Copy of Codes for CFFPR_2018.xlsx")
 data_dict$var <- paste(data_dict$field_name, data_dict$code_value, sep = "_")
 # Remove those with T1D or T2D
 annual <- annual %>% filter(cfrd_status_annual != 4, cfrd_status_annual != 5)
@@ -42,7 +42,7 @@ annual$cfrd_status_annual <- factor(annual$cfrd_status_annual,
   labels = c("CFRD-", "CFRD-", "CFRD+")
 )
 # Get mutations
-demogs <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Laura/Peds Endo/Christine Chan/CF registry data/Data_Raw/CFF19_DemogCFDiag_Del1.csv")
+demogs <- read.csv("~/Documents/Work/Christine Chan/CF registry data/Data_Raw/CFF19_DemogCFDiag_Del1.csv")
 demogs <- demogs %>% select(eDWID, Gender, MutClass)
 annual <- left_join(annual, demogs, by = join_by(eDWID))
 # Variable formatting
@@ -115,110 +115,6 @@ yn_vars <- c(
 )
 annual[, yn_vars] <- lapply(annual[, yn_vars], factor, levels = 0:1, labels = c("No", "Yes"))
 annual$A_IsOnEnzymes <- relevel(annual$A_IsOnEnzymes, ref = "Yes")
-# Analysis function
-log_reg <- function(year, missingness = F) {
-  # Clean data
-  df <- annual %>%
-    filter(ReviewYear == year, Age_YrEnd >= 10) %>%
-    select(
-      eDWID, Age_YrEnd, Gender, MutClass, A_IsOnEnzymes, A_FEV1, A_FEV1_pct_predicted,
-      A_bmivalue, A_bmipercentile, A_height, A_weight, A_heightpercentile,
-      A_supplement_feeding, tube_feeding,
-      NumPulmExacerbation, A_pseudomonasaeruginosa,
-      A_fungalyeast1, A_pulmonarycomplications1, A_mycocultureresults3,
-      A_corticosteroids1, cfrd_status_annual, A_Vx770, A_VX809comb,
-      liver_disease
-    )
-  # Remove all empty columns
-  empty <- which(colSums(is.na(df)) == nrow(df))
-  if (length(empty) > 0) {
-    df <- df[, -empty]
-  }
-  # Models
-  vars <- colnames(df)[which(!colnames(df) %in%
-    c(
-      bugs, "cfrd_status_annual", "eDWID", "A_bmivalue",
-      "A_bmipercentile", "A_height", "A_heightpercentile",
-      "Age_YrEnd", "A_weight", "bmi", "age_perc",
-      "A_supplement_feeding", "A_feeding2", "A_feeding3",
-      "A_feeding4", "A_FEV1", liver_fields
-    ))]
-  base_mod <- as.formula(paste0("cfrd_status_annual~", paste0(vars, collapse = "+")))
-  # Labels
-  labels <- list(
-    cfrd_status_annual = "CFRD Status", MutClass = "Mutation class",
-    Gender = "Sex", A_IsOnEnzymes = "Pancreatic enzyme use",
-    A_FEV1_pct_predicted = "FEV1 percent predicted",
-    tube_feeding = "Enteric feedings", liver_disease = "Liver disease",
-    A_corticosteroids1 = "Use of corticosteroids",
-    NumPulmExacerbation = "Admissions for PEx", age_group = "Age group",
-    height_perc = "Height percentile", bmi_perc = "BMI percentile",
-    A_Vx770 = "Use of CFTR modulator Vx770",
-    A_VX809comb = "Use of CFTR modulator Vx809 combination",
-    A_pseudomonasaeruginosa = "Pseudomonas aeruginosa",
-    A_fungalyeast1 = "Aspergillus (any species)",
-    A_pulmonarycomplications1 = "ABPA",
-    A_mycocultureresults3 = "Microorganisms in myco culture"
-  )
-  var_label(df[, vars[which(vars %in% colnames(df))]]) <-
-    as.character(labels[vars[which(vars %in% colnames(df))]])
-  var_label(df[, bugs[which(bugs %in% colnames(df))]]) <-
-    as.character(labels[bugs[which(bugs %in% colnames(df))]])
-  # Visualize missingness if required
-  if (missingness) {
-    cat("\n")
-    cat("### Missingness")
-    cat("\n")
-    cat("\n")
-    naniar::vis_miss(df)
-    cat("\n")
-  }
-  # Simple models
-  mod1 <- glm(base_mod, data = df, family = "binomial")
-  # Print results
-  cat("\n")
-  cat("### Base Model")
-  cat("\n")
-  cat("\n")
-  print(forest_model(mod1, exclude_infinite_cis = F))
-  cat("\n")
-  if ("A_pseudomonasaeruginosa" %in% colnames(df)) {
-    mod2 <- glm(update(base_mod, . ~ . + A_pseudomonasaeruginosa), data = df, family = "binomial")
-    cat("\n")
-    cat("### P. aeruginosa")
-    cat("\n")
-    cat("\n")
-    print(forest_model(mod2, exclude_infinite_cis = F))
-    cat("\n")
-  }
-  if ("A_fungalyeast1" %in% colnames(df)) {
-    mod3 <- glm(update(base_mod, . ~ . + A_fungalyeast1), data = df, family = "binomial")
-    cat("\n")
-    cat("### Aspergillus")
-    cat("\n")
-    cat("\n")
-    print(forest_model(mod3, exclude_infinite_cis = F))
-    cat("\n")
-  }
-  if ("A_pulmonarycomplications1" %in% colnames(df)) {
-    mod4 <- glm(update(base_mod, . ~ . + A_pulmonarycomplications1), data = df, family = "binomial")
-    cat("\n")
-    cat("### ABPA")
-    cat("\n")
-    cat("\n")
-    print(forest_model(mod4, exclude_infinite_cis = F))
-    cat("\n")
-  }
-  if ("A_mycocultureresults3" %in% colnames(df)) {
-    mod5 <- glm(update(base_mod, . ~ . + A_mycocultureresults3), data = df, family = "binomial")
-    cat("\n")
-    cat("### Mycobacterium")
-    cat("\n")
-    cat("\n")
-    print(forest_model(mod5, exclude_infinite_cis = F))
-    cat("\n")
-  }
-}
 ```
 
 # Data cleaning
@@ -273,14 +169,151 @@ annual %>%
   gt()
 ```
 
+Why are the percentages so low in 2006 - 2009? These appear to be correct based on the data we have, so could it be to do with how the data were collected or pulled by the CFFPR?
+
+# CFRD incidence and prevalence 
+
+Based on CFFPR annualized data.
+
+```{r}
+# Find approximate birth date
+annual$approx_birth_year = annual$ReviewYear - ceiling(annual$Age_YrEnd)
+annual = annual %>% group_by(eDWID) %>% 
+  mutate(approx_birth_year = round(mean(approx_birth_year)))
+# Create survival dataset
+s <- annual %>%
+  rename(end = ReviewYear) %>% # ReviewYear is the end of the interval
+  group_by(eDWID) %>%
+  mutate(start = lag(end)) %>% # Get interval start
+  select(eDWID, start,end, Age_YrEnd, approx_birth_year,cfrd_status_annual) # Sort columns
+s$start[is.na(s$start)] = s$approx_birth_year[is.na(s$start)]
+# Age group as time-varying covariate
+s$age_group <- cut(s$Age_YrEnd,
+  breaks = c(-Inf, 10, 19, 31, Inf), right = F,
+  labels = c("< 10", "[10,19)", "[19,31)", ">= 31")
+)
+# Fill down diagnosis
+s$cfrd_status_annual[s$cfrd_status_annual=="CFRD-"] = NA
+s = s %>% group_by(eDWID) %>% fill(cfrd_status_annual,.direction = "down")
+s$cfrd_status_annual[is.na(s$cfrd_status_annual)] = "CFRD-"
+# Remove records where start == end
+s = s[s$end > s$start,]
+# Survival fit
+surv_obj = Surv(time = as.numeric(s$start),time2 = as.numeric(s$end),
+                event = as.numeric(s$cfrd_status_annual)-1)
+fit <- survfit(surv_obj ~ age_group,id = eDWID,data = s)
+ggsurvplot(fit,risk.table = T,cumevents = T,
+  cumcensor = T,
+           fun = "event",xlim = c(2003, 2018))
+```
+
 # Logistic analyses
 
 Any participants with T1D or T2D were excluded from these analyses. Variables that were entirely missing in a given year (e.g., `A_Vx770` and `A_VX809comb` in 2005) were excluded from those models. Participants under age 10 at year end were also excluded due to missing PFT data.
 
+```{r}
+# Analysis function
+log_reg <- function(year, missingness = T) {
+  # Clean data
+  df <- annual %>%
+    filter(ReviewYear == year, Age_YrEnd >= 10) %>%
+    select(
+      eDWID, age_group, Gender, bmi_perc, MutClass, A_IsOnEnzymes, A_FEV1_pct_predicted,
+      tube_feeding, NumPulmExacerbation, A_pseudomonasaeruginosa,
+      A_fungalyeast1, A_pulmonarycomplications1, A_mycocultureresults3,
+      A_corticosteroids1, cfrd_status_annual, A_Vx770, A_VX809comb,
+      liver_disease
+    )
+  # Remove all empty columns
+  empty <- which(colSums(is.na(df)) == nrow(df))
+  if (length(empty) > 0) {
+    df <- df[, -empty]
+  }
+  # Models
+  vars <- colnames(df)[which(!colnames(df) %in%
+    c(bugs, liver_fields, "cfrd_status_annual", "eDWID"))]
+  base_mod <- as.formula(paste0("cfrd_status_annual~", paste0(vars, collapse = "+")))
+  # Labels
+  labels <- list(
+    cfrd_status_annual = "CFRD Status", MutClass = "Mutation class",
+    Gender = "Sex", A_IsOnEnzymes = "Pancreatic enzyme use",
+    A_FEV1_pct_predicted = "FEV1 percent predicted",
+    tube_feeding = "Enteric feedings", liver_disease = "Liver disease",
+    A_corticosteroids1 = "Use of corticosteroids",
+    NumPulmExacerbation = "Admissions for PEx", age_group = "Age group",
+    height_perc = "Height percentile", bmi_perc = "BMI percentile",
+    A_Vx770 = "Use of CFTR modulator Vx770",
+    A_VX809comb = "Use of CFTR modulator Vx809 combination",
+    A_pseudomonasaeruginosa = "Pseudomonas aeruginosa",
+    A_fungalyeast1 = "Aspergillus (any species)",
+    A_pulmonarycomplications1 = "ABPA",
+    A_mycocultureresults3 = "Microorganisms in myco culture"
+  )
+  var_label(df[, vars[which(vars %in% colnames(df))]]) <-
+    as.character(labels[vars[which(vars %in% colnames(df))]])
+  var_label(df[, bugs[which(bugs %in% colnames(df))]]) <-
+    as.character(labels[bugs[which(bugs %in% colnames(df))]])
+  # Visualize missingness if required
+  if (missingness) {
+    cat("\n")
+    cat("### Missingness")
+    cat("\n")
+    cat("\n")
+    print(naniar::vis_miss(df))
+    cat("\n")
+  }
+  # Simple models
+  mod1 <- glm(base_mod, data = df, family = "binomial")
+  # Print results
+  cat("\n")
+  cat("### Base Model")
+  cat("\n")
+  cat("\n")
+  print(forest_model(mod1, exclude_infinite_cis = F))
+  cat("\n")
+  if ("A_pseudomonasaeruginosa" %in% colnames(df)) {
+    mod2 <- glm(update(base_mod, . ~ . + A_pseudomonasaeruginosa), data = df, family = "binomial")
+    cat("\n")
+    cat("### P. aeruginosa")
+    cat("\n")
+    cat("\n")
+    print(forest_model(mod2, exclude_infinite_cis = F))
+    cat("\n")
+  }
+  if ("A_fungalyeast1" %in% colnames(df)) {
+    mod3 <- glm(update(base_mod, . ~ . + A_fungalyeast1), data = df, family = "binomial")
+    cat("\n")
+    cat("### Aspergillus")
+    cat("\n")
+    cat("\n")
+    print(forest_model(mod3, exclude_infinite_cis = F))
+    cat("\n")
+  }
+  if ("A_pulmonarycomplications1" %in% colnames(df)) {
+    mod4 <- glm(update(base_mod, . ~ . + A_pulmonarycomplications1), data = df, family = "binomial")
+    cat("\n")
+    cat("### ABPA")
+    cat("\n")
+    cat("\n")
+    print(forest_model(mod4, exclude_infinite_cis = F))
+    cat("\n")
+  }
+  if ("A_mycocultureresults3" %in% colnames(df)) {
+    mod5 <- glm(update(base_mod, . ~ . + A_mycocultureresults3), data = df, family = "binomial")
+    cat("\n")
+    cat("### Mycobacterium")
+    cat("\n")
+    cat("\n")
+    print(forest_model(mod5, exclude_infinite_cis = F))
+    cat("\n")
+  }
+}
+```
+
 ## 2004
 
 ```{r results='asis',fig.height=10,fig.width=10}
-log_reg(2004,missingness = T)
+log_reg(2004)
 ```
 
 ## 2006
