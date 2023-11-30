@@ -171,40 +171,46 @@ annual %>%
 
 Why are the percentages so low in 2006 - 2009? These appear to be correct based on the data we have, so could it be to do with how the data were collected or pulled by the CFFPR?
 
-# CFRD incidence and prevalence 
+# CFRD incidence and prevalence
 
 Based on CFFPR annualized data.
 
 ```{r}
 # Find approximate birth date
-annual$approx_birth_year = annual$ReviewYear - ceiling(annual$Age_YrEnd)
-annual = annual %>% group_by(eDWID) %>% 
+annual$approx_birth_year <- annual$ReviewYear - ceiling(annual$Age_YrEnd)
+annual <- annual %>%
+  group_by(eDWID) %>%
   mutate(approx_birth_year = round(mean(approx_birth_year)))
 # Create survival dataset
 s <- annual %>%
   rename(end = ReviewYear) %>% # ReviewYear is the end of the interval
   group_by(eDWID) %>%
   mutate(start = lag(end)) %>% # Get interval start
-  select(eDWID, start,end, Age_YrEnd, approx_birth_year,cfrd_status_annual) # Sort columns
-s$start[is.na(s$start)] = s$approx_birth_year[is.na(s$start)]
+  select(eDWID, start, end, Age_YrEnd, approx_birth_year, cfrd_status_annual) # Sort columns
+s$start[is.na(s$start)] <- s$approx_birth_year[is.na(s$start)]
 # Age group as time-varying covariate
 s$age_group <- cut(s$Age_YrEnd,
   breaks = c(-Inf, 10, 19, 31, Inf), right = F,
   labels = c("< 10", "[10,19)", "[19,31)", ">= 31")
 )
 # Fill down diagnosis
-s$cfrd_status_annual[s$cfrd_status_annual=="CFRD-"] = NA
-s = s %>% group_by(eDWID) %>% fill(cfrd_status_annual,.direction = "down")
-s$cfrd_status_annual[is.na(s$cfrd_status_annual)] = "CFRD-"
+s$cfrd_status_annual[s$cfrd_status_annual == "CFRD-"] <- NA
+s <- s %>%
+  group_by(eDWID) %>%
+  fill(cfrd_status_annual, .direction = "down")
+s$cfrd_status_annual[is.na(s$cfrd_status_annual)] <- "CFRD-"
 # Remove records where start == end
-s = s[s$end > s$start,]
+s <- s[s$end > s$start, ]
 # Survival fit
-surv_obj = Surv(time = as.numeric(s$start),time2 = as.numeric(s$end),
-                event = as.numeric(s$cfrd_status_annual)-1)
-fit <- survfit(surv_obj ~ age_group,id = eDWID,data = s)
-ggsurvplot(fit,risk.table = T,cumevents = T,
-  cumcensor = T,
-           fun = "event",xlim = c(2003, 2018))
+surv_obj <- Surv(
+  time = as.numeric(s$start), time2 = as.numeric(s$end),
+  event = as.numeric(s$cfrd_status_annual) - 1
+)
+fit <- survfit(surv_obj ~ age_group, id = eDWID, data = s)
+ggsurvplot(fit,
+  risk.table = T, cumevents = T,
+  fun = "event", xlim = c(2002, 2018)
+)
 ```
 
 # Logistic analyses
