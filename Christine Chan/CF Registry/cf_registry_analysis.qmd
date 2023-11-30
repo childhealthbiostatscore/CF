@@ -42,6 +42,10 @@ annual$cfrd_status_annual <- factor(annual$cfrd_status_annual,
   levels = 1:3,
   labels = c("CFRD-", "CFRD-", "CFRD+")
 )
+annual$age_2018 = 2018 - (annual$ReviewYear - annual$Age_YrEnd)
+annual = annual %>% 
+  group_by(eDWID) %>%
+  mutate(age_2018 = as.numeric(names(sort(table(age_2018),decreasing = TRUE)[1])))
 # Get mutations
 demogs <- read.csv("~/Documents/Work/Christine Chan/CF registry data/Data_Raw/CFF19_DemogCFDiag_Del1.csv")
 demogs <- demogs %>% select(eDWID, Gender, MutClass)
@@ -182,25 +186,27 @@ first_cfrd <- annual %>%
   filter(cfrd_status_annual == "CFRD+") %>%
   group_by(eDWID) %>%
   slice_head(n = 1) %>%
-  select(eDWID, ReviewYear) %>%
-  mutate(v = 1) %>%
-  pivot_wider(
-    id_cols = eDWID, names_from = ReviewYear, values_from = v,
-    values_fill = 0
-  )
+  select(eDWID,ReviewYear) %>% rename(first_cfrd=ReviewYear)
 # Make a dataframe for who was at risk each year
-at_risk <- annual %>%
-  select(eDWID, ReviewYear) %>%
-  mutate(v = 1) %>%
-  pivot_wider(
-    id_cols = eDWID, names_from = ReviewYear, values_from = v,
-    values_fill = 0
-  )
-# Add age information
-ages <- annual %>%
-  pivot_wider(
-    id_cols = eDWID, names_from = ReviewYear, values_from = age_group
-  )
+at_risk = expand.grid(eDWID = unique(annual$eDWID), ReviewYear=2003:2018)
+at_risk = at_risk %>% arrange(eDWID)
+at_risk = at_risk %>% 
+  full_join(.,annual %>% select(eDWID, ReviewYear,age_2018,A_hgba1c),
+            by = join_by(eDWID, ReviewYear))
+# Combine
+inc = left_join(at_risk,first_cfrd,by = join_by(eDWID))
+# Calculate all missing ages
+inc = inc %>% 
+  group_by(eDWID) %>%
+  mutate(age = age_2018[1] - (2018 - ReviewYear)) %>%
+  # No missing age in 2018 field, so this indicates whether they were at risk 
+  # (i.e. seen that year)
+  mutate(age_2018 = !is.na(age_2018)) %>%
+  rename(at_risk = age_2018)
+# Age group
+inc$age_group = cut(inc$age,c(-Inf,10,19,31,Inf),right=F)
+# Use table1
+table1(ReviewYear~)
 ```
 
 # Logistic analyses
