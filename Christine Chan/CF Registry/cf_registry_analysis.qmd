@@ -28,6 +28,7 @@ library(gt)
 library(gtsummary)
 library(forcats)
 library(labelled)
+library(parallel)
 ```
 
 ```{r}
@@ -344,11 +345,13 @@ log_reg <- function(year, missingness = T) {
 ## By year
 
 ```{r results='asis',fig.height=10,fig.width=10}
-invisible(lapply(unique(annual$ReviewYear), function(y) {
+cl = makeCluster(16,type = "FORK")
+invisible(parLapply(cl,unique(annual$ReviewYear), function(y) {
   cat("\n")
   cat("### ", y)
   cat("\n")
   log_reg(y)
   cat("\n")
 }))
+stopCluster(cl)
 ```
