@@ -225,7 +225,7 @@ Any participants with T1D or T2D were excluded from these analyses. Variables th
 
 ```{r}
 # Analysis function
-log_reg <- function(year, missingness = T) {
+log_reg <- function(year, missingness = F) {
   # Clean data
   df <- annual %>%
     filter(ReviewYear == year, Age_YrEnd >= 10) %>%
@@ -342,16 +342,12 @@ log_reg <- function(year, missingness = T) {
 }
 ```
 
-## By year
-
 ```{r results='asis',fig.height=10,fig.width=10}
-cl = makeCluster(16,type = "FORK")
-invisible(parLapply(cl,unique(annual$ReviewYear), function(y) {
+invisible(lapply(unique(annual$ReviewYear), function(y) {
   cat("\n")
-  cat("### ", y)
+  cat("## ", y)
   cat("\n")
   log_reg(y)
   cat("\n")
 }))
-stopCluster(cl)
 ```
