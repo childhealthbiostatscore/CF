@@ -25,6 +25,8 @@ library(tidyverse)
 library(forestmodel)
 library(childsds)
 library(gt)
+library(gtsummary)
+library(forcats)
 library(labelled)
 ```
 
@@ -37,15 +39,17 @@ data_dict <- readxl::read_excel("~/Documents/Work/Christine Chan/CF registry dat
 data_dict$var <- paste(data_dict$field_name, data_dict$code_value, sep = "_")
 # Remove those with T1D or T2D
 annual <- annual %>% arrange(eDWID, ReviewYear)
-annual = annual[!annual$cfrd_status_annual %in% c(4,5),]
+annual <- annual[!annual$cfrd_status_annual %in% c(4, 5), ]
 annual$cfrd_status_annual <- factor(annual$cfrd_status_annual,
   levels = 1:3,
   labels = c("CFRD-", "CFRD-", "CFRD+")
 )
-annual$age_2018 = 2018 - (annual$ReviewYear - annual$Age_YrEnd)
-annual = annual %>% 
+annual$age_2018 <- 2018 - (annual$ReviewYear - annual$Age_YrEnd)
+annual <- annual %>%
   group_by(eDWID) %>%
-  mutate(age_2018 = as.numeric(names(sort(table(age_2018),decreasing = TRUE)[1])))
+  mutate(age_2018 = as.numeric(names(sort(table(age_2018),
+    decreasing = TRUE
+  )[1])))
 # Get mutations
 demogs <- read.csv("~/Documents/Work/Christine Chan/CF registry data/Data_Raw/CFF19_DemogCFDiag_Del1.csv")
 demogs <- demogs %>% select(eDWID, Gender, MutClass)
@@ -101,12 +105,17 @@ annual$NumPulmExacerbation <- cut(annual$NumPulmExacerbation,
 annual$A_FEV1_pct_predicted <- cut(annual$A_FEV1_pct_predicted,
   breaks = c(0, 40, 80, 100, Inf), right = F
 )
-annual$A_FEV1_pct_predicted <- relevel(annual$A_FEV1_pct_predicted, ref = "[100,Inf)")
+annual$A_FEV1_pct_predicted <- relevel(annual$A_FEV1_pct_predicted,
+  ref = "[100,Inf)"
+)
 annual$height_perc <- cut(annual$height_perc, breaks = c(0, 10, 25, 50, Inf))
 annual$height_perc <- relevel(annual$height_perc, ref = "(50,Inf]")
 annual$bmi_perc <- cut(annual$bmi_perc, breaks = c(0, 10, 50, 85, Inf))
 annual$bmi_perc <- relevel(annual$bmi_perc, ref = "(50,85]")
-annual$age_group <- cut(annual$Age_YrEnd, breaks = c(-Inf,10, 18, 30, Inf), right = F)
+annual$age_group <- cut(annual$Age_YrEnd,
+  breaks = c(-Inf, 10, 18, 30, Inf),
+  right = F
+)
 annual$age_group <- relevel(annual$age_group, ref = "[10,18)")
 # Bugs
 bugs <- c(
@@ -118,7 +127,10 @@ yn_vars <- c(
   "A_IsOnEnzymes", "A_corticosteroids1", "A_feeding2",
   "A_Vx770", "A_VX809comb", bugs, "tube_feeding", "liver_disease"
 )
-annual[, yn_vars] <- lapply(annual[, yn_vars], factor, levels = 0:1, labels = c("No", "Yes"))
+annual[, yn_vars] <- lapply(annual[, yn_vars], factor,
+  levels = 0:1,
+  labels = c("No", "Yes")
+)
 annual$A_IsOnEnzymes <- relevel(annual$A_IsOnEnzymes, ref = "Yes")
 ```
 
@@ -127,7 +139,8 @@ annual$A_IsOnEnzymes <- relevel(annual$A_IsOnEnzymes, ref = "Yes")
 Registry fields included in our liver disease yes/no variable were:
 
 ```{r}
-data.frame(data_dict$code_meaning[data_dict$var %in% sub("A_", "", liver_fields)]) %>%
+data.frame(data_dict$code_meaning[data_dict$var %in%
+  sub("A_", "", liver_fields)]) %>%
   gt() %>%
   tab_options(column_labels.hidden = TRUE)
 ```
@@ -143,70 +156,66 @@ data.frame(data_dict$code_meaning[
   tab_options(column_labels.hidden = TRUE)
 ```
 
-# CFRD validity check
-
-```{r}
-annual %>%
-  mutate(cfrd = as.numeric(cfrd_status_annual == "CFRD+")) %>%
-  group_by(eDWID) %>%
-  summarise(
-    `CFRD Status` = any(rle(cfrd)$lengths[rle(cfrd)$values == 1] >= 2),
-    .groups = "drop"
-  ) %>%
-  mutate(`CFRD Status` = factor(`CFRD Status`,
-    levels = c(F, T),
-    labels = c("CFRD-", "CFRD+")
-  )) %>%
-  count(`CFRD Status`) %>%
-  gt()
-```
-
-# HbA1c by year
-
-```{r}
-annual %>%
-  group_by(ReviewYear) %>%
-  summarise(
-    `Num. HbA1c Tests` = sum(!is.na(A_hgba1c)),
-    `Total n` = n(),
-    `Percent with HbA1c` = round(sum(!is.na(A_hgba1c)) / n() * 100, 2)
-  ) %>%
-  gt()
-```
-
-Why are the percentages so low in 2006 - 2009? These appear to be correct based on the data we have, so could it be to do with how the data were collected or pulled by the CFFPR?
-
 # CFRD incidence and prevalence
 
-## Overall
+## By year
 
-```{r}
+```{r results='asis'}
 # Find the year that each person was diagnosed, make wide
 first_cfrd <- annual %>%
   filter(cfrd_status_annual == "CFRD+") %>%
   group_by(eDWID) %>%
   slice_head(n = 1) %>%
-  select(eDWID,ReviewYear) %>% rename(first_cfrd=ReviewYear)
+  select(eDWID, ReviewYear) %>%
+  rename(first_cfrd = ReviewYear)
 # Make a dataframe for who was at risk each year
-at_risk = expand.grid(eDWID = unique(annual$eDWID), ReviewYear=2003:2018)
-at_risk = at_risk %>% arrange(eDWID)
-at_risk = at_risk %>% 
-  full_join(.,annual %>% select(eDWID, ReviewYear,age_2018,A_hgba1c),
-            by = join_by(eDWID, ReviewYear))
+at_risk <- expand.grid(eDWID = unique(annual$eDWID), ReviewYear = 2003:2018)
+at_risk <- at_risk %>% arrange(eDWID)
+at_risk <- at_risk %>%
+  full_join(., annual %>%
+    select(eDWID, ReviewYear, age_2018, A_hgba1c, cfrd_status_annual),
+  by = join_by(eDWID, ReviewYear)
+  )
 # Combine
-inc = left_join(at_risk,first_cfrd,by = join_by(eDWID))
+inc <- left_join(at_risk, first_cfrd, by = join_by(eDWID))
 # Calculate all missing ages
-inc = inc %>% 
+inc <- inc %>%
   group_by(eDWID) %>%
-  mutate(age = age_2018[1] - (2018 - ReviewYear)) %>%
-  # No missing age in 2018 field, so this indicates whether they were at risk 
+  mutate(age = first(na.omit(age_2018)) - (2018 - ReviewYear)) %>%
+  # No missing age in 2018 field, so this indicates whether they were at risk
   # (i.e. seen that year)
   mutate(age_2018 = !is.na(age_2018)) %>%
-  rename(at_risk = age_2018)
+  rename(at_risk = age_2018) %>%
+  ungroup()
 # Age group
-inc$age_group = cut(inc$age,c(-Inf,10,19,31,Inf),right=F)
-# Use table1
-table1(ReviewYear~)
+inc$age_group <- cut(inc$age, c(-Inf, 10, 19, 31, Inf), right = F)
+# Remove people from at risk after diagnosis
+inc$at_risk[!is.na(inc$first_cfrd) & inc$ReviewYear > inc$first_cfrd] <- FALSE
+# Use gtsummary to make a list of tables by year
+invisible(lapply(unique(inc$ReviewYear), function(y) {
+  d <- inc %>%
+    filter(ReviewYear == y, at_risk) %>%
+    # Make missing values explicit for the tables
+    mutate(
+      a1c = factor(!is.na(A_hgba1c), levels = c(F, T), labels = c("No", "Yes")),
+      cfrd_status_annual = fct_explicit_na(cfrd_status_annual),
+    ) %>%
+    select(age_group, cfrd_status_annual, a1c, A_hgba1c) %>%
+    tbl_summary(
+      by = age_group, missing_text = "(Missing)",
+      label = list(
+        cfrd_status_annual ~ "Annualized CFRD Status",
+        A_hgba1c ~ "Annualized HbA1c", a1c ~ "A1c Collected"
+      ),
+      statistic = list(all_continuous() ~ "{mean} ({sd})")
+    ) %>%
+    add_overall()
+  cat("\n")
+  cat("### ", y)
+  cat("\n")
+  print(d)
+  cat("\n")
+}))
 ```
 
 # Logistic analyses
@@ -220,12 +229,17 @@ log_reg <- function(year, missingness = T) {
   df <- annual %>%
     filter(ReviewYear == year, Age_YrEnd >= 10) %>%
     select(
-      eDWID, age_group, Gender, bmi_perc, MutClass, A_IsOnEnzymes, A_FEV1_pct_predicted,
-      tube_feeding, NumPulmExacerbation, A_pseudomonasaeruginosa,
-      A_fungalyeast1, A_pulmonarycomplications1, A_mycocultureresults3,
+      eDWID, age_group, Gender, bmi_perc, MutClass, A_IsOnEnzymes,
+      A_FEV1_pct_predicted, tube_feeding, NumPulmExacerbation,
+      A_pseudomonasaeruginosa, A_fungalyeast1, A_mycocultureresults3,
+      A_pulmonarycomplications1,
       A_corticosteroids1, cfrd_status_annual, A_Vx770, A_VX809comb,
       liver_disease
     )
+  # Assume that missing are CFRD- for these models
+  df$cfrd_status_annual[is.na(df$cfrd_status_annual)] <- "CFRD-"
+  # Relevel age group since we're excluding kids < 10
+  df$age_group <- droplevels(df$age_group)
   # Remove all empty columns
   empty <- which(colSums(is.na(df)) == nrow(df))
   if (length(empty) > 0) {
@@ -234,7 +248,10 @@ log_reg <- function(year, missingness = T) {
   # Models
   vars <- colnames(df)[which(!colnames(df) %in%
     c(bugs, liver_fields, "cfrd_status_annual", "eDWID"))]
-  base_mod <- as.formula(paste0("cfrd_status_annual~", paste0(vars, collapse = "+")))
+  base_mod <- as.formula(paste0(
+    "cfrd_status_annual~",
+    paste0(vars, collapse = "+")
+  ))
   # Labels
   labels <- list(
     cfrd_status_annual = "CFRD Status", MutClass = "Mutation class",
@@ -274,7 +291,10 @@ log_reg <- function(year, missingness = T) {
   print(forest_model(mod1, exclude_infinite_cis = F))
   cat("\n")
   if ("A_pseudomonasaeruginosa" %in% colnames(df)) {
-    mod2 <- glm(update(base_mod, . ~ . + A_pseudomonasaeruginosa), data = df, family = "binomial")
+    mod2 <- glm(update(base_mod, . ~ . + A_pseudomonasaeruginosa),
+      data = df,
+      family = "binomial"
+    )
     cat("\n")
     cat("### P. aeruginosa")
     cat("\n")
@@ -283,7 +303,10 @@ log_reg <- function(year, missingness = T) {
     cat("\n")
   }
   if ("A_fungalyeast1" %in% colnames(df)) {
-    mod3 <- glm(update(base_mod, . ~ . + A_fungalyeast1), data = df, family = "binomial")
+    mod3 <- glm(update(base_mod, . ~ . + A_fungalyeast1),
+      data = df,
+      family = "binomial"
+    )
     cat("\n")
     cat("### Aspergillus")
     cat("\n")
@@ -292,7 +315,10 @@ log_reg <- function(year, missingness = T) {
     cat("\n")
   }
   if ("A_pulmonarycomplications1" %in% colnames(df)) {
-    mod4 <- glm(update(base_mod, . ~ . + A_pulmonarycomplications1), data = df, family = "binomial")
+    mod4 <- glm(update(base_mod, . ~ . + A_pulmonarycomplications1),
+      data = df,
+      family = "binomial"
+    )
     cat("\n")
     cat("### ABPA")
     cat("\n")
@@ -301,7 +327,10 @@ log_reg <- function(year, missingness = T) {
     cat("\n")
   }
   if ("A_mycocultureresults3" %in% colnames(df)) {
-    mod5 <- glm(update(base_mod, . ~ . + A_mycocultureresults3), data = df, family = "binomial")
+    mod5 <- glm(update(base_mod, . ~ . + A_mycocultureresults3),
+      data = df,
+      family = "binomial"
+    )
     cat("\n")
     cat("### Mycobacterium")
     cat("\n")
@@ -312,31 +341,14 @@ log_reg <- function(year, missingness = T) {
 }
 ```
 
-## 2004
+## By year
 
 ```{r results='asis',fig.height=10,fig.width=10}
-log_reg(2004)
+invisible(lapply(unique(annual$ReviewYear), function(y) {
+  cat("\n")
+  cat("### ", y)
+  cat("\n")
+  log_reg(y)
+  cat("\n")
+}))
 ```
-
-## 2006
-
-```{r results='asis',fig.height=10,fig.width=10}
-log_reg(2006)
-```
-
-## 2013
-
-```{r results='asis',fig.height=10,fig.width=10}
-log_reg(2013)
-```
-
-## 2018
-
-```{r results='asis',fig.height=10,fig.width=10}
-log_reg(2018)
-```
-
-# Questions
-
-1. What variables do we use for B. Cepacia and liver disease?
-2. Do we have CFTR modulator data aside from `Vx770` and `Vx809comb`?
