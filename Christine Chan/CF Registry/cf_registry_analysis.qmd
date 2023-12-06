@@ -29,6 +29,15 @@ library(gtsummary)
 library(forcats)
 library(labelled)
 library(parallel)
+switch(Sys.info()[["sysname"]],
+  Windows = {
+    home_dir <- "OneDrive - The University of Colorado Denver"
+  },
+  Darwin = {
+    home_dir <- "~/"
+  }
+)
+knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r}
