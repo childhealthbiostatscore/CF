@@ -28,7 +28,8 @@ library(gt)
 library(gtsummary)
 library(forcats)
 library(labelled)
-library(parallel)
+library(survival)
+library(survminer)
 switch(Sys.info()[["sysname"]],
   Windows = {
     home_dir <- "C:/Users/timvigers/Dropbox/Work/Christine Chan/CF registry data"
@@ -45,71 +46,54 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```{r}
 # All data
 encounter <- read.csv("./Data_Raw/CFF19_encountersMerged_Del1.csv",
-                      na.strings = c("", "N/A")
+  na.strings = c("", "N/A")
 )
 annual <- read.csv("./Data_Raw/CFF19_Annualized_Del1.csv",
-                   na.strings = c("", "N/A")
+  na.strings = c("", "N/A")
 )
 encounter <- encounter %>%
   arrange(eDWID, reviewyear, encounternum)
-annual = annual %>% arrange(eDWID,ReviewYear)
+annual <- annual %>% arrange(eDWID, ReviewYear)
 # Add age
-ages <- annual %>% 
-  mutate(`Age in 2018` = 2018-(ReviewYear-Age_YrEnd)) %>%
+ages <- annual %>%
+  mutate(`Age in 2018` = 2018 - (ReviewYear - Age_YrEnd)) %>%
   rename(reviewyear = ReviewYear) %>%
-  group_by(eDWID,reviewyear) %>%
-  summarise(`Age in 2018` = as.numeric(names(sort(table(`Age in 2018`), 
-                                                  decreasing = TRUE)[1])),
-            Age = Age_YrEnd[1],.groups = "drop")
-encounter = left_join(encounter,ages,by = c("eDWID", "reviewyear"))
-encounter$`Age Group 2018` = cut(encounter$`Age in 2018`,
-                            c(-Inf,10,19,31,Inf),
-                            labels = c("< 10", "10 - 18", "19 - 30", "> 30"),
-                            right=F)
-encounter$`Age Group` = cut(encounter$Age,
-                            c(-Inf,10,19,31,Inf),
-                            labels = c("< 10", "10 - 18", "19 - 30", "> 30"),
-                            right=F)
-# For those with CFRD by OGTT, find first visit with diagnosis
-first_cfrd_ogtt <- encounter %>% 
-  filter(twohour_bloodglucose >= 200) %>%
-  group_by(eDWID) %>%
-  filter(row_number()==1) %>%
-  select(eDWID, reviewyear, `Age in 2018`) %>%
-  rename(first_cfrd_ogtt = reviewyear)
+  group_by(eDWID, reviewyear) %>%
+  summarise(
+    `Age in 2018` = as.numeric(names(sort(table(`Age in 2018`),
+      decreasing = TRUE
+    )[1])),
+    Age = Age_YrEnd[1], .groups = "drop"
+  )
+encounter <- left_join(encounter, ages, by = c("eDWID", "reviewyear"))
+encounter$`Age Group 2018` <- cut(encounter$`Age in 2018`,
+  c(-Inf, 10, 19, 31, Inf),
+  labels = c("< 10", "10 - 18", "19 - 30", "> 30"),
+  right = F
+)
+encounter$`Age Group` <- cut(encounter$Age,
+  c(-Inf, 10, 19, 31, Inf),
+  labels = c("< 10", "10 - 18", "19 - 30", "> 30"),
+  right = F
+)
 # For those with CFRD by registry criteria, find first visit with diagnosis
-first_cfrd_cffpr <- encounter %>% 
-  filter(cfrd_status==3) %>%
+first_cfrd_cffpr <- encounter %>%
+  filter(cfrd_status == 3) %>%
   group_by(eDWID) %>%
-  filter(row_number()==1) %>%
+  filter(row_number() == 1) %>%
   select(eDWID, reviewyear, `Age in 2018`) %>%
   rename(first_cfrd_cffpr = reviewyear)
-# Both
-first_cfrd_both <- encounter %>% 
-  filter(cfrd_status==3|twohour_bloodglucose >= 200) %>%
-  group_by(eDWID) %>%
-  filter(row_number()==1) %>%
-  select(eDWID, reviewyear, `Age in 2018`) %>%
-  rename(first_cfrd_both = reviewyear)
 # Add to encounter level data
 encounter <- left_join(encounter, first_cfrd_ogtt, by = c("eDWID", "Age in 2018"))
 encounter <- left_join(encounter, first_cfrd_cffpr, by = c("eDWID", "Age in 2018"))
-encounter <- left_join(encounter, first_cfrd_both,by = c("eDWID", "Age in 2018"))
+encounter <- left_join(encounter, first_cfrd_both, by = c("eDWID", "Age in 2018"))
 # Fill down CFRD Yes/No by year
 encounter <- encounter %>%
   group_by(eDWID) %>%
   mutate(
-    cfrd_ogtt = case_when(
-      reviewyear < first_cfrd_ogtt ~ "No",
-      reviewyear >= first_cfrd_ogtt ~ "Yes"
-    ),
     cfrd_cffpr = case_when(
       reviewyear < first_cfrd_cffpr ~ "No",
       reviewyear >= first_cfrd_cffpr ~ "Yes"
-    ),
-    cfrd_both = case_when(
-      reviewyear < first_cfrd_both ~ "No",
-      reviewyear >= first_cfrd_both ~ "Yes"
     )
   ) %>%
   ungroup()
@@ -117,71 +101,219 @@ encounter$cfrd_ogtt[is.na(encounter$cfrd_ogtt)] <- "No"
 encounter$cfrd_cffpr[is.na(encounter$cfrd_cffpr)] <- "No"
 encounter$cfrd_both[is.na(encounter$cfrd_both)] <- "No"
 # Ordered factors
-encounter$cfrd_ogtt = factor(encounter$cfrd_ogtt,levels = c("No","Yes"),ordered = T)
-encounter$cfrd_cffpr = factor(encounter$cfrd_cffpr,levels = c("No","Yes"),ordered = T)
-encounter$cfrd_both = factor(encounter$cfrd_both,levels = c("No","Yes"),ordered = T)
+encounter$cfrd_ogtt <- factor(encounter$cfrd_ogtt, levels = c("No", "Yes"), ordered = T)
+encounter$cfrd_cffpr <- factor(encounter$cfrd_cffpr, levels = c("No", "Yes"), ordered = T)
+encounter$cfrd_both <- factor(encounter$cfrd_both, levels = c("No", "Yes"), ordered = T)
 # Remove those missing age
-encounter = encounter %>% filter(!is.na(Age))
+encounter <- encounter %>% filter(!is.na(Age))
 ```
 
 ```{r}
+#| label: tbl-incidence_cffpr
+#| tbl-cap: "Year-on-Year Incidence of CFRD Based on CFFPR Alone"
 # For each year, pull everyone with and without CFRD that year
-year_inc = function(df=encounter,year,py = 1000){
+year_inc <- function(df = encounter, year, py = 1000) {
   # Filter and count
-  inc = df %>%  
-    filter(reviewyear==year,is.na(first_cfrd_cffpr) | first_cfrd_cffpr >= year) %>%
-    group_by(eDWID) %>% filter(row_number() == 1) %>% 
-    select(eDWID,`Age Group`,cfrd_cffpr)
-  inc = inc %>% group_by(cfrd_cffpr) %>% count(`Age Group`,.drop = F)
-  inc = inc[!is.na(inc$`Age Group`),]
+  inc <- df %>%
+    filter(reviewyear == year, is.na(first_cfrd_cffpr) | first_cfrd_cffpr >= year) %>%
+    group_by(eDWID) %>%
+    filter(row_number() == 1) %>%
+    select(eDWID, `Age Group`, cfrd_cffpr)
+  inc <- inc %>%
+    group_by(cfrd_cffpr) %>%
+    count(`Age Group`, .drop = F)
+  inc <- inc[!is.na(inc$`Age Group`), ]
   # Calculations
-  new_cases = sum(inc$n[inc$cfrd_cffpr=="Yes"])
-  total_at_risk = sum(inc$n)
-  total_inc = new_cases/(total_at_risk/py)
-  
-  new_cases_10 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group` == "< 10"])
-  at_risk_10 = sum(inc$n[inc$`Age Group` == "< 10"])
-  inc_10 = new_cases_10/(at_risk_10/py)
-  
-  new_cases_10_18 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group` == "10 - 18"])
-  at_risk_10_18 = sum(inc$n[inc$`Age Group` == "10 - 18"])
-  inc_10_18 = new_cases_10_18/(at_risk_10_18/py)
-  
-  new_cases_19_30 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group` == "19 - 30"])
-  at_risk_19_30 = sum(inc$n[inc$`Age Group` == "19 - 30"])
-  inc_19_30 = new_cases_19_30/(at_risk_19_30/py)
-  
-  new_cases_30 = sum(inc$n[inc$cfrd_cffpr=="Yes" & inc$`Age Group` == "> 30"])
-  at_risk_30 = sum(inc$n[inc$`Age Group` == "> 30"])
-  inc_30 = new_cases_30/(at_risk_30/py)
-  
+  new_cases <- sum(inc$n[inc$cfrd_cffpr == "Yes"])
+  total_at_risk <- sum(inc$n)
+  total_inc <- new_cases / (total_at_risk / py)
+
+  new_cases_10 <- sum(inc$n[inc$cfrd_cffpr == "Yes" & inc$`Age Group` == "< 10"])
+  at_risk_10 <- sum(inc$n[inc$`Age Group` == "< 10"])
+  inc_10 <- new_cases_10 / (at_risk_10 / py)
+
+  new_cases_10_18 <- sum(inc$n[inc$cfrd_cffpr == "Yes" & inc$`Age Group` == "10 - 18"])
+  at_risk_10_18 <- sum(inc$n[inc$`Age Group` == "10 - 18"])
+  inc_10_18 <- new_cases_10_18 / (at_risk_10_18 / py)
+
+  new_cases_19_30 <- sum(inc$n[inc$cfrd_cffpr == "Yes" & inc$`Age Group` == "19 - 30"])
+  at_risk_19_30 <- sum(inc$n[inc$`Age Group` == "19 - 30"])
+  inc_19_30 <- new_cases_19_30 / (at_risk_19_30 / py)
+
+  new_cases_30 <- sum(inc$n[inc$cfrd_cffpr == "Yes" & inc$`Age Group` == "> 30"])
+  at_risk_30 <- sum(inc$n[inc$`Age Group` == "> 30"])
+  inc_30 <- new_cases_30 / (at_risk_30 / py)
+
   # Nice results
-  list(`Year` = year,
-       `Total New Cases` = new_cases,
-       `Total At Risk` = total_at_risk,
-       `Total Incidence` = total_inc,
-       
-       `Total New Cases Age < 10` = new_cases_10,
-       `Total At Risk Age < 10` = at_risk_10,
-       `Total Incidence Age < 10` = inc_10,
-       
-       `Total New Cases Age 10-18` = new_cases_10_18,
-       `Total At Risk Age 10-18` = at_risk_10_18,
-       `Total Incidence Age 10-18` = inc_10_18,
-       
-       `Total New Cases Age 19-30` = new_cases_19_30,
-       `Total At Risk Age 19-30` = at_risk_19_30,
-       `Total Incidence Age 19-30` = inc_19_30,
-       
-       `Total New Cases Age > 30` = new_cases_30,
-       `Total At Risk Age > 30` = at_risk_30,
-       `Total Incidence Age > 30` = inc_30)
+  list(
+    `Year` = year,
+    `Total New Cases` = new_cases,
+    `Total At Risk` = total_at_risk,
+    `Total Incidence` = total_inc,
+    `Total New Cases Age < 10` = new_cases_10,
+    `Total At Risk Age < 10` = at_risk_10,
+    `Total Incidence Age < 10` = inc_10,
+    `Total New Cases Age 10-18` = new_cases_10_18,
+    `Total At Risk Age 10-18` = at_risk_10_18,
+    `Total Incidence Age 10-18` = inc_10_18,
+    `Total New Cases Age 19-30` = new_cases_19_30,
+    `Total At Risk Age 19-30` = at_risk_19_30,
+    `Total Incidence Age 19-30` = inc_19_30,
+    `Total New Cases Age > 30` = new_cases_30,
+    `Total At Risk Age > 30` = at_risk_30,
+    `Total Incidence Age > 30` = inc_30
+  )
 }
-incidence = lapply(2003:2018, function(y){year_inc(year = y)})
-incidence = data.frame(do.call(rbind,incidence),check.names = F)
-incidence = data.frame(lapply(incidence,as.numeric),check.names = F)
-kable(incidence,digits = 3)
+incidence <- lapply(2003:2018, function(y) {
+  year_inc(year = y)
+})
+incidence <- data.frame(do.call(rbind, incidence), check.names = F)
+incidence <- data.frame(lapply(incidence, as.numeric), check.names = F)
+kable(incidence, digits = 3)
 ```
+
+In @tbl-incidence_cffpr, incidence per year is calculated as the number of new CFRD diagnoses (by registry definition alone) per 1,000 person-years of those at risk, excluding previously identified cases.
+
+```{r}
+#| label: tbl-prevalence_cffpr
+#| tbl-cap: "Yearly Prevalence of CFRD Based on CFFPR Alone"
+encounter %>%
+  group_by(eDWID, reviewyear) %>%
+  summarise(cfrd = max(cfrd_cffpr), .groups = "drop") %>%
+  group_by(reviewyear) %>%
+  summarise(Prevalence = mean(as.numeric(cfrd) - 1, na.rm = T) * 100, .groups = "drop") %>%
+  kable(., digits = 3)
+```
+
+```{r}
+#| label: tbl-prevalence_cffpr_year
+#| tbl-cap: "Yearly Prevalence of CFRD by Age Group Based on CFFPR Alone"
+encounter %>%
+  group_by(eDWID, reviewyear, `Age Group`) %>%
+  summarise(cfrd = max(cfrd_cffpr), .groups = "drop") %>%
+  group_by(reviewyear, `Age Group`) %>%
+  summarise(Prevalence = mean(as.numeric(cfrd) - 1, na.rm = T) * 100, .groups = "drop") %>%
+  pivot_wider(names_from = `Age Group`, values_from = Prevalence) %>%
+  kable(., digits = 3)
+```
+
+In @tbl-prevalence_cffpr_year and @tbl-prevalence_cffpr, prevalence is calculated as the total number of CFRD cases (by registry definition alone) seen in clinic divided by the total number of people seen in clinic in a given year.
+
+# CFRD screening rates
+
+```{r}
+#| label: tbl-screening_ogtt
+#| tbl-cap: "Yearly OGTT Screening Rates"
+year_screen <- function(df = encounter, year) {
+  # Filter and count
+  inc <- df %>%
+    filter(reviewyear == year, first_cfrd_cffpr > year | is.na(first_cfrd_cffpr)) %>%
+    mutate(ogtt = !is.na(ogttfast_bloodglucose) | !is.na(twohour_bloodglucose)) %>%
+    group_by(eDWID) %>%
+    summarise(ogtt = max(ogtt), `Age Group` = `Age Group`[1])
+  inc <- inc %>%
+    group_by(ogtt) %>%
+    count(`Age Group`) %>%
+    filter(`Age Group` != "< 10")
+  # Calculations
+  total_screened <- sum(inc$n[inc$ogtt == 1])
+  total_seen <- sum(inc$n)
+  screen_rate <- total_screened / total_seen * 100
+
+  screened_10_18 <- inc$n[inc$ogtt == 1 & inc$`Age Group` == "10 - 18"]
+  seen_10_18 <- sum(inc$n[inc$`Age Group` == "10 - 18"])
+  rate_10_18 <- screened_10_18 / seen_10_18 * 100
+
+  screened_19_30 <- inc$n[inc$ogtt == 1 & inc$`Age Group` == "19 - 30"]
+  seen_19_30 <- sum(inc$n[inc$`Age Group` == "19 - 30"])
+  rate_19_30 <- screened_19_30 / seen_19_30 * 100
+
+  screened_30 <- inc$n[inc$ogtt == 1 & inc$`Age Group` == "> 30"]
+  seen_30 <- sum(inc$n[inc$`Age Group` == "> 30"])
+  rate_30 <- screened_30 / seen_30 * 100
+
+  # Nice results
+  list(
+    `Year` = year,
+    `Total Screened` = total_screened,
+    `Total Seen` = total_seen,
+    `Screen Rate (%)` = screen_rate,
+    `Total Screened Age 10-18` = screened_10_18,
+    `Total Seen Age 10-18` = seen_10_18,
+    `Screen Rate Age 10-18 (%)` = rate_10_18,
+    `Total Screened Age 19-30` = screened_19_30,
+    `Total Seen Age 19-30` = seen_19_30,
+    `Screen Rate Age 19-30 (%)` = rate_19_30,
+    `Total Screened Age > 30` = screened_30,
+    `Total Seen Age > 30` = seen_30,
+    `Screen Rate Age > 30 (%)` = rate_30
+  )
+}
+screen <- lapply(2003:2018, function(y) {
+  year_screen(year = y)
+})
+screen <- data.frame(do.call(rbind, screen), check.names = F)
+screen <- data.frame(lapply(screen, as.numeric), check.names = F)
+kable(screen, digits = 3)
+```
+
+```{r}
+#| label: tbl-screening_a1c
+#| tbl-cap: "Yearly HbA1c Screening Rates"
+year_screen <- function(df = encounter, year) {
+  # Filter and count
+  inc <- df %>%
+    filter(reviewyear == year, first_cfrd_cffpr > year | is.na(first_cfrd_cffpr)) %>%
+    mutate(a1c = !is.na(hgba1c)) %>%
+    group_by(eDWID) %>%
+    summarise(a1c = max(a1c), `Age Group` = `Age Group`[1])
+  inc <- inc %>%
+    group_by(a1c) %>%
+    count(`Age Group`) %>%
+    filter(`Age Group` != "< 10")
+  # Calculations
+  total_screened <- sum(inc$n[inc$a1c == 1])
+  total_seen <- sum(inc$n)
+  screen_rate <- total_screened / total_seen * 100
+
+  screened_10_18 <- inc$n[inc$a1c == 1 & inc$`Age Group` == "10 - 18"]
+  seen_10_18 <- sum(inc$n[inc$`Age Group` == "10 - 18"])
+  rate_10_18 <- screened_10_18 / seen_10_18 * 100
+
+  screened_19_30 <- inc$n[inc$a1c == 1 & inc$`Age Group` == "19 - 30"]
+  seen_19_30 <- sum(inc$n[inc$`Age Group` == "19 - 30"])
+  rate_19_30 <- screened_19_30 / seen_19_30 * 100
+
+  screened_30 <- inc$n[inc$a1c == 1 & inc$`Age Group` == "> 30"]
+  seen_30 <- sum(inc$n[inc$`Age Group` == "> 30"])
+  rate_30 <- screened_30 / seen_30 * 100
+
+  # Nice results
+  list(
+    `Year` = year,
+    `Total Screened` = total_screened,
+    `Total Seen` = total_seen,
+    `Screen Rate (%)` = screen_rate,
+    `Total Screened Age 10-18` = screened_10_18,
+    `Total Seen Age 10-18` = seen_10_18,
+    `Screen Rate Age 10-18 (%)` = rate_10_18,
+    `Total Screened Age 19-30` = screened_19_30,
+    `Total Seen Age 19-30` = seen_19_30,
+    `Screen Rate Age 19-30 (%)` = rate_19_30,
+    `Total Screened Age > 30` = screened_30,
+    `Total Seen Age > 30` = seen_30,
+    `Screen Rate Age > 30 (%)` = rate_30
+  )
+}
+screen <- lapply(2003:2018, function(y) {
+  year_screen(year = y)
+})
+screen <- data.frame(do.call(rbind, screen), check.names = F)
+screen <- data.frame(lapply(screen, as.numeric), check.names = F)
+kable(screen, digits = 3)
+```
+
+In @tbl-screening_ogtt and @tbl-screening_a1c, people with CFRD (by registry definition) and those under age 10 were excluded. Screening rate is calculated as the number of people with an OGTT or HbA1c, respectively, divided by the total number of people seen in clinic that year.
 
 # Data cleaning
 
@@ -287,6 +419,11 @@ annual[, yn_vars] <- lapply(annual[, yn_vars], factor,
   labels = c("No", "Yes")
 )
 annual$A_IsOnEnzymes <- relevel(annual$A_IsOnEnzymes, ref = "Yes")
+# To have CFRD, must have two consecutive visits with CFRD
+# Once diagnosed, always in CFRD group.
+annual = annual %>%
+  group_by(eDWID) %>%
+  mutate(two_consec = 0)
 ```
 
 Registry fields included in our liver disease yes/no variable were:
@@ -309,135 +446,56 @@ data.frame(data_dict$code_meaning[
   tab_options(column_labels.hidden = TRUE)
 ```
 
-# Logistic analyses
+# Survival analysis
 
-Any participants with T1D or T2D were excluded from these analyses. Variables that were entirely missing in a given year (e.g., `A_Vx770` and `A_VX809comb` in 2005) were excluded from those models. Participants under age 10 at year end were also excluded due to missing PFT data.
+Based on CFFPR annualized data.
 
 ```{r}
-# Analysis function
-log_reg <- function(year, missingness = F) {
-  # Clean data
-  df <- annual %>%
-    filter(ReviewYear == year, Age_YrEnd >= 10) %>%
-    select(
-      eDWID, age_group, Gender, bmi_perc, MutClass, A_IsOnEnzymes,
-      A_FEV1_pct_predicted, tube_feeding, NumPulmExacerbation,
-      A_pseudomonasaeruginosa, A_fungalyeast1, A_mycocultureresults3,
-      A_pulmonarycomplications1,
-      A_corticosteroids1, cfrd_status_annual, A_Vx770, A_VX809comb,
-      liver_disease
-    )
-  # Assume that missing are CFRD- for these models
-  df$cfrd_status_annual[is.na(df$cfrd_status_annual)] <- "CFRD-"
-  # Relevel age group since we're excluding kids < 10
-  df$age_group <- droplevels(df$age_group)
-  # Remove all empty columns
-  empty <- which(colSums(is.na(df)) == nrow(df))
-  if (length(empty) > 0) {
-    df <- df[, -empty]
-  }
-  # Models
-  vars <- colnames(df)[which(!colnames(df) %in%
-    c(bugs, liver_fields, "cfrd_status_annual", "eDWID"))]
-  base_mod <- as.formula(paste0(
-    "cfrd_status_annual~",
-    paste0(vars, collapse = "+")
-  ))
-  # Labels
-  labels <- list(
-    cfrd_status_annual = "CFRD Status", MutClass = "Mutation class",
-    Gender = "Sex", A_IsOnEnzymes = "Pancreatic enzyme use",
-    A_FEV1_pct_predicted = "FEV1 percent predicted",
-    tube_feeding = "Enteric feedings", liver_disease = "Liver disease",
-    A_corticosteroids1 = "Use of corticosteroids",
-    NumPulmExacerbation = "Admissions for PEx", age_group = "Age group",
-    height_perc = "Height percentile", bmi_perc = "BMI percentile",
-    A_Vx770 = "Use of CFTR modulator Vx770",
-    A_VX809comb = "Use of CFTR modulator Vx809 combination",
-    A_pseudomonasaeruginosa = "Pseudomonas aeruginosa",
-    A_fungalyeast1 = "Aspergillus (any species)",
-    A_pulmonarycomplications1 = "ABPA",
-    A_mycocultureresults3 = "Microorganisms in myco culture"
-  )
-  var_label(df[, vars[which(vars %in% colnames(df))]]) <-
-    as.character(labels[vars[which(vars %in% colnames(df))]])
-  var_label(df[, bugs[which(bugs %in% colnames(df))]]) <-
-    as.character(labels[bugs[which(bugs %in% colnames(df))]])
-  # Visualize missingness if required
-  if (missingness) {
-    cat("\n")
-    cat("### Missingness")
-    cat("\n")
-    cat("\n")
-    print(naniar::vis_miss(df))
-    cat("\n")
-  }
-  # Simple models
-  mod1 <- glm(base_mod, data = df, family = "binomial")
-  # Print results
-  cat("\n")
-  cat("### Base Model")
-  cat("\n")
-  cat("\n")
-  print(forest_model(mod1, exclude_infinite_cis = F))
-  cat("\n")
-  if ("A_pseudomonasaeruginosa" %in% colnames(df)) {
-    mod2 <- glm(update(base_mod, . ~ . + A_pseudomonasaeruginosa),
-      data = df,
-      family = "binomial"
-    )
-    cat("\n")
-    cat("### P. aeruginosa")
-    cat("\n")
-    cat("\n")
-    print(forest_model(mod2, exclude_infinite_cis = F))
-    cat("\n")
-  }
-  if ("A_fungalyeast1" %in% colnames(df)) {
-    mod3 <- glm(update(base_mod, . ~ . + A_fungalyeast1),
-      data = df,
-      family = "binomial"
-    )
-    cat("\n")
-    cat("### Aspergillus")
-    cat("\n")
-    cat("\n")
-    print(forest_model(mod3, exclude_infinite_cis = F))
-    cat("\n")
-  }
-  if ("A_pulmonarycomplications1" %in% colnames(df)) {
-    mod4 <- glm(update(base_mod, . ~ . + A_pulmonarycomplications1),
-      data = df,
-      family = "binomial"
-    )
-    cat("\n")
-    cat("### ABPA")
-    cat("\n")
-    cat("\n")
-    print(forest_model(mod4, exclude_infinite_cis = F))
-    cat("\n")
-  }
-  if ("A_mycocultureresults3" %in% colnames(df)) {
-    mod5 <- glm(update(base_mod, . ~ . + A_mycocultureresults3),
-      data = df,
-      family = "binomial"
-    )
-    cat("\n")
-    cat("### Mycobacterium")
-    cat("\n")
-    cat("\n")
-    print(forest_model(mod5, exclude_infinite_cis = F))
-    cat("\n")
-  }
-}
+# Create survival dataset
+s <- annual %>%
+  rename(end = ReviewYear) %>% # ReviewYear is the end of the interval
+  group_by(eDWID) %>%
+  mutate(start = lag(end,default = 2002)) %>% # Get interval start
+  select(eDWID, start, end, Age_YrEnd, cfrd_status_annual) # Sort columns
+# Age group
+s$age_group <- cut(s$Age_YrEnd,
+  breaks = c(-Inf, 10, 19, 31, Inf), right = F
+)
+knitr::kable(head(s,40))
 ```
 
-```{r results='asis',fig.height=10,fig.width=10}
-invisible(lapply(unique(annual$ReviewYear), function(y) {
-  cat("\n")
-  cat("## ", y)
-  cat("\n")
-  log_reg(y)
-  cat("\n")
-}))
+```{r}
+# New dataset approach
+cases = unique(annual$eDWID[annual$cfrd_status_annual == "CFRD+"])
+controls_df = annual[!annual$eDWID %in% cases,]
+cases_df = annual[annual$eDWID %in% cases,]
+# Controls
+tc = controls_df %>% 
+  select(eDWID,ReviewYear,cfrd_status_annual) %>%
+  filter(!is.na(cfrd_status_annual)) %>%
+  group_by(eDWID) %>%
+  summarise(start = first(ReviewYear),
+         end = last(ReviewYear),.groups = "drop") %>%
+  mutate(cfrd = 0)
+# Cases
+tc2 = cases_df %>% 
+  select(eDWID,ReviewYear,cfrd_status_annual) %>%
+  filter(!is.na(cfrd_status_annual)) %>%
+  mutate(neg_year = ReviewYear * (ifelse(cfrd_status_annual=="CFRD-",-1,1))) %>%
+  arrange(eDWID,cfrd_status_annual,neg_year) %>%
+  group_by(eDWID,cfrd_status_annual) %>% 
+  filter(row_number()==1)
+```
+
+```{r}
+# Survival fit
+surv_obj <- Surv(
+  time = s$start, time2 = s$end,
+  event = as.numeric(s$cfrd_status_annual) - 1
+)
+fit <- survfit(surv_obj ~ age_group, id = eDWID, data = s)
+ggsurvplot(fit,
+  risk.table = T, cumevents = T,
+  fun = "event", xlim = c(2002, 2018)
+)
 ```
