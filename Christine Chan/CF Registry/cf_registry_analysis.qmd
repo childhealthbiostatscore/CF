@@ -412,6 +412,12 @@ by <- annual %>%
   slice_min(birth_year) %>%
   select(-n)
 annual <- left_join(annual, by, by = join_by(eDWID))
+# Get first year of CFRD
+first_cfrd <- annual %>%
+  filter(cfrd_status_annual == "CFRD+") %>%
+  group_by(eDWID) %>%
+  summarise(first_cfrd = min(ReviewYear))
+annual <- left_join(annual, first_cfrd, by = join_by(eDWID))
 ```
 
 Registry fields included in our liver disease yes/no variable were:
@@ -464,7 +470,11 @@ labels <- list(
 )
 # For now, let's just assume that everyone's first CFRD+ diagnosis is correct
 s <- annual %>%
-  filter(!is.na(cfrd_status_annual), Age_YrEnd != 0) %>%
+  filter(
+    !is.na(cfrd_status_annual),
+    Age_YrEnd != 0,
+    is.na(first_cfrd) | ReviewYear <= first_cfrd
+  ) %>%
   select(
     eDWID, ReviewYear, birth_year, Age_YrEnd,
     all_of(vars), cfrd_status_annual
@@ -476,17 +486,21 @@ s <- annual %>%
     age_at_entry = Age_YrEnd[1]
   ) %>%
   select(eDWID, birth_year, tstart, tstop, cfrd_status_annual, age_at_entry, everything())
-write.csv(s, file = "~/survival_data.csv", row.names = F, na = "")
 ```
 
 ```{r}
 cox_res <- coxph(
   Surv(tstart, tstop, cfrd_status_annual == "CFRD+") ~
     age_group + A_FEV1_pct_predicted,
-  data = s
+  data = s, cluster = eDWID
 )
 ggsurvplot(survfit(cox_res),
   data = s,
+  risk.table = T, cumevents = T, fun = "event", xlim = c(2003, 2018)
+)
+surv_fit = survfit(Surv(tstart, tstop, cfrd_status_annual == "CFRD+") ~ age_group, 
+                   data = s)
+ggsurvplot(surv_fit,
   risk.table = T, cumevents = T, fun = "event", xlim = c(2003, 2018)
 )
 ```
