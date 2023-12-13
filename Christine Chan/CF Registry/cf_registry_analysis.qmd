@@ -183,7 +183,8 @@ encounter %>%
   group_by(eDWID, reviewyear) %>%
   summarise(cfrd = max(cfrd_cffpr), .groups = "drop") %>%
   group_by(reviewyear) %>%
-  summarise(Prevalence = mean(as.numeric(cfrd) - 1, na.rm = T) * 100, .groups = "drop") %>%
+  summarise(Prevalence = mean(as.numeric(cfrd) - 1, na.rm = T) * 100, 
+            .groups = "drop") %>%
   kable(., digits = 3)
 ```
 
@@ -505,17 +506,18 @@ fit_pattern = fit_pattern[!is.na(fit_pattern)]
 # Filter out those that don't follow the pattern, calculate largest gaps 
 # between CFRD+ diagnoses
 largest_gap = annual %>% 
-  filter(eDWID %in% names(t)) %>% 
+  filter(eDWID %in% names(fit_pattern),cfrd_status_annual=="CFRD+") %>% 
   select(eDWID,ReviewYear,cfrd_status_annual) %>%
   group_by(eDWID) %>%
-  summarise(largest_gap = max(diff(ReviewYear)))
+  summarise(largest_gap = max(diff(ReviewYear))-1)
+largest_gap = data.frame(table(largest_gap$largest_gap))
+colnames(largest_gap) = c("Years between CFRD+","n")
 ```
 
-There were a total of `r nrow(largest_gap)` partipants who had a diagnosis of CFRD+ followed by at least one CFRD-, followed again by a CFRD+ diagnosis. For each person, we calculated the largest gap between CFRD+ diagnoses. 
+There were a total of `r sum(largest_gap$n)` participants who had a diagnosis of CFRD+ followed by at least one CFRD-, followed again by a CFRD+ diagnosis. For each person, we calculated the largest gap between CFRD+ diagnoses. A total of `r sum(largest_gap$n[as.numeric(largest_gap[,1])>=3])` people had a gap $\geq$ 3 years.
 
 ```{r}
-kable(table(largest_gap$largest_gap),
-      col.names = c("Years between CFRD+","n"))
+kable(largest_gap)
 ```
 
 ## Basic survival curve
