@@ -31,13 +31,15 @@ library(forcats)
 library(labelled)
 library(survival)
 library(survminer)
+library(icenReg)
 library(knitr)
+library(eulerr)
 switch(Sys.info()[["sysname"]],
   Windows = {
-    home_dir <- "C:/Users/timvigers/Dropbox/Work/Christine Chan/CF registry data"
+    home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Christine Chan/CF registry data"
   },
   Darwin = {
-    home_dir <- "/Users/timvigers/Dropbox/Work/Christine Chan/CF registry data"
+    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Christine Chan/CF registry data"
   }
 )
 knitr::opts_knit$set(root.dir = home_dir)
@@ -442,7 +444,81 @@ data.frame(data_dict$code_meaning[
 
 # Survival analysis
 
-Based on CFFPR annualized data.
+Based on CFFPR annualized data. These data are interval censored because we know the first visit at which people with CFRD were diagnosed, but we do not know the exact time that they developed CFRD. These data are also left truncated because not all participants enter the study at the same time.
+
+## Participants with a single observation
+
+```{r}
+# Get total number of people with only one row with CFRD info
+one_row <- annual %>%
+  group_by(eDWID) %>%
+  summarise(n = n()) %>%
+  filter(n == 1)
+one_row_cfrd <- annual %>%
+  filter(!is.na(cfrd_status_annual)) %>%
+  group_by(eDWID) %>%
+  summarise(n = n()) %>%
+  filter(n == 1)
+```
+
+There were `r nrow(one_row)` people with a single year of observation in the annual data (across all variables), and `r nrow(one_row_cfrd)` people with a single non-missing CFRD status. `r length(intersect(one_row$eDWID,one_row_cfrd$eDWID))` people fall into both of these categories:
+
+```{r}
+plot(
+  euler(list(
+    "One Observation (All)" = one_row$eDWID,
+    "One Observation (CFRD)" = one_row_cfrd$eDWID
+  )),
+  fills = c("lightblue2", "lightsalmon"),
+  quantities = T,
+  legend = list(side = "right")
+)
+```
+
+## Participants with $\geq$ 3 years between CFRD+
+
+```{r}
+# I can't think of a good tidyverse way to do this, so trying it myself
+dfs <- annual %>% select(eDWID, ReviewYear, cfrd_status_annual)
+dfs <- split.data.frame(dfs, dfs$eDWID)
+# For each ID, test whether they follow the pattern
+fit_pattern <- lapply(dfs, function(d) {
+  r <- rle(as.character(d$cfrd_status_annual))
+  # Check for CFRD+, CFRD-, CFRD+ pattern
+  # Can have NAs on either side of the CFRD- as well, so
+  # CFRD+, CFRD-, CFRD+ OR CFRD+, NA, CFRD-, CFRD+ OR CFRD+, CFRD-, NA, CFRD+
+  # OR CFRD+, NA,CFRD-, NA,CFRD+
+  if (
+    grepl(
+      paste("CFRD\\+,CFRD\\-,CFRD\\+|", "CFRD\\+,NA,CFRD\\-,CFRD\\+|",
+        "CFRD\\+,CFRD\\-,NA,CFRD\\+|", "CFRD\\+,NA,CFRD\\-,NA,CFRD\\+",
+        sep = "", collapse = ""
+      ),
+      paste(r$values, collapse = ",")
+    )) {
+    return(unique(d$eDWID))
+  } else {
+    return(NA)
+  }
+})
+fit_pattern = fit_pattern[!is.na(fit_pattern)]
+# Filter out those that don't follow the pattern, calculate largest gaps 
+# between CFRD+ diagnoses
+largest_gap = annual %>% 
+  filter(eDWID %in% names(t)) %>% 
+  select(eDWID,ReviewYear,cfrd_status_annual) %>%
+  group_by(eDWID) %>%
+  summarise(largest_gap = max(diff(ReviewYear)))
+```
+
+There were a total of `r nrow(largest_gap)` partipants who had a diagnosis of CFRD+ followed by at least one CFRD-, followed again by a CFRD+ diagnosis. For each person, we calculated the largest gap between CFRD+ diagnoses. 
+
+```{r}
+kable(table(largest_gap$largest_gap),
+      col.names = c("Years between CFRD+","n"))
+```
+
+## Basic survival curve
 
 ```{r}
 # List of covariates
@@ -498,8 +574,9 @@ ggsurvplot(survfit(cox_res),
   data = s,
   risk.table = T, cumevents = T, fun = "event", xlim = c(2003, 2018)
 )
-surv_fit = survfit(Surv(tstart, tstop, cfrd_status_annual == "CFRD+") ~ age_group, 
-                   data = s)
+surv_fit <- survfit(Surv(tstart, tstop, cfrd_status_annual == "CFRD+") ~ age_group,
+  data = s
+)
 ggsurvplot(surv_fit,
   risk.table = T, cumevents = T, fun = "event", xlim = c(2003, 2018)
 )
