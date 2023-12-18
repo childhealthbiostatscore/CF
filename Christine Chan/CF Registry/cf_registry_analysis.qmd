@@ -448,10 +448,6 @@ data.frame(data_dict$code_meaning[
   tab_options(column_labels.hidden = TRUE)
 ```
 
-# Survival analysis
-
-Based on CFFPR annualized data. These data are interval censored because we know the first visit at which people with CFRD were diagnosed, but we do not know the exact time that they developed CFRD. These data are also left truncated because not all participants enter the study at the same time.
-
 ## Participants with a single observation
 
 ```{r}
@@ -515,6 +511,7 @@ largest_gap <- annual %>%
   select(eDWID, ReviewYear, cfrd_status_annual) %>%
   group_by(eDWID) %>%
   summarise(largest_gap = max(diff(ReviewYear)) - 1)
+gap_ids = unique(largest_gap$eDWID[largest_gap$largest_gap>=4])
 largest_gap <- data.frame(table(largest_gap$largest_gap))
 colnames(largest_gap) <- c("Years between CFRD+", "n")
 ```
@@ -524,6 +521,10 @@ There were a total of `r sum(largest_gap$n)` participants who had a diagnosis of
 ```{r}
 kable(largest_gap)
 ```
+
+# Survival analysis - first CFRD diagnosis
+
+Based on CFFPR annualized data. These data are interval censored because we know the first visit at which people with CFRD were diagnosed, but we do not know the exact time that they developed CFRD. These data are also left truncated because not all participants enter the study at the same time.
 
 ```{r}
 # List of covariates
@@ -550,6 +551,271 @@ labels <- list(
   A_pulmonarycomplications1 = "ABPA",
   A_mycocultureresults3 = "Microorganisms in myco culture"
 )
+# For now, let's just assume that everyone's first CFRD+ diagnosis is correct
+s <- annual %>%
+  filter(
+    !is.na(cfrd_status_annual),
+    Age_YrEnd != 0,
+    is.na(first_cfrd) | ReviewYear <= first_cfrd,
+    Age_YrEnd >= 10
+  ) %>%
+  select(
+    eDWID, ReviewYear, birth_year, Age_YrEnd,
+    all_of(vars), cfrd_status_annual
+  ) %>%
+  rename(tstop = ReviewYear) %>%
+  group_by(eDWID) %>%
+  mutate(
+    tstart = lag(tstop, default = birth_year[1]),
+    age_at_entry = Age_YrEnd[1]
+  ) %>%
+  select(
+    eDWID, birth_year, tstart, tstop, cfrd_status_annual,
+    age_at_entry, everything()
+  )
+# Convert from tibble to dataframe for survival packages
+s <- as.data.frame(s)
+# CFRD status to numeric
+s$cfrd_status_annual <- as.numeric(s$cfrd_status_annual) - 1
+# Drop under 10s
+s$age_group <- droplevels(s$age_group)
+```
+
+## Kaplan Meier Analysis
+
+```{r}
+# Whole cohort
+km_fit <- survfit(Surv(tstart, tstop, cfrd_status_annual) ~ 1,
+  data = s, cluster = eDWID
+)
+ggsurvplot(km_fit,
+  data = s, risk.table = T, cumevents = T,
+  fun = "event", xlim = c(2003, 2018), break.x.by = 1
+)
+kable(tidy(km_fit))
+# By age group
+km_fit <- survfit(Surv(tstart, tstop, cfrd_status_annual) ~ age_group,
+  data = s, cluster = eDWID
+)
+ggsurvplot(km_fit,
+  data = s, risk.table = T, cumevents = T,
+  fun = "event", xlim = c(2003, 2018), break.x.by = 1
+)
+km_table <- tidy(km_fit)
+km_table <- split.data.frame(km_table, km_table$strata)
+invisible(lapply(km_table, function(t) {
+  name <- t$strata[1]
+  t <- t %>% select(-strata)
+  kable(t, caption = name)
+}))
+```
+
+## Cox PH model
+
+### Base model
+
+```{r}
+# Formula for base model
+x <- c(
+  "age_group", "Gender", "bmi_perc", "MutClass", "A_IsOnEnzymes",
+  "tube_feeding", "liver_disease",
+  "A_FEV1_pct_predicted", "NumPulmExacerbation",
+  "A_pulmonarycomplications1", "A_corticosteroids1"
+)
+y <- "Surv(tstart, tstop, cfrd_status_annual)"
+f <- as.formula(paste0(y, "~", paste0(x, collapse = "+")))
+cox_res <- coxph(f, data = s, cluster = eDWID)
+# Plot survival
+ggsurvplot(survfit(cox_res),
+  data = s, risk.table = T, cumevents = T, fun = "event",
+  xlim = c(2003, 2018), break.x.by = 1
+)
+# Forest plot and coefficients table
+ggforest(cox_res, data = s)
+# Diagnostics
+# test.ph= cox.zph(cox_res)
+# ggcoxzph(test.ph)
+# ggcoxdiagnostics(cox_res,type = "martingale")
+# ggcoxdiagnostics(cox_res,type = "deviance")
+# ggcoxdiagnostics(cox_res,type = "score")
+# ggcoxdiagnostics(cox_res,type = "schoenfeld")
+```
+
+#### P. aeruginosa
+
+```{r}
+# Update formula
+cox_res <- coxph(update(f, . ~ . + A_pseudomonasaeruginosa),
+  data = s, cluster = eDWID
+)
+# Forest plot and coefficients table
+ggforest(cox_res, data = s)
+```
+
+#### Aspergillus
+
+```{r}
+# Update formula
+cox_res <- coxph(update(f, . ~ . + A_fungalyeast1),
+  data = s, cluster = eDWID
+)
+# Forest plot and coefficients table
+ggforest(cox_res, data = s)
+```
+
+#### ABPA
+
+```{r}
+# Update formula
+cox_res <- coxph(update(f, . ~ . + A_pulmonarycomplications1),
+  data = s, cluster = eDWID
+)
+# Forest plot and coefficients table
+ggforest(cox_res, data = s)
+```
+
+### Vx770
+
+```{r}
+f <- update(f, . ~ . + A_Vx770)
+cox_res <- coxph(f, data = s, cluster = eDWID)
+# Plot survival
+ggsurvplot(survfit(cox_res),
+  data = s, risk.table = T, cumevents = T, fun = "event",
+  xlim = c(2003, 2018), break.x.by = 1
+)
+# Forest plot and coefficients table
+ggforest(cox_res, data = s)
+# Diagnostics
+# test.ph= cox.zph(cox_res)
+# ggcoxzph(test.ph)
+# ggcoxdiagnostics(cox_res,type = "martingale")
+# ggcoxdiagnostics(cox_res,type = "deviance")
+# ggcoxdiagnostics(cox_res,type = "score")
+# ggcoxdiagnostics(cox_res,type = "schoenfeld")
+```
+
+#### P. aeruginosa
+
+```{r}
+# Update formula
+cox_res <- coxph(update(f, . ~ . + A_pseudomonasaeruginosa),
+  data = s, cluster = eDWID
+)
+# Forest plot and coefficients table
+ggforest(cox_res, data = s)
+```
+
+#### Aspergillus
+
+```{r}
+# Update formula
+cox_res <- coxph(update(f, . ~ . + A_fungalyeast1),
+  data = s, cluster = eDWID
+)
+# Forest plot and coefficients table
+ggforest(cox_res, data = s)
+```
+
+#### ABPA
+
+```{r}
+# Update formula
+cox_res <- coxph(update(f, . ~ . + A_pulmonarycomplications1),
+  data = s, cluster = eDWID
+)
+# Forest plot and coefficients table
+ggforest(cox_res, data = s)
+```
+
+#### Mycobacterium
+
+```{r}
+# Update formula
+cox_res <- coxph(update(f, . ~ . + A_mycocultureresults3),
+  data = s, cluster = eDWID
+)
+# Forest plot and coefficients table
+ggforest(cox_res, data = s)
+```
+
+### Vx809
+
+```{r}
+f <- update(f, . ~ . + A_VX809comb)
+cox_res <- coxph(f, data = s, cluster = eDWID)
+# Plot survival
+ggsurvplot(survfit(cox_res),
+  data = s, risk.table = T, cumevents = T, fun = "event",
+  xlim = c(2003, 2018), break.x.by = 1
+)
+# Forest plot and coefficients table
+ggforest(cox_res, data = s)
+# Diagnostics
+# test.ph= cox.zph(cox_res)
+# ggcoxzph(test.ph)
+# ggcoxdiagnostics(cox_res,type = "martingale")
+# ggcoxdiagnostics(cox_res,type = "deviance")
+# ggcoxdiagnostics(cox_res,type = "score")
+# ggcoxdiagnostics(cox_res,type = "schoenfeld")
+```
+
+#### P. aeruginosa
+
+```{r}
+# Update formula
+cox_res <- coxph(update(f, . ~ . + A_pseudomonasaeruginosa),
+  data = s, cluster = eDWID
+)
+# Forest plot and coefficients table
+ggforest(cox_res, data = s)
+```
+
+#### Aspergillus
+
+```{r}
+# Update formula
+cox_res <- coxph(update(f, . ~ . + A_fungalyeast1),
+  data = s, cluster = eDWID
+)
+# Forest plot and coefficients table
+ggforest(cox_res, data = s)
+```
+
+#### ABPA
+
+```{r}
+# Update formula
+cox_res <- coxph(update(f, . ~ . + A_pulmonarycomplications1),
+  data = s, cluster = eDWID
+)
+# Forest plot and coefficients table
+ggforest(cox_res, data = s)
+```
+
+#### Mycobacterium
+
+```{r}
+# Update formula
+cox_res <- coxph(update(f, . ~ . + A_mycocultureresults3),
+  data = s, cluster = eDWID
+)
+# Forest plot and coefficients table
+ggforest(cox_res, data = s)
+```
+
+# Survival analysis - second CFRD diagnosis (for those with $\geq$ 4 years between CFRD+ diagnoses)
+
+```{r}
+second_cfrd <- annual %>%
+  filter(eDWID %in% gap_ids,cfrd_status_annual=="CFRD+") %>%
+  group_by(eDWID) %>%
+  summarise(second_cfrd = ReviewYear[2])
+annual <- left_join(annual, second_cfrd, by = join_by(eDWID))
+annual$first_cfrd = pmax(annual$first_cfrd,annual$second_cfrd)
+```
+
+```{r}
 # For now, let's just assume that everyone's first CFRD+ diagnosis is correct
 s <- annual %>%
   filter(
