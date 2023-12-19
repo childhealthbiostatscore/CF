@@ -1,7 +1,7 @@
 # Load Hmisc library
 library(Hmisc)
 # Read Data
-survey_data <- read.csv("/Users/timvigers/Dropbox/Work/Vigers/CF/Jordana Hoppe/Home Collection/Data_Raw/HomeCollection220661_DATA_2023-12-19_0911.csv")
+survey_data <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Jordana Hoppe/Home Collection/Data_Raw/HomeCollection220661_DATA_2023-12-19_0911.csv")
 # Setting Labels
 label(survey_data$participant_id) <- "Participant ID"
 label(survey_data$redcap_survey_identifier) <- "Survey Identifier"

@@ -30,9 +30,13 @@ library(gtsummary)
 ```{r data cleaning, include=FALSE}
 # Use REDCap import
 source("/Users/timvigers/GitHub/CF/Jordana Hoppe/Home Collection/home_collection_data.r")
+source("/Users/timvigers/GitHub/CF/Jordana Hoppe/Home Collection/home_collection_surveys.r")
 # Fix missing labels
 labels <- label(data)[which(label(data) != "")]
 labels[paste0(names(labels), ".factor")] <- as.character(labels)
+survey_labels <- label(survey_data)[which(label(survey_data) != "")]
+survey_labels[paste0(names(survey_labels), ".factor")] <- as.character(survey_labels)
+labels = c(labels,survey_labels)
 # Combine race columns
 races <- c(
   "American Indian or Alaska Native", "Asian", "Black or African-American",
@@ -50,7 +54,7 @@ labels["race"] <- "Race"
 labels["age"] <- "Age at Clinic Visit"
 ```
 
-# Table
+# Table 1: Participant Characteristics
 
 ```{r}
 #| label: tbl-1
@@ -67,12 +71,49 @@ data %>%
   tbl_summary(
     label = labels, missing_text = "Missing",
     statistic = list(all_continuous() ~ "{mean} ({sd})")
-  ) 
+  ) %>%
+  as_kable_extra()
 ```
 
-# Figure
+It appears that the two participants who were previously marked as unknown race are now considered more than one race.
+
+# Table 2: Survey Results
 
 ```{r}
-#| label: fig-planets
-#| fig-cap: Planets
+#| label: tbl-2
+#| tbl-cap: Survey Results
+survey_data %>%
+  select(q1.factor:q6b___4.factor) %>%
+  tbl_summary(
+    label = labels, missing_text = "Missing"
+  ) %>%
+  as_kable_extra()
 ```
+
+# Table 3: Clinic Culture Results
+
+```{r}
+#| label: tbl-3
+#| tbl-cap: Clinic Culture Results
+data %>%
+  select(clinic_cx_source.factor:clinic_burk_sp.factor) %>%
+  tbl_summary(
+    label = labels, missing_text = "Missing"
+  ) %>%
+  as_kable_extra()
+```
+
+# Table 4: Research Culture Results
+
+```{r}
+#| label: tbl-4
+#| tbl-cap: Research Culture Results
+data %>%
+  select(research_cx.factor:res_burk_sp.factor) %>%
+  tbl_summary(
+    label = labels, missing_text = "Missing"
+  ) %>%
+  as_kable_extra()
+```
+
+For Yes/No variables in @tbl-2 through @tbl-4, the percentage of "Yes" answers is shown.
