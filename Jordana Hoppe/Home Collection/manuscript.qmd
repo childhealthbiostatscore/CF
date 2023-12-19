@@ -1,0 +1,78 @@
+---
+title: "Remote Collection of Respiratory Samples"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+    theme:
+      light: flatly
+      dark: darkly
+bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Dropbox/Miscellaneous/american-medical-association.csl
+editor: source
+---
+
+```{r libraries}
+#| include: false
+library(tidyverse)
+library(lubridate)
+library(gtsummary)
+```
+
+```{r data cleaning, include=FALSE}
+# Use REDCap import
+source("/Users/timvigers/GitHub/CF/Jordana Hoppe/Home Collection/home_collection_data.r")
+# Fix missing labels
+labels <- label(data)[which(label(data) != "")]
+labels[paste0(names(labels), ".factor")] <- as.character(labels)
+# Combine race columns
+races <- c(
+  "American Indian or Alaska Native", "Asian", "Black or African-American",
+  "Native Hawaiian or Other Pacific Islander", "White", "More than one race",
+  "Unknown or not reported"
+)
+data$race <- apply(data, 1, function(r) {
+  w <- which(r[paste0("race___", 1:7)] == 1)
+  paste0(races[w], collapse = "/")
+})
+# Age
+data$age <- round(as.numeric(ymd(data$clinic_date) - ymd(data$pt_dob)) / 365.25, 1)
+# Additional labels for tables
+labels["race"] <- "Race"
+labels["age"] <- "Age at Clinic Visit"
+```
+
+# Table
+
+```{r}
+#| label: tbl-1
+#| tbl-cap: Participant Characteristics
+data %>%
+  select(
+    age, pt_sex.factor, race, ethnicity.factor, mutation1.factor,
+    mutation2.factor, rural_location.factor, fev1_pp, fvc_pp
+  ) %>%
+  mutate(
+    mutation1.factor = droplevels(mutation1.factor),
+    mutation2.factor = droplevels(mutation2.factor)
+  ) %>%
+  tbl_summary(
+    label = labels, missing_text = "Missing",
+    statistic = list(all_continuous() ~ "{mean} ({sd})")
+  ) 
+```
+
+# Figure
+
+```{r}
+#| label: fig-planets
+#| fig-cap: Planets
+```
