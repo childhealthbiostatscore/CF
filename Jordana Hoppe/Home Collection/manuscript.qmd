@@ -25,6 +25,7 @@ editor: source
 library(tidyverse)
 library(lubridate)
 library(gtsummary)
+library(eulerr)
 ```
 
 ```{r data cleaning, include=FALSE}
@@ -36,7 +37,7 @@ labels <- label(data)[which(label(data) != "")]
 labels[paste0(names(labels), ".factor")] <- as.character(labels)
 survey_labels <- label(survey_data)[which(label(survey_data) != "")]
 survey_labels[paste0(names(survey_labels), ".factor")] <- as.character(survey_labels)
-labels = c(labels,survey_labels)
+labels <- c(labels, survey_labels)
 # Combine race columns
 races <- c(
   "American Indian or Alaska Native", "Asian", "Black or African-American",
@@ -49,12 +50,24 @@ data$race <- apply(data, 1, function(r) {
 })
 # Age
 data$age <- round(as.numeric(ymd(data$clinic_date) - ymd(data$pt_dob)) / 365.25, 1)
+# Find tests with no growth
+data$clinic_cx_no_growth <- apply(data, 1, function(r) {
+  sum(as.numeric(r[grep("clinic_cx_results___\\d$", names(r))]))
+})
+data$res_cx_no_growth <- apply(data, 1, function(r) {
+  sum(as.numeric(r[grep("res_cx_results___\\d$", names(r))]))
+})
+data$home_cx_no_growth <- apply(data, 1, function(r) {
+  sum(as.numeric(r[grep("home_cx_results___\\d$", names(r))]))
+})
 # Additional labels for tables
 labels["race"] <- "Race"
 labels["age"] <- "Age at Clinic Visit"
 ```
 
-# Table 1: Participant Characteristics
+# Summary Tables
+
+## Table 1: Participant Characteristics
 
 ```{r}
 #| label: tbl-1
@@ -77,7 +90,7 @@ data %>%
 
 It appears that the two participants who were previously marked as unknown race are now considered more than one race.
 
-# Table 2: Survey Results
+## Table 2: Survey Results
 
 ```{r}
 #| label: tbl-2
@@ -90,7 +103,7 @@ survey_data %>%
   as_kable_extra()
 ```
 
-# Table 3: Clinic Culture Results
+## Table 3: Clinic Culture Results
 
 ```{r}
 #| label: tbl-3
@@ -103,7 +116,7 @@ data %>%
   as_kable_extra()
 ```
 
-# Table 4: Research Culture Results
+## Table 4: Research Culture Results
 
 ```{r}
 #| label: tbl-4
@@ -116,4 +129,86 @@ data %>%
   as_kable_extra()
 ```
 
-For Yes/No variables in @tbl-2 through @tbl-4, the percentage of "Yes" answers is shown.
+## Table 5: Home Culture Results
+
+```{r}
+#| label: tbl-5
+#| tbl-cap: Home Culture Results
+data %>%
+  select(home_cx.factor:home_burk_sp.factor) %>%
+  tbl_summary(
+    label = labels, missing_text = "Missing"
+  ) %>%
+  as_kable_extra()
+```
+
+For Yes/No variables in @tbl-2 through @tbl-5, the percentage of "Yes" answers is shown.
+
+# Agreement
+
+## Euler Diagrams
+
+### MSSA
+
+```{r}
+data %>%
+  select(
+    clinic_cx_results___1.factor, res_cx_results___1.factor,
+    home_cx_results___1.factor
+  ) %>%
+  mutate(across(
+    everything(),
+    ~ factor(., levels = c("Checked", "Unchecked"), labels = c(1, 0))
+  )) %>%
+  mutate(across(
+    everything(), ~ as.numeric(as.character(.))
+  )) %>%
+  rename(
+    Clinic = clinic_cx_results___1.factor,
+    Research = res_cx_results___1.factor,
+    Home = home_cx_results___1.factor
+  ) %>%
+  euler(.) %>%
+  plot(., quantities = T)
+```
+
+### *H. flu*
+
+```{r}
+data %>%
+  select(
+    clinic_cx_results___3.factor, res_cx_results___3.factor,
+    home_cx_results___3.factor
+  ) %>%
+  mutate(across(
+    everything(),
+    ~ factor(., levels = c("Checked", "Unchecked"), labels = c(1, 0))
+  )) %>%
+  mutate(across(
+    everything(), ~ as.numeric(as.character(.))
+  )) %>%
+  rename(
+    Clinic = clinic_cx_results___3.factor,
+    Research = res_cx_results___3.factor,
+    Home = home_cx_results___3.factor
+  ) %>%
+  euler(.) %>%
+  plot(., quantities = T)
+```
+
+### No growth
+
+```{r}
+data %>%
+  select(clinic_cx_no_growth, res_cx_no_growth, home_cx_no_growth) %>%
+  mutate(across(
+    everything(), ~ .==0)
+  ) %>%
+  rename(
+    Clinic = clinic_cx_no_growth,
+    Research = res_cx_no_growth,
+    Home = home_cx_no_growth
+  ) %>%
+  euler(.) %>%
+  plot(., quantities = T)
+```
