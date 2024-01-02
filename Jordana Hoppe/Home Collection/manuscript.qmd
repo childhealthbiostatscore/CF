@@ -25,7 +25,9 @@ editor: source
 library(tidyverse)
 library(lubridate)
 library(gtsummary)
+library(irr)
 library(eulerr)
+library(kableExtra)
 ```
 
 ```{r data cleaning, include=FALSE}
@@ -51,15 +53,27 @@ data$race <- apply(data, 1, function(r) {
 # Age
 data$age <- round(as.numeric(ymd(data$clinic_date) - ymd(data$pt_dob)) / 365.25, 1)
 # Find tests with no growth
-data$clinic_cx_no_growth <- apply(data, 1, function(r) {
-  sum(as.numeric(r[grep("clinic_cx_results___\\d$", names(r))]))
+data$clinic_cx_no_growth.factor <- apply(data, 1, function(r) {
+  sum(as.numeric(r[grep("clinic_cx_results___\\d$", names(r))]), na.rm = T)
 })
-data$res_cx_no_growth <- apply(data, 1, function(r) {
-  sum(as.numeric(r[grep("res_cx_results___\\d$", names(r))]))
+data$clinic_cx_no_growth.factor <- factor(data$clinic_cx_no_growth.factor,
+  levels = 0:2,
+  labels = c("No Growth", "Some Growth", "Some Growth")
+)
+data$res_cx_no_growth.factor <- apply(data, 1, function(r) {
+  sum(as.numeric(r[grep("res_cx_results___\\d$", names(r))]), na.rm = T)
 })
-data$home_cx_no_growth <- apply(data, 1, function(r) {
-  sum(as.numeric(r[grep("home_cx_results___\\d$", names(r))]))
+data$res_cx_no_growth.factor <- factor(data$res_cx_no_growth.factor,
+  levels = 0:2,
+  labels = c("No Growth", "Some Growth", "Some Growth")
+)
+data$home_cx_no_growth.factor <- apply(data, 1, function(r) {
+  sum(as.numeric(r[grep("home_cx_results___\\d$", names(r))]), na.rm = T)
 })
+data$home_cx_no_growth.factor <- factor(data$home_cx_no_growth.factor,
+  levels = 0:2,
+  labels = c("No Growth", "Some Growth", "Some Growth")
+)
 # Additional labels for tables
 labels["race"] <- "Race"
 labels["age"] <- "Age at Clinic Visit"
@@ -116,11 +130,11 @@ data %>%
   as_kable_extra()
 ```
 
-## Table 4: Research Culture Results
+## Table 4: Delayed Culture Results
 
 ```{r}
 #| label: tbl-4
-#| tbl-cap: Research Culture Results
+#| tbl-cap: Delayed Culture Results
 data %>%
   select(research_cx.factor:res_burk_sp.factor) %>%
   tbl_summary(
@@ -146,69 +160,223 @@ For Yes/No variables in @tbl-2 through @tbl-5, the percentage of "Yes" answers i
 
 # Agreement
 
-## Euler Diagrams
+Fleiss' kappa is interpreted analagously to Cohen's kappa, but applies to more than two tests. Tables with NaN and NAs indicate that all tests had the same values (i.e. all absent or all present).
 
-### MSSA
+| Cohen's Kappa | Interpretation         |
+|---------------|------------------------|
+| 0             | No agreement           |
+| 0.10 - 0.20   | Slight agreement       |
+| 0.21 - 0.40   | Fair agreement         |
+| 0.41 - 0.60   | Moderate agreement     |
+| 0.61 - 0.80   | Substantial agreement  |
+| 0.81 - 0.99   | Near perfect agreement |
+| 1             | Perfect agreement      |
 
 ```{r}
-data %>%
-  select(
-    clinic_cx_results___1.factor, res_cx_results___1.factor,
-    home_cx_results___1.factor
-  ) %>%
-  mutate(across(
-    everything(),
-    ~ factor(., levels = c("Checked", "Unchecked"), labels = c(1, 0))
-  )) %>%
-  mutate(across(
-    everything(), ~ as.numeric(as.character(.))
-  )) %>%
-  rename(
-    Clinic = clinic_cx_results___1.factor,
-    Research = res_cx_results___1.factor,
-    Home = home_cx_results___1.factor
-  ) %>%
-  euler(.) %>%
-  plot(., quantities = T)
+agreement <- function(result_pattern, df = data) {
+  cols <- paste0(
+    c("clinic_cx_", "res_cx_", "home_cx_"),
+    paste0(result_pattern, ".factor")
+  )
+  d <- df[, cols]
+  colnames(d) <- c("Clinic", "Delayed", "Home")
+  d <- d %>%
+    mutate(across(everything(), ~ as.character(.)))
+  d[d == "NA"] <- NA
+  d[d == "Unchecked"] <- "Absent"
+  d[d == "Checked"] <- "Present"
+  fk <- kappam.fleiss(d)
+  cat("\n")
+  cat("### Agreement between all three methods")
+  cat("\n")
+  cat("\n")
+  cat("#### Fleiss' kappa")
+  cat("\n")
+  cat("\n")
+  f <- ftable(d)
+  f %>%
+    as.data.frame(.) %>%
+    kable(.) %>%
+    kable_styling(., "striped") %>%
+    print(.)
+  cat("\n")
+  cat("\n")
+  cat(
+    "Overall Fleiss' kappa for the three tests was", round(fk$value, 3),
+    paste0("(p = ", format.pval(fk$p.value, digits = 3, eps = 0.001), ")")
+  )
+  cat("\n")
+  cat("\n")
+  cat("#### Euler diagram")
+  cat("\n")
+  d %>%
+    mutate(across(everything(), ~ as.numeric(. == "Present" | . == "No Growth"))) %>%
+    drop_na(.) %>%
+    euler(.) %>%
+    plot(., quantities = T) %>%
+    print(.)
+  cat("\n")
+  cat("\n")
+  cat("### Pairwise agreement")
+  cat("\n")
+  clinic_vs_res <- xtabs(~ Clinic + Delayed, data = d)
+  clinic_vs_home <- xtabs(~ Clinic + Home, data = d)
+  home_vs_res <- xtabs(~ Home + Delayed, data = d)
+  cat("\n")
+  cat("\n")
+  cat("#### Clinic vs. delayed")
+  cat("\n")
+  cat("\n")
+  clinic_vs_res %>%
+    as.data.frame(.) %>%
+    kable(.) %>%
+    kable_styling("striped") %>%
+    print(.)
+  cat("\n")
+  clinic_vs_res %>%
+    prop.table(.) %>%
+    as.data.frame(.) %>%
+    rename("Percentage" = Freq) %>%
+    kable(., digits = 2) %>%
+    kable_styling("striped") %>%
+    print(.)
+  cat("\n")
+  cat("\n")
+  cat("#### Clinic vs. home")
+  cat("\n")
+  clinic_vs_home %>%
+    as.data.frame(.) %>%
+    kable(.) %>%
+    kable_styling("striped") %>%
+    print(.)
+  cat("\n")
+  clinic_vs_home %>%
+    prop.table(.) %>%
+    as.data.frame(.) %>%
+    rename("Percentage" = Freq) %>%
+    kable(., digits = 2) %>%
+    kable_styling("striped") %>%
+    print(.)
+  cat("\n")
+  cat("\n")
+  cat("#### Home vs. delayed")
+  cat("\n")
+  home_vs_res %>%
+    as.data.frame(.) %>%
+    kable(.) %>%
+    kable_styling("striped") %>%
+    print(.)
+  cat("\n")
+  home_vs_res %>%
+    prop.table(.) %>%
+    as.data.frame(.) %>%
+    rename("Percentage" = Freq) %>%
+    kable(., digits = 2) %>%
+    kable_styling("striped") %>%
+    print(.)
+  cat("\n")
+  cat("\n")
+}
 ```
 
-### *H. flu*
+## MSSA
 
-```{r}
-data %>%
-  select(
-    clinic_cx_results___3.factor, res_cx_results___3.factor,
-    home_cx_results___3.factor
-  ) %>%
-  mutate(across(
-    everything(),
-    ~ factor(., levels = c("Checked", "Unchecked"), labels = c(1, 0))
-  )) %>%
-  mutate(across(
-    everything(), ~ as.numeric(as.character(.))
-  )) %>%
-  rename(
-    Clinic = clinic_cx_results___3.factor,
-    Research = res_cx_results___3.factor,
-    Home = home_cx_results___3.factor
-  ) %>%
-  euler(.) %>%
-  plot(., quantities = T)
+```{r results='asis'}
+agreement("results___1")
 ```
 
-### No growth
+## MRSA
 
-```{r}
-data %>%
-  select(clinic_cx_no_growth, res_cx_no_growth, home_cx_no_growth) %>%
-  mutate(across(
-    everything(), ~ .==0)
-  ) %>%
-  rename(
-    Clinic = clinic_cx_no_growth,
-    Research = res_cx_no_growth,
-    Home = home_cx_no_growth
-  ) %>%
-  euler(.) %>%
-  plot(., quantities = T)
+```{r results='asis'}
+agreement("results___2")
+```
+
+## A. xylosoxidans
+
+```{r results='asis'}
+agreement("results___16")
+```
+
+## Achromobacter (not xylosoxidans)
+
+```{r results='asis'}
+agreement("results___17")
+```
+
+## Acinetobacter
+
+```{r results='asis'}
+agreement("results___10")
+```
+
+## H. influenzae
+
+```{r results='asis'}
+agreement("results___3")
+```
+
+## P. aeruginosa
+
+```{r results='asis'}
+agreement("results___4")
+```
+
+## P. aeruginosa (mucoid)
+
+```{r results='asis'}
+agreement("results___5")
+```
+
+## Pseudomonas species (not aeruginosa)
+
+```{r results='asis'}
+agreement("results___6")
+```
+
+## B. cepacia complex
+
+```{r results='asis'}
+agreement("results___7")
+```
+
+## Stenotrophomonas
+
+```{r results='asis'}
+agreement("results___8")
+```
+
+## Aspergillus
+
+```{r results='asis'}
+agreement("results___9")
+```
+
+## Penicillium species
+
+```{r results='asis'}
+agreement("results___12")
+```
+
+## Sceosporium species 
+
+```{r results='asis'}
+agreement("results___13")
+```
+
+## M. avium complex
+
+```{r results='asis'}
+agreement("results___14")
+```
+
+## M. abscessus
+
+```{r results='asis'}
+agreement("results___15")
+```
+
+## No growth
+
+```{r results='asis'}
+agreement("no_growth")
 ```
