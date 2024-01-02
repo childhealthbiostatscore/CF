@@ -1,7 +1,7 @@
 library(tidyverse)
 library(rspiro)
 # Import REDCap data
-df <- readxl::read_excel("~/Library/CloudStorage/Dropbox/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Raw/ExacerbationsInCF222_DATA_2023-10-11_1252 All Data.xlsx")
+df <- readxl::read_excel("~/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Scott Sagel/PEx in CF/Data_Raw/ExacerbationsInCF222_DATA_2023-10-11_1252 All Data.xlsx")
 # Separate datasets
 demo <- df %>%
   filter(redcap_event_name == "demographics_arm_1") %>%
@@ -164,5 +164,5 @@ labels <- list(
 df <- df %>% filter(!is.na(admit_year))
 # Save
 save(df, summary_table, labels,
-  file = "~/Dropbox/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Cleaned/analysis_dataset.RData"
+  file = "~/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Scott Sagel/PEx in CF/Data_Cleaned/analysis_dataset.RData"
 )

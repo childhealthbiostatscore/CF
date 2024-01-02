@@ -18,7 +18,7 @@ library(tidyverse)
 library(gtsummary)
 library(ggpubr)
 source("~/GitHub/CF/Scott Sagel/PEx in CF/create_pex_analysis_dataset.R")
-load("~/Library/CloudStorage/Dropbox/Work/Vigers/CF/Scott Sagel/PEx in CF/Data_Cleaned/analysis_dataset.RData")
+load("~/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Scott Sagel/PEx in CF/Data_Cleaned/analysis_dataset.RData")
 # Colors for plots
 yellow <- "#f8b80a"
 red <- "#e30022"

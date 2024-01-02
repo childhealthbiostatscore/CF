@@ -1,0 +1,100 @@
+---
+title: "Pulmonary Exacerbations in CF"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+    theme:
+      light: flatly
+      dark: darkly
+bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Dropbox/Miscellaneous/american-medical-association.csl
+editor: source
+---
+
+```{r setup}
+#| include: false
+library(tidyverse)
+library(lubridate)
+library(gtsummary)
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
+)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r data cleaning}
+# Import
+df <- read.csv("./Scott Sagel/PEx in CF/Data_Raw/ExacerbationsInCF222_DATA_2024-01-02_0857.csv",
+  na.strings = ""
+)
+# Get admit year (some missing in admit_year field)
+df$year <- year(df$admit_date)
+# Labels
+labels <- list(
+  "Aspergillus fumigatus" = "fungi___1",
+  "Aspergillus (other species)" = "fungi___2",
+  "Scedosporium apiospermum" = "fungi___3",
+  "Candidia (any species)" = "fungi___4",
+  "Other fungus" = "fungi___5",
+  "NTM testing performed?" = "ntm_test",
+  "M. abscessus species" = "ntm___1",
+  "M. avium complex species" = "ntm___2",
+  "Other NTM species" = "ntm___3",
+  "A. xylosoxidans" = "bacteria_6months___1",
+  "B. cepacia complex" = "bacteria_6months___2",
+  "H. influenzae" = "bacteria_6months___3",
+  "MRSA" = "bacteria_6months___4",
+  "MSSA" = "bacteria_6months___5",
+  "P. aeruginosa" = "bacteria_6months___6",
+  "S. maltophilia" = "bacteria_6months___7",
+  "Other bacteria" = "bacteria_6months___8"
+)
+labels <- setNames(names(labels), labels)
+# Format
+t <- df %>%
+  select(
+    sid, redcap_event_name, year, redcap_data_access_group,
+    fungi___1:fungi___5,
+    ntm_test, ntm___1:ntm___3,
+    bacteria_6months___1:bacteria_6months___8
+  ) %>%
+  filter(!is.na(year))
+```
+
+```{r}
+#| label: tbl-1
+#| tbl-cap: Variable names
+t %>%
+  select(-sid, -redcap_event_name) %>%
+  tbl_summary(by = year, missing_text = "Missing") %>%
+  add_overall()
+```
+
+```{r}
+#| label: tbl-2
+#| tbl-cap: Labels
+t %>%
+  select(-sid, -redcap_event_name) %>%
+  tbl_summary(
+    by = year, missing_text = "Missing",
+    label = labels
+  ) %>%
+  add_overall()
+```
+
+```{r include=FALSE}
+# Write data to share with Yaron and Elin
+write.csv(t,
+  file = "./Scott Sagel/PEx in CF/Data_Cleaned/data_clean.csv",
+  row.names = F, na = ""
+)
+```
