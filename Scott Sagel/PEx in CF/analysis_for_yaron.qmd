@@ -58,12 +58,12 @@ labels <- list(
   "S. maltophilia" = "bacteria_6months___7",
   "Other bacteria" = "bacteria_6months___8"
 )
-labels <- setNames(names(labels), labels)
+labels <- setNames(paste0(names(labels)," (",labels,")"), labels)
 # Format
 t <- df %>%
   select(
     sid, redcap_event_name, year, redcap_data_access_group,
-    fungi___1:fungi___5,
+    fungal_test,fungi___1:fungi___5,
     ntm_test, ntm___1:ntm___3,
     bacteria_6months___1:bacteria_6months___8
   ) %>%
@@ -73,15 +73,6 @@ t <- df %>%
 ```{r}
 #| label: tbl-1
 #| tbl-cap: Variable names
-t %>%
-  select(-sid, -redcap_event_name) %>%
-  tbl_summary(by = year, missing_text = "Missing") %>%
-  add_overall()
-```
-
-```{r}
-#| label: tbl-2
-#| tbl-cap: Labels
 t %>%
   select(-sid, -redcap_event_name) %>%
   tbl_summary(
