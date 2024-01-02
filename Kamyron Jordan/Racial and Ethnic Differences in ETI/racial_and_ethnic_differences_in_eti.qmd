@@ -35,12 +35,18 @@ library(gt)
 library(performance)
 library(mcp)
 library(ggsurvfit)
+# Paths
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows"="C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF"
+)
+knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
 #| include: false
 # source("/Users/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_race_eti_analysis_dataset.R")
-load("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
+load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData")
 ```
 
 # Race and ethnicity breakdown
@@ -216,7 +222,7 @@ annual %>%
 
 ## Survival analysis
 
-For the following analysis, the start time ($t=0$) was the approximate date that each person became eligible for ETI. Because we don't have exact dates of birth, I calculated an approximate DOB based on age and encounter dates. Encounters prior to ETI eligibility were excluded, and only time to first encounter on ETI was considered (i.e. we did not fit a multi-state model to account for those who started and then stopped the medication).
+For the following analysis, the start time ($t=0$) was the approximate date that each person became eligible for ETI. Because we don't have exact dates of birth, I calculated an approximate DOB based on age and encounter dates, and then used the approximate DOB to determine date of eligibility. Encounters prior to ETI eligibility were excluded, and only time to first encounter on ETI was considered (i.e. we did not fit a multi-state model to account for those who started and then stopped the medication).
 
 ```{r}
 # Create survival dataset
@@ -344,7 +350,6 @@ FEV1 and FVC percent predicted (based on GLI equations) were averaged by year fo
 The most basic model we can fit to these data uses the average values as the outcome, with terms for review year, race, and their interaction and a random intercept for each patient.
 
 ```{r}
-#| cache: true
 # Most basic model of lung function over time by race
 # Try a few different models
 mod <- lmer(
