@@ -20,9 +20,13 @@ csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
-```{r libraries}
+```{r setup}
 #| include: false
 library(tidyverse)
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
+)
+knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
@@ -34,7 +38,6 @@ library(tidyverse)
 ```{r}
 #| label: tbl-planets
 #| tbl-cap: Planets
-
 ```
 
 # Figure
@@ -42,5 +45,4 @@ library(tidyverse)
 ```{r}
 #| label: fig-planets
 #| fig-cap: Planets
-
 ```
