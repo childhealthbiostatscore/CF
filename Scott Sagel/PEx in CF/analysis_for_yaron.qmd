@@ -38,6 +38,12 @@ df <- read.csv("./Scott Sagel/PEx in CF/Data_Raw/ExacerbationsInCF222_DATA_2024-
 )
 # Get admit year (some missing in admit_year field)
 df$year <- year(df$admit_date)
+# Rename centers
+df$redcap_data_access_group <- factor(df$redcap_data_access_group,
+  levels = c("chco", "childrens_national", "orange_county", "rady", "seattle"),
+  labels = c("CHCO", "Children's National", "Orange County", "Rady", "Seattle")
+)
+df$cftr_mod <- factor(df$cftr_mod, levels = 0:1, labels = c("No", "Yes"))
 # Labels
 labels <- list(
   "Aspergillus fumigatus" = "fungi___1",
@@ -49,43 +55,181 @@ labels <- list(
   "M. abscessus species" = "ntm___1",
   "M. avium complex species" = "ntm___2",
   "Other NTM species" = "ntm___3",
-  "A. xylosoxidans" = "bacteria_6months___1",
-  "B. cepacia complex" = "bacteria_6months___2",
-  "H. influenzae" = "bacteria_6months___3",
-  "MRSA" = "bacteria_6months___4",
-  "MSSA" = "bacteria_6months___5",
-  "P. aeruginosa" = "bacteria_6months___6",
-  "S. maltophilia" = "bacteria_6months___7",
-  "Other bacteria" = "bacteria_6months___8"
+  "A. xylosoxidans" = "admit_cx_results___1",
+  "B. cepacia complex" = "admit_cx_results___2",
+  "H. influenzae" = "admit_cx_results___3",
+  "MRSA" = "admit_cx_results___4",
+  "Methicillin-susceptible Staph aureus" = "admit_cx_results___5",
+  "P. aeruginosa" = "admit_cx_results___6",
+  "P. aeruginosa mucoid" = "admit_cx_results___7",
+  "S. maltophilia" = "admit_cx_results___8",
+  "Other bacteria" = "admit_cx_results___9",
+  "CFTR Modulator" = "cftr_mod",
+  "Cultures Tested" = "redcap_data_access_group"
 )
-labels <- setNames(paste0(names(labels)," (",labels,")"), labels)
+labels <- setNames(names(labels), labels)
 # Format
-t <- df %>%
+df <- df %>%
   select(
-    sid, redcap_event_name, year, redcap_data_access_group,
-    fungal_test,fungi___1:fungi___5,
+    sid, redcap_event_name, redcap_data_access_group, year, cftr_mod,
+    fungal_test, fungi___1:fungi___5,
     ntm_test, ntm___1:ntm___3,
-    bacteria_6months___1:bacteria_6months___8
+    admit_cx_results___1:admit_cx_results___9
   ) %>%
   filter(!is.na(year))
 ```
 
+# Fungi
+
+The tables below are limited to patients who had fungal testing performed.
+
 ```{r}
-#| label: tbl-1
-#| tbl-cap: Variable names
-t %>%
-  select(-sid, -redcap_event_name) %>%
-  tbl_summary(
-    by = year, missing_text = "Missing",
-    label = labels
-  ) %>%
-  add_overall()
+#| label: tbl-fungi
+#| tbl-cap: Fungi
+df %>%
+  filter(fungal_test == 1) %>%
+  select(year, redcap_data_access_group, fungi___1:fungi___5) %>%
+  tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
 ```
 
-```{r include=FALSE}
-# Write data to share with Yaron and Elin
-write.csv(t,
-  file = "./Scott Sagel/PEx in CF/Data_Cleaned/data_clean.csv",
-  row.names = F, na = ""
-)
+```{r}
+#| label: tbl-fungi_center
+#| tbl-cap: Fungi by Center
+#| message: false
+df %>%
+  filter(fungal_test == 1) %>%
+  select(year, redcap_data_access_group, fungi___1:fungi___5) %>%
+  tbl_strata(
+    strata = redcap_data_access_group,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+```{r}
+#| label: tbl-fungi_cftr_mod
+#| tbl-cap: Fungi by Modulator Status
+#| message: false
+df %>%
+  filter(fungal_test == 1) %>%
+  select(year, cftr_mod, fungi___1:fungi___5) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(by = cftr_mod, missing_text = "Missing", label = labels) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+# NTM
+
+The tables below are limited to patients who had NTM testing performed.
+
+```{r}
+#| label: tbl-ntm
+#| tbl-cap: NTM
+df %>%
+  filter(ntm_test == 1) %>%
+  select(year, redcap_data_access_group, ntm___1:ntm___3) %>%
+  tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
+```
+
+```{r}
+#| label: tbl-ntm_center
+#| tbl-cap: NTM by Center
+#| message: false
+df %>%
+  filter(ntm_test == 1) %>%
+  select(year, redcap_data_access_group, ntm___1:ntm___3) %>%
+  tbl_strata(
+    strata = redcap_data_access_group,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+```{r}
+#| label: tbl-ntm_cftr_mod
+#| tbl-cap: NTM by Modulator Status
+#| message: false
+df %>%
+  filter(ntm_test == 1) %>%
+  select(year, cftr_mod, ntm___1:ntm___3) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(by = cftr_mod, missing_text = "Missing", label = labels) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+# Bacteria
+
+```{r}
+#| label: tbl-bacteria
+#| tbl-cap: Bacteria
+df %>%
+  select(
+    year, redcap_data_access_group, admit_cx_results___1:admit_cx_results___9
+  ) %>%
+  tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
+```
+
+```{r}
+#| label: tbl-bacteria_center
+#| tbl-cap: Bacteria by Center
+#| message: false
+df %>%
+  select(
+    year, redcap_data_access_group, admit_cx_results___1:admit_cx_results___9
+  ) %>%
+  tbl_strata(
+    strata = redcap_data_access_group,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+```{r}
+#| label: tbl-bacteria_cftr_mod
+#| tbl-cap: Bacteria by Modulator Status
+#| message: false
+df %>%
+  select(year, cftr_mod, admit_cx_results___1:admit_cx_results___9) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(by = cftr_mod, missing_text = "Missing", label = labels) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
 ```
