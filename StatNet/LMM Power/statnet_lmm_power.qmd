@@ -1,25 +1,42 @@
 ---
-title: "Untitled"
+title: "Power and Sample Size in General Linear Mixed Models"
 format: revealjs
+bibliography: zotero.bib
+csl: american-medical-association.csl
 ---
 
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished presentation. To learn more about Quarto presentations see <https://quarto.org/docs/presentations/>.
-
-## Bullets
-
-When you click the **Render** button a document will be generated that includes:
-
--   Content authored with markdown
--   Output from executable code
-
-## Code
-
-When you click the **Render** button a presentation will be generated that includes both content and the output of embedded code. You can embed code like this:
-
-```{r}
-1 + 1
+```{r include=FALSE}
+library(tidyverse)
 ```
 
+## A quick refresher on terminology
 
+- Type 1 error rate ($\alpha$): the probability that we incorrectly reject the null hypothesis ($H_0$).
+- Type 2 error rate ($\beta$): the probability that we incorrectly fail to reject $H_0$.
+- Power ($P$): the probability that we correctly reject $H_0$.
+  - Can also be written as $1-\beta$
+
+## A quick refresher on terminology
+
+<br>
+<br>
+
+|                     | $H_0$ True  |$H_0$ False|
+| ------------------- | ----------- |---------- |
+| Reject $H_0$        | $\alpha$    | $1-\beta$ |
+| Do Not Reject $H_0$ | $1-\alpha$  | $\beta$   |
+
+## The difference between two independent means
+
+<br>
+
+![](t_test_indep_means.jpg) @faulStatisticalPowerAnalyses2009
+
+## Next slide
+
+- As the deviation from the null hypothesis ($d$) approaches 0, $P$ approaches $\alpha$. @diggleAnalysisLongitudinalData2013
+- We typically choose $d$ to be the smallest clinically meaningful difference that we want to detect.
+- Measurement variation ($\sigma^2$): the variance of the response.
+  - Ideally approximated through previous studies, but sometimes estimated based on clinical knowledge.
+
+## References
