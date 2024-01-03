@@ -1,0 +1,50 @@
+---
+title: "SSwAB-IT Phase 1 Analysis"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+    theme:
+      light: flatly
+      dark: darkly
+bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
+editor: source
+---
+
+```{r setup}
+#| include: false
+library(tidyverse)
+library(redcapAPI)
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows"="C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF"
+)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r data cleaning}
+
+```
+
+# Table
+
+```{r}
+#| label: tbl-planets
+#| tbl-cap: Planets
+```
+
+# Figure
+
+```{r}
+#| label: fig-planets
+#| fig-cap: Planets
+```
