@@ -16,8 +16,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Dropbox/Miscellaneous/american-medical-association.csl
+bibliography: C:/Users/timvigers/Dropbox/Miscellaneous/zotero.bib
+csl: C:/Users/timvigers/Dropbox/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -480,7 +480,7 @@ new_df$pred = predict(lm_fixed_cp)
 ggplot(new_df, aes(x = days_from_start, y = pred,group = race,color = race)) +
   geom_line() +
   ylim(0, 150)
-# # Random intercept version isn't converging
+# # Random intercept model isn't converging
 # # Basic model
 # lmm_base <- lme(GLI_FEV1_pct_predicted ~ days_from_start,
 #   random = ~ 1 | eDWID, data = encounter, na.action = na.omit,method = "ML",
@@ -495,11 +495,9 @@ ggplot(new_df, aes(x = days_from_start, y = pred,group = race,color = race)) +
 
 ```{r}
 #| cache: true
-#| eval: false
 t <- encounter %>%
   select(eDWID, GLI_FEV1_pct_predicted, days_from_start) %>%
   drop_na()
-
 model <- list(
   GLI_FEV1_pct_predicted ~ 0 + days_from_start,
   ~ 0 + days_from_start
