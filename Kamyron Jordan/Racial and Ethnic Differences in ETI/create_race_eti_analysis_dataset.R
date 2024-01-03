@@ -4,11 +4,11 @@ library(readxl)
 library(rspiro)
 library(Hmisc)
 # Import
-annual <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
-encounter <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
-demo <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
+annual <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_Annualized_Del1.csv", na.strings = "")
+encounter <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_encountersMerged_Del1.csv", na.strings = "")
+demo <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20230420/CFF21_DemogCFDiag_Del1.csv", na.strings = "")
 # Import responsive mutations list
-responsive_mutations <- read.csv("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/eti_responsive_mutations.csv", header = F)
+responsive_mutations <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/eti_responsive_mutations.csv", header = F)
 responsive_mutations <- unique(responsive_mutations$V1)
 # Dates
 demo$First_LungTransplantDate <- mdy(demo$First_LungTransplantDate)
@@ -228,7 +228,7 @@ demo$Hispanicrace <- factor(demo$Hispanicrace,
 )
 demo$MutClass <- factor(demo$MutClass)
 # Get long mutation lists - demographics
-mutations <- read_excel("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
+mutations <- read_excel("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/Copy of Codes for CFFPR_2023.xlsx")
 mutations <- mutations %>%
   filter(field_name == "mutation1") %>%
   select(code_value, code_meaning)
@@ -311,6 +311,8 @@ labels <-
     "GLI_FVC_pct_predicted" = "ppFVC", "FEV1" = "FEV1",
     "GLI_FEV1_pct_predicted" = "ppFEV1", "FEV1FVC" = "FEV1/FVC",
     "GLI_FEV1FVC_pct_predicted" = "ppFEV1/FVC",
+    "GLI_FEV1_pct_predicted_check" = "GLI_FEV1_pct_predicted_check",
+    "ppFEV1gl" = "ppFEV1gl",
     "hepatobiliary1_3" = "Liver disease, cirrhosis",
     "acutehepatitis" = "Acute hepatitis",
     "acutehepatitis_type2" = "Acute hepatitis type 2",
@@ -509,6 +511,28 @@ annual$eti_elig <- apply(annual, 1, function(r) {
   }
   return(elig)
 }, simplify = T)
+# Check rspiro with registry info
+encounter$GLI_FEV1_pct_predicted_check <- pctpred_GLI(
+  FEV1 = encounter$FEV1, age = encounter$encounterage,
+  height = encounter$height / 100, gender = encounter$Gender,
+  ethnicity = as.numeric(sapply(as.character(encounter$race), function(x) {
+    switch(x,
+      "White" = "1",
+      "Black or African American" = "2",
+      "Hispanic or Latino" = "5",
+      "Asian" = "3",
+      "Indigenous/Mixed/Other/Unknown Race" = "5"
+    )
+  }))
+)
+# Race free lung function equations
+encounter$ppFEV1gl <- pctpred_GLIgl(
+  FEV1 = encounter$FEV1, age = encounter$encounterage,
+  height = encounter$height / 100, gender = encounter$Gender,
+)
+# Remove infinite values
+encounter$GLI_FEV1_pct_predicted_check[is.infinite(encounter$GLI_FEV1_pct_predicted_check)]=NA
+encounter$ppFEV1gl[is.infinite(encounter$ppFEV1gl)]=NA
 # Labels
 label(annual) <- labels[colnames(annual)]
 label(demo) <- labels[colnames(demo)]
@@ -518,5 +542,5 @@ tidy_labels <- names(labels)
 names(tidy_labels) <- sapply(labels, "[[", 1)
 # Save
 save(annual, encounter, demo, labels, tidy_labels, by_year,
-  file = "/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
+  file = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
 )
