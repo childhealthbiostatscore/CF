@@ -24,14 +24,13 @@ editor: source
 #| include: false
 library(tidyverse)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows"="C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF"
+  "Darwin" = "/Users/timvigers/Dropbox/Work/Vigers/CF",
+  "Windows" = "C:/Users/timvigers/Dropbox/Work/Vigers/CF"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
-
 ```
 
 # Table
