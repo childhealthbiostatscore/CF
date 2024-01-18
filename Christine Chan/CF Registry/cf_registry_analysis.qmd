@@ -39,7 +39,7 @@ library(eulerr)
 library(broom)
 switch(Sys.info()[["sysname"]],
   Windows = {
-    home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Christine Chan/CF registry data"
+    home_dir <- "C:/Users/timvigers/Dropbox/Work/Christine Chan/CF registry data"
   },
   Darwin = {
     home_dir <- "/Users/timvigers/Dropbox/Work/Christine Chan/CF registry data"
@@ -559,12 +559,23 @@ ggsurvplot(survfit(cox_res),
 # Forest plot and coefficients table
 ggforest(cox_res, data = s)
 # Diagnostics
-# test.ph= cox.zph(cox_res)
-# ggcoxzph(test.ph)
+test.ph= cox.zph(cox_res)
+ggcoxzph(test.ph)
 # ggcoxdiagnostics(cox_res,type = "martingale")
 # ggcoxdiagnostics(cox_res,type = "deviance")
 # ggcoxdiagnostics(cox_res,type = "score")
 # ggcoxdiagnostics(cox_res,type = "schoenfeld")
+```
+
+### Time varying coefficients
+
+```{r}
+s_split <- survSplit(Surv(tstart, tstop, cfrd_status_annual) ~ .,
+  data = s, cut = 2003:2018, episode = "tgroup"
+)
+cox_res_split <- coxph(update(f, . ~ Gender:strata(tgroup)), data = s_split,
+                       cluster = eDWID)
+t = tidy(cox_res_split)
 ```
 
 #### P. aeruginosa
