@@ -90,7 +90,10 @@ ogtt_ysi_yaling <- read_excel("EnVision OGTT Results YSI.xlsx",
 # Format and combine
 ogtt_ysi_ia <- ogtt_ysi_ia %>% select(Timepoints:`180`)
 ogtt_ysi_ia <- ogtt_ysi_ia[-1, ]
-colnames(ogtt_ysi_ia) <- c("Subject ID", paste(c(0, 10, 30, 60, 90, 120, 150, 180), "min"))
+colnames(ogtt_ysi_ia) <- c(
+  "Subject ID",
+  paste(c(0, 10, 30, 60, 90, 120, 150, 180), "min")
+)
 ogtt_ysi_co <- ogtt_ysi_co %>% select(`Subject ID`:`180 min`)
 ogtt_ysi_mn <- ogtt_ysi_mn %>% select(`Subject ID`:`180 min`)
 ogtt_ysi_wu <- ogtt_ysi_wu %>% select(`Subject ID`:`180 min`)
@@ -168,7 +171,7 @@ clean_catechol <- function(data) {
 }
 files <- list.files("Catecholamines", full.names = T)
 files <- c(
-  files, 
+  files,
   "Catecholamines/Results_VUMCHA_ASC-JC-4071_Catecholamine_J.Coffey_U.of_Iowa_11-19-20.xls",
   "Catecholamines/VUMCHA_ASC-HH-5765_Catecholamine_H.Hemann_U.of_Iowa_3-14-23.xls"
 )
@@ -179,6 +182,15 @@ catecholamines <- lapply(files, function(f) {
 })
 catecholamines <- do.call(rbind, catecholamines)
 # Write results
-write.csv(hormones, file = "hormones_analysis_dataset.csv", row.names = F, na = "")
-write.csv(ysi, file = "ogtt_ysi_analysis_dataset.csv", row.names = F, na = "")
-write.csv(catecholamines, file = "catecholamines_analysis_dataset.csv", row.names = F, na = "")
+write.csv(hormones,
+  file = "hormones_analysis_dataset.csv",
+  row.names = F, na = ""
+)
+write.csv(ysi,
+  file = "ogtt_ysi_analysis_dataset.csv",
+  row.names = F, na = ""
+)
+write.csv(catecholamines,
+  file = "catecholamines_analysis_dataset.csv",
+  row.names = F, na = ""
+)
