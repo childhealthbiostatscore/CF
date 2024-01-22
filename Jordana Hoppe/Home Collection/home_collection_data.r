@@ -1,7 +1,7 @@
 # Load Hmisc library
 library(Hmisc)
 # Read Data
-data <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Jordana Hoppe/Home Collection/Data_Raw/HomeCollection220661_DATA_2023-12-19_0917.csv")
+data <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Jordana Hoppe/Home Collection/Data_Raw/HomeCollection220661_DATA_2023-12-19_0917.csv",na.strings = "")
 # Setting Labels
 label(data$subject_id) <- "Subject ID"
 label(data$pt_initials) <- "Patient Initials"

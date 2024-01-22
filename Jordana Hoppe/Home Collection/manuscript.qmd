@@ -34,6 +34,15 @@ library(kableExtra)
 # Use REDCap import
 source("/Users/timvigers/GitHub/CF/Jordana Hoppe/Home Collection/home_collection_data.r")
 source("/Users/timvigers/GitHub/CF/Jordana Hoppe/Home Collection/home_collection_surveys.r")
+# Find missing subjects
+data_missing <- data %>%
+  filter(is.na(home_cx_source)) %>%
+  select(subject_id, pt_initials, home_cx:home_cx_results___17)
+survey_missing <- survey_data %>%
+  filter(is.na(q1)) %>%
+  select(participant_id, q1:q6b_spec)
+write.csv(data_missing, file = "~/missing_data.csv", row.names = F, na = "")
+write.csv(survey_missing, file = "~/missing_survey.csv", row.names = F, na = "")
 # Fix missing labels
 labels <- label(data)[which(label(data) != "")]
 labels[paste0(names(labels), ".factor")] <- as.character(labels)
