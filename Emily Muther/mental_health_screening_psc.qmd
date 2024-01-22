@@ -1,0 +1,70 @@
+---
+title: "Mental Health Screening in CF"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+editor: source
+---
+
+```{r setup}
+#| include: false
+library(tidyverse)
+library(plotly)
+library(gtsummary)
+library(GLMMadaptive)
+library(lmerTest)
+library(broom.mixed)
+library(knitr)
+library(sjPlot)
+library(report)
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF"
+)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r data cleaning}
+#| warning: false
+# Import
+df <- read.csv("./Emily Muther/General - Muther Research Group/Mental Health Screening/Data_Raw/PSC_Full_Data_data_11-11-22.csv",
+  check.names = F, na.strings = ""
+)
+# Remove duplicate rows
+df <- df %>% distinct()
+# Sort by contact date
+df$CONTACT_DATE <- lubridate::mdy(df$CONTACT_DATE)
+df <- df %>% arrange(PAT_MRN_ID, CONTACT_DATE)
+```
+
+# Table 1: Demographics
+
+```{r table 1}
+cat_demo_vars <- c(
+  "DEPARTMENT_NAME", "ENC_T", "PAYOR_NAME"
+)
+cont_demo_vars <- c("AGE AT CONTACT")
+df %>%
+  group_by(PAT_MRN_ID) %>%
+  summarise(
+    across(all_of(cont_demo_vars), ~ first(na.omit(.x))),
+    across(all_of(cat_demo_vars), ~ first(na.omit(.x)))
+  ) %>%
+  select(-PAT_MRN_ID) %>%
+  tbl_summary(missing_text = "Missing",label = list("Age at First Contact" = "AGE AT CONTACT"))
+```
+
+# Table 2: Prevalence of Behavioral Health Difficulties
+
+```{r table 2}
+
+```
