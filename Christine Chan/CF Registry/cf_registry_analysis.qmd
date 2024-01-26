@@ -39,10 +39,10 @@ library(eulerr)
 library(broom)
 switch(Sys.info()[["sysname"]],
   Windows = {
-    home_dir <- "C:/Users/timvigers/Dropbox/Work/Christine Chan/CF registry data"
+    home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry"
   },
   Darwin = {
-    home_dir <- "/Users/timvigers/Dropbox/Work/Christine Chan/CF registry data"
+    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry"
   }
 )
 knitr::opts_knit$set(root.dir = home_dir)
@@ -575,7 +575,7 @@ s_split <- survSplit(Surv(tstart, tstop, cfrd_status_annual) ~ .,
 )
 cox_res_split <- coxph(update(f, . ~ Gender:strata(tgroup)), data = s_split,
                        cluster = eDWID)
-t = tidy(cox_res_split)
+t = tidy(cox_res_split,exponentiate = T)
 ```
 
 #### P. aeruginosa

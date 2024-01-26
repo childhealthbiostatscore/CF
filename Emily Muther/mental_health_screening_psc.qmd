@@ -1,5 +1,5 @@
 ---
-title: "Mental Health Screening in CF"
+title: "Mental Health Screening in CF - PSC Screening"
 author: "Tim Vigers"
 date: "today"
 date-format: long
@@ -18,16 +18,10 @@ editor: source
 ```{r setup}
 #| include: false
 library(tidyverse)
-library(plotly)
 library(gtsummary)
-library(GLMMadaptive)
-library(lmerTest)
-library(broom.mixed)
-library(knitr)
-library(sjPlot)
-library(report)
+library(ggcorrplot)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF"
 )
 knitr::opts_knit$set(root.dir = home_dir)
@@ -41,12 +35,20 @@ df <- read.csv("./Emily Muther/General - Muther Research Group/Mental Health Scr
 )
 # Remove duplicate rows
 df <- df %>% distinct()
-# Sort by contact date
+# Sort by ID and contact date
 df$CONTACT_DATE <- lubridate::mdy(df$CONTACT_DATE)
 df <- df %>% arrange(PAT_MRN_ID, CONTACT_DATE)
+# Exclude those with no PSC data
+df <- df %>% filter(!is.na(Score))
 ```
 
-# Table 1: Demographics
+# Data cleaning
+
+1. Duplicate rows were removed (n=21).
+2. All rows with missing data for `Score` were excluded (n=2319).
+3. In Table 1, demographics and first contact date are reported.
+
+# Demographics
 
 ```{r table 1}
 cat_demo_vars <- c(
@@ -60,11 +62,51 @@ df %>%
     across(all_of(cat_demo_vars), ~ first(na.omit(.x)))
   ) %>%
   select(-PAT_MRN_ID) %>%
-  tbl_summary(missing_text = "Missing",label = list("Age at First Contact" = "AGE AT CONTACT"))
+  tbl_summary(missing_text = "Missing", label = list("Age at First Contact" = "AGE AT CONTACT"))
 ```
 
-# Table 2: Prevalence of Behavioral Health Difficulties
+# Prevalence of behavioral health difficulties
+
+## All PSC screeners
 
 ```{r table 2}
+df %>%
+  select(
+    `Internalizing subscale`:`Externalizing subscale`, Score,
+    `PSC Attention`:`PSC Totals`
+  ) %>%
+  tbl_summary(
+    missing_text = "Missing",
+    type = list(`Internalizing subscale` ~ "continuous")
+  )
+```
 
+## By person
+
+The maximum score on each subscale was calculated for all participants.
+
+```{r}
+#| warning: false
+df %>%
+  mutate(across(`PSC Attention`:`PSC Totals`, ~ factor(.x, ordered = T))) %>%
+  group_by(PAT_MRN_ID) %>%
+  summarise(across(c(
+    `Internalizing subscale`:`Externalizing subscale`, Score,
+    `PSC Attention`:`PSC Totals`
+  ), ~ max(.x, na.rm = T))) %>%
+  mutate(across(
+    c(`Internalizing subscale`:`Externalizing subscale`, Score),
+    ~ case_when(.x == -Inf ~ NA, .default = .x)
+  )) %>%
+  select(-PAT_MRN_ID) %>%
+  tbl_summary(
+    missing_text = "Missing",
+    type = list(`Internalizing subscale` ~ "continuous")
+  )
+```
+
+# Correlations
+
+```{r}
+X = df %>% 
 ```
