@@ -91,6 +91,14 @@ data$home_cx_no_growth.factor <- factor(data$home_cx_no_growth.factor,
 # Additional labels for tables
 labels["race"] <- "Race"
 labels["age"] <- "Age at Clinic Visit"
+# Genotype format
+data$Genotype <- paste0(
+  data$mutation1.factor == "F508del", "/", data$mutation2.factor == "F508del"
+)
+data$Genotype <- factor(data$Genotype,
+  levels = c("TRUE/TRUE", "TRUE/FALSE", "FALSE/FALSE"),
+  labels = c("F508del/F508del", "F508del/Other", "Other/Other")
+)
 ```
 
 # Summary Tables
@@ -103,7 +111,7 @@ labels["age"] <- "Age at Clinic Visit"
 data %>%
   select(
     age, pt_sex.factor, race, ethnicity.factor, mutation1.factor,
-    mutation2.factor, rural_location.factor, fev1_pp, fvc_pp
+    mutation2.factor, Genotype, rural_location.factor, fev1_pp, fvc_pp
   ) %>%
   mutate(
     mutation1.factor = droplevels(mutation1.factor),
