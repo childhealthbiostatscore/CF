@@ -1,7 +1,17 @@
 # Load Hmisc library
 library(Hmisc)
+# Set WD
+switch(Sys.info()[["sysname"]],
+       Windows = {
+         home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
+       },
+       Darwin = {
+         home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
+       }
+)
+setwd(home_dir)
 # Read Data
-survey_data <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Jordana Hoppe/Home Collection/Data_Raw/HomeCollection220661_DATA_2023-12-19_0911.csv",na.strings = "")
+survey_data <- read.csv("./Jordana Hoppe/Home Collection/Data_Raw/HomeCollection220661_DATA_2023-12-19_0911.csv",na.strings = "")
 # Setting Labels
 label(survey_data$participant_id) <- "Participant ID"
 label(survey_data$redcap_survey_identifier) <- "Survey Identifier"

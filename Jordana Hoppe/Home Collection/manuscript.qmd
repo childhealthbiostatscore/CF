@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Dropbox/Miscellaneous/american-medical-association.csl
+bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -28,6 +28,15 @@ library(gtsummary)
 library(irr)
 library(eulerr)
 library(kableExtra)
+switch(Sys.info()[["sysname"]],
+  Windows = {
+    home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
+  },
+  Darwin = {
+    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
+  }
+)
+knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning, include=FALSE}

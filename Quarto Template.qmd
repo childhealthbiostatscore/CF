@@ -25,10 +25,10 @@ editor: source
 library(tidyverse)
 switch(Sys.info()[["sysname"]],
   Windows = {
-    home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry"
+    home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
   },
   Darwin = {
-    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry"
+    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
   }
 )
 knitr::opts_knit$set(root.dir = home_dir)
