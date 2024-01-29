@@ -19,7 +19,10 @@ editor: source
 #| include: false
 library(tidyverse)
 library(gtsummary)
-library(ggcorrplot)
+library(lme4)
+library(GLMMadaptive)
+library(plotly)
+library(knitr)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF"
@@ -40,6 +43,11 @@ df$CONTACT_DATE <- lubridate::mdy(df$CONTACT_DATE)
 df <- df %>% arrange(PAT_MRN_ID, CONTACT_DATE)
 # Exclude those with no PSC data
 df <- df %>% filter(!is.na(Score))
+# Make visit number
+df <- df %>%
+  group_by(PAT_MRN_ID) %>%
+  mutate(visit_num = row_number()) %>%
+  ungroup()
 ```
 
 # Data cleaning
@@ -62,7 +70,10 @@ df %>%
     across(all_of(cat_demo_vars), ~ first(na.omit(.x)))
   ) %>%
   select(-PAT_MRN_ID) %>%
-  tbl_summary(missing_text = "Missing", label = list("Age at First Contact" = "AGE AT CONTACT"))
+  tbl_summary(
+    missing_text = "Missing",
+    label = list("Age at First Contact" = "AGE AT CONTACT")
+  )
 ```
 
 # Prevalence of behavioral health difficulties
@@ -105,8 +116,143 @@ df %>%
   )
 ```
 
-# Correlations
+# Mixed models
 
-```{r}
-X = df %>% 
+Because some participants had multiple PSC scores, we used mixed effects models to account for correlation within each participant. Also, due to the large number of 0 scores, we used a zero-inflated negative binomial model to examine the association between PSC score and age.
+
+## Continuous scores
+
+### Total score
+
+```{r age vs. total psc}
+# Plot
+p <- ggplot(df, aes(
+  x = AGE_AT_CONTACT_IN_YEARS, y = Score,
+  group = factor(PAT_MRN_ID), color = factor(PAT_MRN_ID)
+)) +
+  geom_point() +
+  geom_line() +
+  theme_bw() +
+  theme(legend.position = "none")
+ggplotly(p)
+# Model
+gm <- mixed_model(Score ~ AGE_AT_CONTACT_IN_YEARS,
+  random = ~ 1 | PAT_MRN_ID, data = df,
+  family = zi.poisson(), zi_fixed = ~1
+)
+kable(summary(gm)$coef_table, digits = 3)
 ```
+
+### Internalizing subscale
+
+```{r age vs. internalizing psc}
+# Plot
+p <- ggplot(df, aes(
+  x = AGE_AT_CONTACT_IN_YEARS, y = `Internalizing subscale`,
+  group = factor(PAT_MRN_ID), color = factor(PAT_MRN_ID)
+)) +
+  geom_point() +
+  geom_line() +
+  theme_bw() +
+  theme(legend.position = "none")
+ggplotly(p)
+# Model
+gm <- mixed_model(`Internalizing subscale` ~ AGE_AT_CONTACT_IN_YEARS,
+  random = ~ 1 | PAT_MRN_ID, data = df,
+  family = zi.poisson(), zi_fixed = ~1, control = list(iter_EM = 0)
+)
+kable(summary(gm)$coef_table, digits = 3)
+```
+
+### Attention subscale
+
+```{r age vs. attention psc}
+# Plot
+p <- ggplot(df, aes(
+  x = AGE_AT_CONTACT_IN_YEARS, y = `Attention subscale`,
+  group = factor(PAT_MRN_ID), color = factor(PAT_MRN_ID)
+)) +
+  geom_point() +
+  geom_line() +
+  theme_bw() +
+  theme(legend.position = "none")
+ggplotly(p)
+# Model
+gm <- mixed_model(`Attention subscale` ~ AGE_AT_CONTACT_IN_YEARS,
+  random = ~ 1 | PAT_MRN_ID, data = df,
+  family = zi.poisson(), zi_fixed = ~1, control = list(iter_EM = 0)
+)
+kable(summary(gm)$coef_table, digits = 3)
+```
+
+### Externalizing subscale
+
+```{r age vs. externalizing psc}
+# Plot
+p <- ggplot(df, aes(
+  x = AGE_AT_CONTACT_IN_YEARS, y = `Externalizing subscale`,
+  group = factor(PAT_MRN_ID), color = factor(PAT_MRN_ID)
+)) +
+  geom_point() +
+  geom_line() +
+  theme_bw() +
+  theme(legend.position = "none")
+ggplotly(p)
+# Model
+gm <- mixed_model(`Externalizing subscale` ~ AGE_AT_CONTACT_IN_YEARS,
+  random = ~ 1 | PAT_MRN_ID, data = df,
+  family = zi.poisson(), zi_fixed = ~1, control = list(iter_EM = 0)
+)
+kable(summary(gm)$coef_table, digits = 3)
+```
+
+## Low vs. high risk
+
+### Total score
+
+```{r age vs. total psc categorical}
+# Model
+gm <- glmer(factor(`PSC Totals`) ~ AGE_AT_CONTACT_IN_YEARS + (1 | PAT_MRN_ID),
+  data = df, family = "binomial"
+)
+kable(summary(gm)$coefficients, digits = 3)
+```
+
+### Internalizing subscale
+
+```{r age vs. internalizing psc categorical}
+# Model
+gm <- glmer(
+  factor(`PSC Internalizing`) ~ AGE_AT_CONTACT_IN_YEARS + (1 | PAT_MRN_ID),
+  data = df, family = "binomial"
+)
+kable(table(factor(df$`PSC Internalizing`), df$AGE_AT_CONTACT_IN_YEARS))
+```
+
+The above model is not converging due to low number of high risk scores on this subscale.
+
+### Attention subscale
+
+```{r age vs. attention psc categorical}
+# Model
+gm <- glmer(
+  factor(`PSC Attention`) ~ AGE_AT_CONTACT_IN_YEARS + (1 | PAT_MRN_ID),
+  data = df, family = "binomial"
+)
+kable(summary(gm)$coefficients, digits = 3)
+```
+
+### Externalizing subscale
+
+```{r age vs. externalizing psc categorical}
+# Model
+gm <- glmer(
+  factor(`PSC Externalizing`) ~ AGE_AT_CONTACT_IN_YEARS + (1 | PAT_MRN_ID),
+  data = df, family = "binomial"
+)
+kable(summary(gm)$coefficients, digits = 3)
+```
+
+# Questions for Emily
+
+1. How do we handle people with multiple screenings at the same age?
