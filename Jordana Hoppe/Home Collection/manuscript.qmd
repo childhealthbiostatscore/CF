@@ -43,15 +43,11 @@ knitr::opts_knit$set(root.dir = home_dir)
 # Use REDCap import
 source("/Users/timvigers/GitHub/CF/Jordana Hoppe/Home Collection/home_collection_data.r")
 source("/Users/timvigers/GitHub/CF/Jordana Hoppe/Home Collection/home_collection_surveys.r")
-# Find missing subjects
-data_missing <- data %>%
-  filter(is.na(home_cx_source)) %>%
-  select(subject_id, pt_initials, home_cx:home_cx_results___17)
-survey_missing <- survey_data %>%
-  filter(is.na(q1)) %>%
-  select(participant_id, q1:q6b_spec)
-write.csv(data_missing, file = "~/missing_data.csv", row.names = F, na = "")
-write.csv(survey_missing, file = "~/missing_survey.csv", row.names = F, na = "")
+# Exclude missing subjects
+data <- data %>%
+  filter(!subject_id %in% c("009-07", "009-17", "009-25", "009-37"))
+survey_data <- survey_data %>%
+  filter(!participant_id %in% c(15, 27, 30, 34, 47))
 # Fix missing labels
 labels <- label(data)[which(label(data) != "")]
 labels[paste0(names(labels), ".factor")] <- as.character(labels)

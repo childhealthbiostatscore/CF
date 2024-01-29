@@ -2,16 +2,15 @@
 library(Hmisc)
 # Set WD
 switch(Sys.info()[["sysname"]],
-       Windows = {
-         home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
-       },
-       Darwin = {
-         home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
-       }
+  Windows = {
+    home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
+  },
+  Darwin = {
+    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
+  }
 )
-setwd(home_dir)
 # Read Data
-data <- read.csv("./Jordana Hoppe/Home Collection/Data_Raw/HomeCollection220661_DATA_2023-12-19_0917.csv",na.strings = "")
+data <- read.csv(paste0(home_dir, "/", "Jordana Hoppe/Home Collection/Data_Raw/HomeCollection220661_DATA_2024-01-29_0945.csv"))
 # Setting Labels
 label(data$subject_id) <- "Subject ID"
 label(data$pt_initials) <- "Patient Initials"
