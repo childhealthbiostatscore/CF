@@ -15,21 +15,19 @@ library(DiagrammeR)
 library(readxl)
 library(arsenal)
 library(tidyverse)
+library(factoextra)
 library(pROC)
 library(knitr)
-knitr::opts_chunk$set(echo = FALSE)
-if (Sys.info()["sysname"] == "Windows") {
-  home_dir <- "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Edith Zemanick/Sweat Test"
-  source("C:/Users/timvigers/Documents/GitHub/CF/get_genotype_class_severity.R")
-} else if (Sys.info()["sysname"] == "Linux") {
-  home_dir <- "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Edith Zemanick/Sweat Test"
-  source("~/GitHub/CF/get_genotype_class_severity.R")
-} else if (Sys.info()["sysname"] == "Darwin") {
-  home_dir <- "/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Edith Zemanick/Sweat Test"
-  source("~/GitHub/CF/genotype_class_severity.R")
-}
+source("/Users/timvigers/GitHub/CF/genotype_class_severity.R")
+switch(Sys.info()[["sysname"]],
+  Windows = {
+    home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Test"
+  },
+  Darwin = {
+    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Test"
+  }
+)
 knitr::opts_knit$set(root.dir = home_dir)
-rm(home_dir)
 ```
 
 ```{r}
@@ -38,13 +36,13 @@ diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with C
 exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude)]
 # Import data
 df <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv", na.strings = "")
-n1 = nrow(df)
-n2 = length(unique(df$PatientID))
+n1 <- nrow(df)
+n2 <- length(unique(df$PatientID))
 # Remove exclusions from Angela
 df <- df[!(df$PatientID %in% exclude), ]
 # Diagnosis per Angela
 df$Diagnosis <- factor(diagnoses$Diagnosis[match(df$PatientID, diagnoses$PatientID)])
-levels(df$Diagnosis) = c("CFTR-RD or CRMS","CFTR-RD or CRMS","Cystic Fibrosis","Non-CF")
+levels(df$Diagnosis) <- c("CFTR-RD or CRMS", "CFTR-RD or CRMS", "Cystic Fibrosis", "Non-CF")
 # Add modulator info
 cftr <- read.csv("./Data_Raw/Copy of Report CFTR Modulators.csv")
 df$Modulator <- apply(df, 1, function(r) {
@@ -63,8 +61,8 @@ num_vars <- c("Amount", "Na", "K", "Cl")
 num_vars <- c(paste0(num_vars, "_Left"), paste0(num_vars, "_Right"))
 df[, num_vars] <- suppressWarnings(lapply(df[, num_vars], as.numeric))
 # Filter per Maxie's code
-exclude2 = c(22, 23, 24, 29, 31, 474, 483, 484, 485, 505, 510, 785, 791, 792, 793)
-no_dem = unique(df$PatientID[df$Demographics.Available!="TRUE" | is.na(df$Demographics.Available) | df$Sex==""])
+exclude2 <- c(22, 23, 24, 29, 31, 474, 483, 484, 485, 505, 510, 785, 791, 792, 793)
+no_dem <- unique(df$PatientID[df$Demographics.Available != "TRUE" | is.na(df$Demographics.Available) | df$Sex == ""])
 df <- df %>%
   mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks * 7) %>%
   filter(
@@ -136,17 +134,22 @@ df$K <- apply(df[, c("K", "K_Left", "K_Right")], 1, function(r) {
 })
 # Sodium to chloride ratio
 df$`Na/Cl Ratio` <- df$Na / df$Cl
-high_ratio = unique(which(df$`Na/Cl Ratio`>2))
-high_cl = unique(which(df$Cl>160))
-high_na = unique(which(df$Na>160))
-df = df[-unique(c(high_ratio,high_cl,high_na)),]
+high_ratio <- unique(which(df$`Na/Cl Ratio` > 2))
+high_cl <- unique(which(df$Cl > 160))
+high_na <- unique(which(df$Na > 160))
+df <- df[-unique(c(high_ratio, high_cl, high_na)), ]
 # Sweat chloride group
-df$`Sweat Chloride Group` = cut(df$Cl,c(-Inf,30,60,Inf),right = F,
-                                labels = c("< 30","30-59",">60"))
+df$`Sweat Chloride Group` <- cut(df$Cl, c(-Inf, 30, 60, Inf),
+  right = F,
+  labels = c("< 30", "30-59", ">60")
+)
 # Sort
 df <- df %>% arrange(PatientID, Age.at.Test.in.Weeks)
 # Table options (most variables are not normally distributed)
-mycontrols <- tableby.control(numeric.test = "kwt", numeric.stats = c("Nmiss", "median", "q1q3"))
+mycontrols <- tableby.control(
+  numeric.test = "kwt",
+  numeric.stats = c("Nmiss", "median", "q1q3")
+)
 labels <- list(
   Age.at.Test.in.Years = "Age (Years)",
   geno_risk = "Genotype Severity", geno_class = "Specific Genotype"
@@ -154,7 +157,9 @@ labels <- list(
 # First measure for everyone
 t1_df <- df %>%
   group_by(PatientID) %>%
-  filter(row_number() == 1) 
+  filter(row_number() == 1)
+# Order groups
+df$Diagnosis <- factor(df$Diagnosis, levels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "Non-CF"))
 ```
 
 # Flowchart
@@ -198,13 +203,57 @@ highnacl -> analysis [style=invis]
 ")
 ```
 
+# Cohorts by Na/Cl ratio
+
+## Based on visual inspection
+
+```{r}
+# Visual inspection
+ggplot(df, aes(x = Diagnosis, y = `Na/Cl Ratio`)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_hline(yintercept = 1.25, color = "red")
+df$nacl_ratio_cat <- cut(df$`Na/Cl Ratio`, breaks = c(-Inf, 1, 1.25, Inf), right = F)
+kable(table(df$nacl_ratio_cat, df$Diagnosis))
+```
+
+## Based on k-means clustering
+
+```{r}
+set.seed(1017)
+# K means
+km_df <- df %>%
+  select(Diagnosis, Na, Cl) %>%
+  drop_na()
+ggplot(km_df, aes(x = Na, y = Cl, color = Diagnosis)) +
+  geom_point()
+km <- kmeans(km_df[, c("Na", "Cl")], centers = 3)
+km_df$Cluster <- factor(km$cluster,
+  levels = 1:3,
+  labels = c("High", "Medium", "Low")
+)
+centers <- data.frame(km$centers)
+centers$Cluster <- rownames(km$centers)
+centers$Cluster <- factor(centers$Cluster,
+  levels = 1:3,
+  labels = c("High", "Medium", "Low")
+)
+ggplot(km_df, aes(x = Na, y = Cl, color = Cluster)) +
+  geom_point(shape = 20, alpha = 0.2) +
+  geom_point(data = centers, size = 5)
+rownames(centers) <- NULL
+centers <- centers %>% column_to_rownames("Cluster")
+kable(centers, caption = "K-means centers", row.names = T)
+kable(as.data.frame.matrix(table(km_df$Cluster, km_df$Diagnosis)), row.names = T)
+```
+
 # Patient Demographics and Sample Characteristics
 
 For those with two sweat electrolyte measures (left and right), the average of the two was used. Each participants' first sweat test value was used for the following tables.
 
 ```{r results='asis'}
 t1 <- tableby(
-  Diagnosis ~ Sex + Age.at.Test.in.Years + Method+ fe(geno_risk) + fe(geno_class),
+  Diagnosis ~ Sex + Age.at.Test.in.Years + Method + fe(geno_risk) + fe(geno_class),
   data = t1_df, control = mycontrols, simulate.p.value = T
 )
 summary(t1,
@@ -232,8 +281,8 @@ summary(t1,
 
 ```{r results='asis'}
 t1 <- tableby(
-  `Sweat Chloride Group` ~ fe(geno_risk) + fe(Diagnosis)+  Cl + Na + `Na/Cl Ratio`,
-  data = t1_df, control = mycontrols,simulate.p.value = T
+  `Sweat Chloride Group` ~ fe(geno_risk) + fe(Diagnosis) + Cl + Na + `Na/Cl Ratio`,
+  data = t1_df, control = mycontrols, simulate.p.value = T
 )
 summary(t1,
   pfootnote = T,
@@ -259,7 +308,7 @@ summary(t1,
 
 ```{r results='asis'}
 t1 <- tableby(`Sweat Chloride Group` ~ Cl + Na + `Na/Cl Ratio`,
-  data = t1_df[t1_df$Diagnosis == "CFTR-RD or CRMS", ], 
+  data = t1_df[t1_df$Diagnosis == "CFTR-RD or CRMS", ],
   control = mycontrols
 )
 summary(t1,
@@ -287,15 +336,15 @@ summary(t1,
 For all participants with more than one sweat test, we used only their first value to calculate the absolute difference (AD) between left and right arm.
 
 ```{r}
-t1_df$`Cl AD` = abs(t1_df$Cl_Left-t1_df$Cl_Right)
-t1_df$`Na AD` = abs(t1_df$Na_Left-t1_df$Na_Right)
+t1_df$`Cl AD` <- abs(t1_df$Cl_Left - t1_df$Cl_Right)
+t1_df$`Na AD` <- abs(t1_df$Na_Left - t1_df$Na_Right)
 ```
 
 ### By diagnosis
 
 ```{r results='asis'}
 t1 <- tableby(
-  Diagnosis ~ `Cl AD`+`Na AD`,
+  Diagnosis ~ `Cl AD` + `Na AD`,
   data = t1_df, control = mycontrols,
 )
 summary(t1,
@@ -308,7 +357,7 @@ summary(t1,
 
 ```{r results='asis'}
 t1 <- tableby(
-  `Sweat Chloride Group` ~ `Cl AD`+`Na AD`,
+  `Sweat Chloride Group` ~ `Cl AD` + `Na AD`,
   data = t1_df, control = mycontrols
 )
 summary(t1,
@@ -321,7 +370,7 @@ summary(t1,
 
 ```{r results='asis'}
 t1 <- tableby(
-  geno_risk ~ `Cl AD`+`Na AD`,
+  geno_risk ~ `Cl AD` + `Na AD`,
   data = t1_df, control = mycontrols
 )
 summary(t1,
@@ -340,18 +389,20 @@ multiples <- df %>%
   group_by(PatientID) %>%
   filter(n() > 1) %>% # Multiple values only
   filter(row_number() == 1 | row_number() == n()) %>% # First and last
-  summarise(`Cl AD` = abs(last(Cl) - first(Cl)), # Calculate AD
-            `Na AD` = abs(last(Na) - first(Na)),
-            Diagnosis = first(Diagnosis),
-            `Sweat Chloride Group` = first(`Sweat Chloride Group`),
-            geno_risk = first(geno_risk)) 
+  summarise(
+    `Cl AD` = abs(last(Cl) - first(Cl)), # Calculate AD
+    `Na AD` = abs(last(Na) - first(Na)),
+    Diagnosis = first(Diagnosis),
+    `Sweat Chloride Group` = first(`Sweat Chloride Group`),
+    geno_risk = first(geno_risk)
+  )
 ```
 
 ### By diagnosis
 
 ```{r results='asis'}
 t1 <- tableby(
-  Diagnosis ~ `Cl AD`+`Na AD`,
+  Diagnosis ~ `Cl AD` + `Na AD`,
   data = multiples, control = mycontrols,
 )
 summary(t1,
@@ -364,7 +415,7 @@ summary(t1,
 
 ```{r results='asis'}
 t1 <- tableby(
-  `Sweat Chloride Group` ~ `Cl AD`+`Na AD`,
+  `Sweat Chloride Group` ~ `Cl AD` + `Na AD`,
   data = multiples, control = mycontrols
 )
 summary(t1,
@@ -377,7 +428,7 @@ summary(t1,
 
 ```{r results='asis'}
 t1 <- tableby(
-  geno_risk ~ `Cl AD`+`Na AD`,
+  geno_risk ~ `Cl AD` + `Na AD`,
   data = multiples, control = mycontrols
 )
 summary(t1,
@@ -399,17 +450,21 @@ The full cohort analyses include all participants.
 #### ROC
 
 ```{r}
-roc_cf <- roc(response= t1_df$`Diagnosis`,
-              predictor = t1_df$`Na/Cl Ratio`, 
-              levels = c("CFTR-RD or CRMS","Cystic Fibrosis"),
-              quiet = T)
+roc_cf <- roc(
+  response = t1_df$`Diagnosis`,
+  predictor = t1_df$`Na/Cl Ratio`,
+  levels = c("CFTR-RD or CRMS", "Cystic Fibrosis"),
+  quiet = T
+)
 coords_cf <- round(coords(roc_cf, "best", best.method = "youden"), 3)
 
 
-roc_non_cf <- roc(response= t1_df$`Diagnosis`,
-              predictor = t1_df$`Na/Cl Ratio`, 
-              levels = c("Non-CF","CFTR-RD or CRMS"),
-              quiet = T)
+roc_non_cf <- roc(
+  response = t1_df$`Diagnosis`,
+  predictor = t1_df$`Na/Cl Ratio`,
+  levels = c("Non-CF", "CFTR-RD or CRMS"),
+  quiet = T
+)
 coords_non_cf <- round(coords(roc_non_cf, "best", best.method = "youden"), 3)
 
 plot(roc_cf, print.auc = TRUE, col = "blue")
@@ -423,12 +478,15 @@ The blue curve shows the ROC for distinguishing between CFTR-RD or CRMS vs. CF, 
 Vertical blue line indicates the threshold for CFTR-RD or CRMS vs. CF and green indicates the threshold for non-CF vs. CFTR-RD or CRMS. Na/Cl ratio was log-transformed for easier visualization.
 
 ```{r warning=FALSE}
-ggplot(t1_df[!is.na(t1_df$`Diagnosis`), ], 
-       aes(log(`Na/Cl Ratio`), fill = `Diagnosis`)) +
-  geom_histogram(alpha = 0.3, position = "identity",bins = 50) +
+ggplot(
+  t1_df[!is.na(t1_df$`Diagnosis`), ],
+  aes(log(`Na/Cl Ratio`), fill = `Diagnosis`)
+) +
+  geom_histogram(alpha = 0.3, position = "identity", bins = 50) +
   geom_vline(xintercept = log(coords_cf$threshold), color = "blue") +
   geom_vline(xintercept = log(coords_non_cf$threshold), color = "green") +
-  ylab("Count") + xlab("ln(Na/Cl Ratio)") +
+  ylab("Count") +
+  xlab("ln(Na/Cl Ratio)") +
   theme_bw()
 ```
 
@@ -441,23 +499,28 @@ Participants with unknown genotype risk were excluded from this analysis.
 ```{r}
 # Re-format diagnosis column
 t1_df$`Genotype Risk` <- factor(t1_df$geno_risk,
-                     levels = c("Not CF","Low","High","Unknown"),
-                     ordered = T)
-t1_df$`Genotype Risk`[t1_df$`Genotype Risk`=="Unknown"]= NA
+  levels = c("Not CF", "Low", "High", "Unknown"),
+  ordered = T
+)
+t1_df$`Genotype Risk`[t1_df$`Genotype Risk` == "Unknown"] <- NA
 ```
 
 ```{r}
-roc_cf <- roc(response= t1_df$`Genotype Risk`,
-              predictor = t1_df$`Na/Cl Ratio`, 
-              levels = c("Low","High"),
-              quiet = T)
+roc_cf <- roc(
+  response = t1_df$`Genotype Risk`,
+  predictor = t1_df$`Na/Cl Ratio`,
+  levels = c("Low", "High"),
+  quiet = T
+)
 coords_cf <- round(coords(roc_cf, "best", best.method = "youden"), 3)
 
 
-roc_non_cf <- roc(response= t1_df$`Genotype Risk`,
-              predictor = t1_df$`Na/Cl Ratio`, 
-              levels = c("Not CF","Low"),
-              quiet = T)
+roc_non_cf <- roc(
+  response = t1_df$`Genotype Risk`,
+  predictor = t1_df$`Na/Cl Ratio`,
+  levels = c("Not CF", "Low"),
+  quiet = T
+)
 coords_non_cf <- round(coords(roc_non_cf, "best", best.method = "youden"), 3)
 
 plot(roc_cf, print.auc = TRUE, col = "blue")
@@ -471,12 +534,15 @@ The blue curve shows the ROC for distinguishing between low vs. high risk, and t
 Vertical blue line indicates the threshold for low vs. high risk and green indicates the threshold for non-CF vs. low risk. Na/Cl ratio was log-transformed for easier visualization.
 
 ```{r warning=FALSE}
-ggplot(t1_df[!is.na(t1_df$`Genotype Risk`), ], 
-       aes(log(`Na/Cl Ratio`), fill = `Genotype Risk`)) +
-  geom_histogram(alpha = 0.3, position = "identity",bins = 50) +
+ggplot(
+  t1_df[!is.na(t1_df$`Genotype Risk`), ],
+  aes(log(`Na/Cl Ratio`), fill = `Genotype Risk`)
+) +
+  geom_histogram(alpha = 0.3, position = "identity", bins = 50) +
   geom_vline(xintercept = log(coords_cf$threshold), color = "blue") +
   geom_vline(xintercept = log(coords_non_cf$threshold), color = "green") +
-  ylab("Count") + xlab("ln(Na/Cl Ratio)") +
+  ylab("Count") +
+  xlab("ln(Na/Cl Ratio)") +
   theme_bw()
 ```
 
@@ -490,21 +556,25 @@ The limited cohort analyses only included participants with sweat chloride < 60.
 
 ```{r}
 # Exclude those with Cl >= 60
-t1_df = t1_df %>% filter(Cl < 60)
+t1_df <- t1_df %>% filter(Cl < 60)
 ```
 
 ```{r}
-roc_cf <- roc(response= t1_df$`Diagnosis`,
-              predictor = t1_df$`Na/Cl Ratio`, 
-              levels = c("CFTR-RD or CRMS","Cystic Fibrosis"),
-              quiet = T)
+roc_cf <- roc(
+  response = t1_df$`Diagnosis`,
+  predictor = t1_df$`Na/Cl Ratio`,
+  levels = c("CFTR-RD or CRMS", "Cystic Fibrosis"),
+  quiet = T
+)
 coords_cf <- round(coords(roc_cf, "best", best.method = "youden"), 3)
 
 
-roc_non_cf <- roc(response= t1_df$`Diagnosis`,
-              predictor = t1_df$`Na/Cl Ratio`, 
-              levels = c("Non-CF","CFTR-RD or CRMS"),
-              quiet = T)
+roc_non_cf <- roc(
+  response = t1_df$`Diagnosis`,
+  predictor = t1_df$`Na/Cl Ratio`,
+  levels = c("Non-CF", "CFTR-RD or CRMS"),
+  quiet = T
+)
 coords_non_cf <- round(coords(roc_non_cf, "best", best.method = "youden"), 3)
 
 plot(roc_cf, print.auc = TRUE, col = "blue")
@@ -518,12 +588,15 @@ The blue curve shows the ROC for distinguishing between CFTR-RD or CRMS vs. CF, 
 Vertical blue line indicates the threshold for CFTR-RD or CRMS vs. CF and green indicates the threshold for non-CF vs. CFTR-RD or CRMS. Na/Cl ratio was log-transformed for easier visualization.
 
 ```{r warning=FALSE}
-ggplot(t1_df[!is.na(t1_df$`Diagnosis`), ], 
-       aes(log(`Na/Cl Ratio`), fill = `Diagnosis`)) +
-  geom_histogram(alpha = 0.3, position = "identity",bins = 50) +
+ggplot(
+  t1_df[!is.na(t1_df$`Diagnosis`), ],
+  aes(log(`Na/Cl Ratio`), fill = `Diagnosis`)
+) +
+  geom_histogram(alpha = 0.3, position = "identity", bins = 50) +
   geom_vline(xintercept = log(coords_cf$threshold), color = "blue") +
   geom_vline(xintercept = log(coords_non_cf$threshold), color = "green") +
-  ylab("Count") + xlab("ln(Na/Cl Ratio)") +
+  ylab("Count") +
+  xlab("ln(Na/Cl Ratio)") +
   theme_bw()
 ```
 
@@ -534,17 +607,21 @@ Participants with unknown genotype risk were excluded from this analysis.
 #### ROC
 
 ```{r}
-roc_cf <- roc(response= t1_df$`Genotype Risk`,
-              predictor = t1_df$`Na/Cl Ratio`, 
-              levels = c("Low","High"),
-              quiet = T)
+roc_cf <- roc(
+  response = t1_df$`Genotype Risk`,
+  predictor = t1_df$`Na/Cl Ratio`,
+  levels = c("Low", "High"),
+  quiet = T
+)
 coords_cf <- round(coords(roc_cf, "best", best.method = "youden"), 3)
 
 
-roc_non_cf <- roc(response= t1_df$`Genotype Risk`,
-              predictor = t1_df$`Na/Cl Ratio`, 
-              levels = c("Not CF","Low"),
-              quiet = T)
+roc_non_cf <- roc(
+  response = t1_df$`Genotype Risk`,
+  predictor = t1_df$`Na/Cl Ratio`,
+  levels = c("Not CF", "Low"),
+  quiet = T
+)
 coords_non_cf <- round(coords(roc_non_cf, "best", best.method = "youden"), 3)
 
 plot(roc_cf, print.auc = TRUE, col = "blue")
@@ -558,11 +635,14 @@ The blue curve shows the ROC for distinguishing between low vs. high risk, and t
 Vertical blue line indicates the threshold for low vs. high risk and green indicates the threshold for non-CF vs. low risk. Na/Cl ratio was log-transformed for easier visualization.
 
 ```{r warning=FALSE}
-ggplot(t1_df[!is.na(t1_df$`Genotype Risk`), ], 
-       aes(log(`Na/Cl Ratio`), fill = `Genotype Risk`)) +
-  geom_histogram(alpha = 0.3, position = "identity",bins = 50) +
+ggplot(
+  t1_df[!is.na(t1_df$`Genotype Risk`), ],
+  aes(log(`Na/Cl Ratio`), fill = `Genotype Risk`)
+) +
+  geom_histogram(alpha = 0.3, position = "identity", bins = 50) +
   geom_vline(xintercept = log(coords_cf$threshold), color = "blue") +
   geom_vline(xintercept = log(coords_non_cf$threshold), color = "green") +
-  ylab("Count") + xlab("ln(Na/Cl Ratio)") +
+  ylab("Count") +
+  xlab("ln(Na/Cl Ratio)") +
   theme_bw()
 ```
