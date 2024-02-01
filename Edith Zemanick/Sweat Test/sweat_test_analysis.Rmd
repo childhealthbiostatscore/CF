@@ -207,7 +207,7 @@ highnacl -> analysis [style=invis]
 
 ## Based on visual inspection
 
-```{r}
+```{r warning=FALSE}
 # Visual inspection
 ggplot(df, aes(x = Diagnosis, y = `Na/Cl Ratio`)) +
   geom_boxplot() +
@@ -219,7 +219,9 @@ kable(table(df$nacl_ratio_cat, df$Diagnosis))
 
 ## Based on k-means clustering
 
-```{r}
+### By Na and Cl
+
+```{r warning=FALSE}
 set.seed(1017)
 # K means
 km_df <- df %>%
@@ -241,6 +243,31 @@ centers$Cluster <- factor(centers$Cluster,
 ggplot(km_df, aes(x = Na, y = Cl, color = Cluster)) +
   geom_point(shape = 20, alpha = 0.2) +
   geom_point(data = centers, size = 5)
+rownames(centers) <- NULL
+centers <- centers %>% column_to_rownames("Cluster")
+kable(centers, caption = "K-means centers", row.names = T)
+kable(as.data.frame.matrix(table(km_df$Cluster, km_df$Diagnosis)), row.names = T)
+```
+
+### By Na/Cl ratio
+
+```{r warning=FALSE}
+set.seed(1017)
+# K means
+km_df <- df %>%
+  select(Diagnosis, `Na/Cl Ratio`) %>%
+  drop_na()
+km <- kmeans(km_df[, c("Na/Cl Ratio")], centers = 3)
+km_df$Cluster <- factor(km$cluster,
+  levels = 1:3,
+  labels = c("Low","Medium","High")
+)
+centers <- data.frame(km$centers)
+centers$Cluster <- rownames(km$centers)
+centers$Cluster <- factor(centers$Cluster,
+  levels = 1:3,
+  labels = c("Low","Medium","High")
+)
 rownames(centers) <- NULL
 centers <- centers %>% column_to_rownames("Cluster")
 kable(centers, caption = "K-means centers", row.names = T)
