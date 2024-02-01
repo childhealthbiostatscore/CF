@@ -11,9 +11,13 @@
 library(tidyverse)
 library(readxl)
 # Home directory
-home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Dropbox/Work/Vigers/CF/Christine Chan/EnVision CF/Data_Clean",
-  "Windows" = "C:/Users/timvigers/Dropbox/Work/Vigers/CF/Christine Chan/EnVision CF/Data_Clean"
+switch(Sys.info()[["sysname"]],
+  Windows = {
+    home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF/Data_Clean"
+  },
+  Darwin = {
+    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF/Data_Clean"
+  }
 )
 setwd(home_dir)
 # Variables to use across all spreadsheets
@@ -194,3 +198,20 @@ write.csv(catecholamines,
   file = "catecholamines_analysis_dataset.csv",
   row.names = F, na = ""
 )
+#-------------------------------------------------------------------------------
+# Data checking
+#-------------------------------------------------------------------------------
+# For Katie, pull:
+# - Which subjects have no glucose values in their OGTT (they would have POC glucose, insulin, c-peptide, etc but no glucose value; these would only be 2023 visits)
+# - Which subjects have c-peptide for time points 0-120, but no 150 and 180
+# - Which subjects do not have insulin run at Colorado, but do have insulin run at iowa
+missing_c_pep = hormones %>%
+  filter(!Timepoint %in% c("Control 1","Control 2","no sample")) %>%
+  mutate(Timepoint = factor(Timepoint,levels = paste(c(0, 10, 30, 60, 90, 120, 150, 180),"min"))) %>%
+  group_by(ID) %>%
+  count(Timepoint) %>%
+  reframe(missing_150 = n[Timepoint=="0 min"] != n[Timepoint=="150 min"],
+          missing_180 = n[Timepoint=="0 min"] != n[Timepoint=="180 min"]) %>%
+  filter(missing_150 | missing_180)
+write.csv(missing_c_pep,file = "missing_c_pep.csv",row.names = F,na = "")
+
