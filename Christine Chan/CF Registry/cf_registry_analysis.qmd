@@ -37,15 +37,7 @@ library(icenReg)
 library(knitr)
 library(eulerr)
 library(broom)
-switch(Sys.info()[["sysname"]],
-  Windows = {
-    home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry"
-  },
-  Darwin = {
-    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry"
-  }
-)
-knitr::opts_knit$set(root.dir = home_dir)
+knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry")
 ```
 
 <!-- # CFRD incidence and prevalence -->
@@ -341,7 +333,35 @@ annual$cfrd_status_annual <- factor(annual$cfrd_status_annual,
 )
 # Get mutations
 demogs <- read.csv("./Data_Raw/CFF19_DemogCFDiag_Del1.csv")
-demogs <- demogs %>% select(eDWID, Gender, MutClass)
+races <- c(
+  "White", "Black or African American", "American Indian or Alaska Native",
+  "Asian", "Native Hawaiian or Other Pacific ", "Some other race"
+)
+demogs$Race <- apply(demogs, 1, function(r) {
+  w <- which(r[paste0("Race", 1:6)] == 1)
+  if (length(w) > 1) {
+    return("More than one race")
+  } else {
+    return(races[w])
+  }
+})
+demogs$Race <- factor(demogs$Race,
+  levels = c(
+    "White", "American Indian or Alaska Native", "Asian",
+    "Black or African American", "More than one race",
+    "Native Hawaiian or Other Pacific ", "Some other race"
+  ),
+  labels = c(
+    "White", "Other race", "Other race",
+    "Black or African American", "More than one race",
+    "Other race", "Other race"
+  )
+)
+demogs$Hispanicrace <- factor(demogs$Hispanicrace,
+  levels = 1:2,
+  labels = c("Yes", "No")
+)
+demogs <- demogs %>% select(eDWID, Gender, MutClass, Race, Hispanicrace)
 annual <- left_join(annual, demogs, by = join_by(eDWID))
 # Variable formatting
 # If A_supplement_feeding is 0, then A_feeding2 is also 0 because they are not
@@ -463,15 +483,16 @@ Based on CFFPR annualized data. These data are interval censored because we know
 ```{r}
 # List of covariates
 vars <- c(
-  "age_group", "Gender", "bmi_perc_cat", "MutClass", "A_IsOnEnzymes",
-  "ppFEV1_cat", "tube_feeding", "NumPulmExacerbation",
-  "A_pseudomonasaeruginosa", "A_fungalyeast1", "A_mycocultureresults3",
-  "A_pulmonarycomplications1", "A_corticosteroids1", "cfrd_status_annual",
-  "A_Vx770", "A_VX809comb", "liver_disease"
+  "age_group", "Gender", "bmi_perc", "bmi_perc_cat", "MutClass", "Race",
+  "Hispanicrace", "A_IsOnEnzymes", "ppFEV1_cat", "tube_feeding",
+  "NumPulmExacerbation", "A_pseudomonasaeruginosa", "A_fungalyeast1",
+  "A_mycocultureresults3", "A_pulmonarycomplications1", "A_corticosteroids1",
+  "cfrd_status_annual", "A_Vx770", "A_VX809comb", "liver_disease"
 )
 # Nice labels for plots and tables
 labels <- list(
   cfrd_status_annual = "CFRD Status", MutClass = "Mutation class",
+  Race = "Race", Hispanicrace = "Hispanic",
   Gender = "Sex", A_IsOnEnzymes = "Pancreatic enzyme use",
   ppFEV1_cat = "FEV1 percent predicted",
   tube_feeding = "Enteric feedings", liver_disease = "Liver disease",
@@ -483,7 +504,8 @@ labels <- list(
   A_pseudomonasaeruginosa = "Pseudomonas aeruginosa",
   A_fungalyeast1 = "Aspergillus (any species)",
   A_pulmonarycomplications1 = "ABPA",
-  A_mycocultureresults3 = "Microorganisms in myco culture"
+  A_mycocultureresults3 = "Microorganisms in myco culture",
+  eDWID = "ID",birth_year="Birth year",tstart="Interval start",tstop="Interval stop",age_at_entry="Age at entry",Age_YrEnd="Age",bmi_perc = "BMI %ile"
 )
 # For now, let's just assume that everyone's first CFRD+ diagnosis is correct
 s <- annual %>%
@@ -513,35 +535,37 @@ s <- as.data.frame(s)
 s$cfrd_status_annual <- as.numeric(s$cfrd_status_annual) - 1
 # Drop under 10s
 s$age_group <- droplevels(s$age_group)
+# Labels
+label(s) = labels[colnames(s)]
 ```
 
 ## Kaplan Meier Analysis
 
 ```{r}
-# # Whole cohort
-# km_fit <- survfit(Surv(tstart, tstop, cfrd_status_annual) ~ 1,
-#   data = s, cluster = eDWID
-# )
-# ggsurvplot(km_fit,
-#   data = s, risk.table = T, cumevents = T,
-#   fun = "event", xlim = c(2003, 2018), break.x.by = 1
-# )
-# kable(tidy(km_fit))
-# # By age group
-# km_fit <- survfit(Surv(tstart, tstop, cfrd_status_annual) ~ age_group,
-#   data = s, cluster = eDWID
-# )
-# ggsurvplot(km_fit,
-#   data = s, risk.table = T, cumevents = T,
-#   fun = "event", xlim = c(2003, 2018), break.x.by = 1
-# )
-# km_table <- tidy(km_fit)
-# km_table <- split.data.frame(km_table, km_table$strata)
-# invisible(lapply(km_table, function(t) {
-#   name <- t$strata[1]
-#   t <- t %>% select(-strata)
-#   kable(t, caption = name)
-# }))
+# Whole cohort
+km_fit <- survfit(Surv(tstart, tstop, cfrd_status_annual) ~ 1,
+  data = s, cluster = eDWID
+)
+ggsurvplot(km_fit,
+  data = s, risk.table = T, cumevents = T,
+  fun = "event", xlim = c(2003, 2018), break.x.by = 1
+)
+kable(tidy(km_fit))
+# By age group
+km_fit <- survfit(Surv(tstart, tstop, cfrd_status_annual) ~ age_group,
+  data = s, cluster = eDWID
+)
+ggsurvplot(km_fit,
+  data = s, risk.table = T, cumevents = T,
+  fun = "event", xlim = c(2003, 2018), break.x.by = 1
+)
+km_table <- tidy(km_fit)
+km_table <- split.data.frame(km_table, km_table$strata)
+invisible(lapply(km_table, function(t) {
+  name <- t$strata[1]
+  t <- t %>% select(-strata)
+  kable(t, caption = name)
+}))
 ```
 
 ## Cox PH model
@@ -551,10 +575,9 @@ s$age_group <- droplevels(s$age_group)
 ```{r}
 # Formula for base model
 x <- c(
-  "age_group", "Gender", "bmi_perc_cat", "MutClass", "A_IsOnEnzymes",
-  "tube_feeding", "liver_disease",
-  "ppFEV1_cat", "NumPulmExacerbation",
-  "A_pulmonarycomplications1", "A_corticosteroids1"
+  "age_group", "Gender", "Race","Hispanicrace", "bmi_perc_cat", "MutClass", 
+  "A_IsOnEnzymes", "tube_feeding", "liver_disease", "ppFEV1_cat", 
+  "NumPulmExacerbation", "A_pulmonarycomplications1", "A_corticosteroids1"
 )
 y <- "Surv(tstart, tstop, cfrd_status_annual)"
 f <- as.formula(paste0(y, "~", paste0(x, collapse = "+")))
@@ -567,7 +590,10 @@ cox_res <- coxph(f, data = s, cluster = eDWID)
 # Forest plot and coefficients table
 ggforest(cox_res, data = s)
 # Diagnostics
-# test.ph <- cox.zph(cox_res)
+test.ph <- data.frame(cox.zph(cox_res)$table)
+test.ph = test.ph[rownames(test.ph) != "GLOBAL",]
+# Find which variables technically violate PH assumption
+time_varying = rownames(test.ph)[test.ph$p < 0.05]
 # ggcoxzph(test.ph)
 # ggcoxdiagnostics(cox_res,type = "martingale")
 # ggcoxdiagnostics(cox_res,type = "deviance")
@@ -581,38 +607,37 @@ ggforest(cox_res, data = s)
 - `tgroup=2` indicates the years 2009 - 2013
 - `tgroup=3` indicates the years 2014 - 2018
 
-```{r results='asis'}
+The interpretation of these models can be a little bit tricky, so here is an example using BMI percentile group and not including the other covariates in the model:
+
+```{r}
 s_split <- survSplit(Surv(tstart, tstop, cfrd_status_annual) ~ .,
   data = s, cut = c(2008, 2013, 2018), episode = "tgroup"
 )
+s_split$tgroup <- factor(s_split$tgroup,
+  levels = 1:3, labels = c("[2003,2009)", "[2009,2014)", "[2014,2019)")
+)
 cox_res_split <- coxph(
-  Surv(tstart, tstop, cfrd_status_annual) ~ bmi_perc_cat*strata(tgroup),
+  Surv(tstart, tstop, cfrd_status_annual) ~ bmi_perc_cat * strata(tgroup),
   data = s_split, cluster = eDWID
 )
+kable(summary(cox_res_split)$coefficients, digits = 3)
+```
 
-invisible(lapply(x, function(v) {
+In the table above, the BMI reference group is the (50,85] group. So, in the years 2003 - 2008, the hazard ratio of the (0,10] BMI group was $exp(0.806)=2.238$ compared to the reference. Then, in the period of 2009 - 2013, the hazard ratio of the (0,10] BMI group was $exp(0.806+0.050)=2.354$ compared to the reference group, although this was not statistically significant. The HR for the (85,Inf] BMI group appears to increase over time, starting out at $exp(-0.511)=0.600$ in the first time period, then a statistically significant increase in the second time period to $exp(-0.511+0.282)=0.795$, with a final increase to $exp(-0.511+0.435)=0.927$ in the third period. The interpretation of the following results will follow these same formulas, and the time-varying results are shown at the bottom of each table. This report only includes variables that were statistically significant in the Cox proportional hazards test.
+
+```{r results='asis'}
+invisible(lapply(time_varying, function(v) {
   new_f <- as.formula(paste0(
     y, "~", paste0(x[-which(x == v)], collapse = "+"),
-    paste0("+", v, "+", v, ":strata(tgroup)")
+    paste0("+", v, "*strata(tgroup)")
   ))
   cox_res_split <- coxph(new_f, data = s_split, cluster = eDWID)
-  t <- tidy(cox_res_split, exponentiate = T, conf.int = T)
+  res <- summary(cox_res_split)$coefficients
   cat("\n")
   cat("####", v)
   cat("\n")
-  print(kable(t, digits = 2))
   cat("\n")
-  cat("\n")
-  t <- t %>%
-    filter(!is.na(estimate))
-  p <- t %>%
-    ggplot(aes(y = fct_rev(term))) +
-    geom_point(aes(x = estimate), shape = 15, size = 3) +
-    geom_linerange(aes(xmin = conf.low, xmax = conf.high)) +
-    geom_vline(xintercept = 1, linetype = "dashed") +
-    xlab("Hazard Ratio")
-  cat("\n")
-  print(p)
+  print(kable(res, digits = 3))
   cat("\n")
 }))
 ```
