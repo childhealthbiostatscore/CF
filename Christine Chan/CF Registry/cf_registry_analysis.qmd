@@ -481,6 +481,30 @@ data.frame(data_dict$code_meaning[
 Based on CFFPR annualized data. These data are interval censored because we know the first visit at which people with CFRD were diagnosed, but we do not know the exact time that they developed CFRD. These data are also left truncated because not all participants enter the study at the same time.
 
 ```{r}
+forest_plot <- function(mod, time_varying = NULL, labels = labels) {
+  coeff <- data.frame(summary(mod)$coefficients)
+  coeff$ll <- coeff$coef - (1.96 * coeff$se.coef.)
+  coeff$ul <- coeff$coef + (1.96 * coeff$se.coef.)
+  # Clean up variable names
+  l <- unlist(sapply(labels, paste0, ": "))
+  coeff$names <- rownames(coeff)
+  coeff$names <- str_replace_all(coeff$names, l)
+  coeff$names <- ordered(coeff$names, levels = unique(coeff$names))
+  # Exponentiate
+  coeff$exp.ll <- exp(coeff$ll)
+  coeff$exp.ul <- exp(coeff$ul)
+  # Plot
+  p <- ggplot(coeff, aes(y = fct_rev(names))) +
+    geom_point(aes(x = exp.coef.), shape = 15, size = 3) +
+    geom_linerange(aes(xmin = exp.ll, xmax = exp.ul)) +
+    geom_vline(xintercept = 1, linetype = "dashed") +
+    xlab("Hazard Ratio") +
+    theme_classic() +
+    theme(axis.ticks.y = element_blank(), axis.title.y = element_blank())
+}
+```
+
+```{r}
 # List of covariates
 vars <- c(
   "age_group", "Gender", "bmi_perc", "bmi_perc_cat", "MutClass", "Race",
@@ -505,7 +529,7 @@ labels <- list(
   A_fungalyeast1 = "Aspergillus (any species)",
   A_pulmonarycomplications1 = "ABPA",
   A_mycocultureresults3 = "Microorganisms in myco culture",
-  eDWID = "ID",birth_year="Birth year",tstart="Interval start",tstop="Interval stop",age_at_entry="Age at entry",Age_YrEnd="Age",bmi_perc = "BMI %ile"
+  eDWID = "ID", birth_year = "Birth year", tstart = "Interval start", tstop = "Interval stop", age_at_entry = "Age at entry", Age_YrEnd = "Age", bmi_perc = "BMI %ile"
 )
 # For now, let's just assume that everyone's first CFRD+ diagnosis is correct
 s <- annual %>%
@@ -536,7 +560,7 @@ s$cfrd_status_annual <- as.numeric(s$cfrd_status_annual) - 1
 # Drop under 10s
 s$age_group <- droplevels(s$age_group)
 # Labels
-label(s) = labels[colnames(s)]
+label(s) <- labels[colnames(s)]
 ```
 
 ## Kaplan Meier Analysis
@@ -575,8 +599,8 @@ invisible(lapply(km_table, function(t) {
 ```{r}
 # Formula for base model
 x <- c(
-  "age_group", "Gender", "Race","Hispanicrace", "bmi_perc_cat", "MutClass", 
-  "A_IsOnEnzymes", "tube_feeding", "liver_disease", "ppFEV1_cat", 
+  "age_group", "Gender", "Race", "Hispanicrace", "bmi_perc_cat", "MutClass",
+  "A_IsOnEnzymes", "tube_feeding", "liver_disease", "ppFEV1_cat",
   "NumPulmExacerbation", "A_pulmonarycomplications1", "A_corticosteroids1"
 )
 y <- "Surv(tstart, tstop, cfrd_status_annual)"
@@ -591,9 +615,9 @@ cox_res <- coxph(f, data = s, cluster = eDWID)
 ggforest(cox_res, data = s)
 # Diagnostics
 test.ph <- data.frame(cox.zph(cox_res)$table)
-test.ph = test.ph[rownames(test.ph) != "GLOBAL",]
+test.ph <- test.ph[rownames(test.ph) != "GLOBAL", ]
 # Find which variables technically violate PH assumption
-time_varying = rownames(test.ph)[test.ph$p < 0.05]
+time_varying <- rownames(test.ph)[test.ph$p < 0.05]
 # ggcoxzph(test.ph)
 # ggcoxdiagnostics(cox_res,type = "martingale")
 # ggcoxdiagnostics(cox_res,type = "deviance")
