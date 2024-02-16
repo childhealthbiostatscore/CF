@@ -486,22 +486,21 @@ Based on CFFPR annualized data. These data are interval censored because we know
 
 ```{r}
 forest_plot <- function(mod, time_varying = NULL, labels = labels) {
-    coeff <- tbl_regression(cox_res,
-        exponentiate = T,
+    coeff <- tbl_regression(mod,
         pvalue_fun = function(x) x
     ) %>%
         add_n(location = "level") %>%
         as_tibble()
-    coeff_n <- tbl_regression(cox_res, exponentiate = T) %>%
+    coeff_n <- tbl_regression(mod, exponentiate = T) %>%
         add_n(location = "label") %>%
         as_tibble()
     coeff$N2 <- coeff_n$`**N**`
     # Combine Ns
     coeff <- coeff %>% unite(N, `**N**`, N2, remove = F, na.rm = T)
-    # Separate CI column
-    coeff$hr <- as.numeric(coeff$`**HR**`)
-    coeff$ll <- as.numeric(sapply(str_split(coeff$`**95% CI**`, ", "), "[", 1))
-    coeff$ul <- as.numeric(sapply(str_split(coeff$`**95% CI**`, ", "), "[", 2))
+    # Exponentiate
+    coeff$hr <- exp(as.numeric(coeff$`**log(HR)**`))
+    coeff$exp.ll <- exp(as.numeric(sapply(str_split(coeff$`**95% CI**`, ", "), "[", 1)))
+    coeff$exp.ul <- exp(as.numeric(sapply(str_split(coeff$`**95% CI**`, ", "), "[", 2)))
     # Add N to names
     coeff$names <- paste0(coeff$`**Characteristic**`, " (N = ", coeff$N, ")")
     coeff$names <- ordered(coeff$names,
@@ -526,7 +525,7 @@ forest_plot <- function(mod, time_varying = NULL, labels = labels) {
         ) +
         geom_text(aes(x = 1, label = hr_lab), hjust = 0) +
         theme_void() +
-        coord_cartesian(xlim = c(0, 2)) +
+        coord_cartesian(xlim = c(0, 1.5)) +
         geom_stripes()
     p <- ggplot(coeff, aes(y = fct_rev(names))) +
         geom_point(aes(x = hr), shape = 15, size = 3) +
@@ -551,11 +550,11 @@ forest_plot <- function(mod, time_varying = NULL, labels = labels) {
         theme_void() +
         geom_stripes()
     # Layout
-    p_left + p + p_right +
+    final_p = p_left + p + p_right +
         plot_layout(widths = c(1, 2, 0.25), guides = "collect") &
         theme(plot.margin = margin(0, 0, 0, 0, "pt"))
-    # Return each plot separately - will need to be combined outside of the function
-    return(c(p_left, p, p_right))
+    # Return
+    return(final_p)
 }
 ```
 
