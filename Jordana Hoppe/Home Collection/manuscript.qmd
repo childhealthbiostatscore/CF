@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
+bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Dropbox/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -44,10 +44,8 @@ knitr::opts_knit$set(root.dir = home_dir)
 source("/Users/timvigers/GitHub/CF/Jordana Hoppe/Home Collection/home_collection_data.r")
 source("/Users/timvigers/GitHub/CF/Jordana Hoppe/Home Collection/home_collection_surveys.r")
 # Exclude missing subjects
-data <- data %>%
-  filter(!subject_id %in% c("009-07", "009-17", "009-25", "009-37"))
-survey_data <- survey_data %>%
-  filter(!participant_id %in% c(15, 27, 30, 34, 47))
+data_exclude <- c("009-07", "009-17", "009-25", "009-37")
+survey_exclude <- c(15, 27, 30, 34, 47)
 # Fix missing labels
 labels <- label(data)[which(label(data) != "")]
 labels[paste0(names(labels), ".factor")] <- as.character(labels)
@@ -132,6 +130,7 @@ It appears that the two participants who were previously marked as unknown race 
 #| label: tbl-2
 #| tbl-cap: Survey Results
 survey_data %>%
+  filter(!participant_id %in% survey_exclude) %>%
   select(q1.factor:q6b___4.factor) %>%
   tbl_summary(
     label = labels, missing_text = "Missing"
@@ -145,6 +144,7 @@ survey_data %>%
 #| label: tbl-3
 #| tbl-cap: Clinic Culture Results
 data %>%
+  filter(!subject_id %in% data_exclude) %>%
   select(clinic_cx_source.factor:clinic_burk_sp.factor) %>%
   tbl_summary(
     label = labels, missing_text = "Missing"
@@ -158,6 +158,7 @@ data %>%
 #| label: tbl-4
 #| tbl-cap: Delayed Culture Results
 data %>%
+  filter(!subject_id %in% data_exclude) %>%
   select(research_cx.factor:res_burk_sp.factor) %>%
   tbl_summary(
     label = labels, missing_text = "Missing"
@@ -171,6 +172,7 @@ data %>%
 #| label: tbl-5
 #| tbl-cap: Home Culture Results
 data %>%
+  filter(!subject_id %in% data_exclude) %>%
   select(home_cx.factor:home_burk_sp.factor) %>%
   tbl_summary(
     label = labels, missing_text = "Missing"
