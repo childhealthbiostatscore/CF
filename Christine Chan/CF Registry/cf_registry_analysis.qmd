@@ -454,6 +454,10 @@ annual$ppFEV1_cat <- cut(annual$A_FEV1_pct_predicted,
   breaks = c(0, 40, 80, 100, Inf), right = F
 )
 annual$ppFEV1_cat <- relevel(annual$ppFEV1_cat, ref = "[100,Inf)")
+# Males to reference group
+annual$Gender <- factor(annual$Gender, levels = c("M", "F"))
+# Hispanic no as reference
+annual$Hispanicrace <- factor(annual$Hispanicrace, levels = c("No", "Yes"))
 ```
 
 Registry fields included in our liver disease yes/no variable were:
@@ -482,25 +486,76 @@ Based on CFFPR annualized data. These data are interval censored because we know
 
 ```{r}
 forest_plot <- function(mod, time_varying = NULL, labels = labels) {
-  coeff <- data.frame(summary(mod)$coefficients)
-  coeff$ll <- coeff$coef - (1.96 * coeff$se.coef.)
-  coeff$ul <- coeff$coef + (1.96 * coeff$se.coef.)
-  # Clean up variable names
-  l <- unlist(sapply(labels, paste0, ": "))
-  coeff$names <- rownames(coeff)
-  coeff$names <- str_replace_all(coeff$names, l)
-  coeff$names <- ordered(coeff$names, levels = unique(coeff$names))
-  # Exponentiate
-  coeff$exp.ll <- exp(coeff$ll)
-  coeff$exp.ul <- exp(coeff$ul)
+  coeff <- tbl_regression(cox_res,
+    exponentiate = T,
+    pvalue_fun = function(x) x
+  ) %>%
+    add_n(location = "level") %>%
+    as_tibble()
+  coeff_n <- tbl_regression(cox_res, exponentiate = T) %>%
+    add_n(location = "label") %>%
+    as_tibble()
+  coeff$N2 <- coeff_n$`**N**`
+  # Combine Ns
+  coeff <- coeff %>% unite(N, `**N**`, N2, remove = F, na.rm = T)
+  # Separate CI column
+  coeff$hr <- as.numeric(coeff$`**HR**`)
+  coeff$ll <- as.numeric(sapply(str_split(coeff$`**95% CI**`, ", "), "[", 1))
+  coeff$ul <- as.numeric(sapply(str_split(coeff$`**95% CI**`, ", "), "[", 2))
+  # Add N to names
+  coeff$names <- paste0(coeff$`**Characteristic**`, " (N = ", coeff$N, ")")
+  coeff$names <- ordered(coeff$names,
+    levels = unique(coeff$names)
+  )
+  # P values
+  coeff$sig <- coeff$`**p-value**` < 0.05
+  coeff$p <- style_pvalue(coeff$`**p-value**`)
+  # Row types
+  coeff$type <- "level"
+  coeff$type[!is.na(coeff$N2)] <- "variable"
+  coeff$type[!is.na(coeff$`**N**`) & is.na(coeff$`**HR**`)] <- "reference"
+  # HR label
+  coeff$hr_lab <- paste0(coeff$`**HR**`, " (", coeff$`**95% CI**`, ")")
+  coeff$hr_lab[coeff$hr_lab == "NA (NA)"] <- NA
+  coeff$hr_lab[coeff$type == "reference"] <- "Reference"
   # Plot
+  p_left <- ggplot(coeff, aes(y = fct_rev(names))) +
+    geom_text(aes(x = 0, label = names),
+      hjust = 0,
+      fontface = ifelse(coeff$type == "variable", "bold", "plain")
+    ) +
+    geom_text(aes(x = 1, label = hr_lab), hjust = 0) +
+    theme_void() +
+    coord_cartesian(xlim = c(0, 2)) +
+    geom_stripes()
   p <- ggplot(coeff, aes(y = fct_rev(names))) +
-    geom_point(aes(x = exp.coef.), shape = 15, size = 3) +
-    geom_linerange(aes(xmin = exp.ll, xmax = exp.ul)) +
+    geom_point(aes(x = hr), shape = 15, size = 3) +
+    geom_linerange(aes(xmin = ll, xmax = ul)) +
     geom_vline(xintercept = 1, linetype = "dashed") +
     xlab("Hazard Ratio") +
     theme_classic() +
-    theme(axis.ticks.y = element_blank(), axis.title.y = element_blank())
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.text.y = element_blank(),
+      axis.title.y = element_blank(),
+      axis.line.x = element_blank()
+    ) +
+    geom_stripes()
+  # p values
+  p_right <- ggplot(coeff, aes(y = fct_rev(names))) +
+    geom_text(aes(x = 0, label = p),
+      hjust = 0,
+      fontface = ifelse(coeff$sig, "bold", "plain")
+    ) +
+    theme_void() +
+    geom_stripes()
+  # Layout
+  p_left + p + p_right +
+    plot_layout(widths = c(1, 2, 0.25), guides = "collect") &
+    theme(plot.margin = margin(0, 0, 0, 0, "pt"))
+  # Return each plot separately - will need to be combined outside of the function
+  return(c(p_left, p, p_right))
 }
 ```
 
@@ -612,7 +667,7 @@ cox_res <- coxph(f, data = s, cluster = eDWID)
 #   xlim = c(2003, 2018), break.x.by = 1
 # )
 # Forest plot and coefficients table
-ggforest(cox_res, data = s)
+forest_plot(cox_res)
 # Diagnostics
 test.ph <- data.frame(cox.zph(cox_res)$table)
 test.ph <- test.ph[rownames(test.ph) != "GLOBAL", ]
