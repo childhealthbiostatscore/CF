@@ -320,7 +320,7 @@ knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-
 ```{r}
 # Import data and codebook
 annual <- read.csv("./Data_Raw/CFF19_Annualized_Del1.csv",
-  na.strings = c("", "N/A")
+    na.strings = c("", "N/A")
 )
 data_dict <- readxl::read_excel("./Data_Raw/Copy of Codes for CFFPR_2018.xlsx")
 data_dict$var <- paste(data_dict$field_name, data_dict$code_value, sep = "_")
@@ -328,38 +328,38 @@ data_dict$var <- paste(data_dict$field_name, data_dict$code_value, sep = "_")
 annual <- annual %>% arrange(eDWID, ReviewYear)
 annual <- annual[!annual$cfrd_status_annual %in% c(4, 5), ]
 annual$cfrd_status_annual <- factor(annual$cfrd_status_annual,
-  levels = 1:3,
-  labels = c("CFRD-", "CFRD-", "CFRD+")
+    levels = 1:3,
+    labels = c("CFRD-", "CFRD-", "CFRD+")
 )
 # Get mutations
 demogs <- read.csv("./Data_Raw/CFF19_DemogCFDiag_Del1.csv")
 races <- c(
-  "White", "Black or African American", "American Indian or Alaska Native",
-  "Asian", "Native Hawaiian or Other Pacific ", "Some other race"
+    "White", "Black or African American", "American Indian or Alaska Native",
+    "Asian", "Native Hawaiian or Other Pacific ", "Some other race"
 )
 demogs$Race <- apply(demogs, 1, function(r) {
-  w <- which(r[paste0("Race", 1:6)] == 1)
-  if (length(w) > 1) {
-    return("More than one race")
-  } else {
-    return(races[w])
-  }
+    w <- which(r[paste0("Race", 1:6)] == 1)
+    if (length(w) > 1) {
+        return("More than one race")
+    } else {
+        return(races[w])
+    }
 })
 demogs$Race <- factor(demogs$Race,
-  levels = c(
-    "White", "American Indian or Alaska Native", "Asian",
-    "Black or African American", "More than one race",
-    "Native Hawaiian or Other Pacific ", "Some other race"
-  ),
-  labels = c(
-    "White", "Other race", "Other race",
-    "Black or African American", "More than one race",
-    "Other race", "Other race"
-  )
+    levels = c(
+        "White", "American Indian or Alaska Native", "Asian",
+        "Black or African American", "More than one race",
+        "Native Hawaiian or Other Pacific ", "Some other race"
+    ),
+    labels = c(
+        "White", "Other race", "Other race",
+        "Black or African American", "More than one race",
+        "Other race", "Other race"
+    )
 )
 demogs$Hispanicrace <- factor(demogs$Hispanicrace,
-  levels = 1:2,
-  labels = c("Yes", "No")
+    levels = 1:2,
+    labels = c("Yes", "No")
 )
 demogs <- demogs %>% select(eDWID, Gender, MutClass, Race, Hispanicrace)
 annual <- left_join(annual, demogs, by = join_by(eDWID))
@@ -372,86 +372,86 @@ annual$A_feeding3[annual$A_supplement_feeding == 0] <- 0
 annual$A_feeding4[annual$A_supplement_feeding == 0] <- 0
 tube_fields <- c("A_feeding2", "A_feeding3", "A_feeding4")
 annual$tube_feeding <-
-  apply(annual[, tube_fields], 1, function(r) {
-    if (all(is.na(r))) {
-      return(NA)
-    } else {
-      return(max(as.numeric(r), na.rm = T))
-    }
-  })
+    apply(annual[, tube_fields], 1, function(r) {
+        if (all(is.na(r))) {
+            return(NA)
+        } else {
+            return(max(as.numeric(r), na.rm = T))
+        }
+    })
 # Liver disease
 liver_fields <- c("A_hepatobiliary1_3", paste0("A_hepatobiliary2_", 1:4))
 annual$liver_disease <-
-  apply(annual[, liver_fields], 1, function(r) {
-    if (all(is.na(r))) {
-      return(NA)
-    } else {
-      return(max(as.numeric(r), na.rm = T))
-    }
-  })
+    apply(annual[, liver_fields], 1, function(r) {
+        if (all(is.na(r))) {
+            return(NA)
+        } else {
+            return(max(as.numeric(r), na.rm = T))
+        }
+    })
 # Calculate percentiles
 annual$bmi <- annual$A_weight / ((annual$A_height / 100)^2)
 annual$age_perc <- ifelse(annual$Age_YrEnd < 20, annual$Age_YrEnd, 20)
 annual$height_perc <- sds(annual$A_height,
-  age = annual$age_perc,
-  sex = annual$Gender, male = "M", female = "F",
-  item = "height2_20", ref = cdc.ref, type = "perc"
+    age = annual$age_perc,
+    sex = annual$Gender, male = "M", female = "F",
+    item = "height2_20", ref = cdc.ref, type = "perc"
 ) * 100
 annual$bmi_perc <- sds(annual$bmi,
-  age = annual$age_perc,
-  sex = annual$Gender, male = "M", female = "F",
-  item = "bmi", ref = cdc.ref, type = "perc"
+    age = annual$age_perc,
+    sex = annual$Gender, male = "M", female = "F",
+    item = "bmi", ref = cdc.ref, type = "perc"
 ) * 100
 # Format columns
 annual$MutClass <- factor(annual$MutClass,
-  levels = c("1-3", "4-5", "Oth", "N/A"),
-  labels = c("1-3", "4-5", "Oth", "Unknown")
+    levels = c("1-3", "4-5", "Oth", "N/A"),
+    labels = c("1-3", "4-5", "Oth", "Unknown")
 )
 annual$NumPulmExacerbation <- cut(annual$NumPulmExacerbation,
-  labels = c("0", "1", "2", ">=3"),
-  breaks = c(0, 1, 2, 3, Inf), right = F
+    labels = c("0", "1", "2", ">=3"),
+    breaks = c(0, 1, 2, 3, Inf), right = F
 )
 annual$age_group <- cut(annual$Age_YrEnd,
-  breaks = c(-Inf, 10, 18, 30, Inf),
-  right = F
+    breaks = c(-Inf, 10, 18, 30, Inf),
+    right = F
 )
 annual$age_group <- relevel(annual$age_group, ref = "[10,18)")
 # Bugs
 bugs <- c(
-  "A_pseudomonasaeruginosa", "A_fungalyeast1",
-  "A_pulmonarycomplications1", "A_mycocultureresults3"
+    "A_pseudomonasaeruginosa", "A_fungalyeast1",
+    "A_pulmonarycomplications1", "A_mycocultureresults3"
 )
 # Yes/No variables
 yn_vars <- c(
-  "A_IsOnEnzymes", "A_corticosteroids1", "A_feeding2",
-  "A_Vx770", "A_VX809comb", bugs, "tube_feeding", "liver_disease"
+    "A_IsOnEnzymes", "A_corticosteroids1", "A_feeding2",
+    "A_Vx770", "A_VX809comb", bugs, "tube_feeding", "liver_disease"
 )
 annual[, yn_vars] <- lapply(annual[, yn_vars], factor,
-  levels = 0:1,
-  labels = c("No", "Yes")
+    levels = 0:1,
+    labels = c("No", "Yes")
 )
 annual$A_IsOnEnzymes <- relevel(annual$A_IsOnEnzymes, ref = "Yes")
 # Approximate year of birth
 by <- annual %>%
-  mutate(birth_year = floor(ReviewYear - Age_YrEnd)) %>%
-  group_by(eDWID) %>%
-  count(birth_year) %>%
-  group_by(eDWID) %>%
-  slice_min(birth_year) %>%
-  select(-n)
+    mutate(birth_year = floor(ReviewYear - Age_YrEnd)) %>%
+    group_by(eDWID) %>%
+    count(birth_year) %>%
+    group_by(eDWID) %>%
+    slice_min(birth_year) %>%
+    select(-n)
 annual <- left_join(annual, by, by = join_by(eDWID))
 # Get first year of CFRD
 first_cfrd <- annual %>%
-  filter(cfrd_status_annual == "CFRD+") %>%
-  group_by(eDWID) %>%
-  summarise(first_cfrd = min(ReviewYear))
+    filter(cfrd_status_annual == "CFRD+") %>%
+    group_by(eDWID) %>%
+    summarise(first_cfrd = min(ReviewYear))
 annual <- left_join(annual, first_cfrd, by = join_by(eDWID))
 # BMI percentile to categorical
 annual$bmi_perc_cat <- cut(annual$bmi_perc, breaks = c(0, 10, 50, 85, Inf))
 annual$bmi_perc_cat <- relevel(annual$bmi_perc_cat, ref = "(50,85]")
 # FEV1 to categorical
 annual$ppFEV1_cat <- cut(annual$A_FEV1_pct_predicted,
-  breaks = c(0, 40, 80, 100, Inf), right = F
+    breaks = c(0, 40, 80, 100, Inf), right = F
 )
 annual$ppFEV1_cat <- relevel(annual$ppFEV1_cat, ref = "[100,Inf)")
 # Males to reference group
@@ -464,20 +464,20 @@ Registry fields included in our liver disease yes/no variable were:
 
 ```{r}
 data.frame(data_dict$code_meaning[data_dict$var %in%
-  sub("A_", "", liver_fields)]) %>%
-  gt() %>%
-  tab_options(column_labels.hidden = TRUE)
+    sub("A_", "", liver_fields)]) %>%
+    gt() %>%
+    tab_options(column_labels.hidden = TRUE)
 ```
 
 Registry fields included in our tube feeding yes/no variable were:
 
 ```{r}
 data.frame(data_dict$code_meaning[
-  paste0(data_dict$field_name, data_dict$code_value) %in%
-    sub("A_", "", tube_fields)
+    paste0(data_dict$field_name, data_dict$code_value) %in%
+        sub("A_", "", tube_fields)
 ]) %>%
-  gt() %>%
-  tab_options(column_labels.hidden = TRUE)
+    gt() %>%
+    tab_options(column_labels.hidden = TRUE)
 ```
 
 # Survival analysis - first CFRD diagnosis
@@ -486,128 +486,128 @@ Based on CFFPR annualized data. These data are interval censored because we know
 
 ```{r}
 forest_plot <- function(mod, time_varying = NULL, labels = labels) {
-  coeff <- tbl_regression(cox_res,
-    exponentiate = T,
-    pvalue_fun = function(x) x
-  ) %>%
-    add_n(location = "level") %>%
-    as_tibble()
-  coeff_n <- tbl_regression(cox_res, exponentiate = T) %>%
-    add_n(location = "label") %>%
-    as_tibble()
-  coeff$N2 <- coeff_n$`**N**`
-  # Combine Ns
-  coeff <- coeff %>% unite(N, `**N**`, N2, remove = F, na.rm = T)
-  # Separate CI column
-  coeff$hr <- as.numeric(coeff$`**HR**`)
-  coeff$ll <- as.numeric(sapply(str_split(coeff$`**95% CI**`, ", "), "[", 1))
-  coeff$ul <- as.numeric(sapply(str_split(coeff$`**95% CI**`, ", "), "[", 2))
-  # Add N to names
-  coeff$names <- paste0(coeff$`**Characteristic**`, " (N = ", coeff$N, ")")
-  coeff$names <- ordered(coeff$names,
-    levels = unique(coeff$names)
-  )
-  # P values
-  coeff$sig <- coeff$`**p-value**` < 0.05
-  coeff$p <- style_pvalue(coeff$`**p-value**`)
-  # Row types
-  coeff$type <- "level"
-  coeff$type[!is.na(coeff$N2)] <- "variable"
-  coeff$type[!is.na(coeff$`**N**`) & is.na(coeff$`**HR**`)] <- "reference"
-  # HR label
-  coeff$hr_lab <- paste0(coeff$`**HR**`, " (", coeff$`**95% CI**`, ")")
-  coeff$hr_lab[coeff$hr_lab == "NA (NA)"] <- NA
-  coeff$hr_lab[coeff$type == "reference"] <- "Reference"
-  # Plot
-  p_left <- ggplot(coeff, aes(y = fct_rev(names))) +
-    geom_text(aes(x = 0, label = names),
-      hjust = 0,
-      fontface = ifelse(coeff$type == "variable", "bold", "plain")
-    ) +
-    geom_text(aes(x = 1, label = hr_lab), hjust = 0) +
-    theme_void() +
-    coord_cartesian(xlim = c(0, 2)) +
-    geom_stripes()
-  p <- ggplot(coeff, aes(y = fct_rev(names))) +
-    geom_point(aes(x = hr), shape = 15, size = 3) +
-    geom_linerange(aes(xmin = ll, xmax = ul)) +
-    geom_vline(xintercept = 1, linetype = "dashed") +
-    xlab("Hazard Ratio") +
-    theme_classic() +
-    theme(
-      axis.line.y = element_blank(),
-      axis.ticks.y = element_blank(),
-      axis.text.y = element_blank(),
-      axis.title.y = element_blank(),
-      axis.line.x = element_blank()
-    ) +
-    geom_stripes()
-  # p values
-  p_right <- ggplot(coeff, aes(y = fct_rev(names))) +
-    geom_text(aes(x = 0, label = p),
-      hjust = 0,
-      fontface = ifelse(coeff$sig, "bold", "plain")
-    ) +
-    theme_void() +
-    geom_stripes()
-  # Layout
-  p_left + p + p_right +
-    plot_layout(widths = c(1, 2, 0.25), guides = "collect") &
-    theme(plot.margin = margin(0, 0, 0, 0, "pt"))
-  # Return each plot separately - will need to be combined outside of the function
-  return(c(p_left, p, p_right))
+    coeff <- tbl_regression(cox_res,
+        exponentiate = T,
+        pvalue_fun = function(x) x
+    ) %>%
+        add_n(location = "level") %>%
+        as_tibble()
+    coeff_n <- tbl_regression(cox_res, exponentiate = T) %>%
+        add_n(location = "label") %>%
+        as_tibble()
+    coeff$N2 <- coeff_n$`**N**`
+    # Combine Ns
+    coeff <- coeff %>% unite(N, `**N**`, N2, remove = F, na.rm = T)
+    # Separate CI column
+    coeff$hr <- as.numeric(coeff$`**HR**`)
+    coeff$ll <- as.numeric(sapply(str_split(coeff$`**95% CI**`, ", "), "[", 1))
+    coeff$ul <- as.numeric(sapply(str_split(coeff$`**95% CI**`, ", "), "[", 2))
+    # Add N to names
+    coeff$names <- paste0(coeff$`**Characteristic**`, " (N = ", coeff$N, ")")
+    coeff$names <- ordered(coeff$names,
+        levels = unique(coeff$names)
+    )
+    # P values
+    coeff$sig <- coeff$`**p-value**` < 0.05
+    coeff$p <- style_pvalue(coeff$`**p-value**`)
+    # Row types
+    coeff$type <- "level"
+    coeff$type[!is.na(coeff$N2)] <- "variable"
+    coeff$type[!is.na(coeff$`**N**`) & is.na(coeff$`**HR**`)] <- "reference"
+    # HR label
+    coeff$hr_lab <- paste0(coeff$`**HR**`, " (", coeff$`**95% CI**`, ")")
+    coeff$hr_lab[coeff$hr_lab == "NA (NA)"] <- NA
+    coeff$hr_lab[coeff$type == "reference"] <- "Reference"
+    # Plot
+    p_left <- ggplot(coeff, aes(y = fct_rev(names))) +
+        geom_text(aes(x = 0, label = names),
+            hjust = 0,
+            fontface = ifelse(coeff$type == "variable", "bold", "plain")
+        ) +
+        geom_text(aes(x = 1, label = hr_lab), hjust = 0) +
+        theme_void() +
+        coord_cartesian(xlim = c(0, 2)) +
+        geom_stripes()
+    p <- ggplot(coeff, aes(y = fct_rev(names))) +
+        geom_point(aes(x = hr), shape = 15, size = 3) +
+        geom_linerange(aes(xmin = ll, xmax = ul)) +
+        geom_vline(xintercept = 1, linetype = "dashed") +
+        xlab("Hazard Ratio") +
+        theme_classic() +
+        theme(
+            axis.line.y = element_blank(),
+            axis.ticks.y = element_blank(),
+            axis.text.y = element_blank(),
+            axis.title.y = element_blank(),
+            axis.line.x = element_blank()
+        ) +
+        geom_stripes()
+    # p values
+    p_right <- ggplot(coeff, aes(y = fct_rev(names))) +
+        geom_text(aes(x = 0, label = p),
+            hjust = 0,
+            fontface = ifelse(coeff$sig, "bold", "plain")
+        ) +
+        theme_void() +
+        geom_stripes()
+    # Layout
+    p_left + p + p_right +
+        plot_layout(widths = c(1, 2, 0.25), guides = "collect") &
+        theme(plot.margin = margin(0, 0, 0, 0, "pt"))
+    # Return each plot separately - will need to be combined outside of the function
+    return(c(p_left, p, p_right))
 }
 ```
 
 ```{r}
 # List of covariates
 vars <- c(
-  "age_group", "Gender", "bmi_perc", "bmi_perc_cat", "MutClass", "Race",
-  "Hispanicrace", "A_IsOnEnzymes", "ppFEV1_cat", "tube_feeding",
-  "NumPulmExacerbation", "A_pseudomonasaeruginosa", "A_fungalyeast1",
-  "A_mycocultureresults3", "A_pulmonarycomplications1", "A_corticosteroids1",
-  "cfrd_status_annual", "A_Vx770", "A_VX809comb", "liver_disease"
+    "age_group", "Gender", "bmi_perc", "bmi_perc_cat", "MutClass", "Race",
+    "Hispanicrace", "A_IsOnEnzymes", "ppFEV1_cat", "tube_feeding",
+    "NumPulmExacerbation", "A_pseudomonasaeruginosa", "A_fungalyeast1",
+    "A_mycocultureresults3", "A_pulmonarycomplications1", "A_corticosteroids1",
+    "cfrd_status_annual", "A_Vx770", "A_VX809comb", "liver_disease"
 )
 # Nice labels for plots and tables
 labels <- list(
-  cfrd_status_annual = "CFRD Status", MutClass = "Mutation class",
-  Race = "Race", Hispanicrace = "Hispanic",
-  Gender = "Sex", A_IsOnEnzymes = "Pancreatic enzyme use",
-  ppFEV1_cat = "FEV1 percent predicted",
-  tube_feeding = "Enteric feedings", liver_disease = "Liver disease",
-  A_corticosteroids1 = "Use of corticosteroids",
-  NumPulmExacerbation = "Admissions for PEx", age_group = "Age group",
-  height_perc = "Height percentile", bmi_perc_cat = "BMI percentile",
-  A_Vx770 = "Use of CFTR modulator Vx770",
-  A_VX809comb = "Use of CFTR modulator Vx809 combination",
-  A_pseudomonasaeruginosa = "Pseudomonas aeruginosa",
-  A_fungalyeast1 = "Aspergillus (any species)",
-  A_pulmonarycomplications1 = "ABPA",
-  A_mycocultureresults3 = "Microorganisms in myco culture",
-  eDWID = "ID", birth_year = "Birth year", tstart = "Interval start", tstop = "Interval stop", age_at_entry = "Age at entry", Age_YrEnd = "Age", bmi_perc = "BMI %ile"
+    cfrd_status_annual = "CFRD Status", MutClass = "Mutation class",
+    Race = "Race", Hispanicrace = "Hispanic",
+    Gender = "Sex", A_IsOnEnzymes = "Pancreatic enzyme use",
+    ppFEV1_cat = "FEV1 percent predicted",
+    tube_feeding = "Enteric feedings", liver_disease = "Liver disease",
+    A_corticosteroids1 = "Use of corticosteroids",
+    NumPulmExacerbation = "Admissions for PEx", age_group = "Age group",
+    height_perc = "Height percentile", bmi_perc_cat = "BMI percentile",
+    A_Vx770 = "Use of CFTR modulator Vx770",
+    A_VX809comb = "Use of CFTR modulator Vx809 combination",
+    A_pseudomonasaeruginosa = "Pseudomonas aeruginosa",
+    A_fungalyeast1 = "Aspergillus (any species)",
+    A_pulmonarycomplications1 = "ABPA",
+    A_mycocultureresults3 = "Microorganisms in myco culture",
+    eDWID = "ID", birth_year = "Birth year", tstart = "Interval start", tstop = "Interval stop", age_at_entry = "Age at entry", Age_YrEnd = "Age", bmi_perc = "BMI %ile"
 )
 # For now, let's just assume that everyone's first CFRD+ diagnosis is correct
 s <- annual %>%
-  filter(
-    !is.na(cfrd_status_annual),
-    Age_YrEnd != 0,
-    is.na(first_cfrd) | ReviewYear <= first_cfrd,
-    Age_YrEnd >= 10
-  ) %>%
-  select(
-    eDWID, ReviewYear, birth_year, Age_YrEnd,
-    all_of(vars), cfrd_status_annual
-  ) %>%
-  rename(tstop = ReviewYear) %>%
-  group_by(eDWID) %>%
-  mutate(
-    tstart = lag(tstop, default = birth_year[1]),
-    age_at_entry = Age_YrEnd[1]
-  ) %>%
-  select(
-    eDWID, birth_year, tstart, tstop, cfrd_status_annual,
-    age_at_entry, everything()
-  )
+    filter(
+        !is.na(cfrd_status_annual),
+        Age_YrEnd != 0,
+        is.na(first_cfrd) | ReviewYear <= first_cfrd,
+        Age_YrEnd >= 10
+    ) %>%
+    select(
+        eDWID, ReviewYear, birth_year, Age_YrEnd,
+        all_of(vars), cfrd_status_annual
+    ) %>%
+    rename(tstop = ReviewYear) %>%
+    group_by(eDWID) %>%
+    mutate(
+        tstart = lag(tstop, default = birth_year[1]),
+        age_at_entry = Age_YrEnd[1]
+    ) %>%
+    select(
+        eDWID, birth_year, tstart, tstop, cfrd_status_annual,
+        age_at_entry, everything()
+    )
 # Convert from tibble to dataframe for survival packages
 s <- as.data.frame(s)
 # CFRD status to numeric
@@ -623,27 +623,27 @@ label(s) <- labels[colnames(s)]
 ```{r}
 # Whole cohort
 km_fit <- survfit(Surv(tstart, tstop, cfrd_status_annual) ~ 1,
-  data = s, cluster = eDWID
+    data = s, cluster = eDWID
 )
 ggsurvplot(km_fit,
-  data = s, risk.table = T, cumevents = T,
-  fun = "event", xlim = c(2003, 2018), break.x.by = 1
+    data = s, risk.table = T, cumevents = T,
+    fun = "event", xlim = c(2003, 2018), break.x.by = 1
 )
 kable(tidy(km_fit))
 # By age group
 km_fit <- survfit(Surv(tstart, tstop, cfrd_status_annual) ~ age_group,
-  data = s, cluster = eDWID
+    data = s, cluster = eDWID
 )
 ggsurvplot(km_fit,
-  data = s, risk.table = T, cumevents = T,
-  fun = "event", xlim = c(2003, 2018), break.x.by = 1
+    data = s, risk.table = T, cumevents = T,
+    fun = "event", xlim = c(2003, 2018), break.x.by = 1
 )
 km_table <- tidy(km_fit)
 km_table <- split.data.frame(km_table, km_table$strata)
 invisible(lapply(km_table, function(t) {
-  name <- t$strata[1]
-  t <- t %>% select(-strata)
-  kable(t, caption = name)
+    name <- t$strata[1]
+    t <- t %>% select(-strata)
+    kable(t, caption = name)
 }))
 ```
 
@@ -654,9 +654,9 @@ invisible(lapply(km_table, function(t) {
 ```{r}
 # Formula for base model
 x <- c(
-  "age_group", "Gender", "Race", "Hispanicrace", "bmi_perc_cat", "MutClass",
-  "A_IsOnEnzymes", "tube_feeding", "liver_disease", "ppFEV1_cat",
-  "NumPulmExacerbation", "A_pulmonarycomplications1", "A_corticosteroids1"
+    "age_group", "Gender", "Race", "Hispanicrace", "bmi_perc_cat", "MutClass",
+    "A_IsOnEnzymes", "tube_feeding", "liver_disease", "ppFEV1_cat",
+    "NumPulmExacerbation", "A_pulmonarycomplications1", "A_corticosteroids1"
 )
 y <- "Surv(tstart, tstop, cfrd_status_annual)"
 f <- as.formula(paste0(y, "~", paste0(x, collapse = "+")))
@@ -690,14 +690,14 @@ The interpretation of these models can be a little bit tricky, so here is an exa
 
 ```{r}
 s_split <- survSplit(Surv(tstart, tstop, cfrd_status_annual) ~ .,
-  data = s, cut = c(2008, 2013, 2018), episode = "tgroup"
+    data = s, cut = c(2008, 2013, 2018), episode = "tgroup"
 )
 s_split$tgroup <- factor(s_split$tgroup,
-  levels = 1:3, labels = c("[2003,2009)", "[2009,2014)", "[2014,2019)")
+    levels = 1:3, labels = c("[2003,2009)", "[2009,2014)", "[2014,2019)")
 )
 cox_res_split <- coxph(
-  Surv(tstart, tstop, cfrd_status_annual) ~ bmi_perc_cat * strata(tgroup),
-  data = s_split, cluster = eDWID
+    Surv(tstart, tstop, cfrd_status_annual) ~ bmi_perc_cat * strata(tgroup),
+    data = s_split, cluster = eDWID
 )
 kable(summary(cox_res_split)$coefficients, digits = 3)
 ```
@@ -706,18 +706,18 @@ In the table above, the BMI reference group is the (50,85] group. So, in the yea
 
 ```{r results='asis'}
 invisible(lapply(time_varying, function(v) {
-  new_f <- as.formula(paste0(
-    y, "~", paste0(x[-which(x == v)], collapse = "+"),
-    paste0("+", v, "*strata(tgroup)")
-  ))
-  cox_res_split <- coxph(new_f, data = s_split, cluster = eDWID)
-  res <- summary(cox_res_split)$coefficients
-  cat("\n")
-  cat("####", v)
-  cat("\n")
-  cat("\n")
-  print(kable(res, digits = 3))
-  cat("\n")
+    new_f <- as.formula(paste0(
+        y, "~", paste0(x[-which(x == v)], collapse = "+"),
+        paste0("+", v, "*strata(tgroup)")
+    ))
+    cox_res_split <- coxph(new_f, data = s_split, cluster = eDWID)
+    res <- summary(cox_res_split)$coefficients
+    cat("\n")
+    cat("####", v)
+    cat("\n")
+    cat("\n")
+    print(kable(res, digits = 3))
+    cat("\n")
 }))
 ```
 
