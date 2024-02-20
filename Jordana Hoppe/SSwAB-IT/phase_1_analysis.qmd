@@ -25,6 +25,8 @@ editor: source
 library(tidyverse)
 library(gtsummary)
 library(redcapAPI)
+library(irr)
+library(knitr)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF"
@@ -41,17 +43,82 @@ unlockREDCap(c(rcon = "SSwAB-IT (New)"),
   url = "https://redcap.ucdenver.edu/api/"
 )
 exportBulkRecords(list(db = rcon), envir = 1)
+# Combine collection results
+df <- full_join(db_cos_collection_results, db_sos_collection_results)
+# Format
+df <- df %>%
+  select(
+    record_id, redcap_data_access_group,
+    staphylococcus_aureus_cos:other_result_cos,
+    staphylococcus_aureus_sos:other_result_sos
+  )
 ```
 
-# Feasibility
+# Agreement
+
+Cohen's kappa is interpreted analagously to a correlation coefficient, with -1 indicating perfect disagreement and 1 indicating perfect agreement. Tables with NaN and NAs indicate that all tests had the same values (i.e. all absent or all present).
+
+| Cohen's Kappa | Interpretation         |
+|---------------|------------------------|
+| 0             | No agreement           |
+| 0.10 - 0.20   | Slight agreement       |
+| 0.21 - 0.40   | Fair agreement         |
+| 0.41 - 0.60   | Moderate agreement     |
+| 0.61 - 0.80   | Substantial agreement  |
+| 0.81 - 0.99   | Near perfect agreement |
+| 1             | Perfect agreement      |
 
 ```{r}
-#| message: false
-db_feasibility %>%
-  select(
-    redcap_data_access_group, able_to_collect_sample,
-    believe_collected_good_sample, sample_difficulty, willing_to_repeat,
-  ) %>%
-  tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
-  add_overall()
+agreement <- function(bug, data = df) {
+  cos <- paste0(bug, "_cos")
+  sos <- paste0(bug, "_sos")
+  d <- data[, c(cos, sos)]
+  a <- agree(d)
+  k <- kappa2(d)
+  ct <- table(d[, cos])
+  st <- table(d[, sos])
+  return(list(
+    "COS Absent" = ct[1], "COS Present" = ct[2],
+    "SOS Absent" = st[1], "SOS Present" = st[2],
+    "Percent Agreement" = a$value, "Cohen's Kappa" = k$value,
+    "p value" = k$p.value
+  ))
+}
+```
+
+```{r}
+bugs <- c(
+  "staphylococcus_aureus", "haemophilus_influenza", "pseudomonas_aeruginosa",
+  "pseudomonas_non_aero", "s_maltophilia", "burkholderia", "aspergillus", "ntm",
+  "other"
+)
+bug_names <- c(
+  "S. aureus", "H. influenza", "P. aeruginosa", "Pseudomonas non-aeruginosa",
+  "S. maltophilia", "Burkholderia", "Aspergillus", "NTM", "Other"
+)
+bug_list = as.list(bug_names)
+names(bug_list) = bugs
+l <- lapply(bugs, function(b) {
+  agreement(b)
+})
+l <- data.frame(do.call(rbind, l), check.names = F)
+l <- data.frame(lapply(l, as.numeric), check.names = F)
+rownames(l) <- bug_names
+kable(l, digits = 2)
+```
+
+```{r results='asis'}
+invisible(lapply(names(bug_list),function(b){
+  cat("\n")
+  cat("##",as.character(bug_list[b]))
+  cat("\n")
+  cos <- paste0(b, "_cos")
+  sos <- paste0(b, "_sos")
+  d <- df[, c(cos, sos)]
+  t = data.frame(table(d))
+  colnames(t) = c("COS","SOS","n")
+  cat("\n")
+  print(kable(t))
+  cat("\n")
+}))
 ```
