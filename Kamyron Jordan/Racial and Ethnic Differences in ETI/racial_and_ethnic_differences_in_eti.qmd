@@ -16,8 +16,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Dropbox/Miscellaneous/american-medical-association.csl
+bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -340,44 +340,6 @@ encounter %>%
 
 # Lung function
 
-## GLI-2012 vs. GLI-2022 
-
-GLI-2012 spirometry equations include race/ethnicity in the formula, but GLI-2022 equations are race-free. The results of the GLI-2022 equations contain the "gl" suffix, which stands for "global" (so instead of "ppFEV1" it would be "ppFEV1gl").
-
-First, I wanted to ensure that the `rspiro` package is calculating FEV1 percent predicted correctly. In the graph below, ppFEV1 from the registry is shown on the x-axis and ppFEV1 as calculated with `rspiro` is shown on the y-axis.
-
-```{r}
-#| warning: false
-ggplot(encounter, aes(
-  x = GLI_FEV1_pct_predicted, y = GLI_FEV1_pct_predicted_check,
-  color = race
-)) +
-  geom_point() +
-  geom_abline(slope = 1, intercept = 0) +
-  theme_bw() +
-  xlab("Registry") +
-  ylab("rspiro") +
-  ylim(0, 150) +
-  facet_wrap(~race) +
-  ggtitle("Registry values vs. rspiro")
-```
-
-```{r}
-ggplot(encounter, aes(
-  x = ppFEV1gl, y = GLI_FEV1_pct_predicted_check,
-  color = race
-)) +
-  geom_point() +
-  geom_abline(slope = 1, intercept = 0) +
-  theme_bw() +
-  xlab("GLI-2022") +
-  ylab("GLI-2012") +
-  ylim(0, 150) +
-  xlim(0, 150) +
-  facet_wrap(~race) +
-  ggtitle("GLI-2022 vs. GLI-2012 (rspiro)")
-```
-
 ## Annualized averages
 
 FEV1 and FVC percent predicted (based on GLI equations) were averaged by year for each person.
@@ -386,7 +348,7 @@ FEV1 and FVC percent predicted (based on GLI equations) were averaged by year fo
 
 #### Basic model
 
-The most basic model we can fit to these data uses the average values as the outcome, with terms for review year, race, and their interaction and a random intercept for each patient.
+The most basic model we can fit to these data uses the average values as the outcome, with terms for review year, race, and their interaction and a random intercept for each patient. This model is adjusted for age, private vs. other insurance, and parental education.
 
 ```{r}
 # Most basic model of lung function over time by race
@@ -396,113 +358,9 @@ mod <- lmer(
   data = annual
 )
 res <- tidy(mod, effects = "fixed")
-means <- data.frame(emmeans(mod, ~ race + ReviewYear,
+means <- data.frame(emmeans(mod, ~ race | ReviewYear,
   lmerTest.limit = 1e6,
   pbkrtest.limit = 1e6
 ))
-label(means) <- list("Race/Ethnicity", "Year", "Mean ppFEV", "SE", "df", "Lower CL", "Upper CL")
-gt(means) %>% fmt_number(emmean:last_col(), decimals = 1)
 ```
 
-```{r}
-ggplot(left_join(annual, means, by = join_by(race, ReviewYear))) +
-  geom_point(mapping = aes(x = ReviewYear, y = emmean, color = race)) +
-  geom_line(mapping = aes(x = ReviewYear, y = emmean, group = race, color = race)) +
-  geom_errorbar(mapping = aes(
-    x = ReviewYear, ymin = emmean - SE,
-    ymax = emmean + SE, color = race
-  ), width = .2) +
-  xlab("Year") +
-  ylab("LS Mean FEV1") +
-  theme_bw() +
-  scale_color_discrete(name = "Race/Ethnicity")
-```
-
-```{r}
-#| warning: false
-ggplot(left_join(annual, means, by = join_by(race, ReviewYear))) +
-  geom_line(
-    mapping = aes(x = ReviewYear, y = mean_ppFEV, group = eDWID),
-    alpha = 0.005, linewidth = 0.5
-  ) +
-  geom_point(mapping = aes(x = ReviewYear, y = emmean, color = race)) +
-  geom_line(mapping = aes(x = ReviewYear, y = emmean, group = race, color = race)) +
-  geom_errorbar(mapping = aes(x = ReviewYear, ymin = emmean - SE, ymax = emmean + SE, color = race), width = .2) +
-  xlab("Year") +
-  ylab("LS Mean FEV1") +
-  theme_bw() +
-  scale_color_discrete(name = "Race/Ethnicity")
-```
-
-```{r}
-#| warning: false
-ggplot(left_join(annual, means, by = join_by(race, ReviewYear))) +
-  geom_line(
-    mapping = aes(x = ReviewYear, y = mean_ppFEV, group = eDWID),
-    alpha = 0.005, linewidth = 0.5
-  ) +
-  geom_point(mapping = aes(x = ReviewYear, y = emmean, color = race)) +
-  geom_line(mapping = aes(
-    x = ReviewYear, y = emmean, group = race,
-    color = race
-  )) +
-  geom_errorbar(mapping = aes(
-    x = ReviewYear, ymin = emmean - SE,
-    ymax = emmean + SE, color = race
-  ), width = .2) +
-  xlab("Year") +
-  ylab("LS Mean FEV1") +
-  theme_bw() +
-  scale_color_discrete(name = "Race/Ethnicity") +
-  facet_wrap(~race)
-```
-
-#### Change point model
-
-```{r}
-# Calculate time from first ETI use
-encounter <- encounter %>%
-  mutate(
-    days_from_start =
-      as.numeric(encounterdate - Modulator_trikafta_first_date)
-  )
-# Segmented regression by group
-lm_fixed_cp <- segreg(
-  GLI_FEV1_pct_predicted ~ race + seg(days_from_start, by = race),
-  data = encounter
-)
-# Results
-lm_fixed_cp$psi
-slope(lm_fixed_cp)
-# Plot
-new_df = lm_fixed_cp$model
-new_df$pred = predict(lm_fixed_cp)
-ggplot(new_df, aes(x = days_from_start, y = pred,group = race,color = race)) +
-  geom_line() +
-  ylim(0, 150)
-# # Random intercept model isn't converging
-# # Basic model
-# lmm_base <- lme(GLI_FEV1_pct_predicted ~ days_from_start,
-#   random = ~ 1 | eDWID, data = encounter, na.action = na.omit,method = "ML",
-#   control=list(msMaxIter=1000,msMaxEval = 1000)
-# )
-# # Segmented with fixed change point
-# lmm_fixed_cp <- segmented(lmm_base,
-#   seg.Z = ~days_from_start, psi = 0,
-#   random = list(eDWID = pdDiag(~ 1 + days_from_start + U))
-# )
-```
-
-```{r}
-#| cache: true
-#| eval: false
-t <- encounter %>%
-  select(eDWID, GLI_FEV1_pct_predicted, days_from_start) %>%
-  drop_na()
-model <- list(
-  GLI_FEV1_pct_predicted ~ 0 + days_from_start,
-  ~ 0 + days_from_start
-)
-fit <- mcp(model, data = t, cores = 4, chains = 4)
-plot(fit)
-```
