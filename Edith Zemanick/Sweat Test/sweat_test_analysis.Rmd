@@ -260,13 +260,13 @@ km_df <- df %>%
 km <- kmeans(km_df[, c("Na/Cl Ratio")], centers = 3)
 km_df$Cluster <- factor(km$cluster,
   levels = 1:3,
-  labels = c("Low","Medium","High")
+  labels = c("Low", "Medium", "High")
 )
 centers <- data.frame(km$centers)
 centers$Cluster <- rownames(km$centers)
 centers$Cluster <- factor(centers$Cluster,
   levels = 1:3,
-  labels = c("Low","Medium","High")
+  labels = c("Low", "Medium", "High")
 )
 rownames(centers) <- NULL
 centers <- centers %>% column_to_rownames("Cluster")
