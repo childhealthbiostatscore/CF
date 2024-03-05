@@ -304,6 +304,29 @@ summary(t1,
 )
 ```
 
+### By genotype severity (CF only)
+
+```{r results='asis'}
+t1 <- tableby(
+  geno_risk ~ Cl + Na + `Na/Cl Ratio` + `Sweat Chloride Group`,
+  data = t1_df[t1_df$Diagnosis == "Cystic Fibrosis", ], control = mycontrols,
+)
+summary(t1,
+  pfootnote = T,
+  labelTranslations = labels
+)
+```
+
+### Pairwise comparisons
+
+Pairwise comparisons using Wilcoxon rank sum test with continuity correction
+
+```{r}
+pairwise.wilcox.test(t1_df$Cl, t1_df$Diagnosis, p.adjust.method = "fdr")
+pairwise.wilcox.test(t1_df$Na, t1_df$Diagnosis, p.adjust.method = "fdr")
+pairwise.wilcox.test(t1_df$`Na/Cl Ratio`, t1_df$Diagnosis, p.adjust.method = "fdr")
+```
+
 ## By sweat chloride group
 
 ```{r results='asis'}
