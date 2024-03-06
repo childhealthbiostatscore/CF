@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
+bibliography: /Volumes/Documents/Miscellaneous/zotero.bib
+csl: /Volumes/Documents/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -43,6 +43,8 @@ unlockREDCap(c(rcon = "SSwAB-IT (New)"),
   url = "https://redcap.ucdenver.edu/api/"
 )
 exportBulkRecords(list(db = rcon), envir = 1)
+# Exclude
+exclude <- c("01-030_W", "01-038_W", "02-0038", "02-0039", "04-001")
 # Combine collection results
 df <- full_join(db_cos_collection_results, db_sos_collection_results)
 # Format
@@ -51,7 +53,87 @@ df <- df %>%
     record_id, redcap_data_access_group,
     staphylococcus_aureus_cos:other_result_cos,
     staphylococcus_aureus_sos:other_result_sos
+  ) %>%
+  filter(!record_id %in% exclude)
+# Remove empty demographics rows
+db_demographics <- db_demographics %>%
+  filter(
+    redcap_event_name == "Clinic Visit (Arm 1: Eligible)",
+    !record_id %in% exclude
   )
+# Excluded participants
+db_medications <- db_medications %>% filter(!record_id %in% exclude)
+# Combine race and ethnicity columns
+races <- c(
+  "American Indian or Alaskan Native", "Asian", "Hawaiian or Pacific Islander",
+  "Black or African American", "White", "Unknown", "Other"
+)
+ethnicities <- c("Hispanic", "Non-Hispanic", "Unknown/Not Reported")
+db_demographics$Race <- apply(db_demographics, 1, function(r) {
+  w <- which(r[grep("race", names(r))] == "Checked")
+  if (length(w) == 1) {
+    return(races[w])
+  } else if (length(w) > 1) {
+    return("Multiple Races")
+  } else if (length(w) == 0) {
+    return(NA)
+  }
+})
+db_demographics$Ethnicity <- apply(db_demographics, 1, function(r) {
+  w <- which(r[grep("ethnicity", names(r))] == "Checked")
+  if (length(w) == 1) {
+    return(ethnicities[w])
+  } else if (length(w) > 1) {
+    return(paste(ethnicities[w], sep = "/"))
+  } else if (length(w) == 0) {
+    return(NA)
+  }
+})
+# # Drop levels
+# level_drop <- c("sex", "Race", "Ethnicity")
+# db_demographics[, level_drop] <- lapply(
+#   db_demographics[, level_drop],
+#   function(c) {
+#     droplevels(factor(c))
+#   }
+# )
+# Add groups to other dataframes
+db_medications <- left_join(db_medications,
+  db_demographics %>% select(record_id, group),
+  by = join_by(record_id)
+)
+```
+
+# Data cleaning
+
+Participants 01-030_W, 01-038_W, 02-0038, 02-0039, and 04-001 were excluded from all analyses. Participants missing either the COS or SOS sample were excluded from agreement analyses, but retained in feasibility and other analyses.
+
+# Demographics
+
+```{r}
+db_demographics %>%
+  select(group, sex, Race, Ethnicity) %>%
+  tbl_summary(by = group, label = list("sex" = "Sex")) %>%
+  add_overall() %>%
+  add_p(test = list(c("Race", "Ethnicity") ~ "fisher.test")) %>%
+  separate_p_footnotes() %>%
+  as_gt()
+```
+
+# Medications
+
+```{r}
+db_medications %>%
+  select(group, azithromycin:please_specify_mucolytic) %>%
+  select(
+    -inhaled_colisitin_status, -inhaled_vancomycin_status,
+    -other_inhaled_status, -please_specify_mucolytic
+  ) %>%
+  tbl_summary(by = group) %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes() %>%
+  as_gt()
 ```
 
 # Agreement
@@ -73,6 +155,7 @@ agreement <- function(bug, data = df) {
   cos <- paste0(bug, "_cos")
   sos <- paste0(bug, "_sos")
   d <- data[, c(cos, sos)]
+  d <- d[complete.cases(d), ]
   a <- agree(d)
   k <- kappa2(d)
   ct <- table(d[, cos])
@@ -88,9 +171,7 @@ agreement <- function(bug, data = df) {
 
 ## Overall
 
-
-
-## By bug
+To calculate overall agreement, we determined whether a given COS or SOS sample was positive for *any* organism, and then calculated agreement metrics.
 
 ```{r}
 bugs <- c(
@@ -102,8 +183,39 @@ bug_names <- c(
   "S. aureus", "H. influenza", "P. aeruginosa", "Pseudomonas non-aeruginosa",
   "S. maltophilia", "Burkholderia", "Aspergillus", "NTM", "Other"
 )
-bug_list = as.list(bug_names)
-names(bug_list) = bugs
+bug_list <- as.list(bug_names)
+names(bug_list) <- bugs
+# Create overall columns (any bug detected in sample)
+df$overall_cos <- apply(df, 1, function(r) {
+  any(r[paste0(bugs, "_cos")] == "Yes")
+})
+df$overall_cos <- factor(df$overall_cos, levels = c(F, T), labels = c("Negative", "Positive"))
+
+df$overall_sos <- apply(df, 1, function(r) {
+  any(r[paste0(bugs, "_sos")] == "Yes")
+})
+df$overall_sos <- factor(df$overall_sos, levels = c(F, T), labels = c("Negative", "Positive"))
+# Agreement metrics
+d <- df[, c("overall_cos", "overall_sos")]
+d <- d[complete.cases(d), ]
+a <- agree(d)
+k <- kappa2(d)
+ct <- table(d[, "overall_cos"])
+st <- table(d[, "overall_sos"])
+kable(data.frame(
+  "COS Negative" = ct["Negative"], "COS Positive" = ct["Positive"],
+  "SOS Negative" = st["Negative"], "SOS Positive" = st["Positive"],
+  "Percent Agreement" = a$value, "Cohen's Kappa" = k$value,
+  "p value" = k$p.value, check.names = F
+), digits = 2)
+t <- data.frame(table(d))
+colnames(t) <- c("COS", "SOS", "n")
+kable(t)
+```
+
+## By bug
+
+```{r}
 l <- lapply(bugs, function(b) {
   agreement(b)
 })
@@ -114,15 +226,16 @@ kable(l, digits = 2)
 ```
 
 ```{r results='asis'}
-invisible(lapply(names(bug_list),function(b){
+invisible(lapply(names(bug_list), function(b) {
   cat("\n")
-  cat("##",as.character(bug_list[b]))
+  cat("##", as.character(bug_list[b]))
   cat("\n")
   cos <- paste0(b, "_cos")
   sos <- paste0(b, "_sos")
   d <- df[, c(cos, sos)]
-  t = data.frame(table(d))
-  colnames(t) = c("COS","SOS","n")
+  d <- d[complete.cases(d), ]
+  t <- data.frame(table(d))
+  colnames(t) <- c("COS", "SOS", "n")
   cat("\n")
   print(kable(t))
   cat("\n")
