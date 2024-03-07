@@ -25,7 +25,7 @@ editor: source
 library(tidyverse)
 switch(Sys.info()[["sysname"]],
   Windows = {
-    home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
+    home_dir <- "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF"
   },
   Darwin = {
     home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
