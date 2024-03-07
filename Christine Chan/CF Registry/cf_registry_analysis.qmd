@@ -37,7 +37,15 @@ library(knitr)
 library(eulerr)
 library(broom)
 library(forestplot)
-knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry")
+switch(Sys.info()[["sysname"]],
+  Windows = {
+    home_dir <- "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry"
+  },
+  Darwin = {
+    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry"
+  }
+)
+knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 # CFRD incidence and prevalence
@@ -712,7 +720,7 @@ invisible(lapply(time_varying, function(v) {
   cat("\n")
   plot_df <- tbl_regression(cox_res_split) %>%
     add_n(location = "level") %>%
-    add_nevent(location = "level")%>% 
+    add_nevent(location = "level") %>%
     as_tibble()
   plot_df$ll <- as.numeric(sapply(strsplit(plot_df$`**95% CI**`, ", "), "[", 1))
   plot_df$ul <- as.numeric(sapply(strsplit(plot_df$`**95% CI**`, ", "), "[", 2))
@@ -720,7 +728,7 @@ invisible(lapply(time_varying, function(v) {
   plot_df %>%
     forestplot(
       labeltext = c(`**Characteristic**`, `**N**`, `**Event N**`, `**log(HR)**`),
-      mean = "hr", lower = "ll", upper = "ul", 
+      mean = "hr", lower = "ll", upper = "ul",
       is.summary = is.na(plot_df$`**N**`)
     ) %>%
     fp_add_header(
