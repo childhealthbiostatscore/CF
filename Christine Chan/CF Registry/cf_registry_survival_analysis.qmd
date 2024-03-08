@@ -17,6 +17,7 @@ format:
 execute:
   echo: false
   warning: false
+  cache: true
 editor: source
 ---
 
@@ -36,7 +37,9 @@ library(survminer)
 library(knitr)
 library(eulerr)
 library(broom)
-library(forestplot)
+library(emmeans)
+library(ggstats)
+source("/Users/timvigers/GitHub/shared-resources/Visualization/forest_plots.R")
 switch(Sys.info()[["sysname"]],
   Windows = {
     home_dir <- "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry"
@@ -120,7 +123,8 @@ encounter <- encounter %>% filter(!is.na(Age))
 year_inc <- function(df = encounter, year, py = 1000) {
   # Filter and count
   inc <- df %>%
-    filter(reviewyear == year, is.na(first_cfrd_cffpr) | first_cfrd_cffpr >= year) %>%
+    filter(reviewyear == year, is.na(first_cfrd_cffpr) |
+      first_cfrd_cffpr >= year) %>%
     group_by(eDWID) %>%
     filter(row_number() == 1) %>%
     select(eDWID, `Age Group`, cfrd_cffpr)
@@ -133,22 +137,25 @@ year_inc <- function(df = encounter, year, py = 1000) {
   total_at_risk <- sum(inc$n)
   total_inc <- new_cases / (total_at_risk / py)
 
-  new_cases_10 <- sum(inc$n[inc$cfrd_cffpr == "Yes" & inc$`Age Group` == "< 10"])
+  new_cases_10 <-
+    sum(inc$n[inc$cfrd_cffpr == "Yes" & inc$`Age Group` == "< 10"])
   at_risk_10 <- sum(inc$n[inc$`Age Group` == "< 10"])
   inc_10 <- new_cases_10 / (at_risk_10 / py)
 
-  new_cases_10_18 <- sum(inc$n[inc$cfrd_cffpr == "Yes" & inc$`Age Group` == "10 - 18"])
+  new_cases_10_18 <- sum(inc$n[inc$cfrd_cffpr == "Yes" &
+    inc$`Age Group` == "10 - 18"])
   at_risk_10_18 <- sum(inc$n[inc$`Age Group` == "10 - 18"])
   inc_10_18 <- new_cases_10_18 / (at_risk_10_18 / py)
 
-  new_cases_19_30 <- sum(inc$n[inc$cfrd_cffpr == "Yes" & inc$`Age Group` == "19 - 30"])
+  new_cases_19_30 <- sum(inc$n[inc$cfrd_cffpr == "Yes" &
+    inc$`Age Group` == "19 - 30"])
   at_risk_19_30 <- sum(inc$n[inc$`Age Group` == "19 - 30"])
   inc_19_30 <- new_cases_19_30 / (at_risk_19_30 / py)
 
-  new_cases_30 <- sum(inc$n[inc$cfrd_cffpr == "Yes" & inc$`Age Group` == "> 30"])
+  new_cases_30 <- sum(inc$n[inc$cfrd_cffpr == "Yes" &
+    inc$`Age Group` == "> 30"])
   at_risk_30 <- sum(inc$n[inc$`Age Group` == "> 30"])
   inc_30 <- new_cases_30 / (at_risk_30 / py)
-
   # Nice results
   list(
     `Year` = year,
@@ -215,8 +222,10 @@ In @tbl-prevalence_cffpr_year and @tbl-prevalence_cffpr, prevalence is calculate
 year_screen <- function(df = encounter, year) {
   # Filter and count
   inc <- df %>%
-    filter(reviewyear == year, first_cfrd_cffpr > year | is.na(first_cfrd_cffpr)) %>%
-    mutate(ogtt = !is.na(ogttfast_bloodglucose) | !is.na(twohour_bloodglucose)) %>%
+    filter(reviewyear == year, first_cfrd_cffpr > year |
+      is.na(first_cfrd_cffpr)) %>%
+    mutate(ogtt = !is.na(ogttfast_bloodglucose) |
+      !is.na(twohour_bloodglucose)) %>%
     group_by(eDWID) %>%
     summarise(ogtt = max(ogtt), `Age Group` = `Age Group`[1])
   inc <- inc %>%
@@ -271,7 +280,8 @@ kable(screen, digits = 3)
 year_screen <- function(df = encounter, year) {
   # Filter and count
   inc <- df %>%
-    filter(reviewyear == year, first_cfrd_cffpr > year | is.na(first_cfrd_cffpr)) %>%
+    filter(reviewyear == year, first_cfrd_cffpr > year |
+      is.na(first_cfrd_cffpr)) %>%
     mutate(a1c = !is.na(hgba1c)) %>%
     group_by(eDWID) %>%
     summarise(a1c = max(a1c), `Age Group` = `Age Group`[1])
@@ -493,53 +503,6 @@ data.frame(data_dict$code_meaning[
 Based on CFFPR annualized data. These data are interval censored because we know the first visit at which people with CFRD were diagnosed, but we do not know the exact time that they developed CFRD. These data are also left truncated because not all participants enter the study at the same time.
 
 ```{r}
-tv_forest_plot <- function(mod_coeff, time_variable = NULL, labels = labels) {
-  coeff <- tbl_regression(mod, pvalue_fun = function(x) x) %>%
-    add_n(location = "level") %>%
-    add_nevent(location = "level") %>%
-    as_tibble()
-  # If time-varying, format appropriately
-  if (length(grep("strata", coeff$`**Characteristic**`)) > 0) {
-    # Split table into time-varying and not
-    w <- which(coeff$`**Characteristic**` == labels[time_varying])
-    coeff <- coeff[w:nrow(coeff), ]
-    t <- coeff %>% pivot_longer(`**Characteristic**`)
-  }
-  coeff_n <- tbl_regression(mod, exponentiate = T) %>%
-    add_n(location = "label") %>%
-    as_tibble()
-  coeff$N2 <- coeff_n$`**N**`
-  # Combine Ns
-  coeff$N <- pmax(coeff$`**N**`, coeff$N2, na.rm = T)
-
-
-
-  # Exponentiate
-  coeff$hr <- exp(as.numeric(coeff$`**log(HR)**`))
-  coeff$exp.ll <- exp(as.numeric(sapply(str_split(coeff$`**95% CI**`, ", "), "[", 1)))
-  coeff$exp.ul <- exp(as.numeric(sapply(str_split(coeff$`**95% CI**`, ", "), "[", 2)))
-  # Add N to names
-  coeff$names <- paste0(coeff$`**Characteristic**`, " (N = ", coeff$N, ")")
-  coeff$names <- ordered(coeff$names, levels = unique(coeff$names))
-  # P values
-  coeff$sig <- coeff$`**p-value**` < 0.05
-  coeff$p <- style_pvalue(coeff$`**p-value**`)
-  # Row types
-  coeff$type <- "level"
-  coeff$type[!is.na(coeff$N2)] <- "variable"
-  coeff$type[!is.na(coeff$`**N**`) & is.na(coeff$hr)] <- "reference"
-  # HR label
-  coeff$hr_lab <- paste0(
-    round(coeff$hr, 2), " (", round(coeff$exp.ll, 2), " - ",
-    round(coeff$exp.ul, 2), ")"
-  )
-  coeff$hr_lab[coeff$hr_lab == "NA (NA - NA)"] <- NA
-  coeff$hr_lab[coeff$type == "reference"] <- "Reference"
-  #
-}
-```
-
-```{r}
 # List of covariates
 vars <- c(
   "age_group", "Gender", "bmi_perc", "bmi_perc_cat", "MutClass", "Race",
@@ -633,13 +596,13 @@ invisible(lapply(km_table, function(t) {
 
 ```{r}
 # Formula for base model
-x <- c(
+xvars <- c(
   "age_group", "Gender", "Race", "Hispanicrace", "bmi_perc_cat", "MutClass",
   "A_IsOnEnzymes", "tube_feeding", "liver_disease", "ppFEV1_cat",
   "NumPulmExacerbation", "A_pulmonarycomplications1", "A_corticosteroids1"
 )
 y <- "Surv(tstart, tstop, cfrd_status_annual)"
-f <- as.formula(paste0(y, "~", paste0(x, collapse = "+")))
+f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
 cox_res <- coxph(f, data = s, cluster = eDWID)
 # Plot survival
 # ggsurvplot(survfit(cox_res),
@@ -647,27 +610,14 @@ cox_res <- coxph(f, data = s, cluster = eDWID)
 #   xlim = c(2003, 2018), break.x.by = 1
 # )
 # Forest plot and coefficients table
-plot_df <- tbl_regression(cox_res, exponentiate = T) %>%
+cox_res %>%
+  tbl_regression() %>%
   add_n(location = "level") %>%
   add_nevent(location = "level")
-plot_df <- plot_df %>% as_tibble()
-plot_df$expll <- as.numeric(sapply(strsplit(plot_df$`**95% CI**`, ", "), "[", 1))
-plot_df$expul <- as.numeric(sapply(strsplit(plot_df$`**95% CI**`, ", "), "[", 2))
-plot_df$hr <- as.numeric(plot_df$`**HR**`)
-plot_df %>%
-  forestplot(
-    labeltext = c(`**Characteristic**`, `**N**`, `**Event N**`, `**HR**`),
-    mean = "hr", lower = "expll", upper = "expul", xlog = T,
-    is.summary = is.na(plot_df$`**N**`)
-  ) %>%
-  fp_add_header(
-    `**Characteristic**` = c("", "Characteristic"),
-    `**N**` = c("", "N"),
-    `**Event N**` = c("", "Event N"),
-    `**HR**` = c("", "HR")
-  ) %>%
-  fp_add_lines() %>%
-  fp_set_zebra_style("#EFEFEF", ignore_subheaders = T)
+ggcoef_model(cox_res,
+  show_p_values = F, add_reference_rows = F,
+  signif_stars = F, colour = F,
+)
 # Diagnostics
 test.ph <- data.frame(cox.zph(cox_res)$table)
 test.ph <- test.ph[rownames(test.ph) != "GLOBAL", ]
@@ -682,12 +632,6 @@ time_varying <- rownames(test.ph)[test.ph$p < 0.05]
 
 ### Time varying coefficients
 
-- `tgroup=1` indicates the years 2003 - 2008
-- `tgroup=2` indicates the years 2009 - 2013
-- `tgroup=3` indicates the years 2014 - 2018
-
-The interpretation of these models can be a little bit tricky, so here is an example using BMI percentile group and not including the other covariates in the model:
-
 ```{r}
 s_split <- survSplit(Surv(tstart, tstop, cfrd_status_annual) ~ .,
   data = s, cut = c(2008, 2013, 2018), episode = "tgroup"
@@ -695,26 +639,19 @@ s_split <- survSplit(Surv(tstart, tstop, cfrd_status_annual) ~ .,
 s_split$tgroup <- factor(s_split$tgroup,
   levels = 1:3, labels = c("[2003,2009)", "[2009,2014)", "[2014,2019)")
 )
-cox_res_split <- coxph(
-  Surv(tstart, tstop, cfrd_status_annual) ~ bmi_perc_cat * strata(tgroup),
-  data = s_split, cluster = eDWID
-)
-tbl_regression(cox_res_split) %>%
-  add_n(location = "level") %>%
-  add_nevent(location = "level")
 ```
 
-In the table above, the BMI reference group is the (50,85] group. So, in the years 2003 - 2008, the hazard ratio of the (0,10] BMI group was $exp(0.806)=2.238$ compared to the reference. Then, in the period of 2009 - 2013, the hazard ratio of the (0,10] BMI group was $exp(0.806+0.050)=2.354$ compared to the reference group, although this was not statistically significant. The HR for the (85,Inf] BMI group appears to increase over time, starting out at $exp(-0.511)=0.600$ in the first time period, then a statistically significant increase in the second time period to $exp(-0.511+0.282)=0.795$, with a final increase to $exp(-0.511+0.435)=0.927$ in the third period. The interpretation of the following results will follow these same formulas, and the time-varying results are shown at the bottom of each table. This report only includes variables that were statistically significant in the Cox proportional hazards test.
+In the plots below, time-varying coefficients are excluded from the first forest plot, to show the average effect of the predictors. In the second forest plot, the estimated marginal means (EMMs) for the time-varying coefficients are shown. The EMMs are averaged over the levels of all the other variables in the model. In other words, the EMM represents the baseline hazard (not hazard ratio) at the average level of all the other variables in the model. For example, the log hazard for an average participant age [30, Inf) in the time period [2003,2009) is 1.887 and the log hazard for a similar participant in [2014,2019) is 1.401. 
 
 ```{r results='asis'}
 invisible(lapply(time_varying, function(v) {
   # Formulas
   new_f <- as.formula(paste0(
-    y, "~", paste0(x[-which(x == v)], collapse = "+"),
+    y, "~", paste0(xvars[-which(xvars == v)], collapse = "+"),
     paste0("+", v, "*strata(tgroup)")
   ))
   new_f_int <- as.formula(paste0(
-    y, "~", paste0(x[-which(x == v)], collapse = "+"),
+    y, "~", paste0(xvars[-which(xvars == v)], collapse = "+"),
     paste0("+", v, "*tgroup")
   ))
   new_f_emm <- as.formula(paste0(
@@ -722,7 +659,7 @@ invisible(lapply(time_varying, function(v) {
   ))
   # This could be done more efficiently but it seems to work
   # Fit one stratified model and one with a regular interaction term
-  cox_res_split <- coxph(new_f, data = s_split, cluster = eDWID, contrasts = "contr.sum")
+  cox_res_split <- coxph(new_f, data = s_split, cluster = eDWID)
   cox_res_split_int <- coxph(new_f_int, data = s_split, cluster = eDWID)
   # Use the regular interaction term to get means for each time period
   cat("\n")
@@ -732,17 +669,29 @@ invisible(lapply(time_varying, function(v) {
   cox_res_split %>%
     tbl_regression() %>%
     add_n(location = "level") %>%
-    add_nevent(location = "level")
+    add_nevent(location = "level") %>%
+    print()
   cat("\n")
   cat("\n")
-  cox_res_split %>%
-    tbl_regression() %>%
-    plot()
+  emm <- emmeans(cox_res_split_int, new_f_emm,
+    nuisance = xvars[-which(xvars == v)]
+  )
+  emm <- data.frame(emm)
+  # Plot base model (without time varying)
+  ggcoef_model(cox_res_split,
+    show_p_values = F, add_reference_rows = F, signif_stars = F, colour = F,
+    include = xvars[-which(xvars == v)]
+  ) %>%
+    print()
   cat("\n")
   cat("\n")
-  emm <- data.frame(emmeans(cox_res_split_int, new_f_emm, nuisance = x[-which(x == v)]))
-  plot_df <- data.frame(emm) %>% pivot_longer(cols = tgroup, value)
-
+  # Print EMMs
+  print(kable(emm, digits = 3))
+  cat("\n")
+  cat("\n")
+  # Plot marginal means
+  time_varying_forest_plot(emm, x = "emmean", var = v, var_label = labels[v]) %>%
+    print()
   cat("\n")
   cat("\n")
 }))

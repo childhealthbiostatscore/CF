@@ -1,0 +1,86 @@
+---
+title: "CF Registry Analysis - ROC"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+    theme:
+      light: flatly
+      dark: darkly
+bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Dropbox/Miscellaneous/american-medical-association.csl
+editor: source
+---
+
+```{r setup}
+#| include: false
+library(tidyverse)
+library(gtsummary)
+switch(Sys.info()[["sysname"]],
+  Windows = {
+    home_dir <- "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry"
+  },
+  Darwin = {
+    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry"
+  }
+)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r data cleaning}
+# Import data
+encounter <- read.csv("./Data_Raw/CFF19_encountersMerged_Del1.csv",
+  na.strings = c("", "N/A")
+)
+# Limit to those with two hour OGTT and Hba1c at the same encounter
+roc_df <- encounter %>%
+  select(eDWID, reviewyear, encounternum, twohour_bloodglucose, hgba1c) %>%
+  drop_na() %>%
+  arrange(eDWID, reviewyear, encounternum) %>%
+  group_by(eDWID) %>%
+  filter(row_number() == n()) %>%
+  ungroup() %>%
+  mutate(`OGTT 2-hour` = cut(twohour_bloodglucose,
+    breaks = c(-Inf, 140, 200, Inf), labels = c("<140", "[140,200)", ">=200")
+  ))
+# Add demographic data
+demo <- read.csv("./Data_Raw/CFF19_DemogCFDiag_Del1.csv",
+  na.strings = c("", "N/A")
+)
+roc_df <- left_join(roc_df,
+  demo %>% select(eDWID, Race1:Race6, Hispanicrace, Gender, MutClass),
+  by = join_by(eDWID)
+)
+write.csv(roc_df, file = "~/ROC data.csv", row.names = F, na = "")
+```
+
+# Participant Characteristics
+
+Race 1: White
+
+Race 2: Black or African American
+
+Race 3: American Indian or Alaska Native
+
+Race 4: Asian
+
+Race 5: Native Hawaiian or Other Pacific Islander
+
+Race 6: Some other race
+
+```{r}
+roc_df %>%
+  select(reviewyear, hgba1c, `OGTT 2-hour`, Race1:Race6, Hispanicrace, Gender, MutClass) %>%
+  tbl_summary(by = `OGTT 2-hour`, missing_text = "Missing") %>%
+  add_overall()
+```
+
+# ROC analysis
