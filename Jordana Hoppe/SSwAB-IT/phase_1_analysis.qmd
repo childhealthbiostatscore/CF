@@ -15,8 +15,7 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Volumes/Documents/Miscellaneous/zotero.bib
-csl: /Volumes/Documents/Miscellaneous/american-medical-association.csl
+
 editor: source
 ---
 
@@ -27,6 +26,7 @@ library(gtsummary)
 library(redcapAPI)
 library(irr)
 library(knitr)
+library(caret)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF"
@@ -238,6 +238,15 @@ invisible(lapply(names(bug_list), function(b) {
   colnames(t) <- c("COS", "SOS", "n")
   cat("\n")
   print(kable(t))
+  cat("\n")
+  cat("\n")
+  c <- confusionMatrix(d[, sos], reference = d[, cos], mode = "everything")
+  cat("### 2x2 table")
+  print(kable(c$table))
+  cat("\n")
+  cat("\n")
+  cat("#### 2x2 table metrics")
+  print(kable(c$byClass))
   cat("\n")
 }))
 ```
