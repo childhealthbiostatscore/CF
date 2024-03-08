@@ -493,14 +493,13 @@ data.frame(data_dict$code_meaning[
 Based on CFFPR annualized data. These data are interval censored because we know the first visit at which people with CFRD were diagnosed, but we do not know the exact time that they developed CFRD. These data are also left truncated because not all participants enter the study at the same time.
 
 ```{r}
-tv_forest_plot <- function(mod, time_varying = NULL, time_variable = "tgroup",
-                           labels = labels) {
+tv_forest_plot <- function(mod_coeff, time_variable = NULL, labels = labels) {
   coeff <- tbl_regression(mod, pvalue_fun = function(x) x) %>%
     add_n(location = "level") %>%
     add_nevent(location = "level") %>%
     as_tibble()
   # If time-varying, format appropriately
-  if (!is.null(time_varying)) {
+  if (length(grep("strata", coeff$`**Characteristic**`)) > 0) {
     # Split table into time-varying and not
     w <- which(coeff$`**Characteristic**` == labels[time_varying])
     coeff <- coeff[w:nrow(coeff), ]
@@ -709,37 +708,41 @@ In the table above, the BMI reference group is the (50,85] group. So, in the yea
 
 ```{r results='asis'}
 invisible(lapply(time_varying, function(v) {
+  # Formulas
   new_f <- as.formula(paste0(
     y, "~", paste0(x[-which(x == v)], collapse = "+"),
     paste0("+", v, "*strata(tgroup)")
   ))
-  cox_res_split <- coxph(new_f, data = s_split, cluster = eDWID)
+  new_f_int <- as.formula(paste0(
+    y, "~", paste0(x[-which(x == v)], collapse = "+"),
+    paste0("+", v, "*tgroup")
+  ))
+  new_f_emm <- as.formula(paste0(
+    "~", paste0(v, "|tgroup")
+  ))
+  # This could be done more efficiently but it seems to work
+  # Fit one stratified model and one with a regular interaction term
+  cox_res_split <- coxph(new_f, data = s_split, cluster = eDWID, contrasts = "contr.sum")
+  cox_res_split_int <- coxph(new_f_int, data = s_split, cluster = eDWID)
+  # Use the regular interaction term to get means for each time period
   cat("\n")
   cat("####", v)
   cat("\n")
   cat("\n")
-  plot_df <- tbl_regression(cox_res_split) %>%
+  cox_res_split %>%
+    tbl_regression() %>%
     add_n(location = "level") %>%
-    add_nevent(location = "level") %>%
-    as_tibble()
-  plot_df$ll <- as.numeric(sapply(strsplit(plot_df$`**95% CI**`, ", "), "[", 1))
-  plot_df$ul <- as.numeric(sapply(strsplit(plot_df$`**95% CI**`, ", "), "[", 2))
-  plot_df$hr <- as.numeric(plot_df$`**log(HR)**`)
-  plot_df %>%
-    forestplot(
-      labeltext = c(`**Characteristic**`, `**N**`, `**Event N**`, `**log(HR)**`),
-      mean = "hr", lower = "ll", upper = "ul",
-      is.summary = is.na(plot_df$`**N**`)
-    ) %>%
-    fp_add_header(
-      `**Characteristic**` = c("", "Characteristic"),
-      `**N**` = c("", "N"),
-      `**Event N**` = c("", "Event N"),
-      `**log(HR)**` = c("", "log(HR)")
-    ) %>%
-    fp_add_lines() %>%
-    fp_set_zebra_style("#EFEFEF", ignore_subheaders = T) %>%
-    print()
+    add_nevent(location = "level")
+  cat("\n")
+  cat("\n")
+  cox_res_split %>%
+    tbl_regression() %>%
+    plot()
+  cat("\n")
+  cat("\n")
+  emm <- data.frame(emmeans(cox_res_split_int, new_f_emm, nuisance = x[-which(x == v)]))
+  plot_df <- data.frame(emm) %>% pivot_longer(cols = tgroup, value)
+
   cat("\n")
   cat("\n")
 }))
