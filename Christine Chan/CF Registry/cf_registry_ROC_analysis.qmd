@@ -11,12 +11,11 @@ format:
     code-fold: true
     self-contained: true
     fig-cap-location: top
+    fig-width: 8
+    fig-height: 8
     page-layout: full
-    theme:
-      light: flatly
-      dark: darkly
-bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Dropbox/Miscellaneous/american-medical-association.csl
+bibliography: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -24,6 +23,8 @@ editor: source
 #| include: false
 library(tidyverse)
 library(gtsummary)
+library(gt)
+library(pROC)
 switch(Sys.info()[["sysname"]],
   Windows = {
     home_dir <- "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry"
@@ -40,7 +41,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 encounter <- read.csv("./Data_Raw/CFF19_encountersMerged_Del1.csv",
   na.strings = c("", "N/A")
 )
-# Limit to those with two hour OGTT and Hba1c at the same encounter
+# Limit to those with two hour OGTT and HbA1c at the same encounter
 roc_df <- encounter %>%
   select(eDWID, reviewyear, encounternum, twohour_bloodglucose, hgba1c) %>%
   drop_na() %>%
@@ -51,36 +52,202 @@ roc_df <- encounter %>%
   mutate(`OGTT 2-hour` = cut(twohour_bloodglucose,
     breaks = c(-Inf, 140, 200, Inf), labels = c("<140", "[140,200)", ">=200")
   ))
-# Add demographic data
+# Demographic data
 demo <- read.csv("./Data_Raw/CFF19_DemogCFDiag_Del1.csv",
   na.strings = c("", "N/A")
 )
+# Race
+races <- c(
+  "White", "Black or African American", "American Indian or Alaska Native",
+  "Asian", "Native Hawaiian or Other Pacific Islander", "Some other race"
+)
+demo$Race <- apply(demo, 1, function(r) {
+  w <- which(r[paste0("Race", 1:6)] == 1)
+  if (length(w) == 0) {
+    "Unknown"
+  } else if (length(w) > 1) {
+    "More than one race"
+  } else {
+    races[w]
+  }
+})
+demo$Race <- factor(demo$Race,
+  levels = c(
+    "White", "Black or African American", "American Indian or Alaska Native",
+    "Asian", "More than one race", "Native Hawaiian or Other Pacific Islander",
+    "Some other race"
+  ),
+  labels = c(
+    "White", "Black or African American", "Other race", "Other race",
+    "More than one race", "Other race", "Other race"
+  )
+)
+demo$Hispanicrace <- factor(demo$Hispanicrace,
+  levels = 1:2,
+  labels = c("Yes", "No")
+)
+# F508
+demo$F508 <- factor(demo$F508,
+  levels = 1:3,
+  labels = c("F508del/F508del", "F508del/Other", "Other/Other")
+)
+# Age at year end
+annual <- read.csv("./Data_Raw/CFF19_Annualized_Del1.csv",
+  na.strings = c("", "N/A")
+)
+annual <- annual %>% rename(reviewyear = ReviewYear)
+# Merge
 roc_df <- left_join(roc_df,
-  demo %>% select(eDWID, Race1:Race6, Hispanicrace, Gender, MutClass),
+  demo %>% select(eDWID, Race, Hispanicrace, Gender, F508, MutClass),
   by = join_by(eDWID)
 )
-write.csv(roc_df, file = "~/ROC data.csv", row.names = F, na = "")
+roc_df <- left_join(roc_df,
+  annual %>% select(eDWID, reviewyear, Age_YrEnd),
+  by = join_by(eDWID, reviewyear)
+)
 ```
 
 # Participant Characteristics
 
-Race 1: White
-
-Race 2: Black or African American
-
-Race 3: American Indian or Alaska Native
-
-Race 4: Asian
-
-Race 5: Native Hawaiian or Other Pacific Islander
-
-Race 6: Some other race
+## By two hour OGTT value
 
 ```{r}
 roc_df %>%
-  select(reviewyear, hgba1c, `OGTT 2-hour`, Race1:Race6, Hispanicrace, Gender, MutClass) %>%
-  tbl_summary(by = `OGTT 2-hour`, missing_text = "Missing") %>%
-  add_overall()
+  select(
+    reviewyear, Age_YrEnd, hgba1c, `OGTT 2-hour`, Race, Hispanicrace, Gender,
+    F508, MutClass
+  ) %>%
+  tbl_summary(
+    by = `OGTT 2-hour`, missing_text = "Missing",
+    type = list(reviewyear ~ "categorical"),
+    label = list(
+      hgba1c = "HbA1c", Hispanicrace = "Hispanic", MutClass = "Mutation Class",
+      reviewyear = "Year", Age_YrEnd = "Age at Year End"
+    )
+  ) %>%
+  add_overall() %>%
+  add_p(
+    test = list(reviewyear = "fisher.test"),
+    test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
+  ) %>%
+  separate_p_footnotes() %>%
+  as_gt()
+```
+
+## By age
+
+```{r}
+roc_df %>%
+  select(
+    reviewyear, Age_YrEnd, hgba1c, `OGTT 2-hour`, Race, Hispanicrace, Gender,
+    F508, MutClass
+  ) %>%
+  tbl_summary(
+    by = Age_YrEnd, missing_text = "Missing",
+    type = list(reviewyear ~ "categorical"),
+    label = list(
+      hgba1c = "HbA1c", Hispanicrace = "Hispanic", MutClass = "Mutation Class",
+      reviewyear = "Year", Age_YrEnd = "Age at Year End"
+    )
+  ) %>%
+  add_overall() %>%
+  add_p(
+    test = list(reviewyear = "fisher.test"),
+    test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
+  ) %>%
+  separate_p_footnotes() %>%
+  as_gt()
+```
+
+# HbA1c by diagnosis
+
+```{r}
+ggplot(roc_df, aes(x = `OGTT 2-hour`, y = hgba1c)) +
+  geom_boxplot() +
+  ylab("HbA1c") +
+  theme_classic()
 ```
 
 # ROC analysis
+
+## Two hour OGTT value
+
+### Full cohort
+
+#### $\geq$ 200 vs. $<$ 200
+
+```{r}
+#| message: false
+roc_df$CFRD <- as.numeric(roc_df$twohour_bloodglucose >= 200)
+cfrd_roc <- roc(CFRD ~ hgba1c, data = roc_df)
+thresh <- coords(cfrd_roc, "best", best.method = "youden")
+plot(cfrd_roc, print.auc = T, print.thres = T)
+gt(coords(cfrd_roc)) %>% fmt_number(decimals = 3)
+```
+
+#### $\geq$ 140 vs. $<$ 140
+
+```{r}
+#| message: false
+roc_df$AGT <- as.numeric(roc_df$twohour_bloodglucose >= 140)
+agt_roc <- roc(AGT ~ hgba1c, data = roc_df)
+thresh <- coords(agt_roc, "best", best.method = "youden")
+plot(agt_roc, print.auc = T, print.thres = T)
+gt(coords(agt_roc)) %>% fmt_number(decimals = 3)
+```
+
+### Peds
+
+```{r}
+peds_df <- roc_df %>% filter(Age_YrEnd < 18)
+```
+
+#### $\geq$ 200 vs. $<$ 200
+
+```{r}
+#| message: false
+peds_df$CFRD <- as.numeric(peds_df$twohour_bloodglucose >= 200)
+cfrd_roc <- roc(CFRD ~ hgba1c, data = peds_df)
+thresh <- coords(cfrd_roc, "best", best.method = "youden")
+plot(cfrd_roc, print.auc = T, print.thres = T)
+gt(coords(cfrd_roc)) %>% fmt_number(decimals = 3)
+```
+
+#### $\geq$ 140 vs. $<$ 140
+
+```{r}
+#| message: false
+peds_df$AGT <- as.numeric(peds_df$twohour_bloodglucose >= 140)
+agt_roc <- roc(AGT ~ hgba1c, data = peds_df)
+thresh <- coords(agt_roc, "best", best.method = "youden")
+plot(agt_roc, print.auc = T, print.thres = T)
+gt(coords(agt_roc)) %>% fmt_number(decimals = 3)
+```
+
+### Adults
+
+```{r}
+adult_df <- roc_df %>% filter(Age_YrEnd >= 18)
+```
+
+#### $\geq$ 200 vs. $<$ 200
+
+```{r}
+#| message: false
+adult_df$CFRD <- as.numeric(adult_df$twohour_bloodglucose >= 200)
+cfrd_roc <- roc(CFRD ~ hgba1c, data = adult_df)
+thresh <- coords(cfrd_roc, "best", best.method = "youden")
+plot(cfrd_roc, print.auc = T, print.thres = T)
+gt(coords(cfrd_roc)) %>% fmt_number(decimals = 3)
+```
+
+#### $\geq$ 140 vs. $<$ 140
+
+```{r}
+#| message: false
+adult_df$AGT <- as.numeric(adult_df$twohour_bloodglucose >= 140)
+agt_roc <- roc(AGT ~ hgba1c, data = adult_df)
+thresh <- coords(agt_roc, "best", best.method = "youden")
+plot(agt_roc, print.auc = T, print.thres = T)
+gt(coords(agt_roc)) %>% fmt_number(decimals = 3)
+```
