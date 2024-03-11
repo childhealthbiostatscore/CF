@@ -170,84 +170,97 @@ ggplot(roc_df, aes(x = `OGTT 2-hour`, y = hgba1c)) +
 
 # ROC analysis
 
-## Two hour OGTT value
+For the following analyses, we considered those with a two hour glucose value >= 140 and < 200 as a distinct group (AGT) and use receiver operating characteristic curves to find cutoffs that predict: 
 
-### Full cohort
+1. NGT vs. AGT
 
-#### $\geq$ 200 vs. $<$ 200
+2. AGT vs. CFRD
+
+```{r}
+ngt_agt <- roc_df %>% filter(`OGTT 2-hour` != ">=200")
+ngt_agt$ogtt <- droplevels(ngt_agt$`OGTT 2-hour`)
+agt_cfrd <- roc_df %>% filter(`OGTT 2-hour` != "<140")
+agt_cfrd$ogtt <- droplevels(agt_cfrd$`OGTT 2-hour`)
+```
+
+## Peds and adults
+
+### NGT vs. AGT
 
 ```{r}
 #| message: false
-roc_df$CFRD <- as.numeric(roc_df$twohour_bloodglucose >= 200)
-cfrd_roc <- roc(CFRD ~ hgba1c, data = roc_df)
-thresh <- coords(cfrd_roc, "best", best.method = "youden")
-plot(cfrd_roc, print.auc = T, print.thres = T)
-gt(coords(cfrd_roc)) %>% fmt_number(decimals = 3)
+r <- roc(ogtt ~ hgba1c, data = ngt_agt)
+thresh <- coords(r, "best", best.method = "youden")
+plot(r, print.auc = T, print.thres = T)
+gt(coords(r)) %>% fmt_number(decimals = 3)
+summary(r)
 ```
 
-#### $\geq$ 140 vs. $<$ 140
+#### AGT vs. CFRD
 
 ```{r}
 #| message: false
-roc_df$AGT <- as.numeric(roc_df$twohour_bloodglucose >= 140)
-agt_roc <- roc(AGT ~ hgba1c, data = roc_df)
-thresh <- coords(agt_roc, "best", best.method = "youden")
-plot(agt_roc, print.auc = T, print.thres = T)
-gt(coords(agt_roc)) %>% fmt_number(decimals = 3)
+r <- roc(ogtt ~ hgba1c, data = agt_cfrd)
+thresh <- coords(r, "best", best.method = "youden")
+plot(r, print.auc = T, print.thres = T)
+gt(coords(r)) %>% fmt_number(decimals = 3)
+summary(r)
 ```
 
-### Peds
+## Peds
 
 ```{r}
-peds_df <- roc_df %>% filter(Age_YrEnd < 18)
+peds_ngt_agt <- ngt_agt %>% filter(Age_YrEnd < 18)
+peds_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd < 18)
 ```
 
-#### $\geq$ 200 vs. $<$ 200
-
-```{r}
-#| message: false
-peds_df$CFRD <- as.numeric(peds_df$twohour_bloodglucose >= 200)
-cfrd_roc <- roc(CFRD ~ hgba1c, data = peds_df)
-thresh <- coords(cfrd_roc, "best", best.method = "youden")
-plot(cfrd_roc, print.auc = T, print.thres = T)
-gt(coords(cfrd_roc)) %>% fmt_number(decimals = 3)
-```
-
-#### $\geq$ 140 vs. $<$ 140
+### NGT vs. AGT
 
 ```{r}
 #| message: false
-peds_df$AGT <- as.numeric(peds_df$twohour_bloodglucose >= 140)
-agt_roc <- roc(AGT ~ hgba1c, data = peds_df)
-thresh <- coords(agt_roc, "best", best.method = "youden")
-plot(agt_roc, print.auc = T, print.thres = T)
-gt(coords(agt_roc)) %>% fmt_number(decimals = 3)
+r <- roc(ogtt ~ hgba1c, data = peds_ngt_agt)
+thresh <- coords(r, "best", best.method = "youden")
+plot(r, print.auc = T, print.thres = T)
+gt(coords(r)) %>% fmt_number(decimals = 3)
+summary(r)
+```
+
+#### AGT vs. CFRD
+
+```{r}
+#| message: false
+r <- roc(ogtt ~ hgba1c, data = peds_agt_cfrd)
+thresh <- coords(r, "best", best.method = "youden")
+plot(r, print.auc = T, print.thres = T)
+gt(coords(r)) %>% fmt_number(decimals = 3)
+summary(r)
 ```
 
 ### Adults
 
 ```{r}
-adult_df <- roc_df %>% filter(Age_YrEnd >= 18)
+adult_ngt_agt <- ngt_agt %>% filter(Age_YrEnd >= 18)
+adult_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd >= 18)
 ```
 
-#### $\geq$ 200 vs. $<$ 200
+### NGT vs. AGT
 
 ```{r}
 #| message: false
-adult_df$CFRD <- as.numeric(adult_df$twohour_bloodglucose >= 200)
-cfrd_roc <- roc(CFRD ~ hgba1c, data = adult_df)
-thresh <- coords(cfrd_roc, "best", best.method = "youden")
-plot(cfrd_roc, print.auc = T, print.thres = T)
-gt(coords(cfrd_roc)) %>% fmt_number(decimals = 3)
+r <- roc(ogtt ~ hgba1c, data = adult_ngt_agt)
+thresh <- coords(r, "best", best.method = "youden")
+plot(r, print.auc = T, print.thres = T)
+gt(coords(r)) %>% fmt_number(decimals = 3)
+summary(r)
 ```
 
-#### $\geq$ 140 vs. $<$ 140
+#### AGT vs. CFRD
 
 ```{r}
 #| message: false
-adult_df$AGT <- as.numeric(adult_df$twohour_bloodglucose >= 140)
-agt_roc <- roc(AGT ~ hgba1c, data = adult_df)
-thresh <- coords(agt_roc, "best", best.method = "youden")
-plot(agt_roc, print.auc = T, print.thres = T)
-gt(coords(agt_roc)) %>% fmt_number(decimals = 3)
+r <- roc(ogtt ~ hgba1c, data = adult_agt_cfrd)
+thresh <- coords(r, "best", best.method = "youden")
+plot(r, print.auc = T, print.thres = T)
+gt(coords(r)) %>% fmt_number(decimals = 3)
+summary(r)
 ```
