@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Dropbox/Miscellaneous/american-medical-association.csl
+bibliography: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -28,9 +28,11 @@ library(gtsummary)
 library(irr)
 library(eulerr)
 library(kableExtra)
+library(caret)
+library(likert)
 switch(Sys.info()[["sysname"]],
   Windows = {
-    home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
+    home_dir <- "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF"
   },
   Darwin = {
     home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
@@ -243,61 +245,72 @@ agreement <- function(result_pattern, df = data) {
   cat("\n")
   cat("### Pairwise agreement")
   cat("\n")
-  clinic_vs_res <- xtabs(~ Clinic + Delayed, data = d)
-  clinic_vs_home <- xtabs(~ Clinic + Home, data = d)
-  home_vs_res <- xtabs(~ Home + Delayed, data = d)
+  d <- data.frame(lapply(d, factor, levels = c("Absent", "Present")))
+  cat("\n")
+  cat("#### Clinic vs. delayed (clinic as reference)")
   cat("\n")
   cat("\n")
-  cat("#### Clinic vs. delayed")
+  cat("##### Confusion matrix")
   cat("\n")
   cat("\n")
-  clinic_vs_res %>%
-    as.data.frame(.) %>%
-    kable(.) %>%
-    kable_styling("striped") %>%
-    print(.)
-  cat("\n")
-  clinic_vs_res %>%
-    prop.table(.) %>%
-    as.data.frame(.) %>%
-    rename("Percentage" = Freq) %>%
-    kable(., digits = 2) %>%
-    kable_styling("striped") %>%
-    print(.)
+  c <- confusionMatrix((d[, "Delayed"]), reference = d[, "Clinic"], mode = "everything")
+  print(kable(c$table, digits = 3))
   cat("\n")
   cat("\n")
-  cat("#### Clinic vs. home")
-  cat("\n")
-  clinic_vs_home %>%
-    as.data.frame(.) %>%
-    kable(.) %>%
-    kable_styling("striped") %>%
-    print(.)
-  cat("\n")
-  clinic_vs_home %>%
-    prop.table(.) %>%
-    as.data.frame(.) %>%
-    rename("Percentage" = Freq) %>%
-    kable(., digits = 2) %>%
-    kable_styling("striped") %>%
-    print(.)
+  cat("##### Agreement")
   cat("\n")
   cat("\n")
-  cat("#### Home vs. delayed")
+  print(kable(c$overall, digits = 3, col.names = NULL))
   cat("\n")
-  home_vs_res %>%
-    as.data.frame(.) %>%
-    kable(.) %>%
-    kable_styling("striped") %>%
-    print(.)
   cat("\n")
-  home_vs_res %>%
-    prop.table(.) %>%
-    as.data.frame(.) %>%
-    rename("Percentage" = Freq) %>%
-    kable(., digits = 2) %>%
-    kable_styling("striped") %>%
-    print(.)
+  cat("##### Sensitivity, specificity, etc.")
+  cat("\n")
+  cat("\n")
+  print(kable(c$byClass, digits = 3, col.names = NULL))
+  cat("\n")
+  cat("\n")
+  cat("#### Clinic vs. home (clinic as reference)")
+  cat("\n")
+  cat("\n")
+  cat("##### Confusion matrix")
+  cat("\n")
+  cat("\n")
+  c <- confusionMatrix((d[, "Home"]), reference = d[, "Clinic"], mode = "everything")
+  print(kable(c$table, digits = 3))
+  cat("\n")
+  cat("\n")
+  cat("##### Agreement")
+  cat("\n")
+  cat("\n")
+  print(kable(c$overall, digits = 3, col.names = NULL))
+  cat("\n")
+  cat("\n")
+  cat("##### Sensitivity, specificity, etc.")
+  cat("\n")
+  cat("\n")
+  print(kable(c$byClass, digits = 3, col.names = NULL))
+  cat("\n")
+  cat("\n")
+  cat("#### Home vs. delayed (delayed as reference)")
+  cat("\n")
+  cat("\n")
+  cat("##### Confusion matrix")
+  cat("\n")
+  cat("\n")
+  c <- confusionMatrix((d[, "Home"]), reference = d[, "Delayed"], mode = "everything")
+  print(kable(c$table, digits = 3))
+  cat("\n")
+  cat("\n")
+  cat("##### Agreement")
+  cat("\n")
+  cat("\n")
+  print(kable(c$overall, digits = 3, col.names = NULL))
+  cat("\n")
+  cat("\n")
+  cat("##### Sensitivity, specificity, etc.")
+  cat("\n")
+  cat("\n")
+  print(kable(c$byClass, digits = 3, col.names = NULL))
   cat("\n")
   cat("\n")
 }
@@ -403,4 +416,50 @@ agreement("results___15")
 
 ```{r results='asis'}
 agreement("no_growth")
+```
+
+# Survey results
+
+```{r}
+# List columns by number of possible answers
+levels3 <- "q2.factor"
+levels5 <- c("difficulty.factor", "shipping.factor")
+checkboxes <- c(
+  paste0("barriers___", 1:4, ".factor"),
+  paste0("q6a___", 1:5, ".factor"),
+  paste0("q6b___", 1:4, ".factor")
+)
+yn <- c(
+  "q1.factor", "q3.factor", "previous.factor", "goodsample.factor", "q4.factor",
+  "q5.factor", "q6.factor"
+)
+# Subset and label
+t <- survey_data %>%
+  filter(!participant_id %in% survey_exclude) %>%
+  select(participant_id, q1.factor:q6b___4.factor)
+labels <- as.character(label(survey_data)[sub("\\.factor", "", colnames(t))])
+names(labels) <- colnames(t)
+```
+
+## Plots
+
+```{r}
+yn_df = t %>% select(all_of(yn)) %>% rename(any_of(setNames(names(labels), labels)))
+yn_df = data.frame(lapply(yn_df,factor,levels=c("No","Yes")),check.names = F)
+plot(likert(yn_df))
+```
+
+```{r}
+check_df = t %>% select(all_of(checkboxes)) %>% rename(any_of(setNames(names(labels), labels)))
+plot(likert(check_df))
+```
+
+```{r}
+df3 = t %>% select(all_of(levels3)) %>% rename(any_of(setNames(names(labels), labels)))
+plot(likert(df3))
+```
+
+```{r}
+df5 = t %>% select(all_of(levels5)) %>% rename(any_of(setNames(names(labels), labels)))
+plot(likert(df5))
 ```
