@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
+bibliography: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -25,10 +25,18 @@ editor: source
 library(tidyverse)
 library(lubridate)
 library(gtsummary)
+library(ggpubr)
+library(rspiro)
 knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Scott Sagel/PEx in CF")
+# Colors for plots
+yellow <- "#f8b80a"
+red <- "#e30022"
+purple <- "#7b2670"
+blue <- "#022451"
 ```
 
 ```{r data cleaning}
+#| warning: false
 # Import
 df <- read.csv("./Data_Raw/ExacerbationsInCF222_DATA_2024-01-02_0857.csv",
   na.strings = ""
@@ -47,6 +55,25 @@ df$cftr_mod_spec <- factor(df$cftr_mod_spec,
 )
 df$Trikafta <- factor(df$cftr_mod_spec == "Trikafta",
   levels = c(F, T), labels = c("No", "Yes")
+)
+# % predicted FEV1
+df$sex <- factor(df$sex, levels = c(2, 1), labels = c("Male", "Female"))
+df$fev1_baseline <- rowMeans(df[, paste0("fev1_baseline", 1:6)], na.rm = T)
+df <- df %>%
+  group_by(sid) %>%
+  fill(sex) %>%
+  ungroup()
+df$ppfev1_admit <- pctpred_GLIgl(
+  age = df$age_at_admit, height = df$height / 100, gender = as.numeric(df$sex),
+  FEV1 = df$fev1_admit
+)
+df$ppfev1_baseline <- pctpred_GLIgl(
+  age = df$age_at_admit, height = df$height / 100, gender = as.numeric(df$sex),
+  FEV1 = df$fev1_baseline
+)
+df$ppfev1_discharge <- pctpred_GLIgl(
+  age = df$age_at_admit, height = df$height / 100, gender = as.numeric(df$sex),
+  FEV1 = df$fev1_discharge
 )
 # Labels
 labels <- list(
@@ -70,16 +97,22 @@ labels <- list(
   "Other bacteria" = "admit_cx_results___9",
   "On CFTR Modulator?" = "cftr_mod",
   "CFTR Modulator Type" = "cftr_mod_spec",
-  "Cultures Tested" = "redcap_data_access_group"
+  "Cultures Tested" = "redcap_data_access_group",
+  "Length of Admission" = "days_admit",
+  "Systemic Steroids" = "steroids_system",
+  "Oral Steroids" = "steroids_oral",
+  "IV Steroids" = "steroids_iv"
 )
 labels <- setNames(names(labels), labels)
 # Format
 df <- df %>%
   select(
-    sid, redcap_event_name, redcap_data_access_group, year, cftr_mod,
-    cftr_mod_spec, Trikafta, fungal_test, fungi___1:fungi___5,
+    sid, redcap_event_name, redcap_data_access_group, year, days_admit,
+    cftr_mod, cftr_mod_spec, Trikafta, fungal_test, fungi___1:fungi___5,
     ntm_test, ntm___1:ntm___3,
-    admit_cx_results___1:admit_cx_results___9
+    admit_cx_results___1:admit_cx_results___9,
+    ppfev1_admit, ppfev1_discharge, ppfev1_baseline,
+    contains("steroids")
   ) %>%
   filter(!is.na(year))
 ```
@@ -291,3 +324,286 @@ df %>%
         separate_p_footnotes()
   )
 ```
+
+# Days of admission
+
+```{r}
+#| label: tbl-days
+#| tbl-cap: Length of Admission
+df %>%
+  select(year, days_admit) %>%
+  tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
+```
+
+```{r}
+#| label: tbl-days_center
+#| tbl-cap: Length of Admission by Center
+#| message: false
+df %>%
+  select(year, redcap_data_access_group, days_admit) %>%
+  tbl_strata(
+    strata = redcap_data_access_group,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+```{r}
+#| label: tbl-days_cftr_mod
+#| tbl-cap: Length of Admission by Modulator Status
+#| message: false
+df %>%
+  select(year, cftr_mod_spec, days_admit) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(
+          by = cftr_mod_spec, missing_text = "Missing", label = labels
+        ) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+```{r}
+#| label: tbl-days_trikafta
+#| tbl-cap: Length of Admission by Trikafta Status
+#| message: false
+df %>%
+  select(year, Trikafta, days_admit) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(by = Trikafta, missing_text = "Missing", label = labels) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+# Steroids
+
+```{r}
+#| label: tbl-steroids
+#| tbl-cap: Steroids
+df %>%
+  select(year, contains("steroids")) %>%
+  tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
+```
+
+```{r}
+#| label: tbl-steroids_center
+#| tbl-cap: Steroids by Center
+#| message: false
+df %>%
+  select(year, redcap_data_access_group, contains("steroids")) %>%
+  tbl_strata(
+    strata = redcap_data_access_group,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+```{r}
+#| label: tbl-steroids_cftr_mod
+#| tbl-cap: Steroids by Modulator Status
+#| message: false
+df %>%
+  select(year, cftr_mod_spec, contains("steroids")) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(
+          by = cftr_mod_spec, missing_text = "Missing", label = labels
+        ) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+```{r}
+#| label: tbl-steroids_trikafta
+#| tbl-cap: Steroids by Trikafta Status
+#| message: false
+df %>%
+  select(year, Trikafta, contains("steroids")) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(by = Trikafta, missing_text = "Missing", label = labels) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+# Plots
+
+```{r}
+# Number of hospitalizations
+df %>%
+  group_by(year) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(x = factor(year), y = n, fill = factor(year))) +
+  geom_bar(position = "dodge", stat = "identity") +
+  geom_label(aes(label = n),nudge_y = -20, fill = "white") +
+  ylab("Num. of Hospitalizations") +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_blank()) +
+  scale_fill_manual(values = c(purple, yellow))
+```
+
+```{r}
+# % hospitalized 2 or more times in both years
+df %>%
+  group_by(sid, year) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(year) %>%
+  summarise(
+    num = sum(n >= 2), total = n(),
+    perc = mean(n >= 2) * 100, .groups = "drop"
+  ) %>%
+  ggplot(aes(x = factor(year), y = perc, fill = factor(year))) +
+  geom_bar(position = "dodge", stat = "identity") +
+  geom_label(aes(label = scales::percent(perc, scale = 1, accuracy = 0.1)),
+    nudge_y = -5, fill = "white"
+  ) +
+  geom_label(aes(label = paste0(num, "/", total)),
+    nudge_y = -8, fill = "white"
+  ) +
+  geom_signif(
+    xmin = 1, xmax = 2, y_position = 50, map_signif_level = T,
+    annotation = "<0.001"
+  ) +
+  xlab("Site") +
+  ylab("Percent With >= 2 Hospitalizations") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c(purple, yellow))
+```
+
+```{r}
+# Number hospitalized 2 or more times in both years
+df %>%
+  group_by(sid, year) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(year) %>%
+  summarise(
+    num = sum(n >= 2), total = n(),
+    .groups = "drop"
+  ) %>%
+  ggplot(aes(x = factor(year), y = num, fill = factor(year))) +
+  geom_bar(position = "dodge", stat = "identity") +
+  geom_label(aes(label = num), nudge_y = -5, fill = "white") +
+  xlab("Site") +
+  ylab("Number With >= 2 Hospitalizations") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  scale_fill_manual(values = c(purple, yellow))
+```
+
+```{r}
+#| warning: false
+df %>%
+  group_by(year, sid) %>%
+  rename(
+    Admission = ppfev1_admit, Discharge = ppfev1_discharge,
+    Baseline = ppfev1_baseline
+  ) %>%
+  pivot_longer(c(Admission, Discharge, Baseline)) %>%
+  mutate(name = factor(name,
+    levels = c("Baseline", "Admission", "Discharge")
+  )) %>%
+  ggplot(aes(
+    x = name, y = value,
+    fill = factor(year)
+  )) +
+  geom_boxplot() +
+  geom_pwc(
+    aes(group = year),
+    tip.length = 0.01,
+    method = "t_test", label = "p.format"
+  ) +
+  ylab("FEV1 % predicted") +
+  theme_bw() +
+  theme(
+    legend.title = element_blank(), legend.position = "bottom",
+    axis.title.x = element_blank()
+  ) +
+  scale_fill_manual(values = c(purple, yellow))
+```
+
+FEV1 percent predicted was calculated using the GLI global (2022) equations with the `rspiro` R package.
+
+```{r}
+# Proportions who returned to >= 90% and >= 100% at discharge
+df %>%
+  mutate(
+    returned_90 = ppfev1_discharge >= ppfev1_baseline * 0.9,
+    returned_100 = ppfev1_discharge >= ppfev1_baseline
+  ) %>%
+  group_by(year) %>%
+  summarise(
+    n_returned_90 = sum(returned_90, na.rm = T),
+    n_returned_100 = sum(returned_100, na.rm = T),
+    total = sum(!is.na(ppfev1_discharge) & !is.na(ppfev1_baseline)),
+    returned_90 = mean(returned_90, na.rm = T) * 100,
+    returned_100 = mean(returned_100, na.rm = T) * 100,
+  ) %>%
+  ggplot(aes(x = factor(year))) +
+  geom_bar(aes(y = returned_90, color = "Returned to 90%"),
+    position = "dodge", stat = "identity", fill = yellow
+  ) +
+  geom_label(
+    aes(
+      y = returned_90,
+      label = scales::percent(returned_90, accuracy = 0.1, scale = 1)
+    ),
+    nudge_y = -5, fill = "white"
+  ) +
+  geom_label(aes(y = returned_90, label = paste0(n_returned_90, "/", total)),
+    nudge_y = -11, fill = "white"
+  ) +
+  geom_bar(aes(y = returned_100, color = "Returned to 100%"),
+    position = "dodge", stat = "identity", fill = purple
+  ) +
+  geom_label(
+    aes(
+      y = returned_100,
+      label = scales::percent(returned_100, accuracy = 0.1, scale = 1)
+    ),
+    nudge_y = -10, fill = "white"
+  ) +
+  geom_label(aes(y = returned_100, label = paste0(n_returned_100, "/", total)),
+    nudge_y = -16, fill = "white"
+  ) +
+  ylab("Percent") +
+  xlab("Year") +
+  theme_classic() +
+  scale_color_manual(
+    name = element_blank(), values = c(purple, yellow),
+    labels = c("Returned to 100%", "Returned to 90%")
+  )
+```
+
+The above plot represents the proportion of admissions where the patient returned to close to baseline lung function, and was not aggregated by patient. In other words, multiple admissions for the same patient were considered independent in this case.
