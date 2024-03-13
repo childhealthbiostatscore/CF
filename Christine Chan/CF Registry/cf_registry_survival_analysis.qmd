@@ -14,10 +14,6 @@ format:
     self-contained: true
     fig-cap-location: top
     page-layout: full
-execute:
-  echo: false
-  warning: false
-  cache: true
 editor: source
 ---
 
@@ -508,8 +504,8 @@ vars <- c(
   "age_group", "Gender", "bmi_perc", "bmi_perc_cat", "MutClass", "Race",
   "Hispanicrace", "A_IsOnEnzymes", "ppFEV1_cat", "tube_feeding",
   "NumPulmExacerbation", "A_pseudomonasaeruginosa", "A_fungalyeast1",
-  "A_mycocultureresults3", "A_pulmonarycomplications1", "A_corticosteroids1",
-  "cfrd_status_annual", "A_Vx770", "A_VX809comb", "liver_disease"
+  "A_mycocultureresults3", "A_corticosteroids1", "cfrd_status_annual", 
+  "A_Vx770", "A_VX809comb", "liver_disease"
 )
 # Nice labels for plots and tables
 labels <- list(
@@ -525,7 +521,6 @@ labels <- list(
   A_VX809comb = "Use of CFTR modulator Vx809 combination",
   A_pseudomonasaeruginosa = "Pseudomonas aeruginosa",
   A_fungalyeast1 = "Aspergillus (any species)",
-  A_pulmonarycomplications1 = "ABPA",
   A_mycocultureresults3 = "Microorganisms in myco culture",
   eDWID = "ID", birth_year = "Birth year", tstart = "Interval start", tstop = "Interval stop", age_at_entry = "Age at entry", Age_YrEnd = "Age", bmi_perc = "BMI %ile"
 )
@@ -599,7 +594,7 @@ invisible(lapply(km_table, function(t) {
 xvars <- c(
   "age_group", "Gender", "Race", "Hispanicrace", "bmi_perc_cat", "MutClass",
   "A_IsOnEnzymes", "tube_feeding", "liver_disease", "ppFEV1_cat",
-  "NumPulmExacerbation", "A_pulmonarycomplications1", "A_corticosteroids1"
+  "NumPulmExacerbation",  "A_corticosteroids1"
 )
 y <- "Surv(tstart, tstop, cfrd_status_annual)"
 f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
