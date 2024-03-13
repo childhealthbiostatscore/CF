@@ -41,17 +41,6 @@ knitr::opts_knit$set(root.dir = home_dir)
 encounter <- read.csv("./Data_Raw/CFF19_encountersMerged_Del1.csv",
   na.strings = c("", "N/A")
 )
-# Limit to those with two hour OGTT and HbA1c at the same encounter
-roc_df <- encounter %>%
-  select(eDWID, reviewyear, encounternum, twohour_bloodglucose, hgba1c) %>%
-  drop_na() %>%
-  arrange(eDWID, reviewyear, encounternum) %>%
-  group_by(eDWID) %>%
-  filter(row_number() == n()) %>%
-  ungroup() %>%
-  mutate(`OGTT 2-hour` = cut(twohour_bloodglucose,
-    breaks = c(-Inf, 140, 200, Inf), labels = c("<140", "[140,200)", ">=200")
-  ))
 # Demographic data
 demo <- read.csv("./Data_Raw/CFF19_DemogCFDiag_Del1.csv",
   na.strings = c("", "N/A")
@@ -97,15 +86,49 @@ annual <- read.csv("./Data_Raw/CFF19_Annualized_Del1.csv",
 )
 annual <- annual %>% rename(reviewyear = ReviewYear)
 # Merge
-roc_df <- left_join(roc_df,
+encounter <- left_join(
+  encounter,
   demo %>% select(eDWID, Race, Hispanicrace, Gender, F508, MutClass),
   by = join_by(eDWID)
 )
-roc_df <- left_join(roc_df,
+encounter <- left_join(
+  encounter,
   annual %>% select(eDWID, reviewyear, Age_YrEnd),
   by = join_by(eDWID, reviewyear)
 )
+# Limit to those with two hour OGTT and HbA1c at the same encounter
+# Also remove years before 2010 and those under age 10
+roc_df <- encounter %>%
+  arrange(eDWID, reviewyear, encounternum) %>%
+  select(
+    eDWID, reviewyear, Age_YrEnd, Race, Hispanicrace, Gender, F508, MutClass,
+    twohour_bloodglucose, hgba1c
+  ) %>%
+  filter(reviewyear >= 2010, Age_YrEnd >= 10, hgba1c >= 3.5 & hgba1c <= 15) %>%
+  drop_na() %>%
+  group_by(eDWID) %>%
+  filter(row_number() == n()) %>%
+  ungroup() %>%
+  mutate(
+    `OGTT 2-hour` = cut(twohour_bloodglucose,
+      breaks = c(-Inf, 140, 200, Inf), labels = c("<140", "[140,200)", ">=200")
+    ),
+    `Age Group` = cut(Age_YrEnd, breaks = c(10, 18, 30, Inf), right = F)
+  )
+# Metrics to report
+metrics <- c(
+  "thresh", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn", "fp",
+  "npv", "ppv"
+)
 ```
+
+# Data cleaning
+
+1. People who reported American Indian or Alaska Native, Asian, and Native Hawaiian or Other Pacific Islander for race were considered as "Other race" due to relatively small sample sizes for these groups.
+
+2. Years prior to 2010 and those under age 10 at the end of a given year were excluded from the analysis.
+
+3. HbA1cs < 3.5% or > 15% were excluded from the analysis, as these values were assumed to be entered incorrectly.
 
 # Participant Characteristics
 
@@ -114,8 +137,8 @@ roc_df <- left_join(roc_df,
 ```{r}
 roc_df %>%
   select(
-    reviewyear, Age_YrEnd, hgba1c, `OGTT 2-hour`, Race, Hispanicrace, Gender,
-    F508, MutClass
+    reviewyear, hgba1c, Age_YrEnd, `Age Group`, `OGTT 2-hour`, Race,
+    Hispanicrace, Gender, F508, MutClass
   ) %>%
   tbl_summary(
     by = `OGTT 2-hour`, missing_text = "Missing",
@@ -139,11 +162,11 @@ roc_df %>%
 ```{r}
 roc_df %>%
   select(
-    reviewyear, Age_YrEnd, hgba1c, `OGTT 2-hour`, Race, Hispanicrace, Gender,
-    F508, MutClass
+    reviewyear, hgba1c, Age_YrEnd, `Age Group`, `OGTT 2-hour`, Race,
+    Hispanicrace, Gender, F508, MutClass
   ) %>%
   tbl_summary(
-    by = Age_YrEnd, missing_text = "Missing",
+    by = `Age Group`, missing_text = "Missing",
     type = list(reviewyear ~ "categorical"),
     label = list(
       hgba1c = "HbA1c", Hispanicrace = "Hispanic", MutClass = "Mutation Class",
@@ -170,6 +193,8 @@ ggplot(roc_df, aes(x = `OGTT 2-hour`, y = hgba1c)) +
 
 # ROC analysis
 
+## Three groups, two cutoffs
+
 For the following analyses, we considered those with a two hour glucose value >= 140 and < 200 as a distinct group (AGT) and use receiver operating characteristic curves to find cutoffs that predict: 
 
 1. NGT vs. AGT
@@ -183,17 +208,15 @@ agt_cfrd <- roc_df %>% filter(`OGTT 2-hour` != "<140")
 agt_cfrd$ogtt <- droplevels(agt_cfrd$`OGTT 2-hour`)
 ```
 
-## Peds and adults
+### Peds and adults
 
-### NGT vs. AGT
+#### NGT vs. AGT
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = ngt_agt)
-thresh <- coords(r, "best", best.method = "youden")
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r)) %>% fmt_number(decimals = 3)
-summary(r)
+gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### AGT vs. CFRD
@@ -201,28 +224,24 @@ summary(r)
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = agt_cfrd)
-thresh <- coords(r, "best", best.method = "youden")
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r)) %>% fmt_number(decimals = 3)
-summary(r)
+gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
 ```
 
-## Peds
+### Peds
 
 ```{r}
 peds_ngt_agt <- ngt_agt %>% filter(Age_YrEnd < 18)
 peds_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd < 18)
 ```
 
-### NGT vs. AGT
+#### NGT vs. AGT
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = peds_ngt_agt)
-thresh <- coords(r, "best", best.method = "youden")
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r)) %>% fmt_number(decimals = 3)
-summary(r)
+gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### AGT vs. CFRD
@@ -230,10 +249,8 @@ summary(r)
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = peds_agt_cfrd)
-thresh <- coords(r, "best", best.method = "youden")
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r)) %>% fmt_number(decimals = 3)
-summary(r)
+gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
 ```
 
 ### Adults
@@ -243,15 +260,13 @@ adult_ngt_agt <- ngt_agt %>% filter(Age_YrEnd >= 18)
 adult_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd >= 18)
 ```
 
-### NGT vs. AGT
+#### NGT vs. AGT
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = adult_ngt_agt)
-thresh <- coords(r, "best", best.method = "youden")
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r)) %>% fmt_number(decimals = 3)
-summary(r)
+gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### AGT vs. CFRD
@@ -259,8 +274,83 @@ summary(r)
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = adult_agt_cfrd)
-thresh <- coords(r, "best", best.method = "youden")
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r)) %>% fmt_number(decimals = 3)
-summary(r)
+gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+```
+
+## Two groups, one cutoffs
+
+For the following analyses, we examined HbA1c cutoffs that best predict a two hour OGTT value either >= 140 or >= 200
+
+```{r}
+roc_df$agt <- as.numeric(roc_df$twohour_bloodglucose >= 140)
+roc_df$cfrd <- as.numeric(roc_df$twohour_bloodglucose >= 200)
+```
+
+### Peds and adults
+
+#### $\geq$ 140
+
+```{r}
+#| message: false
+r <- roc(agt ~ hgba1c, data = roc_df)
+plot(r, print.auc = T, print.thres = T)
+gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+```
+
+#### $\geq$ 200
+
+```{r}
+#| message: false
+r <- roc(cfrd ~ hgba1c, data = roc_df)
+plot(r, print.auc = T, print.thres = T)
+gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+```
+
+### Peds
+
+```{r}
+peds_roc <- roc_df %>% filter(Age_YrEnd < 18)
+```
+
+#### $\geq$ 140
+
+```{r}
+#| message: false
+r <- roc(agt ~ hgba1c, data = peds_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+```
+
+#### $\geq$ 200
+
+```{r}
+#| message: false
+r <- roc(cfrd ~ hgba1c, data = peds_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+```
+
+### Adults
+
+```{r}
+adult_roc <- roc_df %>% filter(Age_YrEnd >= 18)
+```
+
+#### $\geq$ 140
+
+```{r}
+#| message: false
+r <- roc(agt ~ hgba1c, data = adult_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+```
+
+#### $\geq$ 200
+
+```{r}
+#| message: false
+r <- roc(cfrd ~ hgba1c, data = adult_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
 ```
