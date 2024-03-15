@@ -253,7 +253,9 @@ agreement <- function(result_pattern, df = data) {
   cat("##### Confusion matrix")
   cat("\n")
   cat("\n")
-  c <- confusionMatrix((d[, "Delayed"]), reference = d[, "Clinic"], mode = "everything")
+  c <- confusionMatrix((d[, "Delayed"]),
+    reference = d[, "Clinic"], positive = "Present", mode = "everything"
+  )
   print(kable(c$table, digits = 3))
   cat("\n")
   cat("\n")
@@ -275,7 +277,9 @@ agreement <- function(result_pattern, df = data) {
   cat("##### Confusion matrix")
   cat("\n")
   cat("\n")
-  c <- confusionMatrix((d[, "Home"]), reference = d[, "Clinic"], mode = "everything")
+  c <- confusionMatrix((d[, "Home"]),
+    reference = d[, "Clinic"], positive = "Present", mode = "everything"
+  )
   print(kable(c$table, digits = 3))
   cat("\n")
   cat("\n")
@@ -297,7 +301,9 @@ agreement <- function(result_pattern, df = data) {
   cat("##### Confusion matrix")
   cat("\n")
   cat("\n")
-  c <- confusionMatrix((d[, "Home"]), reference = d[, "Delayed"], mode = "everything")
+  c <- confusionMatrix((d[, "Home"]),
+    reference = d[, "Delayed"], positive = "Present", mode = "everything"
+  )
   print(kable(c$table, digits = 3))
   cat("\n")
   cat("\n")
@@ -444,22 +450,30 @@ names(labels) <- colnames(t)
 ## Plots
 
 ```{r}
-yn_df = t %>% select(all_of(yn)) %>% rename(any_of(setNames(names(labels), labels)))
-yn_df = data.frame(lapply(yn_df,factor,levels=c("No","Yes")),check.names = F)
+yn_df <- t %>%
+  select(all_of(yn)) %>%
+  rename(any_of(setNames(names(labels), labels)))
+yn_df <- data.frame(lapply(yn_df, factor, levels = c("No", "Yes")), check.names = F)
 plot(likert(yn_df))
 ```
 
 ```{r}
-check_df = t %>% select(all_of(checkboxes)) %>% rename(any_of(setNames(names(labels), labels)))
+check_df <- t %>%
+  select(all_of(checkboxes)) %>%
+  rename(any_of(setNames(names(labels), labels)))
 plot(likert(check_df))
 ```
 
 ```{r}
-df3 = t %>% select(all_of(levels3)) %>% rename(any_of(setNames(names(labels), labels)))
+df3 <- t %>%
+  select(all_of(levels3)) %>%
+  rename(any_of(setNames(names(labels), labels)))
 plot(likert(df3))
 ```
 
 ```{r}
-df5 = t %>% select(all_of(levels5)) %>% rename(any_of(setNames(names(labels), labels)))
+df5 <- t %>%
+  select(all_of(levels5)) %>%
+  rename(any_of(setNames(names(labels), labels)))
 plot(likert(df5))
 ```

@@ -25,13 +25,8 @@ library(tidyverse)
 library(gtsummary)
 library(redcapAPI)
 library(irr)
-library(knitr)
+library(gt)
 library(caret)
-home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF"
-)
-knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
@@ -102,6 +97,41 @@ db_medications <- left_join(db_medications,
   db_demographics %>% select(record_id, group),
   by = join_by(record_id)
 )
+# Bug list
+bugs <- c(
+  "staphylococcus_aureus", "haemophilus_influenza", "pseudomonas_aeruginosa",
+  "pseudomonas_non_aero", "s_maltophilia", "burkholderia", "aspergillus", "ntm",
+  "other"
+)
+bug_names <- c(
+  "S. aureus", "H. influenza", "P. aeruginosa", "Pseudomonas non-aeruginosa",
+  "S. maltophilia", "Burkholderia", "Aspergillus", "NTM", "Other"
+)
+# Convert yes/no to positive/negative
+df[, paste0(bugs, "_cos")] <- lapply(df[, paste0(bugs, "_cos")], factor,
+  levels = c("No", "Yes"), labels = c("Negative", "Positive")
+)
+df[, paste0(bugs, "_sos")] <- lapply(df[, paste0(bugs, "_sos")], factor,
+  levels = c("No", "Yes"), labels = c("Negative", "Positive")
+)
+# Create overall columns (any bug detected in sample)
+df$overall_cos <- apply(df, 1, function(r) {
+  any(r[paste0(bugs, "_cos")] == "Positive")
+})
+df$overall_cos <- factor(df$overall_cos,
+  levels = c(F, T), labels = c("Negative", "Positive")
+)
+df$overall_sos <- apply(df, 1, function(r) {
+  any(r[paste0(bugs, "_sos")] == "Positive")
+})
+df$overall_sos <- factor(df$overall_sos,
+  levels = c(F, T), labels = c("Negative", "Positive")
+)
+# Add overall to list
+bugs <- c(bugs, "overall")
+bug_names <- c(bug_names, "Overall")
+bug_list <- as.list(bug_names)
+names(bug_list) <- bugs
 ```
 
 # Data cleaning
@@ -150,79 +180,68 @@ Cohen's kappa is interpreted analagously to a correlation coefficient, with -1 i
 | 0.81 - 0.99   | Near perfect agreement |
 | 1             | Perfect agreement      |
 
+Given a 2x2 table of the form
+
+| SOS      | COS      | n |
+|----------|----------|---|
+| Negative | Negative | D |
+| Positive | Negative | B |
+| Negative | Positive | C |
+| Positive | Positive | A |
+
+the accuracy metrics are calculated as follows:
+
+$Sensitivity=\frac{A}{A+C}$
+
+$Specificity=\frac{D}{B+D}$
+
+$Prevalence=\frac{A+C}{A+B+C+D}$
+
+$PPV=\frac{sensitivity∗prevalence}{(sensitivity∗prevalence)+((1−specificity)∗(1−prevalence))}$
+
+$NPV=\frac{specificity∗(1−prevalence)}{((1−sensitivity)∗prevalence)+((specificity)∗(1−prevalence))}$
+
+$DetectionRate=\frac{A}{A+B+C+D}$
+
+$DetectionPrevalence=\frac{A+B}{A+B+C+D}$
+
+$BalancedAccuracy=\frac{sensitivity+specificity}{2}$
+
+$Precision=\frac{A}{A+B}$
+
+$Recall=\frac{A}{A+C}$
+
+$F1=\frac{2∗precision∗recall}{precision+recall}$
+
 ```{r}
 agreement <- function(bug, data = df) {
   cos <- paste0(bug, "_cos")
   sos <- paste0(bug, "_sos")
   d <- data[, c(cos, sos)]
   d <- d[complete.cases(d), ]
-  a <- agree(d)
-  k <- kappa2(d)
-  ct <- table(d[, cos])
-  st <- table(d[, sos])
-  return(list(
-    "COS Absent" = ct[1], "COS Present" = ct[2],
-    "SOS Absent" = st[1], "SOS Present" = st[2],
-    "Percent Agreement" = a$value, "Cohen's Kappa" = k$value,
-    "p value" = k$p.value
-  ))
+  # Agreement metrics
+  c <- confusionMatrix((d[, sos]),
+    reference = d[, cos], positive = "Positive", mode = "everything"
+  )
+  # Return
+  return(list(two_by_two = c$table, accuracy = c$overall, metrics = c$byClass))
 }
 ```
 
-## Overall
-
-To calculate overall agreement, we determined whether a given COS or SOS sample was positive for *any* organism, and then calculated agreement metrics.
-
-```{r}
-bugs <- c(
-  "staphylococcus_aureus", "haemophilus_influenza", "pseudomonas_aeruginosa",
-  "pseudomonas_non_aero", "s_maltophilia", "burkholderia", "aspergillus", "ntm",
-  "other"
-)
-bug_names <- c(
-  "S. aureus", "H. influenza", "P. aeruginosa", "Pseudomonas non-aeruginosa",
-  "S. maltophilia", "Burkholderia", "Aspergillus", "NTM", "Other"
-)
-bug_list <- as.list(bug_names)
-names(bug_list) <- bugs
-# Create overall columns (any bug detected in sample)
-df$overall_cos <- apply(df, 1, function(r) {
-  any(r[paste0(bugs, "_cos")] == "Yes")
-})
-df$overall_cos <- factor(df$overall_cos, levels = c(F, T), labels = c("Negative", "Positive"))
-
-df$overall_sos <- apply(df, 1, function(r) {
-  any(r[paste0(bugs, "_sos")] == "Yes")
-})
-df$overall_sos <- factor(df$overall_sos, levels = c(F, T), labels = c("Negative", "Positive"))
-# Agreement metrics
-d <- df[, c("overall_cos", "overall_sos")]
-d <- d[complete.cases(d), ]
-a <- agree(d)
-k <- kappa2(d)
-ct <- table(d[, "overall_cos"])
-st <- table(d[, "overall_sos"])
-kable(data.frame(
-  "COS Negative" = ct["Negative"], "COS Positive" = ct["Positive"],
-  "SOS Negative" = st["Negative"], "SOS Positive" = st["Positive"],
-  "Percent Agreement" = a$value, "Cohen's Kappa" = k$value,
-  "p value" = k$p.value, check.names = F
-), digits = 2)
-t <- data.frame(table(d))
-colnames(t) <- c("COS", "SOS", "n")
-kable(t)
-```
-
-## By bug
-
 ```{r}
 l <- lapply(bugs, function(b) {
-  agreement(b)
+  a <- agreement(b)
+  return(list(
+    Accuracy = a$accuracy["Accuracy"],
+    `Accuracy Lower Limit` = a$accuracy["AccuracyLower"],
+    `Accuracy Upper Limit` = a$accuracy["AccuracyUpper"],
+    Kappa = a$accuracy["Kappa"], `Mcnemar P Value` = a$accuracy["McnemarPValue"]
+  ))
 })
 l <- data.frame(do.call(rbind, l), check.names = F)
 l <- data.frame(lapply(l, as.numeric), check.names = F)
 rownames(l) <- bug_names
-kable(l, digits = 2)
+gt(l, rownames_to_stub = T) %>% fmt_number(n_sigfig = 3)
 ```
 
 ```{r results='asis'}
@@ -234,19 +253,31 @@ invisible(lapply(names(bug_list), function(b) {
   sos <- paste0(b, "_sos")
   d <- df[, c(cos, sos)]
   d <- d[complete.cases(d), ]
-  t <- data.frame(table(d))
-  colnames(t) <- c("COS", "SOS", "n")
   cat("\n")
-  print(kable(t))
-  cat("\n")
-  cat("\n")
-  c <- confusionMatrix(d[, sos], reference = d[, cos], mode = "everything")
+  c <- confusionMatrix(d[, sos],
+    reference = d[, cos], positive = "Positive", mode = "everything"
+  )
+  metrics <- data.frame(c$overall)
+  metrics2 <- data.frame(c$byClass)
   cat("### 2x2 table")
-  print(kable(c$table))
   cat("\n")
+  two_by_two <- data.frame(c$table)
+  colnames(two_by_two) <- c("SOS", "COS", "n")
+  print(gt(two_by_two))
   cat("\n")
-  cat("#### 2x2 table metrics")
-  print(kable(c$byClass))
+  cat("### Metrics")
+  cat("\n")
+  print(gt(metrics, rownames_to_stub = T) %>%
+    fmt_number(n_sigfig = 3) %>%
+    tab_options(column_labels.hidden = TRUE))
+  cat("\n")
+  print(gt(metrics2, rownames_to_stub = T) %>%
+    fmt_number(n_sigfig = 3) %>%
+    tab_options(column_labels.hidden = TRUE))
   cat("\n")
 }))
 ```
+
+# Questions
+
+1. Are we okay with calculating prevalence from the data for the PPV and NPV? Do these numbers seem pretty representative of what you'd expect in the population?
