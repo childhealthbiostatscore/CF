@@ -154,7 +154,7 @@ annual %>%
 ### By race and year
 
 ```{r results='asis'}
-invisible(lapply(c("2019", "2020", "2021", "2022"), function(n) {
+invisible(lapply(c("2020", "2021", "2022"), function(n) {
   cat("\n")
   cat("###", n)
   cat("\n")
@@ -235,8 +235,8 @@ surv_dat <- encounter %>%
   mutate(start = lag(stop, default = 0)) %>%
   select(
     eDWID, race, Insurance, family_income, patient_education, father_education,
-    mother_education, encounterdate, encounterage, eti_elig_date, Vx445comb,
-    start, stop
+    mother_education, encounterdate, encounterage, gli_fev1_ppred_rn,
+    eti_elig_date, Vx445comb, start, stop
   ) %>%
   filter(stop <= first(stop[Vx445comb == "Yes"]))
 surv_dat$Vx445comb <- as.numeric(factor(surv_dat$Vx445comb, levels = c("No", "Yes"))) - 1
@@ -256,6 +256,7 @@ tbl_survfit(fit, probs = c(0.25, 0.5, 0.75))
 ### Plots
 
 ```{r}
+#| warning: false
 # Plot
 names(fit$strata) <- gsub("race=", "", names(fit$strata))
 fit %>%
@@ -267,12 +268,13 @@ fit %>%
   ) +
   add_risktable_strata_symbol() +
   add_quantile() +
-  ylab("Proportion on Vx445comb") + xlab("Days From Eligibility")
+  ylab("Proportion on ETI") + xlab("Days From Eligibility")
 ```
 
 Without Asian subgroup for clearer plot:
 
 ```{r}
+#| warning: false
 fit <- survfit(surv_f, id = eDWID, data = surv_dat[surv_dat$race != "Asian", ])
 # Plot
 names(fit$strata) <- gsub("race=", "", names(fit$strata))
@@ -286,7 +288,7 @@ fit %>%
   ) +
   add_risktable_strata_symbol() +
   add_quantile() +
-  ylab("Proportion on Vx445comb") + xlab("Days From Eligibility")
+  ylab("Proportion on ETI") + xlab("Days From Eligibility")
 ```
 
 ### Cox PH models
@@ -301,23 +303,7 @@ cox_res %>%
   add_nevent(location = "level")
 ggcoef_model(cox_res,
   show_p_values = F, add_reference_rows = F,
-  signif_stars = F, colour = F,
-)
-```
-
-#### Adjusted for insurance status, family income, and education
-
-```{r}
-new_surv_f <- update(surv_f, . ~ . + Insurance + family_income +
-  patient_education + father_education + mother_education)
-cox_res <- coxph(new_surv_f, data = surv_dat, cluster = eDWID)
-cox_res %>%
-  tbl_regression() %>%
-  add_n(location = "level") %>%
-  add_nevent(location = "level")
-ggcoef_model(cox_res,
-  show_p_values = F, add_reference_rows = F,
-  signif_stars = F, colour = F,
+  signif_stars = F, colour = F, exponentiate = T
 )
 ```
 
@@ -325,21 +311,6 @@ ggcoef_model(cox_res,
 
 ```{r}
 gg_miss_var(surv_dat, show_pct = T, facet = race)
-```
-
-#### Adjusted for insurance status only
-
-```{r}
-new_surv_f <- update(surv_f, . ~ . + Insurance)
-cox_res <- coxph(new_surv_f, data = surv_dat, cluster = eDWID)
-cox_res %>%
-  tbl_regression() %>%
-  add_n(location = "level") %>%
-  add_nevent(location = "level")
-ggcoef_model(cox_res,
-  show_p_values = F, add_reference_rows = F,
-  signif_stars = F, colour = F,
-)
 ```
 
 #### Adjusted for combined insurance status only
@@ -358,7 +329,7 @@ No Insurance = No Insurance
 
 Other = Other
 
-State special needs program, e.g., BCMH, CCS, CRS, GHPP, etc. = Other
+State special needs program, e.g., BCMH, CCS, CRS, GHPP, etc. = Public
 
 TriCare or other military health plan = Tricare
 
@@ -377,9 +348,10 @@ surv_dat$Insurance <- factor(surv_dat$Insurance,
   ),
   labels = c(
     "Private", "Public", "Public", "Public", "More Than One", "No Insurance",
-    "Other", "Other", "Tricare"
+    "Other", "Public", "Tricare"
   )
 )
+new_surv_f <- update(surv_f, . ~ . + Insurance)
 cox_res <- coxph(new_surv_f, data = surv_dat, cluster = eDWID)
 cox_res %>%
   tbl_regression() %>%
@@ -387,95 +359,25 @@ cox_res %>%
   add_nevent(location = "level")
 ggcoef_model(cox_res,
   show_p_values = F, add_reference_rows = F,
-  signif_stars = F, colour = F,
+  signif_stars = F, colour = F, exponentiate = T
 )
 ```
 
-# People without visits in a given year
+#### Adjusted for insurance, age group, and FEV1
 
 ```{r}
-# Which are missing from encounters data?
-a <- as.data.frame.matrix(table(annual$eDWID, annual$ReviewYear))
-a <- a %>% rownames_to_column("eDWID")
-e <- as.data.frame.matrix(table(by_year$eDWID, by_year$reviewyear))
-e <- e %>% rownames_to_column("eDWID")
-rowdiff_a <- setdiff(a, e)
-rowdiff_a$data <- "annual"
-rowdiff_e <- setdiff(e, a)
-rowdiff_e$data <- "encounter"
-diffs <- rbind(rowdiff_a, rowdiff_e)
-diffs <- diffs %>%
-  arrange(eDWID, desc(data)) %>%
-  select(-data)
-diffs <- diffs %>%
-  group_by(eDWID) %>%
-  reframe(across(`2015`:`2021`, ~ diff(as.numeric(.x))))
-diffs %>%
-  reframe(across(`2015`:`2021`, ~ sum(.x == 1))) %>%
-  gt()
-```
-
-There were a total of `r length(setdiff(a$eDWID,e$eDWID))` included in the annual dataset that did not appear in the encounter-level dataset at all. There were an additional `r nrow(diffs)` patients who were included in both datasets, but had at least one year with no encounters. The table above shows the number of people missing an encounter in each year.
-
-If someone was not seen a given year, do we count them as eligible for that year? I am assuming they will be eligible but obviously will not have started any modulators.
-
-# Potential COVID effects
-
-## Spaghetti plot
-
-```{r}
-#| warning: false
-ggplot(encounter, aes(
-  y = GLI_FEV1_pct_predicted, x = encounterdate,
-  group = eDWID, color = factor(eDWID)
-)) +
-  geom_line(alpha = 0.02) +
-  theme_bw() +
-  theme(legend.position = "none")
-```
-
-## Visits prior to and after March 11, 2020
-
-The table below is limited to visits 2019 - 2021.
-
-```{r}
-encounter %>%
-  filter(encounterdate >= "2019-01-01") %>%
-  mutate(post_covid = encounterdate > "2020-03-11") %>%
-  group_by(eDWID) %>%
-  summarise(
-    `Number of Visits Pre-COVID` = sum(!post_covid),
-    `Number of Visits Post-COVID` = sum(post_covid),
-    race = first(race),
-    .groups = "drop"
-  ) %>%
-  select(-eDWID) %>%
-  tbl_summary(by = race, missing_text = "Missing") %>%
-  bold_labels()
-```
-
-# Lung function
-
-## Annualized averages
-
-FEV1 and FVC percent predicted (based on GLI equations) were averaged by year for each person.
-
-### FEV1
-
-#### Basic model
-
-The most basic model we can fit to these data uses the average values as the outcome, with terms for review year, race, and their interaction and a random intercept for each patient. This model is adjusted for age, private vs. other insurance, and parental education.
-
-```{r}
-# Most basic model of lung function over time by race
-# Try a few different models
-mod <- lmer(
-  mean_ppFEV ~ factor(ReviewYear) * race + (1 | eDWID),
-  data = annual
+surv_dat$`Age Group` <- cut(surv_dat$encounterage,
+  breaks = c(-Inf, 6, 12, 18, 30, Inf), right = F
 )
-res <- tidy(mod, effects = "fixed")
-means <- data.frame(emmeans(mod, ~ race | ReviewYear,
-  lmerTest.limit = 1e6,
-  pbkrtest.limit = 1e6
-))
+new_surv_f <- update(surv_f, . ~ . + Insurance + `Age Group` +
+  gli_fev1_ppred_rn)
+cox_res <- coxph(new_surv_f, data = surv_dat, cluster = eDWID)
+cox_res %>%
+  tbl_regression() %>%
+  add_n(location = "level") %>%
+  add_nevent(location = "level")
+ggcoef_model(cox_res,
+  show_p_values = F, add_reference_rows = F,
+  signif_stars = F, colour = F, exponentiate = T
+)
 ```

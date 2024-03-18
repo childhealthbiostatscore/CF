@@ -21,11 +21,10 @@ editor: source
 
 ```{r setup}
 #| include: false
-library(tidyverse)
-library(gtsummary)
 library(redcapAPI)
-library(irr)
+library(tidyverse)
 library(gt)
+library(gtsummary)
 library(caret)
 ```
 
@@ -128,10 +127,31 @@ df$overall_sos <- factor(df$overall_sos,
   levels = c(F, T), labels = c("Negative", "Positive")
 )
 # Add overall to list
-bugs <- c(bugs, "overall")
-bug_names <- c(bug_names, "Overall")
+bugs <- c("overall", bugs)
+bug_names <- c("Across all bugs", bug_names)
 bug_list <- as.list(bug_names)
 names(bug_list) <- bugs
+# Agreement columns
+df[, bugs] <- lapply(bugs, function(b) {
+  cos <- df[, paste0(b, "_cos")]
+  sos <- df[, paste0(b, "_sos")]
+  f <- factor(paste(cos, sos, sep = "_"),
+    exclude = c(
+      "NA_Negative", "Negative_NA", "NA_Positive", "Positive_NA", "NA_NA"
+    )
+  )
+  f <- factor(f,
+    levels = c(
+      "Negative_Negative", "Negative_Positive", "Positive_Negative",
+      "Positive_Positive"
+    ),
+    labels = c(
+      "COS Negative / SOS Negative", "COS Negative / SOS Positive",
+      "COS Positive / SOS Negative", "COS Positive / SOS Positive"
+    )
+  )
+  return(f)
+})
 ```
 
 # Data cleaning
@@ -168,50 +188,12 @@ db_medications %>%
 
 # Agreement
 
-Cohen's kappa is interpreted analagously to a correlation coefficient, with -1 indicating perfect disagreement and 1 indicating perfect agreement. Tables with NaN and NAs indicate that all tests had the same values (i.e. all absent or all present).
-
-| Cohen's Kappa | Interpretation         |
-|---------------|------------------------|
-| 0             | No agreement           |
-| 0.10 - 0.20   | Slight agreement       |
-| 0.21 - 0.40   | Fair agreement         |
-| 0.41 - 0.60   | Moderate agreement     |
-| 0.61 - 0.80   | Substantial agreement  |
-| 0.81 - 0.99   | Near perfect agreement |
-| 1             | Perfect agreement      |
-
-Given a 2x2 table of the form
-
-| SOS      | COS      | n |
-|----------|----------|---|
-| Negative | Negative | D |
-| Positive | Negative | B |
-| Negative | Positive | C |
-| Positive | Positive | A |
-
-the accuracy metrics are calculated as follows:
-
-$Sensitivity=\frac{A}{A+C}$
-
-$Specificity=\frac{D}{B+D}$
-
-$Prevalence=\frac{A+C}{A+B+C+D}$
-
-$PPV=\frac{sensitivity∗prevalence}{(sensitivity∗prevalence)+((1−specificity)∗(1−prevalence))}$
-
-$NPV=\frac{specificity∗(1−prevalence)}{((1−sensitivity)∗prevalence)+((specificity)∗(1−prevalence))}$
-
-$DetectionRate=\frac{A}{A+B+C+D}$
-
-$DetectionPrevalence=\frac{A+B}{A+B+C+D}$
-
-$BalancedAccuracy=\frac{sensitivity+specificity}{2}$
-
-$Precision=\frac{A}{A+B}$
-
-$Recall=\frac{A}{A+C}$
-
-$F1=\frac{2∗precision∗recall}{precision+recall}$
+```{r}
+df %>%
+  select(all_of(bugs)) %>%
+  tbl_summary(label = bug_list, missing_text = "Missing") %>%
+  add_ci(statistic=list(all_categorical() ~ "{conf.low} - {conf.high}%"))
+```
 
 ```{r}
 agreement <- function(bug, data = df) {
