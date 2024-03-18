@@ -16,8 +16,6 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -35,11 +33,14 @@ library(emmeans)
 library(gt)
 library(performance)
 library(mcp)
+library(survival)
 library(ggsurvfit)
+library(ggstats)
+library(naniar)
 # Paths
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF"
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -153,7 +154,7 @@ annual %>%
 ### By race and year
 
 ```{r results='asis'}
-invisible(lapply(c("2019", "2020", "2021"), function(n) {
+invisible(lapply(c("2019", "2020", "2021", "2022"), function(n) {
   cat("\n")
   cat("###", n)
   cat("\n")
@@ -229,16 +230,50 @@ For the following analysis, the start time ($t=0$) was the approximate date that
 # Create survival dataset
 surv_dat <- encounter %>%
   mutate(stop = as.numeric(encounterdate - eti_elig_date)) %>%
-  filter(stop >= 0) %>%
+  filter(stop > 0) %>%
   group_by(eDWID) %>%
   mutate(start = lag(stop, default = 0)) %>%
-  select(eDWID, race, encounterdate, encounterage, eti_elig_date, Vx445comb, start, stop) %>%
+  select(
+    eDWID, race, Insurance, family_income, patient_education, father_education,
+    mother_education, encounterdate, encounterage, eti_elig_date, Vx445comb,
+    start, stop
+  ) %>%
   filter(stop <= first(stop[Vx445comb == "Yes"]))
 surv_dat$Vx445comb <- as.numeric(factor(surv_dat$Vx445comb, levels = c("No", "Yes"))) - 1
 # Fit
-fit <- survfit(Surv(start, stop, Vx445comb, type = "interval") ~ race,
-  id = eDWID, data = surv_dat
-)
+y <- "Surv(time = start, time2 = stop, event = Vx445comb)"
+surv_f <- as.formula(paste0(y, "~race"))
+fit <- survfit(surv_f, id = eDWID, data = surv_dat)
+```
+
+### Days to percentile started on ETI
+
+```{r}
+# Quantiles
+tbl_survfit(fit, probs = c(0.25, 0.5, 0.75))
+```
+
+### Plots
+
+```{r}
+# Plot
+names(fit$strata) <- gsub("race=", "", names(fit$strata))
+fit %>%
+  ggsurvfit(type = "risk") +
+  add_confidence_interval() +
+  add_risktable(
+    risktable_stats =
+      c("{round(n.risk)}", "{round(cum.event)}")
+  ) +
+  add_risktable_strata_symbol() +
+  add_quantile() +
+  ylab("Proportion on Vx445comb") + xlab("Days From Eligibility")
+```
+
+Without Asian subgroup for clearer plot:
+
+```{r}
+fit <- survfit(surv_f, id = eDWID, data = surv_dat[surv_dat$race != "Asian", ])
 # Plot
 names(fit$strata) <- gsub("race=", "", names(fit$strata))
 fit %>%
@@ -254,25 +289,106 @@ fit %>%
   ylab("Proportion on Vx445comb") + xlab("Days From Eligibility")
 ```
 
-Without Asian subgroup for clearer plot:
+### Cox PH models
+
+#### Base model (unadjusted)
 
 ```{r}
-fit <- survfit(Surv(start, stop, Vx445comb, type = "interval") ~ race,
-  id = eDWID, data = surv_dat[surv_dat$race != "Asian", ]
+cox_res <- coxph(surv_f, data = surv_dat, cluster = eDWID)
+cox_res %>%
+  tbl_regression() %>%
+  add_n(location = "level") %>%
+  add_nevent(location = "level")
+ggcoef_model(cox_res,
+  show_p_values = F, add_reference_rows = F,
+  signif_stars = F, colour = F,
 )
-# Plot
-names(fit$strata) <- gsub("race=", "", names(fit$strata))
-fit %>%
-  ggsurvfit(type = "risk") +
-  add_confidence_interval() +
-  add_risktable(
-    risktable_stats =
-      c("{round(n.risk)}", "{round(cum.event)}"),
-    stats_label = c("Eligible", "Num. Started")
-  ) +
-  add_risktable_strata_symbol() +
-  add_quantile() +
-  ylab("Proportion on Vx445comb") + xlab("Days From Eligibility")
+```
+
+#### Adjusted for insurance status, family income, and education
+
+```{r}
+new_surv_f <- update(surv_f, . ~ . + Insurance + family_income +
+  patient_education + father_education + mother_education)
+cox_res <- coxph(new_surv_f, data = surv_dat, cluster = eDWID)
+cox_res %>%
+  tbl_regression() %>%
+  add_n(location = "level") %>%
+  add_nevent(location = "level")
+ggcoef_model(cox_res,
+  show_p_values = F, add_reference_rows = F,
+  signif_stars = F, colour = F,
+)
+```
+
+##### Missing data
+
+```{r}
+gg_miss_var(surv_dat, show_pct = T, facet = race)
+```
+
+#### Adjusted for insurance status only
+
+```{r}
+new_surv_f <- update(surv_f, . ~ . + Insurance)
+cox_res <- coxph(new_surv_f, data = surv_dat, cluster = eDWID)
+cox_res %>%
+  tbl_regression() %>%
+  add_n(location = "level") %>%
+  add_nevent(location = "level")
+ggcoef_model(cox_res,
+  show_p_values = F, add_reference_rows = F,
+  signif_stars = F, colour = F,
+)
+```
+
+#### Adjusted for combined insurance status only
+
+Health Insurance Policy (e.g. Private Insurance) = Private
+
+Indian Health Service = Public
+
+Medicaid = Public
+
+Medicare = Public
+
+More than one = More than one
+
+No Insurance = No Insurance
+
+Other = Other
+
+State special needs program, e.g., BCMH, CCS, CRS, GHPP, etc. = Other
+
+TriCare or other military health plan = Tricare
+
+```{r}
+surv_dat$Insurance <- factor(surv_dat$Insurance,
+  levels = c(
+    "Health Insurance Policy (e.g. Private Insurance)",
+    "Indian Health Service",
+    "Medicaid",
+    "Medicare",
+    "More than one",
+    "No Insurance",
+    "Other",
+    "State special needs program, e.g., BCMH, CCS, CRS, GHPP, etc.",
+    "TriCare or other military health plan"
+  ),
+  labels = c(
+    "Private", "Public", "Public", "Public", "More Than One", "No Insurance",
+    "Other", "Other", "Tricare"
+  )
+)
+cox_res <- coxph(new_surv_f, data = surv_dat, cluster = eDWID)
+cox_res %>%
+  tbl_regression() %>%
+  add_n(location = "level") %>%
+  add_nevent(location = "level")
+ggcoef_model(cox_res,
+  show_p_values = F, add_reference_rows = F,
+  signif_stars = F, colour = F,
+)
 ```
 
 # People without visits in a given year
@@ -363,4 +479,3 @@ means <- data.frame(emmeans(mod, ~ race | ReviewYear,
   pbkrtest.limit = 1e6
 ))
 ```
-
