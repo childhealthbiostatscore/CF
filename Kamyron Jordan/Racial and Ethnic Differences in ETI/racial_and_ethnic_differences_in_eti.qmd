@@ -53,7 +53,7 @@ load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysi
 
 # Race and ethnicity breakdown
 
-The table below shows the race and ethnicity proportions for the entire cohort included in the CFFPR dataset. I decided to combine race and ethnicity with Hispanic "overriding" other racial identities. So if a participant was reported as both Black and Hispanic, they were consider Hispanic for the following analyses. Those with missing data for Hispanic ethnicity were moved to the "Indigenous/Mixed/Other/Unknown Race" category.
+The table below shows the race and ethnicity proportions for the entire cohort included in the CFFPR dataset. I decided to combine race and ethnicity with Hispanic "overriding" other racial identities. So if a participant was reported as both Black and Hispanic, they were consider Hispanic for the following analyses. Those with missing data for Hispanic ethnicity were moved to the "Other" category.
 
 ```{r}
 demo %>%
@@ -197,8 +197,8 @@ invisible(lapply(c("2020", "2021", "2022"), function(n) {
 The figure below includes those eligible for ETI and anyone who may have been prescribed ETI off label. Error bars represent 95% confidence intervals.
 
 ```{r}
-annual %>%
-  filter(eti_elig == "Yes" | Vx445comb == "Yes") %>%
+p <- annual %>%
+  filter(eti_elig == "Yes" | Vx445comb == "Yes", ReviewYear > 2019) %>%
   select(eDWID, race, ReviewYear, contains("Vx")) %>%
   group_by(ReviewYear, race) %>%
   summarise(
@@ -214,12 +214,21 @@ annual %>%
   ) +
   xlab("Year") +
   ylab("Percentage Prescribed ETI") +
-  theme_bw() +
-  theme(legend.title = element_blank()) +
+  theme_bw(base_size = 16) +
+  theme(legend.title = element_blank(), legend.text = element_text(size = 14)) +
   scale_fill_manual(values = c(
     "#264653", "#2A9D8F", "#E9C46A",
     "#F4A261", "#E76F51"
   ))
+p
+```
+
+```{r}
+#| warning: false
+# Save image
+ggsave("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Figures/bar_chart.png",
+  plot = p, device = "png", width = 12, height = 8, units = "in"
+)
 ```
 
 ## Survival analysis
@@ -229,6 +238,7 @@ For the following analysis, the start time ($t=0$) was the approximate date that
 ```{r}
 # Create survival dataset
 surv_dat <- encounter %>%
+  filter(eti_elig == "Yes") %>%
   mutate(stop = as.numeric(encounterdate - eti_elig_date)) %>%
   filter(stop > 0) %>%
   group_by(eDWID) %>%
@@ -237,8 +247,7 @@ surv_dat <- encounter %>%
     eDWID, race, Insurance, family_income, patient_education, father_education,
     mother_education, encounterdate, encounterage, gli_fev1_ppred_rn,
     eti_elig_date, Vx445comb, start, stop
-  ) %>%
-  filter(stop <= first(stop[Vx445comb == "Yes"]))
+  )
 surv_dat$Vx445comb <- as.numeric(factor(surv_dat$Vx445comb, levels = c("No", "Yes"))) - 1
 # Fit
 y <- "Surv(time = start, time2 = stop, event = Vx445comb)"
@@ -250,7 +259,7 @@ fit <- survfit(surv_f, id = eDWID, data = surv_dat)
 
 ```{r}
 # Quantiles
-tbl_survfit(fit, probs = c(0.25, 0.5, 0.75))
+tbl_survfit(fit, probs = c(0.25, 0.5, 0.75, 0.9))
 ```
 
 ### Plots
@@ -259,16 +268,22 @@ tbl_survfit(fit, probs = c(0.25, 0.5, 0.75))
 #| warning: false
 # Plot
 names(fit$strata) <- gsub("race=", "", names(fit$strata))
-fit %>%
+p <- fit %>%
   ggsurvfit(type = "risk") +
+  xlim(c(0, 365 * 2)) +
   add_confidence_interval() +
-  add_risktable(
-    risktable_stats =
-      c("{round(n.risk)}", "{round(cum.event)}")
-  ) +
-  add_risktable_strata_symbol() +
   add_quantile() +
-  ylab("Proportion on ETI") + xlab("Days From Eligibility")
+  ylab("Proportion on ETI") + xlab("Days From Eligibility") +
+  theme_bw(base_size = 16) +
+  theme(legend.title = element_blank(), legend.text = element_text(size = 14))
+p
+```
+
+```{r}
+#| warning: false
+ggsave("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Figures/survival.png",
+  plot = p, device = "png", width = 12, height = 8, units = "in"
+)
 ```
 
 Without Asian subgroup for clearer plot:
@@ -278,17 +293,22 @@ Without Asian subgroup for clearer plot:
 fit <- survfit(surv_f, id = eDWID, data = surv_dat[surv_dat$race != "Asian", ])
 # Plot
 names(fit$strata) <- gsub("race=", "", names(fit$strata))
-fit %>%
+p <- fit %>%
   ggsurvfit(type = "risk") +
+  xlim(c(0, 365 * 2)) +
   add_confidence_interval() +
-  add_risktable(
-    risktable_stats =
-      c("{round(n.risk)}", "{round(cum.event)}"),
-    stats_label = c("Eligible", "Num. Started")
-  ) +
-  add_risktable_strata_symbol() +
   add_quantile() +
-  ylab("Proportion on ETI") + xlab("Days From Eligibility")
+  ylab("Proportion on ETI") + xlab("Days From Eligibility") +
+  theme_bw(base_size = 16) +
+  theme(legend.title = element_blank(), legend.text = element_text(size = 14))
+p
+```
+
+```{r}
+#| warning: false
+ggsave("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Figures/survival_no_asian.png",
+  plot = p, device = "png", width = 12, height = 8, units = "in"
+)
 ```
 
 ### Cox PH models
@@ -296,11 +316,9 @@ fit %>%
 #### Base model (unadjusted)
 
 ```{r}
-cox_res <- coxph(surv_f, data = surv_dat, cluster = eDWID)
+cox_res <- coxph(surv_f, data = surv_dat, id = eDWID)
 cox_res %>%
-  tbl_regression() %>%
-  add_n(location = "level") %>%
-  add_nevent(location = "level")
+  tbl_regression(exponentiate = T)
 ggcoef_model(cox_res,
   show_p_values = F, add_reference_rows = F,
   signif_stars = F, colour = F, exponentiate = T
@@ -354,9 +372,7 @@ surv_dat$Insurance <- factor(surv_dat$Insurance,
 new_surv_f <- update(surv_f, . ~ . + Insurance)
 cox_res <- coxph(new_surv_f, data = surv_dat, cluster = eDWID)
 cox_res %>%
-  tbl_regression() %>%
-  add_n(location = "level") %>%
-  add_nevent(location = "level")
+  tbl_regression(exponentiate = T)
 ggcoef_model(cox_res,
   show_p_values = F, add_reference_rows = F,
   signif_stars = F, colour = F, exponentiate = T
@@ -367,17 +383,30 @@ ggcoef_model(cox_res,
 
 ```{r}
 surv_dat$`Age Group` <- cut(surv_dat$encounterage,
-  breaks = c(-Inf, 6, 12, 18, 30, Inf), right = F
+  breaks = c(6, 12, 18, 30, Inf), right = F
 )
 new_surv_f <- update(surv_f, . ~ . + Insurance + `Age Group` +
   gli_fev1_ppred_rn)
 cox_res <- coxph(new_surv_f, data = surv_dat, cluster = eDWID)
 cox_res %>%
-  tbl_regression() %>%
-  add_n(location = "level") %>%
-  add_nevent(location = "level")
+  tbl_regression(exponentiate = T)
 ggcoef_model(cox_res,
   show_p_values = F, add_reference_rows = F,
   signif_stars = F, colour = F, exponentiate = T
 )
+```
+
+# Number of clinic visits
+
+For each participant, we divided the total number of visits by the number of unique years that they were included in the registry data. Visits per year are presented by race.
+
+```{r}
+encounter %>%
+  group_by(eDWID, race) %>%
+  summarise(
+    `Visits per Year` = n() / length(unique(reviewyear)),
+    .groups = "drop"
+  ) %>%
+  select(-eDWID) %>%
+  tbl_summary(by = race)
 ```

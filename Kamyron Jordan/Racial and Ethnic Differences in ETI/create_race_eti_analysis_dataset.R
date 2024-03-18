@@ -295,9 +295,8 @@ demo$race <- factor(demo$race,
     "Native Hawaiian or Other Pacific Islander", "Mixed/Other/Unknown Race"
   ),
   labels = c(
-    "White", "Black or African American", "Hispanic or Latino", "Asian",
-    "Indigenous/Mixed/Other/Unknown Race",
-    "Indigenous/Mixed/Other/Unknown Race", "Indigenous/Mixed/Other/Unknown Race"
+    "Non-Hispanic White", "Black or African American", "Hispanic or Latino", "Asian",
+    "Other", "Other", "Other"
   )
 )
 # Merge
@@ -485,7 +484,7 @@ labels <-
     "GLI_FVC_pct_predicted" = "ppFVC", "FEV1" = "FEV1",
     "GLI_FEV1_pct_predicted" = "ppFEV1", "FEV1FVC" = "FEV1/FVC",
     "GLI_FEV1FVC_pct_predicted" = "ppFEV1/FVC",
-    "gli_fev1_ppred_rn" = "ppFEV1rn", "gli_fvc_ppred_rn" = "ppFVCrn",
+    "gli_fev1_ppred_rn" = "ppFEV1 (Race Neutral)", "gli_fvc_ppred_rn" = "ppFVCrn",
     "gli_fev1fvc_ppred_rn" = "ppFEV1/FVCrn",
     "hepatobiliary1_3" = "Liver disease, cirrhosis",
     "acutehepatitis" = "Acute hepatitis",
@@ -523,7 +522,7 @@ labels <-
     "pregnant" = "Was patient pregnant during the reporting year?",
     "Patient_Dx" = "Patient Diagnosis", "DOB_Year" = "Year of Birth",
     "Gender" = "Gender",
-    "Race1" = "White", "Race2" = "Black or African American",
+    "Race1" = "Non-Hispanic White", "Race2" = "Black or African American",
     "Race3" = "American Indian or Alaska Native", "Race4" = "Asian",
     "Race5" = "Native Hawaiian or Other Pacific Islander",
     "Race6" = "Some other race", "race" = "Race/Ethnicity",
