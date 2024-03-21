@@ -15,7 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-
+bibliography: /Users/timvigers/Documents/Notes/zotero.bib
+csl: /Users/timvigers/GitHub/styles/american-medical-association-10th-edition.csl
 editor: source
 ---
 
@@ -26,6 +27,8 @@ library(tidyverse)
 library(gt)
 library(gtsummary)
 library(caret)
+library(vcd)
+library(eulerr)
 ```
 
 ```{r data cleaning}
@@ -188,12 +191,19 @@ db_medications %>%
 
 # Agreement
 
-```{r}
-df %>%
-  select(all_of(bugs)) %>%
-  tbl_summary(label = bug_list, missing_text = "Missing") %>%
-  add_ci(statistic=list(all_categorical() ~ "{conf.low} - {conf.high}%"))
-```
+For these agreement analyses, we reported accuracy metrics that include all samples. Accuracy is the proportion of samples where the two tests agreed (positive/positive and negative/negative). Cohen's kappa accounts for agreement between the two tests by chance, and is interpreted analagously to correlation where -1 indicates perfect disagreement and 1 indicates perfect agreement. Cohen's kapps of NaN or NA indicates a lack of variability between the two tests.
+
+| Cohen's Kappa | Interpretation         |
+|---------------|------------------------|
+| 0             | No agreement           |
+| 0.10 - 0.20   | Slight agreement       |
+| 0.21 - 0.40   | Fair agreement         |
+| 0.41 - 0.60   | Moderate agreement     |
+| 0.61 - 0.80   | Substantial agreement  |
+| 0.81 - 0.99   | Near perfect agreement |
+| 1             | Perfect agreement      |
+
+Bangdiwala's agreement plot @bangdiwalaAgreementChart2013 is a way of visualizing 2 x 2 contingency tables, and additional details are in the paper referenced at the end of this document.
 
 ```{r}
 agreement <- function(bug, data = df) {
@@ -203,21 +213,43 @@ agreement <- function(bug, data = df) {
   d <- d[complete.cases(d), ]
   # Agreement metrics
   c <- confusionMatrix((d[, sos]),
-    reference = d[, cos], positive = "Positive", mode = "everything"
+    reference = d[, cos], positive = "Positive", mode = "everything",
+    dnn = c("SOS", "COS")
   )
   # Return
-  return(list(two_by_two = c$table, accuracy = c$overall, metrics = c$byClass))
+  return(list(two_by_two = c$table, accuracy = c$overall))
 }
 ```
 
 ```{r}
 l <- lapply(bugs, function(b) {
   a <- agreement(b)
+  # Remove those where both tests were positive
+  n <- a$two_by_two
+  n[2, 2] <- 0
+  # Proportion tests for non-agreement in participants with one negative test
+  cos_p <- prop.test(n[1, 2], sum(n))
+  sos_p <- prop.test(n[2, 1], sum(n))
+  nn <- prop.test(n[1, 1], sum(n))
   return(list(
     Accuracy = a$accuracy["Accuracy"],
-    `Accuracy Lower Limit` = a$accuracy["AccuracyLower"],
-    `Accuracy Upper Limit` = a$accuracy["AccuracyUpper"],
-    Kappa = a$accuracy["Kappa"], `Mcnemar P Value` = a$accuracy["McnemarPValue"]
+    `Accuracy LL` = a$accuracy["AccuracyLower"],
+    `Accuracy UL` = a$accuracy["AccuracyUpper"],
+    Kappa = a$accuracy["Kappa"],
+    `Mcnemar P Value` = a$accuracy["McnemarPValue"],
+    `N With Negative Test on Either` = sum(n),
+    `N Negative on Both` = n[1, 1],
+    `Prop. Both Negative` = nn$estimate,
+    `Prop. Both Negative LL ` = nn$conf.int[1],
+    `Prop. Both Negative UL ` = nn$conf.int[2],
+    `N Postive on COS and Negative on SOS` = n[1, 2],
+    `Prop. Postive on COS` = cos_p$estimate,
+    `Prop. Postive on COS LL ` = cos_p$conf.int[1],
+    `Prop. Postive on COS UL ` = cos_p$conf.int[2],
+    `N Postive on SOS and Negative on COS` = n[2, 1],
+    `Prop. Postive on SOS` = sos_p$estimate,
+    `Prop. Postive on SOS LL ` = sos_p$conf.int[1],
+    `Prop. Postive on SOS UL ` = sos_p$conf.int[2]
   ))
 })
 l <- data.frame(do.call(rbind, l), check.names = F)
@@ -235,31 +267,45 @@ invisible(lapply(names(bug_list), function(b) {
   sos <- paste0(b, "_sos")
   d <- df[, c(cos, sos)]
   d <- d[complete.cases(d), ]
+  colnames(d) <- c("COS", "SOS")
   cat("\n")
-  c <- confusionMatrix(d[, sos],
-    reference = d[, cos], positive = "Positive", mode = "everything"
+  c <- confusionMatrix(d[, "SOS"],
+    reference = d[, "COS"], positive = "Positive", mode = "everything"
   )
   metrics <- data.frame(c$overall)
-  metrics2 <- data.frame(c$byClass)
   cat("### 2x2 table")
   cat("\n")
   two_by_two <- data.frame(c$table)
-  colnames(two_by_two) <- c("SOS", "COS", "n")
   print(gt(two_by_two))
   cat("\n")
-  cat("### Metrics")
+  cat("### Accuracy")
   cat("\n")
   print(gt(metrics, rownames_to_stub = T) %>%
     fmt_number(n_sigfig = 3) %>%
     tab_options(column_labels.hidden = TRUE))
   cat("\n")
-  print(gt(metrics2, rownames_to_stub = T) %>%
-    fmt_number(n_sigfig = 3) %>%
-    tab_options(column_labels.hidden = TRUE))
+  cat("### Agreement plot")
+  cat("\n")
+  print(agreementplot(table(d)))
+  cat("\n")
+  cat("### Positive/Positive Excluded")
+  cat("\n")
+  t <- d[rowSums(d == "Positive") < 2, ]
+  t$`Samples With a Negative Test` <- paste(
+    "COS", t[, "COS"], "/", "SOS", t[, "SOS"]
+  )
+  t %>%
+    select(`Samples With a Negative Test`) %>%
+    tbl_summary() %>%
+    add_ci() %>%
+    as_gt() %>%
+    print()
+  cat("\n")
+  cat("### Euler diagram of negative results")
+  cat("\n")
+  print(plot(euler(d == "Negative"), quantities = T))
   cat("\n")
 }))
 ```
 
-# Questions
-
-1. Are we okay with calculating prevalence from the data for the PPV and NPV? Do these numbers seem pretty representative of what you'd expect in the population?
+# References
