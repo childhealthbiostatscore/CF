@@ -1,0 +1,496 @@
+---
+title: "Using Sweat Na/Cl Ratio to Predict CFTR-RD or CRMS"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format: revealjs
+editor: source
+bibliography: Presentation.bib
+csl: /Users/timvigers/GitHub/styles/american-medical-association.csl
+---
+
+```{r setup}
+#| include: false
+library(DiagrammeR)
+library(readxl)
+library(arsenal)
+library(tidyverse)
+library(factoextra)
+library(pROC)
+library(knitr)
+library(kableExtra)
+library(caret)
+library(rpart)
+library(rpart.plot)
+source("/Users/timvigers/GitHub/CF/genotype_class_severity.R")
+switch(Sys.info()[["sysname"]],
+  Windows = {
+    home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Test"
+  },
+  Darwin = {
+    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Test"
+  }
+)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r data cleaning}
+# Import exclusion data from Excel
+diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with CF or Non-CF.xlsx")
+exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) | diagnoses$Code == "Exclude"]
+exclude <- exclude[!is.na(exclude)]
+# Import data
+df <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv", na.strings = "")
+n1 <- nrow(df)
+n2 <- length(unique(df$PatientID))
+# Remove exclusions from Angela
+df <- df[!(df$PatientID %in% exclude), ]
+# Diagnosis per Angela
+df$Diagnosis <- factor(diagnoses$Diagnosis[match(df$PatientID, diagnoses$PatientID)],
+  levels = c("CFTR-related disorder", "CRMS", "Cystic Fibrosis", "Non-CF"),
+  labels = c("CFTR-RD or CRMS", "CFTR-RD or CRMS", "Cystic Fibrosis", "Non-CF")
+)
+# Add modulator info
+cftr <- read.csv("./Data_Raw/Copy of Report CFTR Modulators.csv")
+df$Modulator <- apply(df, 1, function(r) {
+  mod <- cftr[cftr$Patient.ID == as.numeric(r["PatientID"]), ]
+  if (any(duplicated(mod$Age.at.Start..years.))) {
+    mod <- mod[-which(duplicated(mod$Age.at.Start..years.)), ]
+  }
+  mod <- mod[order(mod$Age.at.Start..years.), ]
+  age <- as.numeric(r["Age.at.Test.in.Years"])
+  as.character(cut(age, c(-Inf, mod$Age.at.Start..years., Inf),
+    labels = c("None", mod$Modulator), right = F
+  ))
+})
+# Numeric variables
+num_vars <- c("Amount", "Na", "K", "Cl")
+num_vars <- c(paste0(num_vars, "_Left"), paste0(num_vars, "_Right"))
+df[, num_vars] <- suppressWarnings(lapply(df[, num_vars], as.numeric))
+# Filter per Maxie's code
+exclude2 <- c(22, 23, 24, 29, 31, 474, 483, 484, 485, 505, 510, 785, 791, 792, 793)
+no_dem <- unique(df$PatientID[df$Demographics.Available != "TRUE" | is.na(df$Demographics.Available) | df$Sex == ""])
+df <- df %>%
+  mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks * 7) %>%
+  filter(
+    Age.at.Test.in.Years < 50 & Age.at.Test.in.Days >= 2,
+    !(Diagnosis == "Non-CF" & PatientID %in% exclude2),
+    Modulator == "None"
+  ) %>%
+  distinct(.) %>%
+  filter(Sex != "", Demographics.Available == "TRUE")
+# Genotype info
+## By severity
+df$geno1 <- cf_genotype_class_severity(df$Genotypes1)
+df$geno2 <- cf_genotype_class_severity(df$Genotypes2)
+df$geno1[df$Diagnosis == "Non-CF"] <- "Not CF"
+df$geno2[df$Diagnosis == "Non-CF"] <- "Not CF"
+df$geno_risk <- paste(df$geno1, df$geno2, sep = "_")
+df$geno_risk <- factor(df$geno_risk,
+  levels = c(
+    "Severe_Severe", "Mild_Severe", "Mild_Unknown", "Severe_Mild", "Mild_Mild",
+    "Not CF_Not CF", "Severe_Unknown", "Unknown_Severe", "Unknown_Unknown"
+  ),
+  labels = c(
+    "High", "Low", "Low", "Low", "Low", "Not CF", "Unknown",
+    "Unknown", "Unknown"
+  )
+)
+## By function
+df$geno1_class <- cf_genotype_class_severity(df$Genotypes1, out = "class")
+df$geno1_class[grep("508", df$Genotypes1)] <- "F508del"
+df$geno1_class <- replace(df$geno1_class, df$geno1_class %in% c("I", "II", "III"), "MF")
+df$geno1_class <- replace(df$geno1_class, df$geno1_class %in% c("IV", "V"), "RF")
+
+df$geno2_class <- cf_genotype_class_severity(df$Genotypes2, out = "class")
+df$geno2_class[grep("508", df$Genotypes2)] <- "F508del"
+df$geno2_class <- replace(df$geno2_class, df$geno2_class %in% c("I", "II", "III"), "MF")
+df$geno2_class <- replace(df$geno2_class, df$geno2_class %in% c("IV", "V"), "RF")
+
+df$geno_class <- factor(paste0(
+  pmin(df$geno1_class, df$geno2_class), "/",
+  pmax(df$geno1_class, df$geno2_class)
+))
+# Which arm?
+df$Arm <- apply(df[, c("Cl", "Cl_Left", "Cl_Right", "Na", "Na_Left", "Na_Right", "K", "K_Left", "K_Right")], 1, function(r) {
+  k <- sum(!is.na(r))
+  if (k == 6) {
+    return("Both")
+  } else if (k == 3) {
+    return("Arm Not Noted")
+  } else {
+    return(NA)
+  }
+})
+# Merge left and right values
+df$Amount <- apply(df[, c("Amount", "Amount_Left", "Amount_Right")], 1, function(r) {
+  amt <- suppressWarnings(as.numeric(as.character(r)))
+  mean(amt, na.rm = T)
+})
+df$Cl <- apply(df[, c("Cl", "Cl_Left", "Cl_Right")], 1, function(r) {
+  cl <- suppressWarnings(as.numeric(as.character(r)))
+  mean(cl, na.rm = T)
+})
+df$Na <- apply(df[, c("Na", "Na_Left", "Na_Right")], 1, function(r) {
+  na <- suppressWarnings(as.numeric(as.character(r)))
+  mean(na, na.rm = T)
+})
+df$K <- apply(df[, c("K", "K_Left", "K_Right")], 1, function(r) {
+  k <- suppressWarnings(as.numeric(as.character(r)))
+  mean(k, na.rm = T)
+})
+# Sodium to chloride ratio
+df$`Na/Cl Ratio` <- df$Na / df$Cl
+high_ratio <- unique(which(df$`Na/Cl Ratio` > 2))
+high_cl <- unique(which(df$Cl > 160))
+high_na <- unique(which(df$Na > 160))
+df <- df[-unique(c(high_ratio, high_cl, high_na)), ]
+# Sweat chloride group
+df$`Sweat Chloride Group` <- cut(df$Cl, c(-Inf, 30, 60, Inf),
+  right = F,
+  labels = c("< 30", "30-59", ">60")
+)
+# Sort
+df <- df %>% arrange(PatientID, Age.at.Test.in.Weeks)
+# Table options (most variables are not normally distributed)
+mycontrols <- tableby.control(
+  numeric.test = "kwt",
+  numeric.stats = c("Nmiss", "median", "q1q3")
+)
+labels <- list(
+  Age.at.Test.in.Years = "Age (Years)",
+  geno_risk = "Genotype Severity", geno_class = "Specific Genotype"
+)
+# First measure for everyone
+t1_df <- df %>%
+  group_by(PatientID) %>%
+  filter(row_number() == 1)
+# Order groups
+df$Diagnosis <- factor(df$Diagnosis, levels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "Non-CF"))
+```
+
+# Background
+
+# Our data
+
+## Flowchart
+
+![](flowchart.png)
+
+## Based on visual inspection
+
+```{r warning=FALSE}
+# Visual inspection
+ggplot(df, aes(x = Diagnosis, y = `Na/Cl Ratio`)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_hline(yintercept = 1.25, color = "red") +
+  theme_classic()
+```
+
+## Confusion matrix
+
+```{r}
+df$nacl_ratio_cat <- cut(df$`Na/Cl Ratio`,
+  breaks = c(-Inf, 1, 1.25, Inf), right = F
+)
+t <- table(df$nacl_ratio_cat, df$Diagnosis)
+t <- addmargins(t)
+# colorize the diagonal elements in table with non-ints
+for (i in 1:3) {
+  t[i, i] <- cell_spec(t[i, i],
+    bold = T, color = "white", background = "darkgreen"
+  )
+}
+kable(t)
+```
+
+## Confusion matrix (proportions)
+
+```{r}
+t <- round(prop.table(table(df$nacl_ratio_cat, df$Diagnosis), margin = 2) * 100, 1)
+# colorize the diagonal elements in table with non-ints
+for (i in 1:(ncol(t))) {
+  t[i, i] <- cell_spec(t[i, i],
+    bold = T, color = "white", background = "darkgreen"
+  )
+}
+kable(t, digits = 3)
+```
+
+::: {.smaller}
+
+*Proportions in the table above are out of the column total (i.e. by diagnosis), not the total number of participants.*
+
+:::
+
+# ROC analyses
+
+## Na/Cl Ratio for CF vs. CFTR-RD or CRMS
+
+```{r}
+roc_cf <- roc(
+  response = df$`Diagnosis`,
+  predictor = df$`Na/Cl Ratio`,
+  levels = c("CFTR-RD or CRMS", "Cystic Fibrosis"),
+  quiet = T
+)
+coords_cf <- round(coords(roc_cf, "best", best.method = "youden"), 3)
+plot(roc_cf, print.auc = TRUE, col = "blue",print.thres=T)
+```
+
+## Na/Cl Ratio for Non-CF vs. CFTR-RD or CRMS
+
+```{r}
+roc_non_cf <- roc(
+  response = df$`Diagnosis`,
+  predictor = df$`Na/Cl Ratio`,
+  levels = c("Non-CF", "CFTR-RD or CRMS"),
+  quiet = T
+)
+coords_non_cf <- round(coords(roc_non_cf, "best", best.method = "youden"), 3)
+plot(roc_non_cf, print.auc = TRUE, col = "red",print.thres=T)
+```
+
+## Histograms by group
+
+Vertical blue line indicates the threshold for CFTR-RD or CRMS vs. CF and red indicates the threshold for non-CF vs. CFTR-RD or CRMS. Na/Cl ratio was log-transformed for easier visualization.
+
+```{r warning=FALSE}
+ggplot(
+  df[!is.na(df$`Diagnosis`), ],
+  aes(log(`Na/Cl Ratio`), fill = `Diagnosis`)
+) +
+  geom_histogram(alpha = 0.3, position = "identity", bins = 50) +
+  geom_vline(xintercept = log(coords_cf$threshold), color = "blue") +
+  geom_vline(xintercept = log(coords_non_cf$threshold), color = "red") +
+  ylab("Count") +
+  xlab("ln(Na/Cl Ratio)") +
+  theme_bw()
+```
+
+# K-means clustering
+
+## Brief overview
+
+Detail here
+
+# K-means clustering by Na and Cl
+
+```{r warning=FALSE}
+set.seed(1017)
+# K means
+km_df <- df %>%
+  select(Diagnosis, Na, Cl) %>%
+  drop_na()
+km <- kmeans(km_df[, c("Na", "Cl")], centers = 3)
+km_df$Cluster <- factor(km$cluster,
+  levels = 1:3,
+  labels = c("High", "Medium", "Low")
+)
+centers <- data.frame(km$centers)
+centers$Cluster <- rownames(km$centers)
+centers$Cluster <- factor(centers$Cluster,
+  levels = 1:3,
+  labels = c("High", "Medium", "Low")
+)
+```
+
+## Na by Cl plot
+
+```{r}
+ggplot(km_df, aes(x = Na, y = Cl, color = Diagnosis)) +
+  geom_point(alpha = 0.5) +
+  theme_classic()
+```
+
+## Na by Cl plot with k-means centers
+
+```{r}
+ggplot(km_df, aes(x = Na, y = Cl, color = Cluster)) +
+  geom_point(shape = 20, alpha = 0.1) +
+  geom_point(data = centers, size = 5) +
+  theme_classic()
+```
+
+## K-means centers
+
+```{r}
+rownames(centers) <- NULL
+centers <- centers %>% column_to_rownames("Cluster")
+kable(centers, row.names = T, digits = 1)
+```
+
+## Confusion matrix
+
+```{r}
+t <- table(km_df$Cluster, km_df$Diagnosis)
+t <- addmargins(t)
+# colorize the diagonal elements in table with non-ints
+for (i in 1:3) {
+  t[i, i] <- cell_spec(t[i, i],
+    bold = T, color = "white", background = "darkgreen"
+  )
+}
+kable(t, row.names = T)
+```
+
+## Confusion matrix (proportions)
+
+```{r}
+t <- table(km_df$Cluster, km_df$Diagnosis)
+t <- round(prop.table(t, margin = 2) * 100, 1)
+# colorize the diagonal elements in table with non-ints
+for (i in 1:(ncol(t))) {
+  t[i, i] <- cell_spec(t[i, i],
+    bold = T, color = "white", background = "darkgreen"
+  )
+}
+kable(t, digits = 3)
+```
+
+# Classification trees
+
+```{r}
+cart_df <- df %>%
+  select(Diagnosis, Na, Cl) %>%
+  drop_na()
+```
+
+## Brief overview
+
+Detail here
+
+## All 3 categories
+
+```{r}
+set.seed(1017)
+cart_full <- rpart(Diagnosis ~ Na + Cl, data = cart_df, method = "class",
+                   control = rpart.control(cp=0))
+rpart.plot(cart_full)
+```
+
+## Confusion matrix
+
+```{r}
+t <- table(predict(cart_full,type = "class"),cart_df$Diagnosis)
+t <- addmargins(t)
+# colorize the diagonal elements in table with non-ints
+for (i in 1:3) {
+  t[i, i] <- cell_spec(t[i, i],
+    bold = T, color = "white", background = "darkgreen"
+  )
+}
+kable(t)
+```
+
+## Confusion matrix (proportions)
+
+```{r}
+t <- table(predict(cart_full,type = "class"),cart_df$Diagnosis)
+t <- round(prop.table(t, margin = 2) * 100, 1)
+# colorize the diagonal elements in table with non-ints
+for (i in 1:(ncol(t))) {
+  t[i, i] <- cell_spec(t[i, i],
+    bold = T, color = "white", background = "darkgreen"
+  )
+}
+kable(t, digits = 3)
+```
+
+## CF vs. CFTR-RD or CRMS
+
+```{r}
+set.seed(1017)
+cf_crms <- cart_df[cart_df$Diagnosis != "Non-CF", ]
+cf_crms$Diagnosis <- droplevels(cf_crms$Diagnosis)
+cart_cf_crms <- rpart(Diagnosis ~ Na + Cl, data = cf_crms, method = "class")
+rpart.plot(cart_cf_crms)
+```
+
+## Confusion matrix
+
+```{r}
+t <- table(predict(cart_cf_crms,type = "class"),cf_crms$Diagnosis)
+t <- addmargins(t)
+# colorize the diagonal elements in table with non-ints
+for (i in 1:2) {
+  t[i, i] <- cell_spec(t[i, i],
+    bold = T, color = "white", background = "darkgreen"
+  )
+}
+kable(t)
+```
+
+## Confusion matrix (proportions)
+
+```{r}
+t <- table(predict(cart_cf_crms,type = "class"),cf_crms$Diagnosis)
+t <- round(prop.table(t, margin = 2) * 100, 1)
+# colorize the diagonal elements in table with non-ints
+for (i in 1:(ncol(t))) {
+  t[i, i] <- cell_spec(t[i, i],
+    bold = T, color = "white", background = "darkgreen"
+  )
+}
+kable(t, digits = 3)
+```
+
+## Non-CF vs. CFTR-RD or CRMS
+
+```{r}
+set.seed(1017)
+non_cf_crms <- cart_df[cart_df$Diagnosis != "Cystic Fibrosis", ]
+non_cf_crms$Diagnosis <- droplevels(non_cf_crms$Diagnosis)
+cart_non_cf_crms <- rpart(Diagnosis ~ Na + Cl, data = non_cf_crms,
+                          method = "class")
+rpart.plot(cart_non_cf_crms)
+```
+
+## Confusion matrix
+
+```{r}
+t <- table(predict(cart_non_cf_crms,type = "class"),non_cf_crms$Diagnosis)
+t <- addmargins(t)
+# colorize the diagonal elements in table with non-ints
+for (i in 1:2) {
+  t[i, i] <- cell_spec(t[i, i],
+    bold = T, color = "white", background = "darkgreen"
+  )
+}
+kable(t)
+```
+
+## Confusion matrix (proportions)
+
+```{r}
+t<- table(predict(cart_non_cf_crms,type = "class"),non_cf_crms$Diagnosis)
+t <- round(prop.table(t, margin = 2) * 100, 1)
+# colorize the diagonal elements in table with non-ints
+for (i in 1:(ncol(t))) {
+  t[i, i] <- cell_spec(t[i, i],
+    bold = T, color = "white", background = "darkgreen"
+  )
+}
+kable(t, digits = 3)
+```
+
+## Future directions
+
+1. Additional work on the prediction approaches to see if we can improve the results in our current data. 
+
+  - Support vector machines may allow for more flexeible partitioning of the Na/Cl space.
+
+2. Validate final prediction models on new data.
+
+# Questions?
+
+## References
+
+---
+nocite: |
+  @jamesIntroductionStatisticalLearning2021, @robinPROCOpensourcePackage2011, @therneau1997introduction
+---
+
+::: {#refs}
+:::

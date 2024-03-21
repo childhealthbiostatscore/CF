@@ -16,8 +16,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
+bibliography: /Users/timvigers/Documents/Notes/zotero.bib
+csl: /Users/timvigers/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -30,6 +30,7 @@ library(tidyverse)
 library(factoextra)
 library(pROC)
 library(knitr)
+library(caret)
 source("/Users/timvigers/GitHub/CF/genotype_class_severity.R")
 switch(Sys.info()[["sysname"]],
   Windows = {
@@ -45,7 +46,8 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```{r data cleaning}
 # Import exclusion data from Excel
 diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with CF or Non-CF.xlsx")
-exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude)]
+exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) | diagnoses$Code == "Exclude"]
+exclude <- exclude[!is.na(exclude)]
 # Import data
 df <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv", na.strings = "")
 n1 <- nrow(df)
@@ -53,8 +55,10 @@ n2 <- length(unique(df$PatientID))
 # Remove exclusions from Angela
 df <- df[!(df$PatientID %in% exclude), ]
 # Diagnosis per Angela
-df$Diagnosis <- factor(diagnoses$Diagnosis[match(df$PatientID, diagnoses$PatientID)])
-levels(df$Diagnosis) <- c("CFTR-RD or CRMS", "CFTR-RD or CRMS", "Cystic Fibrosis", "Non-CF")
+df$Diagnosis <- factor(diagnoses$Diagnosis[match(df$PatientID, diagnoses$PatientID)],
+  levels = c("CFTR-related disorder", "CRMS", "Cystic Fibrosis", "Non-CF"),
+  labels = c("CFTR-RD or CRMS", "CFTR-RD or CRMS", "Cystic Fibrosis", "Non-CF")
+)
 # Add modulator info
 cftr <- read.csv("./Data_Raw/Copy of Report CFTR Modulators.csv")
 df$Modulator <- apply(df, 1, function(r) {
@@ -174,46 +178,48 @@ t1_df <- df %>%
 df$Diagnosis <- factor(df$Diagnosis, levels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "Non-CF"))
 ```
 
-<!-- # Flowchart -->
+# Flowchart
 
-<!-- ```{r} -->
-<!-- grViz("digraph { -->
+```{r}
+grViz("digraph {
 
-<!-- # initiate graph -->
-<!-- graph [layout = dot] -->
+# initiate graph
+graph [layout = dot]
 
-<!-- # global node settings -->
-<!-- node [shape = rectangle] -->
+# global node settings
+node [shape = rectangle]
 
-<!-- # label nodes -->
-<!-- data1 [label = '@@1'] -->
-<!-- data2 [label = '@@2'] -->
-<!-- ineligible [label = '@@3'] -->
-<!-- demo  [label = '@@4'] -->
-<!-- highna  [label = '@@5'] -->
-<!-- highcl  [label = '@@6'] -->
-<!-- highnacl  [label = '@@7'] -->
-<!-- review [label = '@@8'] -->
-<!-- analysis [label = '@@9'] -->
+# label nodes
+data1 [label = '@@1']
+data2 [label = '@@2']
+ineligible [label = '@@3']
+demo  [label = '@@4']
+highna  [label = '@@5']
+highcl  [label = '@@6']
+highnacl  [label = '@@7']
+review [label = '@@8']
+analysis [label = '@@9']
+ratio [label = '@@10']
 
-<!-- # edge definitions with the node IDs -->
-<!-- data1  -> data2 -->
-<!-- data2 -> ineligible -->
-<!-- ineligible -> {demo,highna,highcl,highnacl,review} -->
-<!-- data2  -> analysis -->
-<!-- highnacl -> analysis [style=invis] -->
-<!-- } -->
-<!-- [1]: paste0('Sweat tests performed \\n ','n = ',n1) -->
-<!-- [2]: paste0('Unique participants \\n ','n = ',n2) -->
-<!-- [3]: paste0('Ineligible \\n ','n = ',n2-nrow(t1_df)) -->
-<!-- [4]: paste0('No demographics \\n ','n = ',length(no_dem)) -->
-<!-- [5]: paste0('Na > 160 mmol/L \\n ','n = ',length(high_na)) -->
-<!-- [6]: paste0('Cl > 160 mmol/L \\n ','n = ',length(high_cl)) -->
-<!-- [7]: paste0('Na:Cl > 2 \\n ','n = ',length(high_ratio)) -->
-<!-- [8]: paste0('Other \\n ','n = ',1) -->
-<!-- [9]: paste0('Analysis cohort \\n ','n = ',nrow(t1_df)) -->
-<!-- ") -->
-<!-- ``` -->
+# edge definitions with the node IDs
+data1  -> data2
+data2 -> ineligible
+ineligible -> {demo,highna,highcl,highnacl,review}
+data2  -> analysis -> ratio
+highnacl -> analysis [style=invis]
+}
+[1]: paste0('Sweat tests performed \\n ','n = ',n1)
+[2]: paste0('Unique participants \\n ','n = ',n2)
+[3]: paste0('Ineligible \\n ','n = ',n2-nrow(t1_df))
+[4]: paste0('No demographics \\n ','n = ',length(no_dem))
+[5]: paste0('Na > 160 mmol/L \\n ','n = ',length(high_na))
+[6]: paste0('Cl > 160 mmol/L \\n ','n = ',length(high_cl))
+[7]: paste0('Na:Cl > 2 \\n ','n = ',length(high_ratio))
+[8]: paste0('Other \\n ','n = ',1)
+[9]: paste0('Analysis cohort \\n ','n = ',nrow(t1_df))
+[10]: paste0('Both Na and Cl Measured \\n ','n = ',sum(!is.na(df$`Na/Cl Ratio`)))
+")
+```
 
 # Cohorts by Na/Cl ratio
 
@@ -224,7 +230,8 @@ df$Diagnosis <- factor(df$Diagnosis, levels = c("Cystic Fibrosis", "CFTR-RD or C
 ggplot(df, aes(x = Diagnosis, y = `Na/Cl Ratio`)) +
   geom_boxplot() +
   geom_hline(yintercept = 1, color = "red") +
-  geom_hline(yintercept = 1.25, color = "red")
+  geom_hline(yintercept = 1.25, color = "red") +
+  theme_classic()
 df$nacl_ratio_cat <- cut(df$`Na/Cl Ratio`, breaks = c(-Inf, 1, 1.25, Inf), right = F)
 kable(table(df$nacl_ratio_cat, df$Diagnosis))
 ```
@@ -566,13 +573,13 @@ The blue curve shows the ROC for distinguishing between CFTR-RD or CRMS vs. CF, 
 ###### CFTR-RD or CRMS vs. CF
 
 ```{r}
-roc.test(roc_cf,roc_cf_cl)
+roc.test(roc_cf, roc_cf_cl)
 ```
 
 ###### Non-CF vs. CFTR-RD or CRMS
 
 ```{r}
-roc.test(roc_non_cf,roc_non_cf_cl)
+roc.test(roc_non_cf, roc_non_cf_cl)
 ```
 
 #### Histogram by group
