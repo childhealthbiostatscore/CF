@@ -1,5 +1,5 @@
 ---
-title: "Using Sweat Na/Cl Ratio to Predict CFTR-RD or CRMS"
+title: "Using Sweat Na/Cl Ratio to Predict CFTR-RD and CRMS"
 author: "Tim Vigers"
 date: "today"
 date-format: long
@@ -273,7 +273,25 @@ ggplot(
 
 ## Brief overview
 
-Detail here
+- An approach to splitting up a data set into K non-overlapping groups.
+
+- We want the within-cluster variation to be as low as possible.
+
+- There are several metrics for within-cluster variation, but we usually use the squared Euclidean distance between all pairs of points in a given cluster divided by the number of points in the cluster.
+
+## The K-means clustering algorithm
+
+1. Randomly assign each observation to clusters 1 through K. 
+
+2. Iterate until the cluster assignments stop changing:
+
+  a. For each cluster, compute the cluster centroid (a vector of feature means).
+  
+  b. Re-assign each point to the cluster corresponding with the closest centroid.
+
+## The K-means clustering algorithm
+
+![](kmeans.jpg)
 
 # K-means clustering by Na and Cl
 
@@ -359,7 +377,27 @@ cart_df <- df %>%
 
 ## Brief overview
 
-Detail here
+- Essentially, a regression tree is a way of predicting which category an observation will fall into based on a series of data splitting rules. 
+
+- We want to split the predictor space (the set of possible values for the variables we're interested in) into $R_1, R_2, ... R_J$ non-overlapping regions that minimize some measure of model predictive value (RSS, error rate, etc.).
+
+## Brief overview
+
+- Because in most cases it's impossible to look at every single partition of the predictor space, we use a top-down and greedy approach to splitting up the data.
+
+  - This is a fancy way of saying that we use the data split that gives us the best result at a given step, and don't look at future steps.
+  
+## Potential issues
+
+- This kind of recursive splitting can results in trees that predict extremely well with the training data but are not generalizable. 
+
+- To avoid this we essentially build one large, overfit tree, and then "prune" it down to its best subtree.
+
+  - Won't go into detail here, but the process is called *cost complexity pruning* and also utilizes cross validation to approximate the test error.
+
+## Baseball example
+
+![](hitters.jpg)
 
 ## All 3 categories
 
@@ -474,6 +512,12 @@ for (i in 1:(ncol(t))) {
 }
 kable(t, digits = 3)
 ```
+
+# Random forests
+
+## Brief overview
+
+
 
 ## Future directions
 
