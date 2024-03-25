@@ -1,5 +1,5 @@
 ---
-title: "Using Sweat Na/Cl Ratio to Predict CFTR-RD and CRMS"
+title: "Using Sweat Na and Cl to Predict CFTR-RD and CRMS"
 author: "Tim Vigers"
 date: "today"
 date-format: long
@@ -22,6 +22,7 @@ library(kableExtra)
 library(caret)
 library(rpart)
 library(rpart.plot)
+library(gtsummary)
 source("/Users/timvigers/GitHub/CF/genotype_class_severity.R")
 switch(Sys.info()[["sysname"]],
   Windows = {
@@ -37,10 +38,13 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```{r data cleaning}
 # Import exclusion data from Excel
 diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with CF or Non-CF.xlsx")
-exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) | diagnoses$Code == "Exclude"]
+exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) |
+  diagnoses$Code == "Exclude"]
 exclude <- exclude[!is.na(exclude)]
 # Import data
-df <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv", na.strings = "")
+df <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv",
+  na.strings = ""
+)
 n1 <- nrow(df)
 n2 <- length(unique(df$PatientID))
 # Remove exclusions from Angela
@@ -68,7 +72,9 @@ num_vars <- c("Amount", "Na", "K", "Cl")
 num_vars <- c(paste0(num_vars, "_Left"), paste0(num_vars, "_Right"))
 df[, num_vars] <- suppressWarnings(lapply(df[, num_vars], as.numeric))
 # Filter per Maxie's code
-exclude2 <- c(22, 23, 24, 29, 31, 474, 483, 484, 485, 505, 510, 785, 791, 792, 793)
+exclude2 <- c(
+  22, 23, 24, 29, 31, 474, 483, 484, 485, 505, 510, 785, 791, 792, 793
+)
 no_dem <- unique(df$PatientID[df$Demographics.Available != "TRUE" | is.na(df$Demographics.Available) | df$Sex == ""])
 df <- df %>%
   mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks * 7) %>%
@@ -99,20 +105,35 @@ df$geno_risk <- factor(df$geno_risk,
 ## By function
 df$geno1_class <- cf_genotype_class_severity(df$Genotypes1, out = "class")
 df$geno1_class[grep("508", df$Genotypes1)] <- "F508del"
-df$geno1_class <- replace(df$geno1_class, df$geno1_class %in% c("I", "II", "III"), "MF")
-df$geno1_class <- replace(df$geno1_class, df$geno1_class %in% c("IV", "V"), "RF")
+df$geno1_class <- replace(
+  df$geno1_class,
+  df$geno1_class %in% c("I", "II", "III"), "Minimal function"
+)
+df$geno1_class <- replace(
+  df$geno1_class,
+  df$geno1_class %in% c("IV", "V"), "Residual function"
+)
 
 df$geno2_class <- cf_genotype_class_severity(df$Genotypes2, out = "class")
 df$geno2_class[grep("508", df$Genotypes2)] <- "F508del"
-df$geno2_class <- replace(df$geno2_class, df$geno2_class %in% c("I", "II", "III"), "MF")
-df$geno2_class <- replace(df$geno2_class, df$geno2_class %in% c("IV", "V"), "RF")
+df$geno2_class <- replace(
+  df$geno2_class,
+  df$geno2_class %in% c("I", "II", "III"), "Minimal function"
+)
+df$geno2_class <- replace(
+  df$geno2_class,
+  df$geno2_class %in% c("IV", "V"), "Residual function"
+)
 
 df$geno_class <- factor(paste0(
   pmin(df$geno1_class, df$geno2_class), "/",
   pmax(df$geno1_class, df$geno2_class)
 ))
 # Which arm?
-df$Arm <- apply(df[, c("Cl", "Cl_Left", "Cl_Right", "Na", "Na_Left", "Na_Right", "K", "K_Left", "K_Right")], 1, function(r) {
+df$Arm <- apply(df[, c(
+  "Cl", "Cl_Left", "Cl_Right", "Na", "Na_Left", "Na_Right", "K", "K_Left",
+  "K_Right"
+)], 1, function(r) {
   k <- sum(!is.na(r))
   if (k == 6) {
     return("Both")
@@ -123,10 +144,13 @@ df$Arm <- apply(df[, c("Cl", "Cl_Left", "Cl_Right", "Na", "Na_Left", "Na_Right",
   }
 })
 # Merge left and right values
-df$Amount <- apply(df[, c("Amount", "Amount_Left", "Amount_Right")], 1, function(r) {
-  amt <- suppressWarnings(as.numeric(as.character(r)))
-  mean(amt, na.rm = T)
-})
+df$Amount <- apply(
+  df[, c("Amount", "Amount_Left", "Amount_Right")], 1,
+  function(r) {
+    amt <- suppressWarnings(as.numeric(as.character(r)))
+    mean(amt, na.rm = T)
+  }
+)
 df$Cl <- apply(df[, c("Cl", "Cl_Left", "Cl_Right")], 1, function(r) {
   cl <- suppressWarnings(as.numeric(as.character(r)))
   mean(cl, na.rm = T)
@@ -166,7 +190,9 @@ t1_df <- df %>%
   group_by(PatientID) %>%
   filter(row_number() == 1)
 # Order groups
-df$Diagnosis <- factor(df$Diagnosis, levels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "Non-CF"))
+df$Diagnosis <- factor(df$Diagnosis,
+  levels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "Non-CF")
+)
 ```
 
 # Background
@@ -219,6 +245,26 @@ df$Diagnosis <- factor(df$Diagnosis, levels = c("Cystic Fibrosis", "CFTR-RD or C
 ## Flowchart
 
 ![](flowchart.png)
+
+## Table 1 {.scrollable}
+
+```{r}
+df %>%
+  filter(!is.na(Na) & !is.na(Cl)) %>%
+  select(Diagnosis, Age.at.Test.in.Weeks, Sex, Na, Cl, K, Method, geno_class) %>%
+  tbl_summary(
+    by = Diagnosis, missing_text = "Missing",
+    label = list(
+      Age.at.Test.in.Weeks = "Age (Weeks)",
+      geno_class = "Genotype Class"
+    )
+  ) %>%
+  add_overall() %>%
+  add_p(test = list(geno_class ~ "fisher.test"), test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE)) %>%
+  separate_p_footnotes()
+```
+
+
 
 ## Based on visual inspection
 
@@ -279,7 +325,7 @@ roc_cf <- roc(
   quiet = T
 )
 coords_cf <- round(coords(roc_cf, "best", best.method = "youden"), 3)
-plot(roc_cf, print.auc = TRUE, col = "blue",print.thres=T)
+plot(roc_cf, print.auc = TRUE, col = "blue", print.thres = T)
 ```
 
 ## Na/Cl Ratio for Non-CF vs. CFTR-RD or CRMS
@@ -292,7 +338,7 @@ roc_non_cf <- roc(
   quiet = T
 )
 coords_non_cf <- round(coords(roc_non_cf, "best", best.method = "youden"), 3)
-plot(roc_non_cf, print.auc = TRUE, col = "red",print.thres=T)
+plot(roc_non_cf, print.auc = TRUE, col = "red", print.thres = T)
 ```
 
 ## Histograms by group
@@ -335,6 +381,15 @@ ggplot(
 ## The K-means clustering algorithm
 
 ![](kmeans.jpg)
+
+## K-means pros and cons
+
+| Pros                                         | Cons                                                        |
+|----------------------------------------------|-------------------------------------------------------------|
+| Easy to implement and understand.            | Must choose k manually.                                     |
+| Scales well to large data sets.              | Has trouble when clusters are of varying sizes and density.                                                            |
+| Easily adapts to new examples.               | Centroids can be dragged by outliers. |
+| Generalizes to clusters of different shapes. | Does not scale well with more dimensions.                        |
 
 # K-means clustering by Na and Cl
 
@@ -442,19 +497,30 @@ cart_df <- df %>%
 
 ![](hitters.jpg)
 
+## Classification tree pros and cons
+
+| Pros                                      | Cons                                                                |
+|-------------------------------------------|---------------------------------------------------------------------|
+| Easy to interpret.                        | Prone to overfitting.                                               |
+| Robust to outliers (except when overfit). | Unstable unless well- regularized.                                  |
+| Non-linear.                               | Greedy algorithm means the tree is not and optimal global solution. |
+| Non-parametric.                           | Can become unwieldy if not pruned correctly.                        |
+
 ## All 3 categories
 
 ```{r}
 set.seed(1017)
-cart_full <- rpart(Diagnosis ~ Na + Cl, data = cart_df, method = "class",
-                   control = rpart.control(cp=0))
-rpart.plot(cart_full)
+cart_full <- rpart(Diagnosis ~ Na + Cl,
+  data = cart_df, method = "class",
+  control = rpart.control(cp = 0)
+)
+rpart.plot(cart_full, type = 3, extra = 8)
 ```
 
 ## Confusion matrix
 
 ```{r}
-t <- table(predict(cart_full,type = "class"),cart_df$Diagnosis)
+t <- table(predict(cart_full, type = "class"), cart_df$Diagnosis)
 t <- addmargins(t)
 # colorize the diagonal elements in table with non-ints
 for (i in 1:3) {
@@ -468,7 +534,7 @@ kable(t)
 ## Confusion matrix (proportions)
 
 ```{r}
-t <- table(predict(cart_full,type = "class"),cart_df$Diagnosis)
+t <- table(predict(cart_full, type = "class"), cart_df$Diagnosis)
 t <- round(prop.table(t, margin = 2) * 100, 1)
 # colorize the diagonal elements in table with non-ints
 for (i in 1:(ncol(t))) {
@@ -486,13 +552,13 @@ set.seed(1017)
 cf_crms <- cart_df[cart_df$Diagnosis != "Non-CF", ]
 cf_crms$Diagnosis <- droplevels(cf_crms$Diagnosis)
 cart_cf_crms <- rpart(Diagnosis ~ Na + Cl, data = cf_crms, method = "class")
-rpart.plot(cart_cf_crms)
+rpart.plot(cart_cf_crms, type = 3, extra = 8)
 ```
 
 ## Confusion matrix
 
 ```{r}
-t <- table(predict(cart_cf_crms,type = "class"),cf_crms$Diagnosis)
+t <- table(predict(cart_cf_crms, type = "class"), cf_crms$Diagnosis)
 t <- addmargins(t)
 # colorize the diagonal elements in table with non-ints
 for (i in 1:2) {
@@ -506,7 +572,7 @@ kable(t)
 ## Confusion matrix (proportions)
 
 ```{r}
-t <- table(predict(cart_cf_crms,type = "class"),cf_crms$Diagnosis)
+t <- table(predict(cart_cf_crms, type = "class"), cf_crms$Diagnosis)
 t <- round(prop.table(t, margin = 2) * 100, 1)
 # colorize the diagonal elements in table with non-ints
 for (i in 1:(ncol(t))) {
@@ -523,15 +589,17 @@ kable(t, digits = 3)
 set.seed(1017)
 non_cf_crms <- cart_df[cart_df$Diagnosis != "Cystic Fibrosis", ]
 non_cf_crms$Diagnosis <- droplevels(non_cf_crms$Diagnosis)
-cart_non_cf_crms <- rpart(Diagnosis ~ Na + Cl, data = non_cf_crms,
-                          method = "class")
-rpart.plot(cart_non_cf_crms)
+cart_non_cf_crms <- rpart(Diagnosis ~ Na + Cl,
+  data = non_cf_crms,
+  method = "class"
+)
+rpart.plot(cart_non_cf_crms, type = 1, extra = 8)
 ```
 
 ## Confusion matrix
 
 ```{r}
-t <- table(predict(cart_non_cf_crms,type = "class"),non_cf_crms$Diagnosis)
+t <- table(predict(cart_non_cf_crms, type = "class"), non_cf_crms$Diagnosis)
 t <- addmargins(t)
 # colorize the diagonal elements in table with non-ints
 for (i in 1:2) {
@@ -545,7 +613,7 @@ kable(t)
 ## Confusion matrix (proportions)
 
 ```{r}
-t<- table(predict(cart_non_cf_crms,type = "class"),non_cf_crms$Diagnosis)
+t <- table(predict(cart_non_cf_crms, type = "class"), non_cf_crms$Diagnosis)
 t <- round(prop.table(t, margin = 2) * 100, 1)
 # colorize the diagonal elements in table with non-ints
 for (i in 1:(ncol(t))) {
@@ -556,21 +624,101 @@ for (i in 1:(ncol(t))) {
 kable(t, digits = 3)
 ```
 
-# Random forests
+# Support vector machines
 
 ## Brief overview
 
+- Aims to find a hyperplane that best separates our groups.
+  - In a p-dimensional space, a hyperplane is a flat affine subspace of dimension p − 1.
+    - When considering 2 dimensions, this is just a line.
+    
+## Hyperplane classifiers
 
+![](hyperplane.png)
+
+## The maximal margin classifier
+
+![](mmc.png)
+
+The points with arrows to our dividing line are the *support vectors*.
+
+## But what if the boundary isn't just a simple line?
+
+![](nlb.png)
+
+## But what if the boundary isn't just a simple line?
+
+- The *support vector machine* (SVM) is an extension of the support vector classifier where the feature space is enlarged using kernels.
+  - This is a little complicated, but is analogous to adding polynomial terms to a regression model.
+    - In fact, SVMs are closely related to logistic regression.
+
+
+## SVM pros and cons
+
+- One of the best “out of the box” classifiers.
+- Works best when there's fairly clear separation between classes.
+
+## A simple SVM with radial kernel
+
+![](plot_zoom.png)
+
+## Confusion matrix
+
+```{r}
+library(e1071)
+set.seed(1017)
+svmfit <- svm(Diagnosis ~ Na + Cl, data = cart_df)
+```
+
+```{r}
+t <- table(predict(svmfit, type = "class"), cart_df$Diagnosis)
+t <- addmargins(t)
+# colorize the diagonal elements in table with non-ints
+for (i in 1:2) {
+  t[i, i] <- cell_spec(t[i, i],
+    bold = T, color = "white", background = "darkgreen"
+  )
+}
+kable(t)
+```
+
+## Confusion matrix (proportions)
+
+```{r}
+t <- table(predict(svmfit, type = "class"), cart_df$Diagnosis)
+t <- round(prop.table(t, margin = 2) * 100, 1)
+# colorize the diagonal elements in table with non-ints
+for (i in 1:(ncol(t))) {
+  t[i, i] <- cell_spec(t[i, i],
+    bold = T, color = "white", background = "darkgreen"
+  )
+}
+kable(t, digits = 3)
+```
+
+## Comparison of methods
+
+| Method                                           | % Correct CF | % Correct Non-CF | % Correct CFTR-RD or CRMS |
+|--------------------------------------------------|--------------|------------------|---------------------------|
+| K-means                                          | 93.1         | 81               | 78.6                      |
+| Classification tree (all)                        | 98.9         | 99.9             | 21.4                      |
+| Classification tree (CF vs. CFTR-RD or CRMS)     | 99.2         |                  | 92.9                      |
+| Classification tree (Non-CF vs. CFTR-RD or CRMS) | 39.3         | 99.5             |                           |
+| SVM                                              | 98.2         | 99.9             | 0                         |
 
 ## Future directions
 
 1. Additional work on the prediction approaches to see if we can improve the results in our current data. 
 
-  - Support vector machines may allow for more flexeible partitioning of the Na/Cl space.
+  - Bagging, boosting, and random forests are all extensions of regression trees that minimize overfitting.
 
-2. Validate final prediction models on new data.
+2. Scrap SVMs for now.
 
-# Questions?
+3. Would it be worth considering additional variables for these models? Sex, age at test, etc.?
+
+4. Validate final prediction models on new data.
+
+# Questions, comments, suggestions?
 
 ## References
 
