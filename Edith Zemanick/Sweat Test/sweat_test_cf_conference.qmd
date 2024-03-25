@@ -6,7 +6,7 @@ date-format: long
 format: revealjs
 editor: source
 bibliography: Presentation.bib
-csl: /Users/timvigers/GitHub/styles/american-medical-association.csl
+csl: /Users/timvigers/GitHub/styles/american-medical-association-10th-edition.csl
 ---
 
 ```{r setup}
@@ -170,6 +170,49 @@ df$Diagnosis <- factor(df$Diagnosis, levels = c("Cystic Fibrosis", "CFTR-RD or C
 ```
 
 # Background
+
+## Sweat chloride testing
+
+- Sweat chloride testing is the gold standard for diagnosing Cystic Fibrosis (CF).
+
+| Chloride level (mmol/L) | Diagnosis                |
+|-------------------------|--------------------------|
+| >= 60                   | Cystic Fibrosis          |
+| 30 - 59                 | Intermediate diagnosis   |
+| < 30                    | Cystic Fibrosis unlikely |
+
+## Intermediate sweat test
+
+- Can be caused by:
+  - CF
+  - CF Carrier
+  - CFTR-Related Metabolic Syndrome (CRMS)
+    - Cystic Fibrosis Screen Positive, Inconclusive Diagnosis (CFSPID)
+  - CFTR-related disorder (CFTR-RD)
+  
+## CRMS/CFSPID
+
+- Inconclusive CF diagnosis following newborn screen
+- Elevated IRT, intermediate sweat, and less than 2 disease-causing CFTR variants
+- No clinical signs of Cystic Fibrosis
+- Should be followed by CF provider to monitor for symptoms of CF @bombieriRecommendationsClassificationDiseases2011
+  - Close follow-up, repeat sweat testing, and CFTR sequencing in the first months of life 
+  - Then annual follow-up until age 6-7
+
+## CFTR-RD
+
+- Cystic Fibrosis Transmembrane Regulator (CFTR)-related disorders
+  - "A clinical entity associated with CFTR dysfunction that does not fulfill diagnostic criteria for CF" @bombieriRecommendationsClassificationDiseases2011
+  - Has symptoms, but no positive newborn screen, sweat test, and less than 2 disease-causing CFTR variants
+- Should be followed closely by PCP with consultation of a CF provider to monitor for symptoms of CF 
+
+## Using sodium and chloride for diagnosis
+
+- Small studies have shown that 
+  - The ratio of sweat sodium to chloride (Na:Cl) is significantly different between pwCF and non-CF patients @hallSweatSodiumChloride1990
+  - Suggested cutoffs are anywhere from 1.0-1.2 @hallSweatSodiumChloride1990 @treggiariRoleSweatIon2021
+- This ratio may be more helpful in diagnosing patients with intermediate sweat chloride values @treggiariRoleSweatIon2021
+- *Can we use both sodium and chloride to better predict CFTR-RD/CRMS?*
 
 # Our data
 
@@ -533,7 +576,7 @@ kable(t, digits = 3)
 
 ---
 nocite: |
-  @jamesIntroductionStatisticalLearning2021, @robinPROCOpensourcePackage2011, @therneau1997introduction
+  @jamesIntroductionStatisticalLearning2021, @robinPROCOpensourcePackage2011, @therneau1997introduction, @metcalf_utility_2024
 ---
 
 ::: {#refs}
