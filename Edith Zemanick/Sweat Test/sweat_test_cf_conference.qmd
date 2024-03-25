@@ -4,6 +4,7 @@ author: "Tim Vigers"
 date: "today"
 date-format: long
 format: revealjs
+embed-resources: true
 editor: source
 bibliography: Presentation.bib
 csl: /Users/timvigers/GitHub/styles/american-medical-association-10th-edition.csl
@@ -640,8 +641,6 @@ kable(t, digits = 3)
 
 ![](mmc.png)
 
-The points with arrows to our dividing line are the *support vectors*.
-
 ## But what if the boundary isn't just a simple line?
 
 ![](nlb.png)
@@ -652,6 +651,9 @@ The points with arrows to our dividing line are the *support vectors*.
   - This is a little complicated, but is analogous to adding polynomial terms to a regression model.
     - In fact, SVMs are closely related to logistic regression.
 
+## But what if the boundary isn't just a simple line?
+
+![](svm.png)
 
 ## SVM pros and cons
 
