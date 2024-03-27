@@ -1,0 +1,134 @@
+---
+title: "Title"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+    theme:
+      light: flatly
+      dark: darkly
+editor: source
+---
+
+```{r setup}
+#| include: false
+library(tidyverse)
+library(gtsummary)
+switch(Sys.info()[["sysname"]],
+  Windows = {
+    home_dir <- "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF"
+  },
+  Darwin = {
+    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
+  }
+)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r data cleaning}
+# Import
+df <- read.csv("/Users/timvigers/Desktop/EnVision/EnvisionCF_DATA_2024-03-14_1325.csv",
+  na.strings = ""
+)
+# Fix missing access group
+df$redcap_data_access_group[is.na(df$redcap_data_access_group)] <- "iowa"
+# Trim columns
+glucose <- paste0("timepoint_", c(0, 10, 30, 60, 90, 120, 150, 180), "_min")
+df <- df %>%
+  select(
+    study_id:redcap_data_access_group, age_at_current_date:origin_race,
+    cftr_mutation_1, cftr_mutation_2, bmi_study_visit, bmi_stand_score,
+    a1c_result, fev1, all_of(glucose)
+  )
+# Get diagnosis
+df$Diagnosis <- NA
+df$Diagnosis[df[, glucose[1]] < 100 &
+  (rowSums(df[, glucose[2:5]] < 200, na.rm = T) == rowSums(!is.na(df[, glucose[2:5]]))) &
+  (rowSums(df[, glucose[6:8]] < 140, na.rm = T) == rowSums(!is.na(df[, glucose[6:8]])))] <- "NGT"
+df$Diagnosis[df[, glucose[1]] >= 100] <- "IFG"
+df$Diagnosis[rowSums(df[, glucose[2:5]] >= 200, na.rm = T) > 0] <- "INDET"
+df$Diagnosis[rowSums(df[, glucose[6:8]] >= 140, na.rm = T) > 0] <- "IGF"
+df$Diagnosis[df$timepoint_0_min >= 126 | df$timepoint_120_min >= 200] <- "CFRD"
+df$Diagnosis <- factor(df$Diagnosis, levels = c("NGT", "IFG", "INDET", "IGF", "CFRD"))
+# Exclude those missing <= 3 missing OGTT values
+df$Keep <- rowSums(is.na(df[, glucose])) <= 3
+df <- df %>% filter(Keep)
+# Write for checking
+write.csv(df, file = "~/df.csv", row.names = F, na = "")
+```
+
+# Demographics at first visit
+
+`r length(unique(df$study_id))` participants were included because they were missing <= 3 OGTT timepoints.
+
+```{r}
+#| label: tbl-1
+#| tbl-cap: Participant characteristics (overall)
+df %>%
+  group_by(study_id) %>%
+  filter(row_number() == 1) %>%
+  ungroup() %>%
+  select(redcap_data_access_group:cftr_mutation_2) %>%
+  tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
+  add_overall()
+```
+
+# Diagnoses
+
+## All visits
+
+```{r}
+#| label: tbl-2
+#| tbl-cap: Participant diagnoses based on OGTT
+df %>%
+  select(redcap_data_access_group, Diagnosis) %>%
+  tbl_summary(by = redcap_data_access_group) %>%
+  add_overall()
+```
+
+## Visit 1 only
+
+```{r}
+#| label: tbl-3
+#| tbl-cap: Participant diagnoses based on OGTT (visit 1 only)
+df %>%
+  group_by(study_id) %>%
+  filter(row_number() == 1) %>%
+  ungroup() %>%
+  select(redcap_data_access_group, Diagnosis) %>%
+  tbl_summary(by = redcap_data_access_group) %>%
+  add_overall()
+```
+
+# Figure
+
+```{r}
+#| label: fig-1
+#| fig-cap: Diagnoses over time
+#| fig-width: 12
+#| fig-height: 8
+df %>%
+  group_by(study_id) %>%
+  mutate(`Visit Num.` = row_number()) %>%
+  group_by(`Visit Num.`) %>%
+  count(Diagnosis) %>%
+  mutate(total = sum(n), perc = n / total) %>%
+  ggplot(., aes(x = `Visit Num.`, y = perc, fill = Diagnosis)) +
+  geom_bar(position = "stack", stat = "identity") +
+  geom_text(aes(label = paste0(scales::percent(perc), " (n = ", n, ")")),
+    position = position_stack(vjust = 0.5)
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+    axis.title.y = element_blank()
+  )
+```
