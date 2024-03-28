@@ -1,5 +1,5 @@
 ---
-title: "Title"
+title: "Draft abstract for Envision primary outcome"
 author: "Tim Vigers"
 date: "today"
 date-format: long
@@ -22,6 +22,7 @@ editor: source
 #| include: false
 library(tidyverse)
 library(gtsummary)
+library(pracma)
 switch(Sys.info()[["sysname"]],
   Windows = {
     home_dir <- "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF"
@@ -35,7 +36,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 
 ```{r data cleaning}
 # Import
-df <- read.csv("/Users/timvigers/Desktop/EnVision/EnvisionCF_DATA_2024-03-14_1325.csv",
+df <- read.csv("./Christine Chan/EnVision CF/Data_Raw/EnvisionCF_DATA_2024-03-14_1325.csv",
   na.strings = ""
 )
 # Fix missing access group
@@ -45,8 +46,8 @@ glucose <- paste0("timepoint_", c(0, 10, 30, 60, 90, 120, 150, 180), "_min")
 df <- df %>%
   select(
     study_id:redcap_data_access_group, age_at_current_date:origin_race,
-    cftr_mutation_1, cftr_mutation_2, bmi_study_visit, bmi_stand_score,
-    a1c_result, fev1, all_of(glucose)
+    cftr_mutation_1, cftr_mutation_2, date_visit, bmi_study_visit,
+    bmi_stand_score, a1c_result, fev1, all_of(glucose)
   )
 # Get diagnosis
 df$Diagnosis <- NA
@@ -58,11 +59,51 @@ df$Diagnosis[rowSums(df[, glucose[2:5]] >= 200, na.rm = T) > 0] <- "INDET"
 df$Diagnosis[rowSums(df[, glucose[6:8]] >= 140, na.rm = T) > 0] <- "IGF"
 df$Diagnosis[df$timepoint_0_min >= 126 | df$timepoint_120_min >= 200] <- "CFRD"
 df$Diagnosis <- factor(df$Diagnosis, levels = c("NGT", "IFG", "INDET", "IGF", "CFRD"))
+# iAUCs
+df$iAUC30 <- apply(df, 1, function(r) {
+  y <- as.numeric(r[glucose[1:3]]) - as.numeric(r[glucose[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+df$iAUC120 <- apply(df, 1, function(r) {
+  y <- as.numeric(r[glucose[1:6]]) - as.numeric(r[glucose[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60, 90, 120)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+df$iAUC180 <- apply(df, 1, function(r) {
+  y <- as.numeric(r[glucose]) - as.numeric(r[glucose[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60, 90, 120, 150, 180)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+# Other formatting
+df$date_visit <- lubridate::ymd(df$date_visit)
+# Write for checking
+df$Keep <- NULL
+write.csv(df,
+  file = "./Christine Chan/EnVision CF/Data_Clean/nacfc_2024_analysis_data.csv",
+  row.names = F, na = ""
+)
 # Exclude those missing <= 3 missing OGTT values
 df$Keep <- rowSums(is.na(df[, glucose])) <= 3
 df <- df %>% filter(Keep)
-# Write for checking
-write.csv(df, file = "~/df.csv", row.names = F, na = "")
 ```
 
 # Demographics at first visit
@@ -81,7 +122,9 @@ df %>%
   add_overall()
 ```
 
-# Diagnoses
+# Glycemic metrics
+
+iAUC was calculated as the area under the glucose curve from baseline to the timepoint of interest, excluding the area under the fasting glucose level.
 
 ## All visits
 
@@ -89,8 +132,12 @@ df %>%
 #| label: tbl-2
 #| tbl-cap: Participant diagnoses based on OGTT
 df %>%
-  select(redcap_data_access_group, Diagnosis) %>%
-  tbl_summary(by = redcap_data_access_group) %>%
+  select(
+    redcap_data_access_group, Diagnosis, timepoint_0_min, timepoint_30_min,
+    timepoint_60_min, timepoint_120_min, timepoint_180_min, iAUC30, iAUC120,
+    iAUC180
+  ) %>%
+  tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
   add_overall()
 ```
 
@@ -103,8 +150,12 @@ df %>%
   group_by(study_id) %>%
   filter(row_number() == 1) %>%
   ungroup() %>%
-  select(redcap_data_access_group, Diagnosis) %>%
-  tbl_summary(by = redcap_data_access_group) %>%
+  select(
+    redcap_data_access_group, Diagnosis, timepoint_0_min, timepoint_30_min,
+    timepoint_60_min, timepoint_120_min, timepoint_180_min, iAUC30, iAUC120,
+    iAUC180
+  ) %>%
+  tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
   add_overall()
 ```
 
@@ -112,7 +163,7 @@ df %>%
 
 ```{r}
 #| label: fig-1
-#| fig-cap: Diagnoses over time
+#| fig-cap: Percentages by visit
 #| fig-width: 12
 #| fig-height: 8
 df %>%
