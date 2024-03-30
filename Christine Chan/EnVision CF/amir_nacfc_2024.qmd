@@ -21,6 +21,8 @@ editor: source
 ```{r setup}
 #| include: false
 library(tidyverse)
+library(gt)
+library(gtsummary)
 library(lmerTest)
 library(emmeans)
 switch(Sys.info()[["sysname"]],
@@ -41,31 +43,105 @@ df <- read.csv("./Christine Chan/EnVision CF/Data_Clean/nacfc_2024_analysis_data
 )
 glucose <- paste0("timepoint_", c(0, 10, 30, 60, 90, 120, 150, 180), "_min")
 # Remove those missing all OGTT values
-long_df <- df %>% select(study_id, redcap_event_name, all_of(glucose), Diagnosis)
-long_df <- long_df[rowSums(is.na(long_df)) < length(glucose), ]
+df <- df[rowSums(is.na(df[, glucose])) < length(glucose), ]
+# Hypoglycemia
+df$Hypo70 <- factor(rowSums(df[, glucose] < 70, na.rm = T) > 0,
+  levels = c(F, T), labels = c("No", "Yes")
+)
+df$Hypo60 <- factor(rowSums(df[, glucose] < 60, na.rm = T) > 0,
+  levels = c(F, T), labels = c("No", "Yes")
+)
+```
+
+# Hypoglycemia defined as < 70 mg/dL at any point
+
+## Participant demographics
+
+```{r}
+#| label: tbl-70
+#| tbl-cap: BG <70 at Any Point
+df %>%
+  select(
+    age_at_current_date:cftr_mutation_2, all_of(glucose), iAUC30:iAUC180, Hypo70
+  ) %>%
+  tbl_summary(by = Hypo70, missing_text = "Missing") %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
+```
+
+## LS mean glucose by hypoglycemia status
+
+```{r mixed models 70}
 # Long OGTTs
-long_df <- long_df %>%
+long_df <- df %>%
   pivot_longer(timepoint_0_min:timepoint_180_min,
     names_to = "Time", values_to = "Glucose",
     names_pattern = "timepoint_(.*)_min"
   )
 # Time as a factor
-long_df$Time = factor(long_df$Time,levels = c(0, 10, 30, 60, 90, 120, 150, 180))
+long_df$Time <- factor(long_df$Time, levels = c(0, 10, 30, 60, 90, 120, 150, 180))
+# Fit
+mod <- lmer(Glucose ~ Time * Hypo70 + (1 | study_id), data = long_df)
+means <- data.frame(emmeans(mod, ~ Hypo70 | Time, pbkrtest.limit = 1e4))
+gt(means)
 ```
 
-```{r mixed models}
-mod <- lmer(Glucose ~ Time * Diagnosis + (1 | study_id), data = long_df)
-means <- data.frame(emmeans(mod, ~ Time + Diagnosis, pbkrtest.limit = 1e4))
-```
-
-# Figure
+## Figure
 
 ```{r}
-#| label: fig-mixed-model
+#| label: fig-mixed-model70
 #| fig-cap: Model means by timepoint
-ggplot(means, aes(x = Time, y = emmean, color = Diagnosis, group = Diagnosis)) +
+ggplot(means, aes(x = Time, y = emmean, color = Hypo70, group = Hypo70)) +
   geom_point() +
-  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL),width=0.2) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  geom_line() +
+  theme_classic() +
+  ylab("Mean Glucose")
+```
+
+# Hypoglycemia defined as < 60 mg/dL at any point
+
+## Participant demographics
+
+```{r}
+#| label: tbl-60
+#| tbl-cap: BG <60 at Any Point
+df %>%
+  select(
+    age_at_current_date:cftr_mutation_2, all_of(glucose), iAUC30:iAUC180, Hypo60
+  ) %>%
+  tbl_summary(by = Hypo60, missing_text = "Missing") %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
+```
+
+## LS mean glucose by hypoglycemia status
+
+```{r mixed models 60}
+# Long OGTTs
+long_df <- df %>%
+  pivot_longer(timepoint_0_min:timepoint_180_min,
+    names_to = "Time", values_to = "Glucose",
+    names_pattern = "timepoint_(.*)_min"
+  )
+# Time as a factor
+long_df$Time <- factor(long_df$Time, levels = c(0, 10, 30, 60, 90, 120, 150, 180))
+# Fit
+mod <- lmer(Glucose ~ Time * Hypo60 + (1 | study_id), data = long_df)
+means <- data.frame(emmeans(mod, ~ Hypo60 | Time, pbkrtest.limit = 1e4))
+gt(means)
+```
+
+## Figure
+
+```{r}
+#| label: fig-mixed-model60
+#| fig-cap: Model means by timepoint
+ggplot(means, aes(x = Time, y = emmean, color = Hypo60, group = Hypo60)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
   geom_line() +
   theme_classic() +
   ylab("Mean Glucose")
