@@ -51,6 +51,9 @@ df$Hypo70 <- factor(rowSums(df[, glucose] < 70, na.rm = T) > 0,
 df$Hypo60 <- factor(rowSums(df[, glucose] < 60, na.rm = T) > 0,
   levels = c(F, T), labels = c("No", "Yes")
 )
+df$Hypo50 <- factor(rowSums(df[, glucose] <= 50, na.rm = T) > 0,
+  levels = c(F, T), labels = c("No", "Yes")
+)
 ```
 
 # Hypoglycemia defined as < 70 mg/dL at any point
@@ -59,7 +62,7 @@ df$Hypo60 <- factor(rowSums(df[, glucose] < 60, na.rm = T) > 0,
 
 ```{r}
 #| label: tbl-70
-#| tbl-cap: BG <70 at Any Point
+#| tbl-cap: BG < 70 at Any Point
 df %>%
   select(
     age_at_current_date:cftr_mutation_2, all_of(glucose), iAUC30:iAUC180, Hypo70
@@ -106,7 +109,7 @@ ggplot(means, aes(x = Time, y = emmean, color = Hypo70, group = Hypo70)) +
 
 ```{r}
 #| label: tbl-60
-#| tbl-cap: BG <60 at Any Point
+#| tbl-cap: BG < 60 at Any Point
 df %>%
   select(
     age_at_current_date:cftr_mutation_2, all_of(glucose), iAUC30:iAUC180, Hypo60
@@ -140,6 +143,53 @@ gt(means)
 #| label: fig-mixed-model60
 #| fig-cap: Model means by timepoint
 ggplot(means, aes(x = Time, y = emmean, color = Hypo60, group = Hypo60)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  geom_line() +
+  theme_classic() +
+  ylab("Mean Glucose")
+```
+
+# Hypoglycemia defined as <= 50 mg/dL at any point
+
+## Participant demographics
+
+```{r}
+#| label: tbl-50
+#| tbl-cap: BG <= 50 at Any Point
+df %>%
+  select(
+    age_at_current_date:cftr_mutation_2, all_of(glucose), iAUC30:iAUC180, Hypo50
+  ) %>%
+  tbl_summary(by = Hypo50, missing_text = "Missing") %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
+```
+
+## LS mean glucose by hypoglycemia status
+
+```{r mixed models 50}
+# Long OGTTs
+long_df <- df %>%
+  pivot_longer(timepoint_0_min:timepoint_180_min,
+    names_to = "Time", values_to = "Glucose",
+    names_pattern = "timepoint_(.*)_min"
+  )
+# Time as a factor
+long_df$Time <- factor(long_df$Time, levels = c(0, 10, 30, 60, 90, 120, 150, 180))
+# Fit
+mod <- lmer(Glucose ~ Time * Hypo50 + (1 | study_id), data = long_df)
+means <- data.frame(emmeans(mod, ~ Hypo50 | Time, pbkrtest.limit = 1e4))
+gt(means)
+```
+
+## Figure
+
+```{r}
+#| label: fig-mixed-model50
+#| fig-cap: Model means by timepoint
+ggplot(means, aes(x = Time, y = emmean, color = Hypo50, group = Hypo50)) +
   geom_point() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
   geom_line() +
