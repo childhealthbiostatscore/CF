@@ -32,7 +32,6 @@ library(broom.mixed)
 library(emmeans)
 library(gt)
 library(performance)
-library(mcp)
 library(survival)
 library(ggsurvfit)
 library(ggstats)
@@ -40,7 +39,8 @@ library(naniar)
 # Paths
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF"
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -345,7 +345,7 @@ More than one = More than one
 
 No Insurance = No Insurance
 
-Other = Other
+Other = No Insurance (per Liz Cromwell)
 
 State special needs program, e.g., BCMH, CCS, CRS, GHPP, etc. = Public
 
@@ -366,9 +366,15 @@ surv_dat$Insurance <- factor(surv_dat$Insurance,
   ),
   labels = c(
     "Private", "Public", "Public", "Public", "More Than One", "No Insurance",
-    "Other", "Public", "Tricare"
+    "No Insurance", "Public", "Tricare"
   )
 )
+# FEV1 to categorical
+surv_dat$fev1_cat <- cut(surv_dat$gli_fev1_ppred_rn,
+  breaks = c(0, 40, 80, 100, Inf),right = F
+)
+label(surv_dat$fev1_cat)=label(surv_dat$gli_fev1_ppred_rn)
+# New fit
 new_surv_f <- update(surv_f, . ~ . + Insurance)
 cox_res <- coxph(new_surv_f, data = surv_dat, cluster = eDWID)
 cox_res %>%
