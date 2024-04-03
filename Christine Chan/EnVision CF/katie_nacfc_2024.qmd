@@ -41,14 +41,8 @@ df <- read.csv("./Christine Chan/EnVision CF/Data_Raw/EnvisionCF_DATA_2024-03-14
 )
 # Fix missing access group
 df$redcap_data_access_group[is.na(df$redcap_data_access_group)] <- "iowa"
-# Trim columns
+# Glucose columns
 glucose <- paste0("timepoint_", c(0, 10, 30, 60, 90, 120, 150, 180), "_min")
-df <- df %>%
-  select(
-    study_id:redcap_data_access_group, age_at_current_date:origin_race,
-    cftr_mutation_1, cftr_mutation_2, date_visit, bmi_study_visit,
-    bmi_stand_score, a1c_result, fev1, all_of(glucose)
-  )
 # Get diagnosis
 df$Diagnosis <- NA
 df$Diagnosis[df[, glucose[1]] < 100 &
@@ -117,7 +111,10 @@ df %>%
   group_by(study_id) %>%
   filter(row_number() == 1) %>%
   ungroup() %>%
-  select(redcap_data_access_group:cftr_mutation_2) %>%
+  select(
+    redcap_data_access_group, age_at_current_date:origin_race, cftr_mutation_1,
+    cftr_mutation_2
+  ) %>%
   tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
   add_overall()
 ```
