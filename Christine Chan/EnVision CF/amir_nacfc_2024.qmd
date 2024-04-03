@@ -65,7 +65,8 @@ df$Hypo50 <- factor(rowSums(df[, glucose] <= 50, na.rm = T) > 0,
 #| tbl-cap: BG < 70 at Any Point
 df %>%
   select(
-    age_at_current_date:cftr_mutation_2, all_of(glucose), iAUC30:iAUC180, Hypo70
+    age_at_current_date:cftr_mutation_2, all_of(glucose), iAUC30:iAUC180, 
+    Hypo70, 
   ) %>%
   tbl_summary(by = Hypo70, missing_text = "Missing") %>%
   add_overall() %>%
