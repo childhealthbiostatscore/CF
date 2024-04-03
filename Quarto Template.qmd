@@ -15,27 +15,23 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Documents/Miscellaneous/american-medical-association.csl
+bibliography: ~/Documents/Miscellaneous/zotero.bib
+csl: ~/Documents/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
 ```{r setup}
 #| include: false
 library(tidyverse)
-switch(Sys.info()[["sysname"]],
-  Windows = {
-    home_dir <- "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF"
-  },
-  Darwin = {
-    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
-  }
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
-
 ```
 
 # Table
