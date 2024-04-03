@@ -192,6 +192,23 @@ invisible(lapply(c("2020", "2021", "2022"), function(n) {
 }))
 ```
 
+### 2020 - 2022
+
+The table below includes everyone who was in the registry in 2020, 2021, or 2022. 
+People were considered eligible for ETI if they were eligible any of the three years, and were considered prescribed ETI if they had Vx445comb="Yes" for any year. So, a person who was eligible in 2020 but not prescribed until 2022 would count the same as someone who was eligible in 2020 and started immediately. 
+
+```{r}
+annual %>%
+  filter(ReviewYear %in% 2020:2022) %>%
+  group_by(eDWID) %>%
+  summarise(race = race[1],eti_elig = any(eti_elig == "Yes"),
+            on_eti = any(Vx445comb=="Yes")) %>%
+  select(-eDWID) %>%
+  tbl_summary(by=race) %>%
+  add_overall() %>%
+  add_ci()
+```
+
 ### Figure
 
 The figure below includes those eligible for ETI and anyone who may have been prescribed ETI off label. Error bars represent 95% confidence intervals.
@@ -275,7 +292,8 @@ p <- fit %>%
   add_quantile() +
   ylab("Proportion on ETI") + xlab("Days From Eligibility") +
   theme_bw(base_size = 16) +
-  theme(legend.title = element_blank(), legend.text = element_text(size = 14))
+  theme(legend.title = element_blank(), legend.text = element_text(size = 14),
+        legend.position = c(0.7, 0.3))
 p
 ```
 
@@ -371,9 +389,9 @@ surv_dat$Insurance <- factor(surv_dat$Insurance,
 )
 # FEV1 to categorical
 surv_dat$fev1_cat <- cut(surv_dat$gli_fev1_ppred_rn,
-  breaks = c(0, 40, 80, 100, Inf),right = F
+  breaks = c(0, 40, 80, 100, Inf), right = F
 )
-label(surv_dat$fev1_cat)=label(surv_dat$gli_fev1_ppred_rn)
+label(surv_dat$fev1_cat) <- label(surv_dat$gli_fev1_ppred_rn)
 # New fit
 new_surv_f <- update(surv_f, . ~ . + Insurance)
 cox_res <- coxph(new_surv_f, data = surv_dat, cluster = eDWID)
@@ -392,14 +410,14 @@ surv_dat$`Age Group` <- cut(surv_dat$encounterage,
   breaks = c(6, 12, 18, 30, Inf), right = F
 )
 new_surv_f <- update(surv_f, . ~ . + Insurance + `Age Group` +
-  gli_fev1_ppred_rn)
+  fev1_cat)
 cox_res <- coxph(new_surv_f, data = surv_dat, cluster = eDWID)
 cox_res %>%
   tbl_regression(exponentiate = T)
 ggcoef_model(cox_res,
-  show_p_values = F, add_reference_rows = F,
+  show_p_values = F, add_reference_rows = T,
   signif_stars = F, colour = F, exponentiate = T
-)
+) 
 ```
 
 # Number of clinic visits
@@ -414,5 +432,6 @@ encounter %>%
     .groups = "drop"
   ) %>%
   select(-eDWID) %>%
-  tbl_summary(by = race)
+  tbl_summary(by = race) %>%
+  add_p()
 ```
