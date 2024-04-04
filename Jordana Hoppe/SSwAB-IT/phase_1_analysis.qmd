@@ -15,8 +15,6 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Notes/zotero.bib
-csl: /Users/timvigers/GitHub/styles/american-medical-association-10th-edition.csl
 editor: source
 ---
 
@@ -44,6 +42,15 @@ exportBulkRecords(list(db = rcon), envir = 1)
 exclude <- c("01-030_W", "01-038_W", "02-0038", "02-0039", "04-001")
 # Combine collection results
 df <- full_join(db_cos_collection_results, db_sos_collection_results)
+# Add dates to demographics
+db_demographics <- left_join(db_demographics,
+  df %>% select(record_id, cos_result_date),
+  by = join_by(record_id)
+)
+db_demographics$age_at_cos <- difftime(db_demographics$cos_result_date,
+  db_demographics$dob,
+  units = "days"
+) / 365.25
 # Format
 df <- df %>%
   select(
@@ -165,8 +172,12 @@ Participants 01-030_W, 01-038_W, 02-0038, 02-0039, and 04-001 were excluded from
 
 ```{r}
 db_demographics %>%
-  select(group, sex, Race, Ethnicity) %>%
-  tbl_summary(by = group, label = list("sex" = "Sex")) %>%
+  select(group, age_at_cos, sex, Race, Ethnicity) %>%
+  tbl_summary(
+    by = group,
+    statistic = all_continuous()~c("{median} ({min}, {max})"),
+    label = list("sex" = "Sex", "age_at_cos" = "Age at COS")
+  ) %>%
   add_overall() %>%
   add_p(test = list(c("Race", "Ethnicity") ~ "fisher.test")) %>%
   separate_p_footnotes() %>%
