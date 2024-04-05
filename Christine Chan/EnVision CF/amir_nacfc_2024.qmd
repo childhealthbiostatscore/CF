@@ -42,22 +42,26 @@ df <- read.csv("./Christine Chan/EnVision CF/Data_Clean/nacfc_2024_analysis_data
   na.strings = ""
 )
 glucose <- paste0("timepoint_", c(0, 10, 30, 60, 90, 120, 150, 180), "_min")
+insulin <- gsub("timepoint_", "insulin_", glucose)
 # Remove those missing all OGTT values
 df <- df[rowSums(is.na(df[, glucose])) < length(glucose), ]
-# Hypoglycemia
-df$Hypo70 <- factor(rowSums(df[, glucose] < 70, na.rm = T) > 0,
-  levels = c(F, T), labels = c("No", "Yes")
-)
-df$Hypo60 <- factor(rowSums(df[, glucose] < 60, na.rm = T) > 0,
-  levels = c(F, T), labels = c("No", "Yes")
-)
-df$Hypo50 <- factor(rowSums(df[, glucose] <= 50, na.rm = T) > 0,
-  levels = c(F, T), labels = c("No", "Yes")
-)
-# Add insulin data
-insulin <- read.csv("./Christine Chan/EnVision CF/Data_Clean/insulin_wide.csv")
-df <- left_join(df, insulin, by = join_by(study_id, date_visit))
-insulin <- gsub("timepoint_", "insulin_", glucose)
+```
+
+# Demographics at first visit
+
+```{r}
+#| label: tbl-1
+#| tbl-cap: Participant characteristics (overall)
+df %>%
+  group_by(study_id) %>%
+  filter(row_number() == 1) %>%
+  ungroup() %>%
+  select(
+    redcap_data_access_group, age_at_current_date:origin_race, cftr_mutation_1,
+    cftr_mutation_2
+  ) %>%
+  tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
+  add_overall()
 ```
 
 # Hypoglycemia defined as < 70 mg/dL at any point
@@ -70,8 +74,8 @@ insulin <- gsub("timepoint_", "insulin_", glucose)
 df %>%
   select(
     age_at_current_date:origin_race, cftr_mutation_1, cftr_mutation_2,
-    all_of(glucose), iAUC30:iAUC180,
-    Hypo70, all_of(insulin), hypoglycemia_symptoms_yesno
+    all_of(glucose), Hypo70, all_of(insulin), hypoglycemia_symptoms_yesno,
+    iAUC30gluc:iAUC180ins, homa_ir
   ) %>%
   tbl_summary(by = Hypo70, missing_text = "Missing") %>%
   add_overall() %>%
@@ -107,12 +111,12 @@ insulin_long_df$Time <- factor(insulin_long_df$Time,
 ins_mod <- lmer(Insulin ~ Time * Hypo70 + (1 | study_id), data = insulin_long_df)
 ins_means <- data.frame(emmeans(ins_mod, ~ Hypo70 | Time, pbkrtest.limit = 1e4))
 # Combine
-means <- means %>% select(-SE,-df) 
-means$Variable = "Glucose"
-ins_means <- ins_means %>% select(-SE,-df)
-ins_means$Variable = "Insulin"
-plot_df = data.frame(rbind(means,ins_means))
-levels(plot_df$Hypo70) = c("No Hypoglycemia","Hypoglycemia")
+means <- means %>% select(-SE, -df)
+means$Variable <- "Glucose"
+ins_means <- ins_means %>% select(-SE, -df)
+ins_means$Variable <- "Insulin"
+plot_df <- data.frame(rbind(means, ins_means))
+levels(plot_df$Hypo70) <- c("No Hypoglycemia", "Hypoglycemia")
 ```
 
 ```{r}
@@ -137,8 +141,8 @@ ggplot(plot_df, aes(x = Time, y = emmean, color = Variable, group = Variable)) +
 df %>%
   select(
     age_at_current_date:origin_race, cftr_mutation_1, cftr_mutation_2,
-    all_of(glucose), iAUC30:iAUC180,
-    Hypo60, all_of(insulin), hypoglycemia_symptoms_yesno
+    all_of(glucose), Hypo60, all_of(insulin), hypoglycemia_symptoms_yesno,
+    iAUC30gluc:iAUC180ins, homa_ir
   ) %>%
   tbl_summary(by = Hypo60, missing_text = "Missing") %>%
   add_overall() %>%
@@ -174,12 +178,12 @@ insulin_long_df$Time <- factor(insulin_long_df$Time,
 ins_mod <- lmer(Insulin ~ Time * Hypo60 + (1 | study_id), data = insulin_long_df)
 ins_means <- data.frame(emmeans(ins_mod, ~ Hypo60 | Time, pbkrtest.limit = 1e4))
 # Combine
-means <- means %>% select(-SE,-df) 
-means$Variable = "Glucose"
-ins_means <- ins_means %>% select(-SE,-df)
-ins_means$Variable = "Insulin"
-plot_df = data.frame(rbind(means,ins_means))
-levels(plot_df$Hypo60) = c("No Hypoglycemia","Hypoglycemia")
+means <- means %>% select(-SE, -df)
+means$Variable <- "Glucose"
+ins_means <- ins_means %>% select(-SE, -df)
+ins_means$Variable <- "Insulin"
+plot_df <- data.frame(rbind(means, ins_means))
+levels(plot_df$Hypo60) <- c("No Hypoglycemia", "Hypoglycemia")
 ```
 
 ```{r}
@@ -204,8 +208,8 @@ ggplot(plot_df, aes(x = Time, y = emmean, color = Variable, group = Variable)) +
 df %>%
   select(
     age_at_current_date:origin_race, cftr_mutation_1, cftr_mutation_2,
-    all_of(glucose), iAUC30:iAUC180,
-    Hypo50, all_of(insulin), hypoglycemia_symptoms_yesno
+    all_of(glucose), Hypo50, all_of(insulin), hypoglycemia_symptoms_yesno,
+    iAUC30gluc:iAUC180ins, homa_ir
   ) %>%
   tbl_summary(by = Hypo50, missing_text = "Missing") %>%
   add_overall() %>%
@@ -241,12 +245,12 @@ insulin_long_df$Time <- factor(insulin_long_df$Time,
 ins_mod <- lmer(Insulin ~ Time * Hypo50 + (1 | study_id), data = insulin_long_df)
 ins_means <- data.frame(emmeans(ins_mod, ~ Hypo50 | Time, pbkrtest.limit = 1e4))
 # Combine
-means <- means %>% select(-SE,-df) 
-means$Variable = "Glucose"
-ins_means <- ins_means %>% select(-SE,-df)
-ins_means$Variable = "Insulin"
-plot_df = data.frame(rbind(means,ins_means))
-levels(plot_df$Hypo50) = c("No Hypoglycemia","Hypoglycemia")
+means <- means %>% select(-SE, -df)
+means$Variable <- "Glucose"
+ins_means <- ins_means %>% select(-SE, -df)
+ins_means$Variable <- "Insulin"
+plot_df <- data.frame(rbind(means, ins_means))
+levels(plot_df$Hypo50) <- c("No Hypoglycemia", "Hypoglycemia")
 ```
 
 ```{r}
