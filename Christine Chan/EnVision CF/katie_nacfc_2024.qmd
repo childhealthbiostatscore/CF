@@ -53,8 +53,12 @@ df$Diagnosis[rowSums(df[, glucose[2:5]] >= 200, na.rm = T) > 0] <- "INDET"
 df$Diagnosis[rowSums(df[, glucose[6:8]] >= 140, na.rm = T) > 0] <- "IGF"
 df$Diagnosis[df$timepoint_0_min >= 126 | df$timepoint_120_min >= 200] <- "CFRD"
 df$Diagnosis <- factor(df$Diagnosis, levels = c("NGT", "IFG", "INDET", "IGF", "CFRD"))
+# Add insulin data
+insulin <- read.csv("./Christine Chan/EnVision CF/Data_Clean/insulin_wide.csv")
+df <- left_join(df, insulin, by = join_by(study_id, date_visit))
+insulin <- gsub("timepoint_", "insulin_", glucose)
 # iAUCs
-df$iAUC30 <- apply(df, 1, function(r) {
+df$iAUC30gluc <- apply(df, 1, function(r) {
   y <- as.numeric(r[glucose[1:3]]) - as.numeric(r[glucose[1]])
   if (is.na(last(y))) {
     return(NA)
@@ -65,7 +69,7 @@ df$iAUC30 <- apply(df, 1, function(r) {
     return(auc)
   }
 })
-df$iAUC120 <- apply(df, 1, function(r) {
+df$iAUC120gluc <- apply(df, 1, function(r) {
   y <- as.numeric(r[glucose[1:6]]) - as.numeric(r[glucose[1]])
   if (is.na(last(y))) {
     return(NA)
@@ -76,7 +80,7 @@ df$iAUC120 <- apply(df, 1, function(r) {
     return(auc)
   }
 })
-df$iAUC180 <- apply(df, 1, function(r) {
+df$iAUC180gluc <- apply(df, 1, function(r) {
   y <- as.numeric(r[glucose]) - as.numeric(r[glucose[1]])
   if (is.na(last(y))) {
     return(NA)
@@ -87,15 +91,58 @@ df$iAUC180 <- apply(df, 1, function(r) {
     return(auc)
   }
 })
-# Other formatting
-df$date_visit <- lubridate::ymd(df$date_visit)
-# Write for checking
-df$Keep <- NULL
+df$iAUC30ins <- apply(df, 1, function(r) {
+  y <- as.numeric(r[insulin[1:3]]) - as.numeric(r[insulin[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+df$iAUC120ins <- apply(df, 1, function(r) {
+  y <- as.numeric(r[insulin[1:6]]) - as.numeric(r[insulin[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60, 90, 120)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+df$iAUC180ins <- apply(df, 1, function(r) {
+  y <- as.numeric(r[insulin]) - as.numeric(r[insulin[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60, 90, 120, 150, 180)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+# Hypoglycemia
+df$Hypo70 <- factor(rowSums(df[, glucose] < 70, na.rm = T) > 0,
+  levels = c(F, T), labels = c("No", "Yes")
+)
+df$Hypo60 <- factor(rowSums(df[, glucose] < 60, na.rm = T) > 0,
+  levels = c(F, T), labels = c("No", "Yes")
+)
+df$Hypo50 <- factor(rowSums(df[, glucose] <= 50, na.rm = T) > 0,
+  levels = c(F, T), labels = c("No", "Yes")
+)
+# HOMA IR
+df$homa_ir = (df$timepoint_0_min * df$insulin_0_min)/405
+# Write for Amir's abstract
 write.csv(df,
   file = "./Christine Chan/EnVision CF/Data_Clean/nacfc_2024_analysis_data.csv",
   row.names = F, na = ""
 )
 # Exclude those missing <= 3 missing OGTT values
+df$Keep <- NULL
 df$Keep <- rowSums(is.na(df[, glucose])) <= 3
 df <- df %>% filter(Keep)
 ```
@@ -131,8 +178,8 @@ iAUC was calculated as the area under the glucose curve from baseline to the tim
 df %>%
   select(
     redcap_data_access_group, Diagnosis, timepoint_0_min, timepoint_30_min,
-    timepoint_60_min, timepoint_120_min, timepoint_180_min, iAUC30, iAUC120,
-    iAUC180
+    timepoint_60_min, timepoint_120_min, timepoint_180_min, 
+    iAUC30gluc:iAUC180ins,homa_ir
   ) %>%
   tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
   add_overall()
@@ -149,8 +196,8 @@ df %>%
   ungroup() %>%
   select(
     redcap_data_access_group, Diagnosis, timepoint_0_min, timepoint_30_min,
-    timepoint_60_min, timepoint_120_min, timepoint_180_min, iAUC30, iAUC120,
-    iAUC180
+    timepoint_60_min, timepoint_120_min, timepoint_180_min, 
+    iAUC30gluc:iAUC180ins,homa_ir
   ) %>%
   tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
   add_overall()
