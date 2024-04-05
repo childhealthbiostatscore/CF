@@ -31,8 +31,17 @@ library(plotly)
 library(broom)
 library(report)
 library(sjPlot)
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r}
 # Read in data
-df = read.spss("/Users/timvigers/Library/CloudStorage/Dropbox/Work/Vigers/CF/Emily Muther/Body Image and Trikafta/Data_Raw/TrikaftaBodyImage3.6.23.sav",to.data.frame = T)
+df = read.spss("./Emily Muther/General - Muther Research Group/BodyImage_Trikafta/Data/TrikaftaBodyImage3.6.23.sav",to.data.frame = T)
 # Filter
 df = df %>% 
   filter(TakingTrikafta=="yes")
@@ -144,7 +153,7 @@ res = tidy(mod1,exponentiate = T)
 kable(res,digits = 3)
 ```
 
-`r report(mod)`
+`r report(mod1)`
 
 #### Association with BE_APPEARANCE_MEAN in those with elevated scores.
 
@@ -156,7 +165,7 @@ res = tidy(mod2,exponentiate = T)
 kable(res,digits = 3)
 ```
 
-`r report(mod)`
+`r report(mod2)`
 
 ### BE_ATTRIBUTION_MEAN
 
@@ -170,7 +179,7 @@ res = tidy(mod3,exponentiate = T)
 kable(res,digits = 3)
 ```
 
-`r report(mod)`
+`r report(mod3)`
 
 #### Association with BE_ATTRIBUTION_MEAN in those with elevated scores.
 
@@ -182,7 +191,7 @@ res = tidy(mod4,exponentiate = T)
 kable(res,digits = 3)
 ```
 
-`r report(mod)`
+`r report(mod4)`
 
 ### BE_WEIGHT_MEAN
 
@@ -196,7 +205,7 @@ res = tidy(mod5,exponentiate = T)
 kable(res,digits = 3)
 ```
 
-`r report(mod)`
+`r report(mod5)`
 
 #### Association with BE_WEIGHT_MEAN in those with elevated scores.
 
@@ -208,7 +217,7 @@ res = tidy(mod6,exponentiate = T)
 kable(res,digits = 3)
 ```
 
-`r report(mod)`
+`r report(mod6)`
 
 ### Forest plot of logistic regression results
 
@@ -230,7 +239,7 @@ res = tidy(mod1,exponentiate = T)
 kable(res,digits = 3)
 ```
 
-`r report(mod)`
+`r report(mod1)`
 
 #### Association with BE_APPEARANCE_MEAN in those with elevated scores.
 
@@ -242,7 +251,7 @@ res = tidy(mod2,exponentiate = T)
 kable(res,digits = 3)
 ```
 
-`r report(mod)`
+`r report(mod2)`
 
 ### BE_ATTRIBUTION_MEAN
 
@@ -256,7 +265,7 @@ res = tidy(mod3,exponentiate = T)
 kable(res,digits = 3)
 ```
 
-`r report(mod)`
+`r report(mod3)`
 
 #### Association with BE_ATTRIBUTION_MEAN in those with elevated scores.
 
@@ -268,7 +277,7 @@ res = tidy(mod4,exponentiate = T)
 kable(res,digits = 3)
 ```
 
-`r report(mod)`
+`r report(mod4)`
 
 ### BE_WEIGHT_MEAN
 
@@ -282,7 +291,7 @@ res = tidy(mod5,exponentiate = T)
 kable(res,digits = 3)
 ```
 
-`r report(mod)`
+`r report(mod5)`
 
 #### Association with BE_WEIGHT_MEAN in those with elevated scores.
 
@@ -294,7 +303,7 @@ res = tidy(mod6,exponentiate = T)
 kable(res,digits = 3)
 ```
 
-`r report(mod)`
+`r report(mod6)`
 
 ### Forest plot of logistic regression results
 
