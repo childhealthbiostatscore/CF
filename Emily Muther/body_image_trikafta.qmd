@@ -31,6 +31,7 @@ library(plotly)
 library(broom)
 library(report)
 library(sjPlot)
+library(ggstats)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
@@ -40,18 +41,19 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r}
+#| warning: false
 # Read in data
-df = read.spss("./Emily Muther/General - Muther Research Group/BodyImage_Trikafta/Data/TrikaftaBodyImage3.6.23.sav",to.data.frame = T)
+df <- read.spss("./Emily Muther/General - Muther Research Group/BodyImage_Trikafta/Data/TrikaftaBodyImage3.6.23.sav", to.data.frame = T)
 # Filter
-df = df %>% 
-  filter(TakingTrikafta=="yes")
+df <- df %>%
+  filter(TakingTrikafta == "yes")
 # Trim white space
-df = df %>%
-  mutate(across(where(is.character),trimws))
+df <- df %>%
+  mutate(across(where(is.character), trimws))
 # Replace blanks with NA
-df[df==""]=NA
+df[df == ""] <- NA
 # Categorical variables
-df$FRS_Category = relevel(df$FRS_Category,ref = "neutral")
+df$FRS_Category <- relevel(df$FRS_Category, ref = "neutral")
 ```
 
 # Descriptive analyses
@@ -60,7 +62,8 @@ df$FRS_Category = relevel(df$FRS_Category,ref = "neutral")
 
 ```{r}
 #| label: demographics
-df %>% select(Age,Gender,Race,Ethnicity) %>%
+df %>%
+  select(Age, Gender, Race, Ethnicity) %>%
   tbl_summary(
     by = Gender,
     statistic = list(
@@ -74,7 +77,8 @@ df %>% select(Age,Gender,Race,Ethnicity) %>%
 
 ```{r}
 #| label: changes
-df %>% select(ChangestoBreathing:MoodChangesSideEf,FeelTrikafta) %>%
+df %>%
+  select(ChangestoBreathing:MoodChangesSideEf, FeelTrikafta) %>%
   tbl_summary(
     type = list(
       all_categorical() ~ "categorical"
@@ -92,24 +96,21 @@ df %>% select(ChangestoBreathing:MoodChangesSideEf,FeelTrikafta) %>%
 Results are reported as odds ratios, with the FRS "neutral" category as the reference group.
 
 ```{r}
-mod = glm(PHQ9_elevated ~ FRS_Category,data = df,family = "binomial")
-res = tidy(mod,exponentiate = T)
-kable(res,digits = 3)
+mod <- glm(PHQ9_elevated ~ FRS_Category, data = df, family = "binomial")
+tbl_regression(mod)
 ```
-
-`r report(mod)`
 
 ### Association with FRS category in those with elevated scores.
 
 Results are reported as expected counts, with the FRS "neutral" category as the reference group.
 
 ```{r}
-mod = glm(PHQ9_Total~ FRS_Category,data = df[df$PHQ9_elevated=="yes",],family = "poisson")
-res = tidy(mod,exponentiate = T)
-kable(res,digits = 3)
+mod2 <- glm(PHQ9_Total ~ FRS_Category,
+  data = df[df$PHQ9_elevated == "yes", ],
+  family = "poisson"
+)
+tbl_regression(mod2)
 ```
-
-`r report(mod)`
 
 ## GAD7
 
@@ -118,24 +119,18 @@ kable(res,digits = 3)
 Results are reported as odds ratios, with the FRS "neutral" category as the reference group.
 
 ```{r}
-mod = glm(GAD7_elevated ~ FRS_Category,data = df,family = "binomial")
-res = tidy(mod,exponentiate = T)
-kable(res,digits = 3)
+mod3 <- glm(GAD7_elevated ~ FRS_Category, data = df, family = "binomial")
+tbl_regression(mod3)
 ```
-
-`r report(mod)`
 
 ### Association with FRS category in those with elevated scores.
 
 Results are reported as expected counts, with the FRS "neutral" category as the reference group.
 
 ```{r}
-mod = glm(GAD7_Total~ FRS_Category,data = df[df$GAD7_elevated=="yes",],family = "poisson")
-res = tidy(mod,exponentiate = T)
-kable(res,digits = 3)
+mod4 <- glm(GAD7_Total ~ FRS_Category, data = df[df$GAD7_elevated == "yes", ], family = "poisson")
+tbl_regression(mod4)
 ```
-
-`r report(mod)`
 
 # Mental health scores by BES
 
@@ -148,24 +143,21 @@ kable(res,digits = 3)
 Results are reported as odds ratios for a one-unit change in the predictor.
 
 ```{r}
-mod1 = glm(PHQ9_elevated ~ BE_APPEARANCE_MEAN,data = df,family = "binomial")
-res = tidy(mod1,exponentiate = T)
-kable(res,digits = 3)
+mod5 <- glm(PHQ9_elevated ~ BE_APPEARANCE_MEAN, data = df, family = "binomial")
+tbl_regression(mod5)
 ```
-
-`r report(mod1)`
 
 #### Association with BE_APPEARANCE_MEAN in those with elevated scores.
 
 Results are reported as expected counts, with the FRS "neutral" category as the reference group.
 
 ```{r}
-mod2 = glm(PHQ9_Total~ BE_APPEARANCE_MEAN,data = df[df$PHQ9_elevated=="yes",],family = "poisson")
-res = tidy(mod2,exponentiate = T)
-kable(res,digits = 3)
+mod6 <- glm(PHQ9_Total ~ BE_APPEARANCE_MEAN,
+  data = df[df$PHQ9_elevated == "yes", ],
+  family = "poisson"
+)
+tbl_regression(mod6)
 ```
-
-`r report(mod2)`
 
 ### BE_ATTRIBUTION_MEAN
 
@@ -174,24 +166,21 @@ kable(res,digits = 3)
 Results are reported as odds ratios for a one-unit change in the predictor.
 
 ```{r}
-mod3 = glm(PHQ9_elevated ~ BE_ATTRIBUTION_MEAN,data = df,family = "binomial")
-res = tidy(mod3,exponentiate = T)
-kable(res,digits = 3)
+mod7 <- glm(PHQ9_elevated ~ BE_ATTRIBUTION_MEAN, data = df, family = "binomial")
+tbl_regression(mod7)
 ```
-
-`r report(mod3)`
 
 #### Association with BE_ATTRIBUTION_MEAN in those with elevated scores.
 
 Results are reported as expected counts, with the FRS "neutral" category as the reference group.
 
 ```{r}
-mod4 = glm(PHQ9_Total~ BE_ATTRIBUTION_MEAN,data = df[df$PHQ9_elevated=="yes",],family = "poisson")
-res = tidy(mod4,exponentiate = T)
-kable(res,digits = 3)
+mod8 <- glm(PHQ9_Total ~ BE_ATTRIBUTION_MEAN,
+  data = df[df$PHQ9_elevated == "yes", ],
+  family = "poisson"
+)
+tbl_regression(mod8)
 ```
-
-`r report(mod4)`
 
 ### BE_WEIGHT_MEAN
 
@@ -200,30 +189,23 @@ kable(res,digits = 3)
 Results are reported as odds ratios for a one-unit change in the predictor.
 
 ```{r}
-mod5 = glm(PHQ9_elevated ~ BE_WEIGHT_MEAN,data = df,family = "binomial")
-res = tidy(mod5,exponentiate = T)
-kable(res,digits = 3)
+mod9 <- glm(PHQ9_elevated ~ BE_WEIGHT_MEAN, data = df, family = "binomial")
+tbl_regression(mod9)
 ```
-
-`r report(mod5)`
 
 #### Association with BE_WEIGHT_MEAN in those with elevated scores.
 
 Results are reported as expected counts, with the FRS "neutral" category as the reference group.
 
 ```{r}
-mod6 = glm(PHQ9_Total~ BE_WEIGHT_MEAN,data = df[df$PHQ9_elevated=="yes",],family = "poisson")
-res = tidy(mod6,exponentiate = T)
-kable(res,digits = 3)
+mod10 <- glm(PHQ9_Total ~ BE_WEIGHT_MEAN,
+  data = df[df$PHQ9_elevated == "yes", ],
+  family = "poisson"
+)
+tbl_regression(mod10)
 ```
-
-`r report(mod6)`
 
 ### Forest plot of logistic regression results
-
-```{r}
-plot_models(mod1,mod3,mod5) + theme_bw() + theme(legend.position = "none")
-```
 
 ## GAD7
 
@@ -234,24 +216,18 @@ plot_models(mod1,mod3,mod5) + theme_bw() + theme(legend.position = "none")
 Results are reported as odds ratios for a one-unit change in the predictor.
 
 ```{r}
-mod1 = glm(GAD7_elevated ~ BE_APPEARANCE_MEAN,data = df,family = "binomial")
-res = tidy(mod1,exponentiate = T)
-kable(res,digits = 3)
+mod11 <- glm(GAD7_elevated ~ BE_APPEARANCE_MEAN, data = df, family = "binomial")
+tbl_regression(mod11)
 ```
-
-`r report(mod1)`
 
 #### Association with BE_APPEARANCE_MEAN in those with elevated scores.
 
 Results are reported as expected counts, with the FRS "neutral" category as the reference group.
 
 ```{r}
-mod2 = glm(GAD7_Total~ BE_APPEARANCE_MEAN,data = df[df$GAD7_elevated=="yes",],family = "poisson")
-res = tidy(mod2,exponentiate = T)
-kable(res,digits = 3)
+mod12 <- glm(GAD7_Total ~ BE_APPEARANCE_MEAN, data = df[df$GAD7_elevated == "yes", ], family = "poisson")
+tbl_regression(mod12)
 ```
-
-`r report(mod2)`
 
 ### BE_ATTRIBUTION_MEAN
 
@@ -260,24 +236,21 @@ kable(res,digits = 3)
 Results are reported as odds ratios for a one-unit change in the predictor.
 
 ```{r}
-mod3 = glm(GAD7_elevated ~ BE_ATTRIBUTION_MEAN,data = df,family = "binomial")
-res = tidy(mod3,exponentiate = T)
-kable(res,digits = 3)
+mod13 <- glm(GAD7_elevated ~ BE_ATTRIBUTION_MEAN, data = df, family = "binomial")
+tbl_regression(mod13)
 ```
-
-`r report(mod3)`
 
 #### Association with BE_ATTRIBUTION_MEAN in those with elevated scores.
 
 Results are reported as expected counts, with the FRS "neutral" category as the reference group.
 
 ```{r}
-mod4 = glm(GAD7_Total~ BE_ATTRIBUTION_MEAN,data = df[df$GAD7_elevated=="yes",],family = "poisson")
-res = tidy(mod4,exponentiate = T)
-kable(res,digits = 3)
+mod14 <- glm(GAD7_Total ~ BE_ATTRIBUTION_MEAN,
+  data = df[df$GAD7_elevated == "yes", ],
+  family = "poisson"
+)
+tbl_regression(mod14)
 ```
-
-`r report(mod4)`
 
 ### BE_WEIGHT_MEAN
 
@@ -286,27 +259,27 @@ kable(res,digits = 3)
 Results are reported as odds ratios for a one-unit change in the predictor.
 
 ```{r}
-mod5 = glm(GAD7_elevated ~ BE_WEIGHT_MEAN,data = df,family = "binomial")
-res = tidy(mod5,exponentiate = T)
-kable(res,digits = 3)
+mod15 <- glm(GAD7_elevated ~ BE_WEIGHT_MEAN, data = df, family = "binomial")
+tbl_regression(mod15)
 ```
-
-`r report(mod5)`
 
 #### Association with BE_WEIGHT_MEAN in those with elevated scores.
 
 Results are reported as expected counts, with the FRS "neutral" category as the reference group.
 
 ```{r}
-mod6 = glm(GAD7_Total~ BE_WEIGHT_MEAN,data = df[df$GAD7_elevated=="yes",],family = "poisson")
-res = tidy(mod6,exponentiate = T)
-kable(res,digits = 3)
+mod16 <- glm(GAD7_Total ~ BE_WEIGHT_MEAN,
+  data = df[df$GAD7_elevated == "yes", ],
+  family = "poisson"
+)
+tbl_regression(mod16)
 ```
-
-`r report(mod6)`
 
 ### Forest plot of logistic regression results
 
 ```{r}
-plot_models(mod1,mod3,mod5) + theme_bw() + theme(legend.position = "none")
+ggcoef_compare(list("PHQ9" = mod,
+  "PHQ9" = mod5, "PHQ9" = mod7, "PHQ9" = mod9,"GAD7" = mod3,
+  "GAD7" = mod11, "GAD7" = mod13, "GAD7" = mod15
+), exponentiate = T)
 ```
