@@ -25,13 +25,10 @@ library(gt)
 library(gtsummary)
 library(lmerTest)
 library(emmeans)
-switch(Sys.info()[["sysname"]],
-  Windows = {
-    home_dir <- "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF"
-  },
-  Darwin = {
-    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
-  }
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
