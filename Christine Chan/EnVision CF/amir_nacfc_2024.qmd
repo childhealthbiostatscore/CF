@@ -37,7 +37,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 # Import data cleaned for Katie's analysis
 df <- read.csv("./Christine Chan/EnVision CF/Data_Clean/nacfc_2024_analysis_data.csv",
   na.strings = ""
-)
+) 
 glucose <- paste0("timepoint_", c(0, 10, 30, 60, 90, 120, 150, 180), "_min")
 insulin <- gsub("timepoint_", "insulin_", glucose)
 # Remove those missing all OGTT values
