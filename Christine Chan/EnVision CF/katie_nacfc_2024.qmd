@@ -66,6 +66,17 @@ df$iAUC30gluc <- apply(df, 1, function(r) {
     return(auc)
   }
 })
+df$iAUC60gluc <- apply(df, 1, function(r) {
+  y <- as.numeric(r[glucose[1:4]]) - as.numeric(r[glucose[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
 df$iAUC120gluc <- apply(df, 1, function(r) {
   y <- as.numeric(r[glucose[1:6]]) - as.numeric(r[glucose[1]])
   if (is.na(last(y))) {
@@ -94,6 +105,17 @@ df$iAUC30ins <- apply(df, 1, function(r) {
     return(NA)
   } else {
     x <- c(0, 10, 30)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+df$iAUC60ins <- apply(df, 1, function(r) {
+  y <- as.numeric(r[insulin[1:4]]) - as.numeric(r[insulin[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60)[!is.na(y)]
     y <- y[!is.na(y)]
     auc <- trapz(x, y)
     return(auc)
@@ -132,7 +154,7 @@ df$Hypo50 <- factor(rowSums(df[, glucose] <= 50, na.rm = T) > 0,
   levels = c(F, T), labels = c("No", "Yes")
 )
 # HOMA IR
-df$homa_ir = (df$timepoint_0_min * df$insulin_0_min)/405
+df$homa_ir <- (df$timepoint_0_min * df$insulin_0_min) / 405
 # Write for Amir's abstract
 write.csv(df,
   file = "./Christine Chan/EnVision CF/Data_Clean/nacfc_2024_analysis_data.csv",
@@ -157,7 +179,7 @@ df %>%
   ungroup() %>%
   select(
     redcap_data_access_group, age_at_current_date:origin_race, cftr_mutation_1,
-    cftr_mutation_2
+    cftr_mutation_2, weight
   ) %>%
   tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
   add_overall()
@@ -175,8 +197,8 @@ iAUC was calculated as the area under the glucose curve from baseline to the tim
 df %>%
   select(
     redcap_data_access_group, Diagnosis, timepoint_0_min, timepoint_30_min,
-    timepoint_60_min, timepoint_120_min, timepoint_180_min, 
-    iAUC30gluc:iAUC180ins,homa_ir
+    timepoint_60_min, timepoint_120_min, timepoint_180_min,
+    iAUC30gluc:iAUC180ins, homa_ir
   ) %>%
   tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
   add_overall()
@@ -193,8 +215,8 @@ df %>%
   ungroup() %>%
   select(
     redcap_data_access_group, Diagnosis, timepoint_0_min, timepoint_30_min,
-    timepoint_60_min, timepoint_120_min, timepoint_180_min, 
-    iAUC30gluc:iAUC180ins,homa_ir
+    timepoint_60_min, timepoint_120_min, timepoint_180_min,
+    iAUC30gluc:iAUC180ins, homa_ir
   ) %>%
   tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
   add_overall()
