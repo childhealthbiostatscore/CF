@@ -21,9 +21,16 @@ setwd(home_dir)
 # Insulin
 #-------------------------------------------------------------------------------
 # Import
-insulin <- read.csv("./Christine Chan/EnVision CF/Data_Raw/insulin data/19-0422TestResultsAug2023_klonotes3-1-24_#2.csv",
-  na.strings = c("", "-999.99")
+insulin_aug <- read.csv("./Christine Chan/EnVision CF/Data_Raw/insulin data/19-0422TestResultsAug2023.csv",
+  na.strings = c("", "-999.99", "NULL", "NA")
 )
+insulin_july <- read.csv("./Christine Chan/EnVision CF/Data_Raw/insulin data/19-0422TestResultsJuly2023 CHECK_ERROR_LOG.csv",
+  na.strings = c("", "-999.99", "NULL", "NA")
+)
+insulin_oct <- read.csv("./Christine Chan/EnVision CF/Data_Raw/insulin data/19-0422TestResultsOct2022.csv",
+  na.strings = c("", "-999.99", "NULL", "NA")
+)
+insulin <- rbind(insulin_aug, insulin_july, insulin_oct)
 # Only necessary columns
 insulin <- insulin %>%
   select(LastName, TestName, Result.Numeric, Collection.Date) %>%
@@ -32,23 +39,32 @@ insulin <- insulin %>%
     Date = Collection.Date
   )
 # Format times/dates
-insulin$Date = lubridate::mdy(insulin$Date)
-insulin$Timepoint = sub("Insulin ","",insulin$Timepoint)
-insulin$Timepoint = sub(" min","",insulin$Timepoint)
-insulin$Timepoint = as.numeric(insulin$Timepoint)
+insulin$Date <- lubridate::mdy(insulin$Date)
+insulin$Timepoint <- sub("Insulin ", "", insulin$Timepoint)
+insulin$Timepoint <- sub("Insulin-endo ", "", insulin$Timepoint)
+insulin$Timepoint <- sub(" min", "", insulin$Timepoint)
+insulin$Timepoint <- as.numeric(insulin$Timepoint)
+# Remove exact duplicates
+insulin <- insulin %>% distinct()
+# For duplicates with different insulin values, average them
+insulin <- insulin %>%
+  group_by(study_id, Date, Timepoint) %>%
+  summarise(Insulin = mean(Insulin, na.rm = T))
 # Write
 write.csv(insulin,
   file = "./Christine Chan/EnVision CF/Data_Clean/tim_manual_dataset_insulin_only.csv",
   row.names = F, na = ""
 )
 # Make a wide version
-insulin_wide = insulin %>%
-  pivot_wider(id_cols = c("study_id","Date"),names_from = "Timepoint",values_from = "Insulin",
-              names_glue = "insulin_{Timepoint}_min") %>%
+insulin_wide <- insulin %>%
+  pivot_wider(
+    id_cols = c("study_id", "Date"), names_from = "Timepoint", values_from = "Insulin",
+    names_glue = "insulin_{Timepoint}_min"
+  ) %>%
   rename(date_visit = Date)
 write.csv(insulin_wide,
-          file = "./Christine Chan/EnVision CF/Data_Clean/insulin_wide.csv",
-          row.names = F, na = ""
+  file = "./Christine Chan/EnVision CF/Data_Clean/insulin_wide.csv",
+  row.names = F, na = ""
 )
 
 #-------------------------------------------------------------------------------
