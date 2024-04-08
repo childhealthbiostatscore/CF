@@ -16,8 +16,6 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Notes/zotero.bib
-csl: /Users/timvigers/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -31,14 +29,11 @@ library(factoextra)
 library(pROC)
 library(knitr)
 library(caret)
-source("/Users/timvigers/GitHub/CF/genotype_class_severity.R")
-switch(Sys.info()[["sysname"]],
-  Windows = {
-    home_dir <- "C:/Users/timvigers/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Test"
-  },
-  Darwin = {
-    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Test"
-  }
+source("~/GitHub/CF/genotype_class_severity.R")
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Test",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Edith Zemanick/Sweat Test",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Edith Zemanick/Sweat Test"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -537,8 +532,9 @@ roc_non_cf <- roc(
 )
 coords_non_cf <- round(coords(roc_non_cf, "best", best.method = "youden"), 3)
 
-plot(roc_cf, print.auc = TRUE, col = "blue")
-plot(roc_non_cf, print.auc = TRUE, col = "red")
+plot(roc_cf, print.auc = TRUE,lty=1)
+plot(roc_non_cf, print.auc = TRUE,add=T,lty=2,print.auc.y=0.4)
+legend("bottomright",legend = c("CF vs. CFTR-RD or CRMS","Non-CF vs. CFTR-RD or CRMS"),lty = c(1,2))
 ```
 
 The blue curve shows the ROC for distinguishing between CFTR-RD or CRMS vs. CF, and the red is the ROC curve for distinguishing between non-CF vs. CFTR-RD or CRMS. The optimal threshold for distinguishing between CFTR-RD or CRMS vs. CF was `r coords_cf$threshold` (sensitivity = `r coords_cf$sensitivity`, specificity = `r coords_cf$specificity`) based on the Youden index. The optimal threshold for distinguishing between non-CF vs. CFTR-RD or CRMS was `r coords_non_cf$threshold` (sensitivity = `r coords_non_cf$sensitivity`, specificity = `r coords_non_cf$specificity`) based on the Youden index. The mean AUC for the two curves is `r round(mean(c(roc_cf$auc,roc_non_cf$auc)),3)`.
