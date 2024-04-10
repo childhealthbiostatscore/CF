@@ -30,8 +30,8 @@ library(foreign)
 library(plotly)
 library(broom)
 library(report)
-library(sjPlot)
 library(ggstats)
+library(Hmisc)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
@@ -43,7 +43,9 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```{r}
 #| warning: false
 # Read in data
-df <- read.spss("./Emily Muther/General - Muther Research Group/BodyImage_Trikafta/Data/TrikaftaBodyImage3.6.23.sav", to.data.frame = T)
+df <- read.spss("./Emily Muther/General/BodyImage_Trikafta/Data/TrikaftaBodyImage3.6.23.sav",
+  to.data.frame = T
+)
 # Filter
 df <- df %>%
   filter(TakingTrikafta == "yes")
@@ -54,6 +56,14 @@ df <- df %>%
 df[df == ""] <- NA
 # Categorical variables
 df$FRS_Category <- relevel(df$FRS_Category, ref = "neutral")
+levels(df$FRS_Category) <- c(
+  "Neutral", "Want to be larger", "Want to be smaller"
+)
+# Labels
+label(df$FRS_Category) <- "FRS Category"
+label(df$BE_APPEARANCE_MEAN) <- "Mean Body Esteem Scale (Appearance)"
+label(df$BE_ATTRIBUTION_MEAN) <- "Mean Body Esteem Scale (Attribution)"
+label(df$BE_WEIGHT_MEAN) <- "Mean Body Esteem Scale (Weight)"
 ```
 
 # Descriptive analyses
@@ -275,11 +285,53 @@ mod16 <- glm(GAD7_Total ~ BE_WEIGHT_MEAN,
 tbl_regression(mod16)
 ```
 
-### Forest plot of logistic regression results
+# Nicely formatted stuff
+
+## Table
 
 ```{r}
-ggcoef_compare(list("PHQ9" = mod,
-  "PHQ9" = mod5, "PHQ9" = mod7, "PHQ9" = mod9,"GAD7" = mod3,
-  "GAD7" = mod11, "GAD7" = mod13, "GAD7" = mod15
-), exponentiate = T)
+tbl_stack(
+  list(
+    mod %>%
+      tbl_regression(exponentiate = T,intercept = T),
+    mod5 %>%
+      tbl_regression(exponentiate = T,intercept = T),
+    mod7 %>%
+      tbl_regression(exponentiate = T,intercept = T),
+    mod9 %>%
+      tbl_regression(exponentiate = T,intercept = T),
+    mod3 %>%
+      tbl_regression(exponentiate = T,intercept = T),
+    mod11 %>%
+      tbl_regression(exponentiate = T,intercept = T),
+    mod13 %>%
+      tbl_regression(exponentiate = T,intercept = T),
+    mod15 %>%
+      tbl_regression(exponentiate = T,intercept = T)
+  ),
+  group_header = c(
+    rep("Elevated PHQ9", times = 4),
+    rep("Elevated GAD7", times = 4)
+  )
+)
 ```
+
+This table shows the odds ratios and confidence intervals for an elevated score on the PHQ9 or GAD7. Odds ratios for FRS category represent the multiplicative difference in odds compared the reference group ("Neutral"), and estimates for BES mean scores represent the average multiplicative change in odds for a one unit increase in score. For example, the odds of an elevated score on the GAD for someone who endorsed wanting to be larger is 0.75 times those of someone who endorsed feeling neutral about their body (i.e. a decrease of 25%).
+
+## Forest plot of logistic regression results
+
+```{r}
+# Plot models together
+p <- ggcoef_compare(list(
+  "PHQ9" = mod,
+  "PHQ9" = mod5, "PHQ9" = mod7, "PHQ9" = mod9, "GAD7" = mod3,
+  "GAD7" = mod11, "GAD7" = mod13, "GAD7" = mod15
+), exponentiate = T, add_reference_rows = F) +
+  theme(text = element_text(size = 18))
+p
+# Save
+ggsave("./Emily Muther/General/BodyImage_Trikafta/Reports/forest_plot.png",
+       plot = p,width = 9,height = 6,units = "in")
+```
+
+Figure 1 shows the unadjusted odds ratios and confidence intervals for an elevated score on the PHQ9 or GAD7. Filled circles indicate an odds ratio significantly different from 1. Estimates to the left of the vertical bar indicate lower odds of an elevated score.
