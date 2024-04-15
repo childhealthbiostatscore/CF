@@ -25,8 +25,6 @@ library(tidyverse)
 library(gt)
 library(gtsummary)
 library(caret)
-library(twoxtwo)
-library(vcd)
 library(eulerr)
 ```
 
@@ -48,10 +46,13 @@ db_demographics <- left_join(db_demographics,
   df %>% select(record_id, cos_result_date),
   by = join_by(record_id)
 )
-db_demographics$age_at_cos <- difftime(db_demographics$cos_result_date,
+db_demographics$age_at_cos <- as.numeric(difftime(db_demographics$cos_result_date,
   db_demographics$dob,
   units = "days"
-) / 365.25
+)) / 365.25
+db_demographics$age_group <- cut(db_demographics$age_at_cos, c(-Inf, 18, Inf),
+  right = F
+)
 # Format
 df <- df %>%
   select(
@@ -94,14 +95,6 @@ db_demographics$Ethnicity <- apply(db_demographics, 1, function(r) {
     return(NA)
   }
 })
-# # Drop levels
-# level_drop <- c("sex", "Race", "Ethnicity")
-# db_demographics[, level_drop] <- lapply(
-#   db_demographics[, level_drop],
-#   function(c) {
-#     droplevels(factor(c))
-#   }
-# )
 # Add groups to other dataframes
 db_medications <- left_join(db_medications,
   db_demographics %>% select(record_id, group),
@@ -142,27 +135,10 @@ bugs <- c("overall", bugs)
 bug_names <- c("Across all bugs", bug_names)
 bug_list <- as.list(bug_names)
 names(bug_list) <- bugs
-# Agreement columns
-df[, bugs] <- lapply(bugs, function(b) {
-  cos <- df[, paste0(b, "_cos")]
-  sos <- df[, paste0(b, "_sos")]
-  f <- factor(paste(cos, sos, sep = "_"),
-    exclude = c(
-      "NA_Negative", "Negative_NA", "NA_Positive", "Positive_NA", "NA_NA"
-    )
-  )
-  f <- factor(f,
-    levels = c(
-      "Negative_Negative", "Negative_Positive", "Positive_Negative",
-      "Positive_Positive"
-    ),
-    labels = c(
-      "COS Negative / SOS Negative", "COS Negative / SOS Positive",
-      "COS Positive / SOS Negative", "COS Positive / SOS Positive"
-    )
-  )
-  return(f)
-})
+# Add group to dataframe
+df <- left_join(df, db_demographics %>% select(record_id, group),
+  by = join_by(record_id)
+)
 ```
 
 # Data cleaning
@@ -173,11 +149,13 @@ Participants 01-030_W, 01-038_W, 02-0038, 02-0039, and 04-001 were excluded from
 
 ```{r}
 db_demographics %>%
-  select(group, age_at_cos, sex, Race, Ethnicity) %>%
+  select(group, age_at_cos, age_group, sex, Race, Ethnicity) %>%
   tbl_summary(
     by = group,
-    statistic = all_continuous()~c("{median} ({min}, {max})"),
-    label = list("sex" = "Sex", "age_at_cos" = "Age at COS")
+    statistic = all_continuous() ~ c("{median} ({min}, {max})"),
+    label = list(
+      "sex" = "Sex", "age_at_cos" = "Age at COS", "age_group" = "Age Group"
+    )
   ) %>%
   add_overall() %>%
   add_p(test = list(c("Race", "Ethnicity") ~ "fisher.test")) %>%
@@ -215,59 +193,79 @@ For these agreement analyses, we reported accuracy metrics that include all samp
 | 0.81 - 0.99   | Near perfect agreement |
 | 1             | Perfect agreement      |
 
-Bangdiwala's agreement plot @bangdiwalaAgreementChart2013 is a way of visualizing 2 x 2 contingency tables, and additional details are in the paper referenced at the end of this document.
-
 ```{r}
 agreement <- function(bug, data = df) {
   cos <- paste0(bug, "_cos")
   sos <- paste0(bug, "_sos")
   d <- data[, c(cos, sos)]
+  colnames(d) <- c("COS", "SOS")
   d <- d[complete.cases(d), ]
   # Agreement metrics
-  c <- confusionMatrix((d[, sos]),
-    reference = d[, cos], positive = "Positive", mode = "everything",
+  c <- confusionMatrix(d$SOS,
+    reference = d$COS,
+    positive = "Positive", mode = "everything",
     dnn = c("SOS", "COS")
   )
-  # Return
-  return(list(two_by_two = c$table, accuracy = c$overall))
+  # Print
+  cat("\n")
+  cat("####", "2x2 Table")
+  cat("\n")
+  d %>%
+    tbl_cross(percent = "cell") %>%
+    print()
+  cat("\n")
+  cat("####", "2x2 Table (With CIs)")
+  cat("\n")
+  d %>%
+    tbl_cross(percent = "cell") %>%
+    add_ci() %>%
+    print()
+  cat("\n")
+  cat("Overall accuracy (both negative/negative and positive/positive) was ",
+    scales::percent(c$overall["Accuracy"], accuracy = 0.1), " (95% CI: ",
+    scales::percent(c$overall["AccuracyLower"], accuracy = 0.1), " - ",
+    scales::percent(c$overall["AccuracyUpper"], accuracy = 0.1), ").",
+    sep = ""
+  )
+  cat("\n")
+  cat("\n")
+  cat("Kappa was ", round(c$overall["Kappa"], 3), ".", sep = "")
+  cat("\n")
+  cat("\n")
+  cat("#### Euler diagram of negative results")
+  cat("\n")
+  print(plot(euler(d == "Negative"), quantities = T))
+  cat("\n")
+  cat("\n")
+  cat("#### Euler diagram of positive results")
+  cat("\n")
+  print(plot(euler(d == "Positive"), quantities = T))
+  cat("\n")
 }
-```
-
-```{r}
-l <- lapply(bugs, function(b) {
-  a <- agreement(b)
-  # Remove those where both tests were positive
-  n <- a$two_by_two
-  n[2, 2] <- 0
-  # Proportion tests for non-agreement in participants with one negative test
-  cos_p <- prop.test(n[1, 2], sum(n))
-  sos_p <- prop.test(n[2, 1], sum(n))
-  nn <- prop.test(n[1, 1], sum(n))
-  return(list(
-    Accuracy = a$accuracy["Accuracy"],
-    `Accuracy LL` = a$accuracy["AccuracyLower"],
-    `Accuracy UL` = a$accuracy["AccuracyUpper"],
-    Kappa = a$accuracy["Kappa"],
-    `Mcnemar P Value` = a$accuracy["McnemarPValue"],
-    `N With Negative Test on Either` = sum(n),
-    `N Negative on Both` = n[1, 1],
-    `Prop. Both Negative` = nn$estimate,
-    `Prop. Both Negative LL ` = nn$conf.int[1],
-    `Prop. Both Negative UL ` = nn$conf.int[2],
-    `N Postive on COS and Negative on SOS` = n[1, 2],
-    `Prop. Postive on COS` = cos_p$estimate,
-    `Prop. Postive on COS LL ` = cos_p$conf.int[1],
-    `Prop. Postive on COS UL ` = cos_p$conf.int[2],
-    `N Postive on SOS and Negative on COS` = n[2, 1],
-    `Prop. Postive on SOS` = sos_p$estimate,
-    `Prop. Postive on SOS LL ` = sos_p$conf.int[1],
-    `Prop. Postive on SOS UL ` = sos_p$conf.int[2]
-  ))
-})
-l <- data.frame(do.call(rbind, l), check.names = F)
-l <- data.frame(lapply(l, as.numeric), check.names = F)
-rownames(l) <- bug_names
-gt(l, rownames_to_stub = T) %>% fmt_number(n_sigfig = 3)
+agreement_test <- function(bug, group = "group", data = df) {
+  # Prepare data
+  cos <- paste0(bug, "_cos")
+  sos <- paste0(bug, "_sos")
+  d <- data[, c(cos, sos, group)]
+  d <- d[complete.cases(d), ]
+  colnames(d) <- c("COS", "SOS", "Group")
+  # Agreement and detailed agreement
+  d$agree <- d$COS == d$SOS
+  d$detailed_agree <- paste0("COS ", d$COS, "/", "SOS ", d$SOS)
+  # Print
+  cat("\n")
+  d %>%
+    select(agree, detailed_agree, Group) %>%
+    tbl_summary(by = Group, label = list(
+      agree ~ "Agree (Both Positive/Positive and Negative/Negative)",
+      detailed_agree ~ "Detailed Agreement"
+    )) %>%
+    add_overall() %>%
+    add_p(test.args = all_tests("fisher.test") ~ list(workspace = 2e6)) %>%
+    separate_p_footnotes() %>%
+    print()
+  cat("\n")
+}
 ```
 
 ```{r results='asis'}
@@ -275,49 +273,64 @@ invisible(lapply(names(bug_list), function(b) {
   cat("\n")
   cat("##", as.character(bug_list[b]))
   cat("\n")
-  cos <- paste0(b, "_cos")
-  sos <- paste0(b, "_sos")
-  d <- df[, c(cos, sos)]
-  d <- d[complete.cases(d), ]
-  colnames(d) <- c("COS", "SOS")
+  cat("###", "Overall agreement")
   cat("\n")
-  c <- confusionMatrix(d[, "SOS"],
-    reference = d[, "COS"], positive = "Positive", mode = "everything"
-  )
-  metrics <- data.frame(c$overall)
-  cat("### 2x2 table")
+  agreement(b)
   cat("\n")
-  two_by_two <- data.frame(c$table)
-  print(gt(two_by_two))
+  cat("###", "Agreement by group")
   cat("\n")
-  cat("### Accuracy")
-  cat("\n")
-  print(gt(metrics, rownames_to_stub = T) %>%
-    fmt_number(n_sigfig = 3) %>%
-    tab_options(column_labels.hidden = TRUE))
-  cat("\n")
-  cat("### Agreement plot")
-  cat("\n")
-  print(agreementplot(table(d)))
-  cat("\n")
-  cat("### Positive/Positive Excluded")
-  cat("\n")
-  t <- d[rowSums(d == "Positive") < 2, ]
-  t$`Samples With a Negative Test` <- paste(
-    "COS", t[, "COS"], "/", "SOS", t[, "SOS"]
-  )
-  t %>%
-    select(`Samples With a Negative Test`) %>%
-    tbl_summary() %>%
-    add_ci() %>%
-    as_gt() %>%
-    print()
-  cat("\n")
-  cat("### Euler diagram of negative results")
-  cat("\n")
-  print(plot(euler(d == "Negative"), quantities = T))
+  agreement_test(b)
   cat("\n")
 }))
+
+
+# invisible(lapply(names(bug_list), function(b) {
+#   cat("\n")
+#   cat("##", as.character(bug_list[b]))
+#   cat("\n")
+#   cos <- paste0(b, "_cos")
+#   sos <- paste0(b, "_sos")
+#   d <- df[, c(cos, sos)]
+#   d <- d[complete.cases(d), ]
+#   colnames(d) <- c("COS", "SOS")
+#   cat("\n")
+#   c <- confusionMatrix(d[, "SOS"],
+#     reference = d[, "COS"], positive = "Positive", mode = "everything"
+#   )
+#   metrics <- data.frame(c$overall)
+#   cat("### 2x2 table")
+#   cat("\n")
+#   two_by_two <- data.frame(c$table)
+#   print(gt(two_by_two))
+#   cat("\n")
+#   cat("### Accuracy")
+#   cat("\n")
+#   print(gt(metrics, rownames_to_stub = T) %>%
+#     fmt_number(n_sigfig = 3) %>%
+#     tab_options(column_labels.hidden = TRUE))
+#   cat("\n")
+#   cat("### Agreement plot")
+#   cat("\n")
+#   print(agreementplot(table(d)))
+#   cat("\n")
+#   cat("### Positive/Positive Excluded")
+#   cat("\n")
+#   t <- d[rowSums(d == "Positive") < 2, ]
+#   t$`Samples With a Negative Test` <- paste(
+#     "COS", t[, "COS"], "/", "SOS", t[, "SOS"]
+#   )
+#   t %>%
+#     select(`Samples With a Negative Test`) %>%
+#     tbl_summary() %>%
+#     add_ci() %>%
+#     as_gt() %>%
+#     print()
+#   cat("\n")
+#   cat("### Euler diagram of negative results")
+#   cat("\n")
+#   print(plot(euler(d == "Negative"), quantities = T))
+#   cat("\n")
+# }))
 ```
 
 # References
