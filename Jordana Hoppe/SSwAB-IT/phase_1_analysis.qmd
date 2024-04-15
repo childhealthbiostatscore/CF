@@ -25,6 +25,7 @@ library(tidyverse)
 library(gt)
 library(gtsummary)
 library(caret)
+library(twoxtwo)
 library(vcd)
 library(eulerr)
 ```
@@ -202,7 +203,7 @@ db_medications %>%
 
 # Agreement
 
-For these agreement analyses, we reported accuracy metrics that include all samples. Accuracy is the proportion of samples where the two tests agreed (positive/positive and negative/negative). Cohen's kappa accounts for agreement between the two tests by chance, and is interpreted analagously to correlation where -1 indicates perfect disagreement and 1 indicates perfect agreement. Cohen's kapps of NaN or NA indicates a lack of variability between the two tests.
+For these agreement analyses, we reported accuracy metrics that include all samples. Accuracy is the proportion of samples where the two tests agreed (positive/positive and negative/negative). Cohen's kappa accounts for agreement between the two tests by chance, and is interpreted analogously to correlation where -1 indicates perfect disagreement and 1 indicates perfect agreement. A Cohen's kappa of NaN or NA indicates a lack of variability between the two tests.
 
 | Cohen's Kappa | Interpretation         |
 |---------------|------------------------|
