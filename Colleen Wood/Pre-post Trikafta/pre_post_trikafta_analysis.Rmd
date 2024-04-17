@@ -11,20 +11,35 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(arsenal)
-load("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood/Prepost Triakfta/Data_Cleaned/analysis_dataset.rdata")
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+)
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r}
+load("./Colleen Wood/Prepost Trikafta/Data_Cleaned/analysis_dataset.rdata")
+df <- df %>%
+  group_by(`CFF ID`) %>%
+  mutate(`Baseline HbA1c` = HbA1c[`Pre or Post` == "Pre"]) %>%
+  ungroup()
+df$`Baseline HbA1c` <- cut(df$`Baseline HbA1c`, c(-Inf, 6.5, Inf), right = F)
 ```
 
 # Participant characteristics prior to CFTR modulator start
 
 ```{r results='asis'}
 # Table
-t1 <- tableby(~ Age + `BMI Percentile` + Weight + Sex + ppFEV1 + ppFVC +
-  `G-tube in past 12 months` + `Pancreatic Status` + Site +
-  Genotype + `Age Group` + Race,
-data = df %>% filter(`Pre or Post` == "Pre")
+t1 <- tableby(
+  ~ Age + `BMI Percentile` + Weight + Sex + ppFEV1 + ppFVC +
+    `G-tube in past 12 months` + `Pancreatic Status` + Site +
+    Genotype + `Age Group` + Race,
+  data = df %>% filter(`Pre or Post` == "Pre")
 )
 summary(t1)
 ```
@@ -36,11 +51,25 @@ summary(t1)
 ### All groups
 
 ```{r results='asis'}
-p <- paired(`Pre or Post` ~ `Num. A1c Values` + HbA1c + Time + Weight + `BMI Percentile` +
-  ppFEV1 + ppFVC + TDD + `Long acting insulin dose`,
-data = df, id = `CFF ID`,
-signed.rank.exact = FALSE, 
-numeric.stats = c("Nmiss", "medianrange", "q1q3")
+p <- paired(
+  `Pre or Post` ~ `Num. A1c Values` + HbA1c + Time + Weight + `BMI Percentile` +
+    ppFEV1 + ppFVC + TDD + `Long acting insulin dose`,
+  data = df, id = `CFF ID`,
+  signed.rank.exact = FALSE,
+  numeric.stats = c("Nmiss", "medianrange", "q1q3")
+)
+summary(p, pfootnote = T, digits = 1)
+```
+
+### Stratified by baseline HbA1c
+
+```{r results='asis'}
+p <- paired(
+  `Pre or Post` ~ `Num. A1c Values` + HbA1c + Time + Weight + `BMI Percentile` +
+    ppFEV1 + ppFVC,
+  data = df, id = `CFF ID`, strata = `Baseline HbA1c`,
+  signed.rank.exact = FALSE,
+  numeric.stats = c("Nmiss", "medianrange", "q1q3")
 )
 summary(p, pfootnote = T, digits = 1)
 ```
@@ -48,11 +77,12 @@ summary(p, pfootnote = T, digits = 1)
 ### By site
 
 ```{r results='asis'}
-p <- paired(`Pre or Post` ~ `Num. A1c Values` + HbA1c + Time + Weight + `BMI Percentile` +
-  ppFEV1 + ppFVC + TDD,
-data = df, id = `CFF ID`,strata = Site,
-signed.rank.exact = FALSE, numeric.test = "notest",
-numeric.stats = c("Nmiss", "medianrange", "q1q3")
+p <- paired(
+  `Pre or Post` ~ `Num. A1c Values` + HbA1c + Time + Weight + `BMI Percentile` +
+    ppFEV1 + ppFVC + TDD,
+  data = df, id = `CFF ID`, strata = Site,
+  signed.rank.exact = FALSE, numeric.test = "notest",
+  numeric.stats = c("Nmiss", "medianrange", "q1q3")
 )
 summary(p, pfootnote = T, digits = 1)
 ```
@@ -64,12 +94,13 @@ Only 13 of those with CGM also had HbA1c values pre- and post-CFTR modulator.
 ### Demographics
 
 ```{r results='asis'}
-cgm = df[!is.na(df$average_sensor),]
+cgm <- df[!is.na(df$average_sensor), ]
 # Table
-t1 <- tableby(~ Age + `BMI Percentile` + Weight + Sex + ppFEV1 + ppFVC +
-  `G-tube in past 12 months` + `Pancreatic Status` + Site +
-  Genotype + `Age Group` + Race,
-data = cgm %>% filter(`Pre or Post` == "Pre")
+t1 <- tableby(
+  ~ Age + `BMI Percentile` + Weight + Sex + ppFEV1 + ppFVC +
+    `G-tube in past 12 months` + `Pancreatic Status` + Site +
+    Genotype + `Age Group` + Race,
+  data = cgm %>% filter(`Pre or Post` == "Pre")
 )
 summary(t1)
 ```
@@ -78,9 +109,22 @@ summary(t1)
 
 ```{r results='asis'}
 cgm_formula <- as.formula(paste0("`Pre or Post`~", paste0(cgm_vars, collapse = "+")))
-cgm_formula = update(cgm_formula,.~.+TDD + `Long acting insulin dose`)
+cgm_formula <- update(cgm_formula, . ~ . + TDD + `Long acting insulin dose`)
 p <- paired(cgm_formula,
   data = cgm, id = `CFF ID`,
+  signed.rank.exact = FALSE, numeric.test = "signed.rank",
+  numeric.stats = c("Nmiss", "medianrange", "q1q3")
+)
+summary(p, pfootnote = T, digits = 1)
+```
+
+#### Stratified by baseline HbA1c
+
+```{r results='asis'}
+cgm_formula <- as.formula(paste0("`Pre or Post`~", paste0(cgm_vars, collapse = "+")))
+cgm_formula <- update(cgm_formula, . ~ . + TDD + `Long acting insulin dose`)
+p <- paired(cgm_formula,
+  data = cgm, id = `CFF ID`, strata = `Baseline HbA1c`,
   signed.rank.exact = FALSE, numeric.test = "signed.rank",
   numeric.stats = c("Nmiss", "medianrange", "q1q3")
 )
@@ -90,8 +134,8 @@ summary(p, pfootnote = T, digits = 1)
 ### Daytime CGM variables
 
 ```{r results='asis'}
-cgm$daytime_cv = cgm$daytime_sd / cgm$daytime_avg_sensor_glucose
-day_cgm = c(day_cgm,"daytime_cv")
+cgm$daytime_cv <- cgm$daytime_sd / cgm$daytime_avg_sensor_glucose
+day_cgm <- c(day_cgm, "daytime_cv")
 cgm_formula <- as.formula(paste0("`Pre or Post`~", paste0(day_cgm, collapse = "+")))
 p <- paired(cgm_formula,
   data = cgm, id = `CFF ID`,
@@ -101,14 +145,42 @@ p <- paired(cgm_formula,
 summary(p, pfootnote = T, digits = 1)
 ```
 
+#### Stratified by baseline HbA1c
+
+```{r results='asis'}
+cgm$daytime_cv <- cgm$daytime_sd / cgm$daytime_avg_sensor_glucose
+day_cgm <- c(day_cgm, "daytime_cv")
+cgm_formula <- as.formula(paste0("`Pre or Post`~", paste0(day_cgm, collapse = "+")))
+p <- paired(cgm_formula,
+  data = cgm, id = `CFF ID`, strata = `Baseline HbA1c`,
+  signed.rank.exact = FALSE, numeric.test = "signed.rank",
+  numeric.stats = c("Nmiss", "medianrange", "q1q3")
+)
+summary(p, pfootnote = T, digits = 1)
+```
+
 ### Nighttime CGM variables
 
 ```{r results='asis'}
-cgm$nighttime_cv = cgm$nighttime_sd / cgm$nighttime_avg_sens_glucose
-night_cgm = c(night_cgm,"nighttime_cv")
+cgm$nighttime_cv <- cgm$nighttime_sd / cgm$nighttime_avg_sens_glucose
+night_cgm <- c(night_cgm, "nighttime_cv")
 cgm_formula <- as.formula(paste0("`Pre or Post`~", paste0(night_cgm, collapse = "+")))
 p <- paired(cgm_formula,
   data = cgm, id = `CFF ID`,
+  signed.rank.exact = FALSE, numeric.test = "signed.rank",
+  numeric.stats = c("Nmiss", "medianrange", "q1q3")
+)
+summary(p, pfootnote = T, digits = 1)
+```
+
+#### Stratified by baseline HbA1c
+
+```{r results='asis'}
+cgm$nighttime_cv <- cgm$nighttime_sd / cgm$nighttime_avg_sens_glucose
+night_cgm <- c(night_cgm, "nighttime_cv")
+cgm_formula <- as.formula(paste0("`Pre or Post`~", paste0(night_cgm, collapse = "+")))
+p <- paired(cgm_formula,
+  data = cgm, id = `CFF ID`, strata = `Baseline HbA1c`,
   signed.rank.exact = FALSE, numeric.test = "signed.rank",
   numeric.stats = c("Nmiss", "medianrange", "q1q3")
 )
