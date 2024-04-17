@@ -13,6 +13,7 @@ output:
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(arsenal)
+library(rspiro)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
@@ -24,11 +25,19 @@ knitr::opts_knit$set(root.dir = home_dir)
 
 ```{r}
 load("./Colleen Wood/Prepost Trikafta/Data_Cleaned/analysis_dataset.rdata")
+# Baseline HbA1c
 df <- df %>%
   group_by(`CFF ID`) %>%
   mutate(`Baseline HbA1c` = HbA1c[`Pre or Post` == "Pre"]) %>%
   ungroup()
 df$`Baseline HbA1c` <- cut(df$`Baseline HbA1c`, c(-Inf, 6.5, Inf), right = F)
+# Race neutral equations
+df$ppFEV1gl <- pctpred_GLIgl(
+  age = df$Age, height = df$Height / 100, gender = df$Sex, FEV1 = df$FEV1
+)
+df$ppFVCgl <- pctpred_GLIgl(
+  age = df$Age, height = df$Height / 100, gender = df$Sex, FVC = df$FEV1
+)
 ```
 
 # Participant characteristics prior to CFTR modulator start
@@ -36,8 +45,8 @@ df$`Baseline HbA1c` <- cut(df$`Baseline HbA1c`, c(-Inf, 6.5, Inf), right = F)
 ```{r results='asis'}
 # Table
 t1 <- tableby(
-  ~ Age + `BMI Percentile` + Weight + Sex + ppFEV1 + ppFVC +
-    `G-tube in past 12 months` + `Pancreatic Status` + Site +
+  ~ Age + `BMI Percentile` + Weight + Sex + ppFEV1 + ppFEV1gl + ppFVC +
+    ppFVCgl + `G-tube in past 12 months` + `Pancreatic Status` + Site +
     Genotype + `Age Group` + Race,
   data = df %>% filter(`Pre or Post` == "Pre")
 )
@@ -52,8 +61,9 @@ summary(t1)
 
 ```{r results='asis'}
 p <- paired(
-  `Pre or Post` ~ `Num. A1c Values` + HbA1c + Time + Weight + `BMI Percentile` +
-    ppFEV1 + ppFVC + TDD + `Long acting insulin dose`,
+  `Pre or Post` ~ `Num. A1c Values` + HbA1c + Time + Weight +
+    `BMI Percentile` + ppFEV1 + ppFEV1gl + ppFVC + ppFVCgl + TDD +
+    `Long acting insulin dose`,
   data = df, id = `CFF ID`,
   signed.rank.exact = FALSE,
   numeric.stats = c("Nmiss", "medianrange", "q1q3")
@@ -78,8 +88,8 @@ summary(p, pfootnote = T, digits = 1)
 
 ```{r results='asis'}
 p <- paired(
-  `Pre or Post` ~ `Num. A1c Values` + HbA1c + Time + Weight + `BMI Percentile` +
-    ppFEV1 + ppFVC + TDD,
+  `Pre or Post` ~ `Num. A1c Values` + HbA1c + Time + Weight +
+    `BMI Percentile` + ppFEV1 + ppFEV1gl + ppFVC + ppFVCgl + TDD,
   data = df, id = `CFF ID`, strata = Site,
   signed.rank.exact = FALSE, numeric.test = "notest",
   numeric.stats = c("Nmiss", "medianrange", "q1q3")
@@ -97,8 +107,8 @@ Only 13 of those with CGM also had HbA1c values pre- and post-CFTR modulator.
 cgm <- df[!is.na(df$average_sensor), ]
 # Table
 t1 <- tableby(
-  ~ Age + `BMI Percentile` + Weight + Sex + ppFEV1 + ppFVC +
-    `G-tube in past 12 months` + `Pancreatic Status` + Site +
+  ~ Age + `BMI Percentile` + Weight + Sex + ppFEV1 + ppFEV1gl + ppFVC +
+    ppFVCgl + `G-tube in past 12 months` + `Pancreatic Status` + Site +
     Genotype + `Age Group` + Race,
   data = cgm %>% filter(`Pre or Post` == "Pre")
 )
