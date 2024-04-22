@@ -35,15 +35,18 @@ library(eulerr)
 library(broom)
 library(emmeans)
 library(ggstats)
-source("/Users/timvigers/GitHub/shared-resources/Visualization/forest_plots.R")
-switch(Sys.info()[["sysname"]],
-  Windows = {
-    home_dir <- "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry"
-  },
-  Darwin = {
-    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry"
-  }
+library(data.table)
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry"
 )
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/GitHub",
+  "Windows" = "C:/Users/Tim/GitHub",
+  "Linux" = "/home/timvigers/GitHub"
+)
+source(paste0(github_dir, "/shared-resources/Visualization/forest_plots.R"))
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
@@ -504,7 +507,7 @@ vars <- c(
   "age_group", "Gender", "bmi_perc", "bmi_perc_cat", "MutClass", "Race",
   "Hispanicrace", "A_IsOnEnzymes", "ppFEV1_cat", "tube_feeding",
   "NumPulmExacerbation", "A_pseudomonasaeruginosa", "A_fungalyeast1",
-  "A_mycocultureresults3", "A_corticosteroids1", "cfrd_status_annual", 
+  "A_mycocultureresults3", "A_corticosteroids1", "cfrd_status_annual",
   "A_Vx770", "A_VX809comb", "liver_disease"
 )
 # Nice labels for plots and tables
@@ -594,7 +597,7 @@ invisible(lapply(km_table, function(t) {
 xvars <- c(
   "age_group", "Gender", "Race", "Hispanicrace", "bmi_perc_cat", "MutClass",
   "A_IsOnEnzymes", "tube_feeding", "liver_disease", "ppFEV1_cat",
-  "NumPulmExacerbation",  "A_corticosteroids1"
+  "NumPulmExacerbation", "A_corticosteroids1"
 )
 y <- "Surv(tstart, tstop, cfrd_status_annual)"
 f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
