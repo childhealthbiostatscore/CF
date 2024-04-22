@@ -28,6 +28,11 @@ home_dir <- switch(Sys.info()["sysname"],
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
 )
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/GitHub",
+  "Windows" = "C:/Users/Tim/GitHub",
+  "Linux" = "/home/timvigers/GitHub"
+)
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
