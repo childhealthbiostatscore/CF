@@ -44,7 +44,8 @@ diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with C
 exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) | diagnoses$Code == "Exclude"]
 exclude <- exclude[!is.na(exclude)]
 # Import data
-df <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv", na.strings = "")
+df <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv", 
+               na.strings = "")
 n1 <- nrow(df)
 n2 <- length(unique(df$PatientID))
 # Remove exclusions from Angela
