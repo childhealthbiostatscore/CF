@@ -44,8 +44,9 @@ diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with C
 exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) | diagnoses$Code == "Exclude"]
 exclude <- exclude[!is.na(exclude)]
 # Import data
-df <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv", 
-               na.strings = "")
+df <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv",
+  na.strings = ""
+)
 n1 <- nrow(df)
 n2 <- length(unique(df$PatientID))
 # Remove exclusions from Angela
@@ -174,48 +175,48 @@ t1_df <- df %>%
 df$Diagnosis <- factor(df$Diagnosis, levels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "Non-CF"))
 ```
 
-# Flowchart
+<!-- # Flowchart -->
 
-```{r}
-grViz("digraph {
+<!-- ```{r} -->
+<!-- grViz("digraph { -->
 
-# initiate graph
-graph [layout = dot]
+<!-- # initiate graph -->
+<!-- graph [layout = dot] -->
 
-# global node settings
-node [shape = rectangle]
+<!-- # global node settings -->
+<!-- node [shape = rectangle] -->
 
-# label nodes
-data1 [label = '@@1']
-data2 [label = '@@2']
-ineligible [label = '@@3']
-demo  [label = '@@4']
-highna  [label = '@@5']
-highcl  [label = '@@6']
-highnacl  [label = '@@7']
-review [label = '@@8']
-analysis [label = '@@9']
-ratio [label = '@@10']
+<!-- # label nodes -->
+<!-- data1 [label = '@@1'] -->
+<!-- data2 [label = '@@2'] -->
+<!-- ineligible [label = '@@3'] -->
+<!-- demo  [label = '@@4'] -->
+<!-- highna  [label = '@@5'] -->
+<!-- highcl  [label = '@@6'] -->
+<!-- highnacl  [label = '@@7'] -->
+<!-- review [label = '@@8'] -->
+<!-- analysis [label = '@@9'] -->
+<!-- ratio [label = '@@10'] -->
 
-# edge definitions with the node IDs
-data1  -> data2
-data2 -> ineligible
-ineligible -> {demo,highna,highcl,highnacl,review}
-data2  -> analysis -> ratio
-highnacl -> analysis [style=invis]
-}
-[1]: paste0('Sweat tests performed \\n ','n = ',n1)
-[2]: paste0('Unique participants \\n ','n = ',n2)
-[3]: paste0('Ineligible \\n ','n = ',n2-nrow(t1_df))
-[4]: paste0('No demographics \\n ','n = ',length(no_dem))
-[5]: paste0('Na > 160 mmol/L \\n ','n = ',length(high_na))
-[6]: paste0('Cl > 160 mmol/L \\n ','n = ',length(high_cl))
-[7]: paste0('Na:Cl > 2 \\n ','n = ',length(high_ratio))
-[8]: paste0('Other \\n ','n = ',1)
-[9]: paste0('Analysis cohort \\n ','n = ',nrow(t1_df))
-[10]: paste0('Both Na and Cl Measured \\n ','n = ',sum(!is.na(df$`Na/Cl Ratio`)))
-")
-```
+<!-- # edge definitions with the node IDs -->
+<!-- data1  -> data2 -->
+<!-- data2 -> ineligible -->
+<!-- ineligible -> {demo,highna,highcl,highnacl,review} -->
+<!-- data2  -> analysis -> ratio -->
+<!-- highnacl -> analysis [style=invis] -->
+<!-- } -->
+<!-- [1]: paste0('Sweat tests performed \\n ','n = ',n1) -->
+<!-- [2]: paste0('Unique participants \\n ','n = ',n2) -->
+<!-- [3]: paste0('Ineligible \\n ','n = ',n2-nrow(t1_df)) -->
+<!-- [4]: paste0('No demographics \\n ','n = ',length(no_dem)) -->
+<!-- [5]: paste0('Na > 160 mmol/L \\n ','n = ',length(high_na)) -->
+<!-- [6]: paste0('Cl > 160 mmol/L \\n ','n = ',length(high_cl)) -->
+<!-- [7]: paste0('Na:Cl > 2 \\n ','n = ',length(high_ratio)) -->
+<!-- [8]: paste0('Other \\n ','n = ',1) -->
+<!-- [9]: paste0('Analysis cohort \\n ','n = ',nrow(t1_df)) -->
+<!-- [10]: paste0('Both Na and Cl Measured \\n ','n = ',sum(!is.na(df$`Na/Cl Ratio`))) -->
+<!-- ") -->
+<!-- ``` -->
 
 # Cohorts by Na/Cl ratio
 
@@ -533,9 +534,9 @@ roc_non_cf <- roc(
 )
 coords_non_cf <- round(coords(roc_non_cf, "best", best.method = "youden"), 3)
 
-plot(roc_cf, print.auc = TRUE,lty=1)
-plot(roc_non_cf, print.auc = TRUE,add=T,lty=2,print.auc.y=0.4)
-legend("bottomright",legend = c("CF vs. CFTR-RD or CRMS","Non-CF vs. CFTR-RD or CRMS"),lty = c(1,2))
+plot(roc_cf, print.auc = TRUE, lty = 1)
+plot(roc_non_cf, print.auc = TRUE, add = T, lty = 2, print.auc.y = 0.4)
+legend("bottomright", legend = c("CF vs. CFTR-RD or CRMS", "Non-CF vs. CFTR-RD or CRMS"), lty = c(1, 2))
 ```
 
 The blue curve shows the ROC for distinguishing between CFTR-RD or CRMS vs. CF, and the red is the ROC curve for distinguishing between non-CF vs. CFTR-RD or CRMS. The optimal threshold for distinguishing between CFTR-RD or CRMS vs. CF was `r coords_cf$threshold` (sensitivity = `r coords_cf$sensitivity`, specificity = `r coords_cf$specificity`) based on the Youden index. The optimal threshold for distinguishing between non-CF vs. CFTR-RD or CRMS was `r coords_non_cf$threshold` (sensitivity = `r coords_non_cf$sensitivity`, specificity = `r coords_non_cf$specificity`) based on the Youden index. The mean AUC for the two curves is `r round(mean(c(roc_cf$auc,roc_non_cf$auc)),3)`.

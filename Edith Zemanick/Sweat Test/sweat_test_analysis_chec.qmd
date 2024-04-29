@@ -23,10 +23,11 @@ editor: source
 ```{r setup}
 #| include: false
 library(tidyverse)
+library(readxl)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Test",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Edith Zemanick/Sweat Test",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Edith Zemanick/Sweat Test"
 )
 github_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/GitHub",
@@ -37,7 +38,34 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
-
+# Import exclusion data from Excel
+diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with CF or Non-CF.xlsx")
+exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) | diagnoses$Code == "Exclude"]
+exclude <- exclude[!is.na(exclude)]
+# Import data
+df <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv",
+  na.strings = ""
+)
+# Remove exclusions from Angela
+df <- df[!(df$PatientID %in% exclude), ]
+# Diagnosis per Angela
+df$Diagnosis <- factor(diagnoses$Diagnosis[match(df$PatientID, diagnoses$PatientID)],
+  levels = c("CFTR-related disorder", "CRMS", "Cystic Fibrosis", "Non-CF"),
+  labels = c("CFTR-RD or CRMS", "CFTR-RD or CRMS", "Cystic Fibrosis", "Non-CF")
+)
+# Add modulator info
+cftr <- read.csv("./Data_Raw/Copy of Report CFTR Modulators.csv")
+df$Modulator <- apply(df, 1, function(r) {
+  mod <- cftr[cftr$Patient.ID == as.numeric(r["PatientID"]), ]
+  if (any(duplicated(mod$Age.at.Start..years.))) {
+    mod <- mod[-which(duplicated(mod$Age.at.Start..years.)), ]
+  }
+  mod <- mod[order(mod$Age.at.Start..years.), ]
+  age <- as.numeric(r["Age.at.Test.in.Years"])
+  as.character(cut(age, c(-Inf, mod$Age.at.Start..years., Inf),
+    labels = c("None", mod$Modulator), right = F
+  ))
+})
 ```
 
 # Table
