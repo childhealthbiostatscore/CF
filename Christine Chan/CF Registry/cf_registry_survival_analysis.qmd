@@ -59,9 +59,6 @@ annual <- read.csv("./Data_Raw/CFF19_Annualized_Del1.csv",
 )
 data_dict <- readxl::read_excel("./Data_Raw/Copy of Codes for CFFPR_2018.xlsx")
 data_dict$var <- paste(data_dict$field_name, data_dict$code_value, sep = "_")
-# Find each person's entry date
-annual = annual %>% group_by(eDWID) %>%
-  mutate(entry_date = min(ReviewYear))
 # Remove those with T1D or T2D
 annual <- annual %>% arrange(eDWID, ReviewYear)
 annual <- annual[!annual$cfrd_status_annual %in% c(4, 5), ]
@@ -169,15 +166,6 @@ annual[, yn_vars] <- lapply(annual[, yn_vars], factor,
   labels = c("No", "Yes")
 )
 annual$A_IsOnEnzymes <- relevel(annual$A_IsOnEnzymes, ref = "Yes")
-# Approximate year of birth
-by <- annual %>%
-  mutate(birth_year = floor(ReviewYear - Age_YrEnd)) %>%
-  group_by(eDWID) %>%
-  count(birth_year) %>%
-  group_by(eDWID) %>%
-  slice_min(birth_year) %>%
-  select(-n)
-annual <- left_join(annual, by, by = join_by(eDWID))
 # BMI percentile to categorical
 annual$bmi_perc_cat <- cut(annual$bmi_perc, breaks = c(0, 10, 50, 85, Inf))
 annual$bmi_perc_cat <- relevel(annual$bmi_perc_cat, ref = "(50,85]")
@@ -203,19 +191,18 @@ annual$CFRD[annual$ReviewYear < annual$first_cfrd] <- "CFRD-"
 annual$CFRD[annual$ReviewYear >= annual$first_cfrd] <- "CFRD+"
 annual$CFRD[is.na(annual$first_cfrd)] <- "CFRD-"
 annual$CFRD <- factor(annual$CFRD, levels = c("CFRD-", "CFRD+"))
+# Add formatted columns for survival analysis
+annual$tstop <- ymd(paste0(annual$ReviewYear, "-12-31"))
+annual$tstart <- ymd(paste0(annual$ReviewYear, "-01-01"))
+annual <- annual %>%
+  group_by(eDWID) %>%
+  mutate(entry_date = tstart[1]) %>%
+  ungroup()
 # For each person, filter out all the years after first CFRD diagnosis
 annual <- annual %>% filter(ReviewYear <= first_cfrd | is.na(first_cfrd))
 # Remove those under 10
 annual <- annual %>% filter(Age_YrEnd != 0, Age_YrEnd >= 10)
-annual$age_group = droplevels(annual$age_group)
-# Add formatted columns for survival analysis
-annual = annual %>% 
-  mutate(tstop = ReviewYear) %>%
-  group_by(eDWID) %>%
-  mutate(
-    tstart = lag(tstop, default = birth_year[1]),
-    age_at_entry = Age_YrEnd[1]
-  )
+annual$age_group <- droplevels(annual$age_group)
 # List of covariates
 vars <- c(
   "age_group", "Gender", "bmi_perc", "bmi_perc_cat", "MutClass", "Race",
@@ -229,7 +216,9 @@ labels <- list(
   cfrd_status_annual = "CFRD Status", MutClass = "Mutation class",
   Race = "Race", Hispanicrace = "Hispanic",
   Gender = "Sex", A_IsOnEnzymes = "Pancreatic enzyme use",
-  ppFEV1_cat = "FEV1 percent predicted",
+  ppFEV1_cat = "FEV1 percent predicted category",
+  A_FEV1_pct_predicted = "FEV1 percent predicted",
+  A_FVC_pct_predicted = "FVC percent predicted",
   tube_feeding = "Enteric feedings", liver_disease = "Liver disease",
   A_corticosteroids1 = "Use of corticosteroids",
   NumPulmExacerbation = "Admissions for PEx", age_group = "Age group",
@@ -238,11 +227,12 @@ labels <- list(
   A_VX809comb = "Use of CFTR modulator Vx809 combination",
   A_pseudomonasaeruginosa = "Pseudomonas aeruginosa",
   A_fungalyeast1 = "Aspergillus (any species)",
-  A_mycocultureresults3 = "Microorganisms in myco culture",
-  eDWID = "ID", birth_year = "Birth year",
+  A_mycocultureresults3 = "Microorganisms in myco culture", eDWID = "ID",
   tstart = "Interval start", tstop = "Interval stop",
-  age_at_entry = "Age at entry", Age_YrEnd = "Age", bmi_perc = "BMI %ile"
+  Age_YrEnd = "Age", bmi_perc = "BMI %ile"
 )
+label(annual[, which(colnames(annual) %in% names(labels))]) <-
+  labels[colnames(annual)[which(colnames(annual) %in% names(labels))]]
 ```
 
 Registry fields included in our liver disease yes/no variable were:
@@ -267,22 +257,28 @@ data.frame(data_dict$code_meaning[
 
 # CFRD incidence and prevalence
 
-```{r}
-t2004 = annual %>% select()
-```
+## Demographics of Incident CFRD cases versus non-CFRD cases in 2004, 2011, and 2018
 
 ```{r}
-# Use flexsurv to fit a survival model that can be passed to rprev
-llog <- flexsurv::flexsurvreg(Surv(tstop, as.numeric(CFRD)==2) ~ 1, 
-                              data=prevdata, dist='llogis')
-prev_llog <- prevalence(index='2004-01-01', 
-                        num_years_to_estimate=1, 
-                        data=annual, 
-                        inc_formula = entrydate ~ 1,
-                        surv_model=llog,
-                        death_column = "first_cfrd",
-                        incident_column = "first_cfrd",
-                        N_boot = 100)
+annual %>%
+  filter(ReviewYear %in% c(2004, 2011, 2018)) %>%
+  select(
+    ReviewYear, CFRD, Age_YrEnd, Gender, Race, Hispanicrace, bmi_perc,
+    bmi_perc_cat, MutClass, tube_feeding, liver_disease, A_FEV1_pct_predicted,
+    A_FVC_pct_predicted, NumPulmExacerbation, A_corticosteroids1
+  ) %>%
+  tbl_strata(
+    strata = ReviewYear,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(
+          by = CFRD, missing_text = "Missing",
+          type = list(A_corticosteroids1 ~ "categorical")
+        ) %>%
+        add_p() %>%
+        add_overall() %>%
+        separate_p_footnotes()
+  )
 ```
 
 # CFRD screening rates
@@ -295,28 +291,41 @@ Based on CFFPR annualized data. These data are interval censored because we know
 
 ```{r}
 # Whole cohort
-km_fit <- survfit(Surv(tstart, tstop, as.numeric(CFRD)==2) ~ 1,
+og <- as.numeric(ymd("2003-01-01"))
+km_fit <- survfit(
+  Surv(as.numeric(tstart), as.numeric(tstop), as.numeric(CFRD) == 2,
+    origin = og
+  ) ~ 1,
   data = annual, id = eDWID
 )
 ggsurvplot(km_fit,
-  data = annual, risk.table = T, cumevents = T,
-  fun = "event", xlim = c(2003, 2018), break.x.by = 1
+  data = annual, risk.table = T, cumevents = T, fun = "event",
+  xlab = "Days from 2003-01-01"
 )
-kable(tidy(km_fit))
+cum_inc <- tidy(km_fit)
+cum_inc$time <- as.Date(cum_inc$time + og)
+kable(cum_inc)
 # By age group
-km_fit <- survfit(Surv(tstart, tstop, as.numeric(CFRD)==2) ~ age_group,
+km_fit <- survfit(
+  Surv(as.numeric(tstart), as.numeric(tstop), as.numeric(CFRD) == 2,
+    origin = og
+  ) ~ age_group,
   data = annual, id = eDWID
 )
 ggsurvplot(km_fit,
-  data = annual, risk.table = T, cumevents = T,
-  fun = "event", xlim = c(2003, 2018), break.x.by = 1
+  data = annual, risk.table = T, cumevents = T, fun = "event",
+  xlab = "Days from 2003-01-01"
 )
 km_table <- tidy(km_fit)
+km_table$time <- as.Date(km_table$time + og)
 km_table <- split.data.frame(km_table, km_table$strata)
+```
+
+```{r results='asis'}
 invisible(lapply(km_table, function(t) {
   name <- t$strata[1]
   t <- t %>% select(-strata)
-  kable(t, caption = name)
+  print(kable(t, caption = name))
 }))
 ```
 
@@ -331,7 +340,7 @@ xvars <- c(
   "A_IsOnEnzymes", "tube_feeding", "liver_disease", "ppFEV1_cat",
   "NumPulmExacerbation", "A_corticosteroids1"
 )
-y <- "Surv(tstart, tstop, as.numeric(CFRD)==2)"
+y <- "Surv(as.numeric(tstart), as.numeric(tstop), as.numeric(CFRD) == 2)"
 f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
 cox_res <- coxph(f, data = annual, id = eDWID)
 # Plot survival
@@ -358,12 +367,16 @@ time_varying <- rownames(test.ph)[test.ph$p < 0.05]
 ### Time varying coefficients
 
 ```{r}
-annual_split <- survSplit(Surv(tstart, tstop, as.numeric(CFRD)==2) ~ .,
+annual_split <- survSplit(
+  Surv(as.numeric(tstart), as.numeric(tstop), as.numeric(CFRD) == 2,
+    origin = og
+  ) ~ .,
   data = annual, cut = c(2008, 2013, 2018), episode = "tgroup"
 )
 annual_split$tgroup <- factor(annual_split$tgroup,
   levels = 1:3, labels = c("[2003,2009)", "[2009,2014)", "[2014,2019)")
 )
+y <- "Surv(as.numeric(tstart), as.numeric(tstop), event)"
 ```
 
 In the plots below, time-varying coefficients are excluded from the first forest plot, to show the average effect of the predictors. In the second forest plot, the estimated marginal means (EMMs) for the time-varying coefficients are shown. The EMMs are averaged over the levels of all the other variables in the model. In other words, the EMM represents the baseline hazard (not hazard ratio) at the average level of all the other variables in the model. For example, the log hazard for an average participant age [30, Inf) in the time period [2003,2009) is 1.887 and the log hazard for a similar participant in [2014,2019) is 1.401. 
