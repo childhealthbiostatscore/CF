@@ -12,7 +12,7 @@ output:
 
 ```{r setup, include=FALSE}
 library(tidyverse)
-library(arsenal)
+library(gtsummary)
 library(rspiro)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
@@ -38,6 +38,8 @@ df$ppFEV1gl <- pctpred_GLIgl(
 df$ppFVCgl <- pctpred_GLIgl(
   age = df$Age, height = df$Height / 100, gender = df$Sex, FVC = df$FEV1
 )
+# Columns formats
+df$`Num. A1c Values` <- as.numeric(df$`Num. A1c Values`)
 ```
 
 # Participant characteristics prior to CFTR modulator start
@@ -51,6 +53,17 @@ t1 <- tableby(
   data = df %>% filter(`Pre or Post` == "Pre")
 )
 summary(t1)
+
+df %>%
+  select(
+    Age, `BMI Percentile`, Weight, Sex, ppFEV1, ppFEV1gl, ppFVC,
+    ppFVCgl, `G-tube in past 12 months`, `Pancreatic Status`, Site,
+    Genotype, `Age Group`, Race
+  ) %>%
+  tbl_summary(
+    statistic = list(c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~ "{mean} ± {sd}"),
+    missing_text = "Missing"
+  )
 ```
 
 # Pre-post
@@ -69,6 +82,21 @@ p <- paired(
   numeric.stats = c("Nmiss", "medianrange", "q1q3")
 )
 summary(p, pfootnote = T, digits = 1)
+
+df %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Num. A1c Values`, HbA1c, Time, Weight,
+    `BMI Percentile`, ppFEV1, ppFEV1gl, ppFVC, ppFVCgl, TDD,
+  ) %>%
+  tbl_summary(by = `Pre or Post`,type = list(`Num. A1c Values`~"continuous"),
+              include = -`CFF ID`) %>%
+  add_p(test = list(
+      c("Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile", "TDD") ~
+        "paired.wilcox.test",
+      c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~ "paired.t.test"
+    ),
+    group = `CFF ID`)%>%
+  separate_p_footnotes()
 ```
 
 ### Stratified by baseline HbA1c
