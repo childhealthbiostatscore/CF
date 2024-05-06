@@ -78,6 +78,7 @@ df %>%
 ### All groups
 
 ```{r}
+# Table
 df %>%
   select(
     `CFF ID`, `Pre or Post`, `Num. A1c Values`, HbA1c, Time, Weight,
@@ -108,11 +109,18 @@ df %>%
     group = `CFF ID`
   ) %>%
   separate_p_footnotes()
+# Plot
+ggplot(df, aes(x = `Pre or Post`, y = HbA1c, group = `CFF ID`)) +
+  geom_point(alpha = 0.2) +
+  geom_line(alpha = 0.2) +
+  theme_classic() +
+  theme(axis.title.x = element_blank())
 ```
 
 ### By site
 
 ```{r}
+# Table
 df %>%
   select(
     `CFF ID`, `Pre or Post`, Site, `Num. A1c Values`, HbA1c, Time,
@@ -122,7 +130,8 @@ df %>%
     strata = Site,
     .tbl_fun = ~ .x %>%
       tbl_summary(
-        by = `Pre or Post`, type = list(
+        by = `Pre or Post`,
+        type = list(
           c(
             "Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile",
             "ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl", "TDD"
@@ -139,19 +148,29 @@ df %>%
       ) %>%
       add_p(
         test = list(
-          c("Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile", "TDD") ~
-            "paired.wilcox.test",
+          c(
+            "Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile",
+            "TDD"
+          ) ~ "paired.wilcox.test",
           c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~ "paired.t.test"
         ),
         group = `CFF ID`
       ) %>%
       separate_p_footnotes()
   )
+# Plot
+ggplot(df, aes(x = `Pre or Post`, y = HbA1c, group = `CFF ID`)) +
+  geom_point(alpha = 0.2) +
+  geom_line(alpha = 0.2) +
+  theme_classic() +
+  theme(axis.title.x = element_blank()) +
+  facet_wrap(~Site)
 ```
 
 ### By baseline HbA1c
 
 ```{r}
+# Table
 df %>%
   select(
     `CFF ID`, `Pre or Post`, `Baseline HbA1c`, `Num. A1c Values`, HbA1c, Time,
@@ -161,7 +180,8 @@ df %>%
     strata = `Baseline HbA1c`,
     .tbl_fun = ~ .x %>%
       tbl_summary(
-        by = `Pre or Post`, type = list(
+        by = `Pre or Post`,
+        type = list(
           c(
             "Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile",
             "ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl", "TDD"
@@ -178,19 +198,29 @@ df %>%
       ) %>%
       add_p(
         test = list(
-          c("Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile", "TDD") ~
-            "paired.wilcox.test",
+          c(
+            "Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile",
+            "TDD"
+          ) ~ "paired.wilcox.test",
           c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~ "paired.t.test"
         ),
         group = `CFF ID`
       ) %>%
       separate_p_footnotes()
   )
+# Plot
+ggplot(df, aes(x = `Pre or Post`, y = HbA1c, group = `CFF ID`)) +
+  geom_point(alpha = 0.2) +
+  geom_line(alpha = 0.2) +
+  theme_classic() +
+  theme(axis.title.x = element_blank()) +
+  facet_wrap(~`Baseline HbA1c`)
 ```
 
 ### By BMI percentile pre-modulator
 
 ```{r}
+# Table
 df %>%
   select(
     `CFF ID`, `Pre or Post`, `Baseline BMI`, `Num. A1c Values`, HbA1c, Time,
@@ -200,7 +230,8 @@ df %>%
     strata = `Baseline BMI`,
     .tbl_fun = ~ .x %>%
       tbl_summary(
-        by = `Pre or Post`, type = list(
+        by = `Pre or Post`,
+        type = list(
           c(
             "Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile",
             "ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl", "TDD"
@@ -217,19 +248,29 @@ df %>%
       ) %>%
       add_p(
         test = list(
-          c("Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile", "TDD") ~
-            "paired.wilcox.test",
+          c(
+            "Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile",
+            "TDD"
+          ) ~ "paired.wilcox.test",
           c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~ "paired.t.test"
         ),
         group = `CFF ID`
       ) %>%
       separate_p_footnotes()
   )
+# Plot
+ggplot(df, aes(x = `Pre or Post`, y = HbA1c, group = `CFF ID`)) +
+  geom_point(alpha = 0.2) +
+  geom_line(alpha = 0.2) +
+  theme_classic() +
+  theme(axis.title.x = element_blank()) +
+  facet_wrap(~`Baseline BMI`)
 ```
 
 ### By BMI percentile post-modulator
 
 ```{r}
+# Table
 df %>%
   select(
     `CFF ID`, `Pre or Post`, `Post BMI`, `Num. A1c Values`, HbA1c, Time,
@@ -268,6 +309,16 @@ df %>%
       ) %>%
       separate_p_footnotes()
   )
+# Plot
+ggplot(
+  df[!is.na(df$`Post BMI`), ],
+  aes(x = `Pre or Post`, y = HbA1c, group = `CFF ID`)
+) +
+  geom_point(alpha = 0.2) +
+  geom_line(alpha = 0.2) +
+  theme_classic() +
+  theme(axis.title.x = element_blank()) +
+  facet_wrap(~`Post BMI`)
 ```
 
 ## CGM
