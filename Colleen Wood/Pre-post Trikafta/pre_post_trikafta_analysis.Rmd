@@ -20,7 +20,7 @@ home_dir <- switch(Sys.info()["sysname"],
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
 )
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
@@ -77,7 +77,7 @@ df %>%
 
 ### All groups
 
-```{r warning=FALSE, message=FALSE}
+```{r}
 df %>%
   select(
     `CFF ID`, `Pre or Post`, `Num. A1c Values`, HbA1c, Time, Weight,
@@ -110,48 +110,9 @@ df %>%
   separate_p_footnotes()
 ```
 
-### Stratified by baseline HbA1c
-
-```{r warning=FALSE, message=FALSE}
-df %>%
-  select(
-    `CFF ID`, `Pre or Post`, `Baseline HbA1c`, `Num. A1c Values`, HbA1c, Time,
-    Weight, `BMI Percentile`, ppFEV1, ppFEV1gl, ppFVC, ppFVCgl, TDD,
-  ) %>%
-  tbl_strata(
-    strata = `Baseline HbA1c`,
-    .tbl_fun = ~ .x %>%
-      tbl_summary(
-        by = `Pre or Post`, type = list(
-          c(
-            "Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile",
-            "ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl", "TDD"
-          ) ~ "continuous2"
-        ),
-        statistic = list(
-          c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~
-            c("{mean} ± {sd}", "{min}, {max}"),
-          c("Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile") ~
-            c("{median} [{p25}, {p75}]", "{min}, {max}")
-        ),
-        include = -`CFF ID`, digits = list(everything() ~ 2),
-        missing_text = "Missing"
-      ) %>%
-      add_p(
-        test = list(
-          c("Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile", "TDD") ~
-            "paired.wilcox.test",
-          c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~ "paired.t.test"
-        ),
-        group = `CFF ID`
-      ) %>%
-      separate_p_footnotes()
-  )
-```
-
 ### By site
 
-```{r warning=FALSE, message=FALSE}
+```{r}
 df %>%
   select(
     `CFF ID`, `Pre or Post`, Site, `Num. A1c Values`, HbA1c, Time,
@@ -188,9 +149,48 @@ df %>%
   )
 ```
 
+### By baseline HbA1c
+
+```{r}
+df %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Baseline HbA1c`, `Num. A1c Values`, HbA1c, Time,
+    Weight, `BMI Percentile`, ppFEV1, ppFEV1gl, ppFVC, ppFVCgl, TDD,
+  ) %>%
+  tbl_strata(
+    strata = `Baseline HbA1c`,
+    .tbl_fun = ~ .x %>%
+      tbl_summary(
+        by = `Pre or Post`, type = list(
+          c(
+            "Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile",
+            "ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl", "TDD"
+          ) ~ "continuous2"
+        ),
+        statistic = list(
+          c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~
+            c("{mean} ± {sd}", "{min}, {max}"),
+          c("Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile") ~
+            c("{median} [{p25}, {p75}]", "{min}, {max}")
+        ),
+        include = -`CFF ID`, digits = list(everything() ~ 2),
+        missing_text = "Missing"
+      ) %>%
+      add_p(
+        test = list(
+          c("Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile", "TDD") ~
+            "paired.wilcox.test",
+          c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~ "paired.t.test"
+        ),
+        group = `CFF ID`
+      ) %>%
+      separate_p_footnotes()
+  )
+```
+
 ### By BMI percentile pre-modulator
 
-```{r warning=FALSE, message=FALSE}
+```{r}
 df %>%
   select(
     `CFF ID`, `Pre or Post`, `Baseline BMI`, `Num. A1c Values`, HbA1c, Time,
@@ -229,7 +229,7 @@ df %>%
 
 ### By BMI percentile post-modulator
 
-```{r warning=FALSE, message=FALSE}
+```{r}
 df %>%
   select(
     `CFF ID`, `Pre or Post`, `Post BMI`, `Num. A1c Values`, HbA1c, Time,
@@ -276,7 +276,7 @@ Only 13 of those with CGM also had HbA1c values pre- and post-CFTR modulator.
 
 ### Demographics
 
-```{r warning=FALSE, message=FALSE}
+```{r}
 cgm <- df[!is.na(df$average_sensor), ]
 cgm %>%
   filter(`Pre or Post` == "Pre") %>%
@@ -300,13 +300,10 @@ cgm %>%
 
 ### Overall CGM variables
 
-```{r results='asis'}
-cgm_formula <- as.formula(paste0("`Pre or Post`~", paste0(cgm_vars, collapse = "+")))
-cgm_formula <- update(cgm_formula, . ~ . + TDD + `Long acting insulin dose`)
-cgm_vars2 <- c(cgm_vars, "TDD", "Long acting insulin dose")
-
+```{r}
+cgm_vars <- c(cgm_vars, "TDD", "Long acting insulin dose")
 cgm %>%
-  select(`CFF ID`, `Pre or Post`, all_of(cgm_vars2)) %>%
+  select(`CFF ID`, `Pre or Post`, all_of(cgm_vars)) %>%
   tbl_summary(
     by = `Pre or Post`,
     type = list(everything() ~ "continuous2"),
@@ -323,23 +320,69 @@ cgm %>%
   separate_p_footnotes()
 ```
 
-#### Stratified by baseline HbA1c
+#### By baseline HbA1c
 
-```{r results='asis'}
-cgm_formula <- as.formula(paste0("`Pre or Post`~", paste0(cgm_vars, collapse = "+")))
-cgm_formula <- update(cgm_formula, . ~ . + TDD + `Long acting insulin dose`)
-p <- paired(cgm_formula,
-  data = cgm, id = `CFF ID`, strata = `Baseline HbA1c`,
-  signed.rank.exact = FALSE, numeric.test = "signed.rank",
-  numeric.stats = c("Nmiss", "medianrange", "q1q3")
-)
-summary(p, pfootnote = T, digits = 1)
-
-
+```{r}
 cgm %>%
-  select(`CFF ID`, `Pre or Post`, `Baseline HbA1c`, all_of(cgm_vars2)) %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Baseline HbA1c`, all_of(cgm_vars)
+  ) %>%
   tbl_strata(
-    by = `Baseline HbA1c`,
+    strata = `Baseline HbA1c`,
+    .tbl_fun = ~ .x %>%
+      tbl_summary(
+        by = `Pre or Post`,
+        type = list(everything() ~ "continuous2"),
+        statistic = list(
+          everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+        ),
+        include = -`CFF ID`, digits = list(everything() ~ 2),
+        missing_text = "Missing"
+      ) %>%
+      add_p(
+        test = list(everything() ~ "paired.wilcox.test"),
+        group = `CFF ID`
+      ) %>%
+      separate_p_footnotes()
+  )
+```
+
+#### By BMI percentile pre-modulator
+
+```{r}
+cgm %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Baseline BMI`, all_of(cgm_vars)
+  ) %>%
+  tbl_strata(
+    strata = `Baseline BMI`,
+    .tbl_fun = ~ .x %>%
+      tbl_summary(
+        by = `Pre or Post`,
+        type = list(everything() ~ "continuous2"),
+        statistic = list(
+          everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+        ),
+        include = -`CFF ID`, digits = list(everything() ~ 2),
+        missing_text = "Missing"
+      ) %>%
+      add_p(
+        test = list(everything() ~ "paired.wilcox.test"),
+        group = `CFF ID`
+      ) %>%
+      separate_p_footnotes()
+  )
+```
+
+#### By BMI percentile post-modulator
+
+```{r}
+cgm %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Post BMI`, all_of(cgm_vars)
+  ) %>%
+  tbl_strata(
+    strata = `Post BMI`,
     .tbl_fun = ~ .x %>%
       tbl_summary(
         by = `Pre or Post`,
@@ -360,56 +403,210 @@ cgm %>%
 
 ### Daytime CGM variables
 
-```{r results='asis'}
+```{r}
 cgm$daytime_cv <- cgm$daytime_sd / cgm$daytime_avg_sensor_glucose
 day_cgm <- c(day_cgm, "daytime_cv")
-cgm_formula <- as.formula(paste0("`Pre or Post`~", paste0(day_cgm, collapse = "+")))
-p <- paired(cgm_formula,
-  data = cgm, id = `CFF ID`,
-  signed.rank.exact = FALSE, numeric.test = "signed.rank",
-  numeric.stats = c("Nmiss", "medianrange", "q1q3")
-)
-summary(p, pfootnote = T, digits = 1)
+
+cgm %>%
+  select(`CFF ID`, `Pre or Post`, all_of(day_cgm)) %>%
+  tbl_summary(
+    by = `Pre or Post`,
+    type = list(everything() ~ "continuous2"),
+    statistic = list(
+      everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+    ),
+    include = -`CFF ID`, digits = list(everything() ~ 2),
+    missing_text = "Missing"
+  ) %>%
+  add_p(
+    test = list(everything() ~ "paired.wilcox.test"),
+    group = `CFF ID`
+  ) %>%
+  separate_p_footnotes()
 ```
 
-#### Stratified by baseline HbA1c
+#### By baseline HbA1c
 
-```{r results='asis'}
-cgm$daytime_cv <- cgm$daytime_sd / cgm$daytime_avg_sensor_glucose
-day_cgm <- c(day_cgm, "daytime_cv")
-cgm_formula <- as.formula(paste0("`Pre or Post`~", paste0(day_cgm, collapse = "+")))
-p <- paired(cgm_formula,
-  data = cgm, id = `CFF ID`, strata = `Baseline HbA1c`,
-  signed.rank.exact = FALSE, numeric.test = "signed.rank",
-  numeric.stats = c("Nmiss", "medianrange", "q1q3")
-)
-summary(p, pfootnote = T, digits = 1)
+```{r}
+cgm %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Baseline HbA1c`, all_of(day_cgm)
+  ) %>%
+  tbl_strata(
+    strata = `Baseline HbA1c`,
+    .tbl_fun = ~ .x %>%
+      tbl_summary(
+        by = `Pre or Post`,
+        type = list(everything() ~ "continuous2"),
+        statistic = list(
+          everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+        ),
+        include = -`CFF ID`, digits = list(everything() ~ 2),
+        missing_text = "Missing"
+      ) %>%
+      add_p(
+        test = list(everything() ~ "paired.wilcox.test"),
+        group = `CFF ID`
+      ) %>%
+      separate_p_footnotes()
+  )
+```
+
+#### By BMI percentile pre-modulator
+
+```{r}
+cgm %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Baseline BMI`, all_of(day_cgm)
+  ) %>%
+  tbl_strata(
+    strata = `Baseline BMI`,
+    .tbl_fun = ~ .x %>%
+      tbl_summary(
+        by = `Pre or Post`,
+        type = list(everything() ~ "continuous2"),
+        statistic = list(
+          everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+        ),
+        include = -`CFF ID`, digits = list(everything() ~ 2),
+        missing_text = "Missing"
+      ) %>%
+      add_p(
+        test = list(everything() ~ "paired.wilcox.test"),
+        group = `CFF ID`
+      ) %>%
+      separate_p_footnotes()
+  )
+```
+
+#### By BMI percentile post-modulator
+
+```{r}
+cgm %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Post BMI`, all_of(day_cgm)
+  ) %>%
+  tbl_strata(
+    strata = `Post BMI`,
+    .tbl_fun = ~ .x %>%
+      tbl_summary(
+        by = `Pre or Post`,
+        type = list(everything() ~ "continuous2"),
+        statistic = list(
+          everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+        ),
+        include = -`CFF ID`, digits = list(everything() ~ 2),
+        missing_text = "Missing"
+      ) %>%
+      add_p(
+        test = list(everything() ~ "paired.wilcox.test"),
+        group = `CFF ID`
+      ) %>%
+      separate_p_footnotes()
+  )
 ```
 
 ### Nighttime CGM variables
 
-```{r results='asis'}
+```{r}
 cgm$nighttime_cv <- cgm$nighttime_sd / cgm$nighttime_avg_sens_glucose
 night_cgm <- c(night_cgm, "nighttime_cv")
-cgm_formula <- as.formula(paste0("`Pre or Post`~", paste0(night_cgm, collapse = "+")))
-p <- paired(cgm_formula,
-  data = cgm, id = `CFF ID`,
-  signed.rank.exact = FALSE, numeric.test = "signed.rank",
-  numeric.stats = c("Nmiss", "medianrange", "q1q3")
-)
-summary(p, pfootnote = T, digits = 1)
+
+cgm %>%
+  select(`CFF ID`, `Pre or Post`, all_of(night_cgm)) %>%
+  tbl_summary(
+    by = `Pre or Post`,
+    type = list(everything() ~ "continuous2"),
+    statistic = list(
+      everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+    ),
+    include = -`CFF ID`, digits = list(everything() ~ 2),
+    missing_text = "Missing"
+  ) %>%
+  add_p(
+    test = list(everything() ~ "paired.wilcox.test"),
+    group = `CFF ID`
+  ) %>%
+  separate_p_footnotes()
 ```
 
-#### Stratified by baseline HbA1c
+#### By baseline HbA1c
 
-```{r results='asis'}
-cgm$nighttime_cv <- cgm$nighttime_sd / cgm$nighttime_avg_sens_glucose
-night_cgm <- c(night_cgm, "nighttime_cv")
-cgm_formula <- as.formula(paste0("`Pre or Post`~", paste0(night_cgm, collapse = "+")))
-p <- paired(cgm_formula,
-  data = cgm, id = `CFF ID`, strata = `Baseline HbA1c`,
-  signed.rank.exact = FALSE, numeric.test = "signed.rank",
-  numeric.stats = c("Nmiss", "medianrange", "q1q3")
-)
-summary(p, pfootnote = T, digits = 1)
+```{r}
+cgm %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Baseline HbA1c`, all_of(night_cgm)
+  ) %>%
+  tbl_strata(
+    strata = `Baseline HbA1c`,
+    .tbl_fun = ~ .x %>%
+      tbl_summary(
+        by = `Pre or Post`,
+        type = list(everything() ~ "continuous2"),
+        statistic = list(
+          everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+        ),
+        include = -`CFF ID`, digits = list(everything() ~ 2),
+        missing_text = "Missing"
+      ) %>%
+      add_p(
+        test = list(everything() ~ "paired.wilcox.test"),
+        group = `CFF ID`
+      ) %>%
+      separate_p_footnotes()
+  )
+```
+
+#### By BMI percentile pre-modulator
+
+```{r}
+cgm %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Baseline BMI`, all_of(night_cgm)
+  ) %>%
+  tbl_strata(
+    strata = `Baseline BMI`,
+    .tbl_fun = ~ .x %>%
+      tbl_summary(
+        by = `Pre or Post`,
+        type = list(everything() ~ "continuous2"),
+        statistic = list(
+          everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+        ),
+        include = -`CFF ID`, digits = list(everything() ~ 2),
+        missing_text = "Missing"
+      ) %>%
+      add_p(
+        test = list(everything() ~ "paired.wilcox.test"),
+        group = `CFF ID`
+      ) %>%
+      separate_p_footnotes()
+  )
+```
+
+#### By BMI percentile post-modulator
+
+```{r}
+cgm %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Post BMI`, all_of(night_cgm)
+  ) %>%
+  tbl_strata(
+    strata = `Post BMI`,
+    .tbl_fun = ~ .x %>%
+      tbl_summary(
+        by = `Pre or Post`,
+        type = list(everything() ~ "continuous2"),
+        statistic = list(
+          everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+        ),
+        include = -`CFF ID`, digits = list(everything() ~ 2),
+        missing_text = "Missing"
+      ) %>%
+      add_p(
+        test = list(everything() ~ "paired.wilcox.test"),
+        group = `CFF ID`
+      ) %>%
+      separate_p_footnotes()
+  )
 ```
