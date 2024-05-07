@@ -282,15 +282,9 @@ annual %>%
   )
 ```
 
-# CFRD screening rates
+# Incidence
 
-# Survival analysis - first CFRD diagnosis
-
-Based on CFFPR annualized data. These data are interval censored because we know the first visit at which people with CFRD were diagnosed, but we do not know the exact time that they developed CFRD. These data are also left truncated because not all participants enter the study at the same time.
-
-## Incidence and prevalence
-
-### Full cohort
+## Full cohort
 
 ```{r}
 #| message: false
@@ -329,7 +323,7 @@ gt(km_table) %>%
   opt_stylize(style = 6, color = "gray")
 ```
 
-### By age group
+## By age group
 
 ```{r}
 #| message: false
@@ -375,7 +369,9 @@ invisible(lapply(km_table, function(km) {
 }))
 ```
 
-## Screening rates
+# Screening rates
+
+## By age group
 
 ```{r}
 screening <- annual %>%
@@ -396,6 +392,38 @@ ggplot(screening, aes(x = ReviewYear, y = value, color = age_group)) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
   scale_color_discrete(name = "Age Group", labels = c("10-17", "18-29", "30+"))
 ```
+
+## Who is getting OGTTs?
+
+```{r}
+# How many OGTTs are non-CFRD people getting 2016-2018
+ogtts <- annual %>%
+  filter(ReviewYear %in% 2016:2018, CFRD == "CFRD-") %>%
+  group_by(eDWID) %>%
+  summarise(
+    `Age Group` = last(na.omit(age_group)),
+    `OGTTs` = sum(!is.na(A_twohour_bloodglucose) | !is.na(A_ogttfast_bloodglucose))
+  )
+# Add demographics
+ogtts$eDWID <- as.numeric(ogtts$eDWID)
+ogtts <- left_join(ogtts, demogs, by = join_by(eDWID))
+label(ogtts$eDWID) <- "ID"
+# Format OGTT counts
+ogtts$OGTTs <- factor(ogtts$OGTTs,
+  levels = 0:3, labels = c(
+    "No OGTT", "At least 1 OGTT", "At least 1 OGTT", "At least 1 OGTT"
+  )
+)
+# Compare no OGTT to at least 1 OGTT
+ogtts %>% 
+  select(-eDWID) %>%
+  tbl_summary(by=OGTTs,missing_text = "Missing") %>%
+  add_p()
+```
+
+# Survival analysis - first CFRD diagnosis
+
+Based on CFFPR annualized data. These data are interval censored because we know the first visit at which people with CFRD were diagnosed, but we do not know the exact time that they developed CFRD. These data are also left truncated because not all participants enter the study at the same time.
 
 ## Cox PH model
 
@@ -435,16 +463,23 @@ time_varying <- rownames(test.ph)[test.ph$p < 0.05]
 ### Time varying coefficients
 
 ```{r}
+annual$tstart <- as.numeric(annual$tstart)
+annual$tstop <- as.numeric(annual$tstop)
 annual_split <- survSplit(
   Surv(as.numeric(tstart), as.numeric(tstop), as.numeric(CFRD) == 2,
     origin = as.numeric(og)
   ) ~ .,
-  data = annual, cut = c(2008, 2013, 2018), episode = "tgroup"
+  data = annual,
+  cut = c(
+    as.numeric(ymd("2008-12-31")) - as.numeric(og),
+    as.numeric(ymd("2013-12-31")) - as.numeric(og)
+  ),
+  episode = "tgroup"
 )
 annual_split$tgroup <- factor(annual_split$tgroup,
   levels = 1:3, labels = c("[2003,2009)", "[2009,2014)", "[2014,2019)")
 )
-y <- "Surv(as.numeric(tstart), as.numeric(tstop), event)"
+y <- "Surv(tstart, tstop, event)"
 ```
 
 In the plots below, time-varying coefficients are excluded from the first forest plot, to show the average effect of the predictors. In the second forest plot, the estimated marginal means (EMMs) for the time-varying coefficients are shown. The EMMs are averaged over the levels of all the other variables in the model. In other words, the EMM represents the baseline hazard (not hazard ratio) at the average level of all the other variables in the model. For example, the log hazard for an average participant age [30, Inf) in the time period [2003,2009) is 1.887 and the log hazard for a similar participant in [2014,2019) is 1.401. 
@@ -456,17 +491,12 @@ invisible(lapply(time_varying, function(v) {
     y, "~", paste0(xvars[-which(xvars == v)], collapse = "+"),
     paste0("+", v, "*strata(tgroup)")
   ))
-  new_f_int <- as.formula(paste0(
-    y, "~", paste0(xvars[-which(xvars == v)], collapse = "+"),
-    paste0("+", v, "*tgroup")
-  ))
   new_f_emm <- as.formula(paste0(
     "~", paste0(v, "|tgroup")
   ))
   # This could be done more efficiently but it seems to work
   # Fit one stratified model and one with a regular interaction term
   cox_res_split <- coxph(new_f, data = annual_split, cluster = eDWID)
-  cox_res_split_int <- coxph(new_f_int, data = annual_split, cluster = eDWID)
   # Use the regular interaction term to get means for each time period
   cat("\n")
   cat("####", v)
@@ -479,9 +509,7 @@ invisible(lapply(time_varying, function(v) {
     print()
   cat("\n")
   cat("\n")
-  emm <- emmeans(cox_res_split_int, new_f_emm,
-    nuisance = xvars[-which(xvars == v)]
-  )
+  emm <- emmeans(cox_res_split, new_f_emm, nuisance = xvars[-which(xvars == v)])
   emm <- data.frame(emm)
   # Plot base model (without time varying)
   ggcoef_model(cox_res_split,
