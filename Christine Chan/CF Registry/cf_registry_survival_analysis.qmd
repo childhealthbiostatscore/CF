@@ -257,9 +257,10 @@ data.frame(data_dict$code_meaning[
 
 # CFRD incidence and prevalence
 
-## Demographics of Incident CFRD cases versus non-CFRD cases in 2004, 2011, and 2018
+## Demographics of incident CFRD cases versus non-CFRD cases in 2004, 2011, and 2018
 
 ```{r}
+#| message: false
 annual %>%
   filter(ReviewYear %in% c(2004, 2011, 2018)) %>%
   select(
@@ -287,46 +288,113 @@ annual %>%
 
 Based on CFFPR annualized data. These data are interval censored because we know the first visit at which people with CFRD were diagnosed, but we do not know the exact time that they developed CFRD. These data are also left truncated because not all participants enter the study at the same time.
 
-## Kaplan Meier Analysis
+## Incidence and prevalence
+
+### Full cohort
 
 ```{r}
-# Whole cohort
-og <- as.numeric(ymd("2003-01-01"))
+#| message: false
+og <- ymd("2003-01-01")
 km_fit <- survfit(
   Surv(as.numeric(tstart), as.numeric(tstop), as.numeric(CFRD) == 2,
-    origin = og
+    origin = as.numeric(og)
   ) ~ 1,
   data = annual, id = eDWID
 )
-ggsurvplot(km_fit,
-  data = annual, risk.table = T, cumevents = T, fun = "event",
-  xlab = "Days from 2003-01-01"
-)
-cum_inc <- tidy(km_fit)
-cum_inc$time <- as.Date(cum_inc$time + og)
-kable(cum_inc)
-# By age group
-km_fit <- survfit(
+# Plot
+surv_p <- ggsurvplot(km_fit, data = annual, fun = "event")
+surv_p$plot +
+  scale_x_continuous(
+    breaks = km_fit$time,
+    labels = year(ymd("2003-01-01") + days(km_fit$time))
+  ) +
+  theme(axis.title.x = element_blank(), legend.position = "none") +
+  ggtitle("Cumulative Incidence")
+# Table
+km_table <- tidy(km_fit)
+km_table$time <- year(og + days(km_table$time))
+gt(km_table) %>%
+  cols_hide("std.error") %>%
+  fmt_percent(columns = c("estimate", "conf.low", "conf.high")) %>%
+  cols_merge(
+    columns = c("estimate", "conf.low", "conf.high"),
+    pattern = "{1} [{2} - {3}]"
+  ) %>%
+  cols_label(
+    time = "Year", n.risk = "At Risk", n.event = "CFRD+",
+    n.censor = "Censored", estimate = "Estimated CFRD- [95% CI]"
+  ) %>%
+  opt_row_striping() %>%
+  opt_table_lines() %>%
+  opt_stylize(style = 6, color = "gray")
+```
+
+### By age group
+
+```{r}
+#| message: false
+# Plot
+km_age_fit <- survfit(
   Surv(as.numeric(tstart), as.numeric(tstop), as.numeric(CFRD) == 2,
-    origin = og
+    origin = as.numeric(og)
   ) ~ age_group,
   data = annual, id = eDWID
 )
-ggsurvplot(km_fit,
-  data = annual, risk.table = T, cumevents = T, fun = "event",
-  xlab = "Days from 2003-01-01"
-)
-km_table <- tidy(km_fit)
-km_table$time <- as.Date(km_table$time + og)
+surv_p <- ggsurvplot(km_age_fit, data = annual, fun = "event")
+surv_p$plot +
+  scale_x_continuous(
+    breaks = km_age_fit$time,
+    labels = year(ymd("2003-01-01") + days(km_age_fit$time))
+  ) +
+  scale_color_discrete(name = "Age Group", labels = c("10-17", "18-29", "30+")) +
+  theme(axis.title.x = element_blank(), legend.title = element_blank()) +
+  ggtitle("Cumulative Incidence by Age Group")
+# Table
+km_table <- tidy(km_age_fit)
+km_table$time <- year(og + days(km_table$time))
 km_table <- split.data.frame(km_table, km_table$strata)
+
+invisible(lapply(km_table, function(km) {
+  title <- km$strata[1]
+  title <- sub("age_group=", "Ages ", title)
+  gt(km) %>%
+    cols_hide(c("std.error", "strata")) %>%
+    fmt_percent(columns = c("estimate", "conf.low", "conf.high")) %>%
+    cols_merge(
+      columns = c("estimate", "conf.low", "conf.high"),
+      pattern = "{1} [{2} - {3}]"
+    ) %>%
+    cols_label(
+      time = "Year", n.risk = "At Risk", n.event = "CFRD+",
+      n.censor = "Censored", estimate = "Estimated CFRD- [95% CI]"
+    ) %>%
+    opt_row_striping() %>%
+    opt_table_lines() %>%
+    opt_stylize(style = 6, color = "gray") %>%
+    tab_caption(title)
+}))
 ```
 
-```{r results='asis'}
-invisible(lapply(km_table, function(t) {
-  name <- t$strata[1]
-  t <- t %>% select(-strata)
-  print(kable(t, caption = name))
-}))
+## Screening rates
+
+```{r}
+screening <- annual %>%
+  group_by(ReviewYear, age_group) %>%
+  summarise(
+    `Screened HbA1c` = mean(!is.na(A_hgba1c)),
+    `Screened OGTT` = mean(!is.na(A_twohour_bloodglucose) |
+      !is.na(A_ogttfast_bloodglucose)),
+    `Screened Either` = mean(!is.na(A_twohour_bloodglucose) |
+      !is.na(A_ogttfast_bloodglucose) | !is.na(A_hgba1c)),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(`Screened HbA1c`:`Screened Either`)
+ggplot(screening, aes(x = ReviewYear, y = value, color = age_group)) +
+  geom_line() +
+  facet_wrap(~name) +
+  theme_bw() +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  scale_color_discrete(name = "Age Group", labels = c("10-17", "18-29", "30+"))
 ```
 
 ## Cox PH model
@@ -369,7 +437,7 @@ time_varying <- rownames(test.ph)[test.ph$p < 0.05]
 ```{r}
 annual_split <- survSplit(
   Surv(as.numeric(tstart), as.numeric(tstop), as.numeric(CFRD) == 2,
-    origin = og
+    origin = as.numeric(og)
   ) ~ .,
   data = annual, cut = c(2008, 2013, 2018), episode = "tgroup"
 )
