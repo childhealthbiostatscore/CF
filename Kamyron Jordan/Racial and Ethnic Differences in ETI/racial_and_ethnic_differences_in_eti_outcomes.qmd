@@ -1,0 +1,223 @@
+---
+title: "Racial and Ethnic Differences in ETI: Outcomes"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    number-sections: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+    theme:
+      light: flatly
+      dark: darkly
+editor: source
+---
+
+```{r setup}
+#| include: false
+# Libraries
+library(nlme)
+library(performance)
+library(segmented)
+library(tidyverse)
+library(mcp)
+options(mc.cores = 4)
+set.seed(1017)
+# Paths
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r data setup}
+#| include: false
+# Import
+encounter <- read.csv("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20240125/CFF22_encountersMerged_Del1.csv", na.strings = "")
+annual <- read.csv("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20240125/CFF22_Annualized_Del1.csv", na.strings = "")
+demo <- read.csv("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Raw/DataDelivery_20240125/CFF22_DemogCFDiag_Del1.csv", na.strings = "")
+# Race variable
+races <- list(
+  "Race1" = "White",
+  "Race2" = "Black or African American",
+  "Race3" = "American Indian or Alaska Native",
+  "Race4" = "Asian",
+  "Race5" = "Native Hawaiian or Other Pacific Islander",
+  "Race6" = "Some other race"
+)
+demo$Race <- apply(demo[, paste0("Race", 1:6)], 1, function(r) {
+  w <- which(r == 1)
+  if (length(w) > 1 | 6 %in% w) {
+    return("Mixed/Other/Unknown Race")
+  } else {
+    return(as.character(races[w]))
+  }
+})
+demo$Race[demo$Hispanicrace == 1] <- "Hispanic or Latino"
+demo$Race[is.na(demo$Hispanicrace)] <- "Mixed/Other/Unknown Race"
+demo$Race <- factor(demo$Race,
+  levels = c(
+    "White", "Black or African American", "Hispanic or Latino", "Asian",
+    "American Indian or Alaska Native",
+    "Native Hawaiian or Other Pacific Islander", "Mixed/Other/Unknown Race"
+  ),
+  labels = c(
+    "Non-Hispanic White", "Black or African American", "Hispanic or Latino", "Asian",
+    "Other", "Other", "Other"
+  )
+)
+# Insurance
+ins_vars <- c(paste0("insurance", 1:7), "noinsurance")
+ins <- c(
+  "Health Insurance Policy (e.g. Private Insurance)", "Medicare", "Medicaid",
+  "State special needs program, e.g., BCMH, CCS, CRS, GHPP, etc.",
+  "TriCare or other military health plan",
+  "Indian Health Service", "Other", "No Insurance"
+)
+annual$Insurance <- apply(annual[, ins_vars], 1, function(r) {
+  w <- which(r == 1)
+  if (length(w) == 0) {
+    return(NA)
+  } else if (length(w) > 1) {
+    return("More than one")
+  } else {
+    return(ins[w])
+  }
+})
+annual$Insurance <- factor(annual$Insurance,
+  levels = c(
+    "Health Insurance Policy (e.g. Private Insurance)",
+    "Indian Health Service",
+    "Medicaid",
+    "Medicare",
+    "More than one",
+    "No Insurance",
+    "Other",
+    "State special needs program, e.g., BCMH, CCS, CRS, GHPP, etc.",
+    "TriCare or other military health plan"
+  ),
+  labels = c(
+    "Private", "Public", "Public", "Public", "More Than One", "No Insurance",
+    "No Insurance", "Public", "Tricare"
+  )
+)
+# Merge
+encounter <- left_join(
+  encounter,
+  demo %>% select(eDWID, Race, Modulator_trikafta_first_date)
+)
+encounter <- left_join(encounter,
+  annual %>% select(eDWID, ReviewYear, Insurance),
+  by = join_by(eDWID, reviewyear == ReviewYear)
+)
+# Age group
+encounter$age_group <- cut(encounter$encounterage, breaks = c(6, 12, 18, 30, Inf), right = F)
+# Days between encounter and first ETI
+encounter$Modulator_trikafta_first_date <-
+  mdy(encounter$Modulator_trikafta_first_date)
+encounter$encounterdate <- mdy(encounter$encounterdate)
+encounter$Days <- as.numeric(encounter$encounterdate - encounter$Modulator_trikafta_first_date)
+# Separate cleaned set
+cleaned <- encounter %>% filter(gli_fev1_ppred_rn <= 200, !is.na(Days))
+# List of outcomes
+continuous_outcomes <- c("gli_fev1_ppred_rn", "gli_fvc_ppred_rn", "gli_fev1fvc_ppred_rn")
+```
+
+```{r functions}
+# Plots
+loess_plot <- function(df = cleaned, outcome, facet = F) {
+  p <- ggplot(df, aes(x = Days, y = !!sym(outcome), color = Race)) +
+    geom_point(shape = ".", aes(x = Days, y = !!sym(outcome)), inherit.aes = F) +
+    geom_smooth() +
+    theme_classic()
+  if (facet) {
+    p <- p + facet_wrap(~Race)
+  }
+  return(p)
+}
+```
+
+# Data cleaning
+
+1. For now, I have excluded any rows where the FEV1 predicted values are over 200.
+
+# LOESS-smoothed outcome plots
+
+```{r results='asis'}
+#| warning: false
+invisible(lapply(continuous_outcomes, function(o) {
+  cat("\n")
+  cat("##", o)
+  cat("\n")
+  print(loess_plot(outcome = o))
+  print(loess_plot(outcome = o, facet = T))
+}))
+```
+
+# Segmented models
+
+The following models are adjusted for age group and insurance status.
+
+## A Bayesian approach
+
+### FEV1
+
+```{r}
+#| cache: true
+model <- list(
+  gli_fev1_ppred_rn ~ 1, # intercept
+  gli_fev1_ppred_rn ~ 1 ~ 0 + Days # joined slope
+)
+fit <- mcp(model, data = cleaned)
+```
+
+```{r}
+summary(fit)
+plot(fit)
+```
+
+## Frequentist models
+
+First, a Gaussian mixed model is fit with random intercept for patient ID. Then, the `segmented.lme` function is applied to this mixed model, with 0 as the starting value for finding the optimal breakpoint.
+
+### FEV1
+
+```{r}
+#| cache: true
+# Fit lme
+mod1 <- lme(gli_fev1_ppred_rn ~ Days * Race + Insurance,
+  random = ~ 1 | eDWID,
+  data = cleaned, na.action = na.omit
+)
+mod1_seg <- segmented.lme(mod1, ~Days,
+  psi = 0,
+  random = list(eDWID = pdDiag(~ 1 + Days + U)) # ind. random eff. (changepoint fixed)
+)
+# mod1_seg <- segmented.lme(mod1, ~Days,
+#   psi = 0,
+#   random = list(eDWID = pdDiag(~ 1 + Days + U + G0))  #ind. random eff. (in the changepoint too)
+# )
+```
+
+# Questions for Scott and Kam
+
+1. Some of the predicted lung function measures are insanely high. How should we deal with outliers? Is there a limit that you would consider biologically impossible? Over 200%? What about FVC and FEV1/FVC?
+
+2. Similarly, what would be a good cutoff for the lower end? I assume that a value of 0 is not possible.
+
+3. I know we've discussed this before, but looking at the LOESS plots, do we want to cut off the pre-ETI at about 2000 days?
+
+4. Are we interested in statistical inference on age group? Or are we simply adjusting for it? If we're not clinically interested in the age groups is would be worth treating it as a continuous variable.
+
+```{r}
+#| warning: false
+loess_plot(df = encounter, outcome = "gli_fev1_ppred_rn")
+```
