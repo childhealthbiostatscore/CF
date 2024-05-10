@@ -27,8 +27,6 @@ library(performance)
 library(segmented)
 library(tidyverse)
 library(mcp)
-options(mc.cores = 4)
-set.seed(1017)
 # Paths
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
@@ -172,11 +170,12 @@ The following models are adjusted for age group and insurance status.
 
 ```{r}
 #| cache: true
+set.seed(1017)
 model <- list(
   gli_fev1_ppred_rn ~ 1, # intercept
   gli_fev1_ppred_rn ~ 1 ~ 0 + Days # joined slope
 )
-fit <- mcp(model, data = cleaned)
+fit <- mcp(model, data = cleaned, chains = 4, cores = 4, iter = 1000, adapt = 0) # Increase iter and adapt later, because it will take forever to run
 ```
 
 ```{r}
@@ -197,14 +196,19 @@ mod1 <- lme(gli_fev1_ppred_rn ~ Days * Race + Insurance,
   random = ~ 1 | eDWID,
   data = cleaned, na.action = na.omit
 )
-mod1_seg <- segmented.lme(mod1, ~Days,
-  psi = 0,
-  random = list(eDWID = pdDiag(~ 1 + Days + U)) # ind. random eff. (changepoint fixed)
-)
 # mod1_seg <- segmented.lme(mod1, ~Days,
 #   psi = 0,
-#   random = list(eDWID = pdDiag(~ 1 + Days + U + G0))  #ind. random eff. (in the changepoint too)
+#   random = list(eDWID = pdDiag(~ 1 + Days + U)), # ind. random eff. (changepoint fixed)
+#   control = seg.control(n.boot = 0, display = TRUE)
 # )
+mod1_seg <- segmented.lme(mod1, ~Days,
+  psi = 0,
+  random = list(eDWID = pdDiag(~ 1 + Days + U + G0)), # ind. random eff. (in the changepoint too)
+  control = seg.control(n.boot = 0, display = TRUE)
+)
+```
+
+```{r}
 ```
 
 # Questions for Scott and Kam
