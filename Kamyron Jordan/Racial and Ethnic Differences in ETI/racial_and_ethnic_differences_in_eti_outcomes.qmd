@@ -12,6 +12,8 @@ format:
     code-fold: true
     self-contained: true
     fig-cap-location: top
+    fig-height: 10
+    fig-width: 10
     page-layout: full
     theme:
       light: flatly
@@ -126,20 +128,43 @@ encounter$Days <- as.numeric(encounter$encounterdate - encounter$Modulator_trika
 # Separate cleaned set
 cleaned <- encounter %>% filter(gli_fev1_ppred_rn <= 200, !is.na(Days))
 # List of outcomes
-continuous_outcomes <- c("gli_fev1_ppred_rn", "gli_fvc_ppred_rn", "gli_fev1fvc_ppred_rn")
+continuous_outcomes <- c(
+  "gli_fev1_ppred_rn", "gli_fvc_ppred_rn", "gli_fev1fvc_ppred_rn",
+  "bmipercentile", "heightpercentile", "weightpercentile"
+)
+binary_outcomes <- c(
+  "staphylococcus_aureus", "haemophilus_influenzae", "pseudomonasaeruginosa",
+  "burkho_complex"
+)
 ```
 
 ```{r functions}
 # Plots
 loess_plot <- function(df = cleaned, outcome, facet = F) {
   p <- ggplot(df, aes(x = Days, y = !!sym(outcome), color = Race)) +
-    geom_point(shape = ".", aes(x = Days, y = !!sym(outcome)), inherit.aes = F) +
+    geom_point(
+      shape = ".", aes(x = Days, y = !!sym(outcome)), inherit.aes = F,
+      alpha = 0.1
+    ) +
     geom_smooth() +
     theme_classic()
   if (facet) {
     p <- p + facet_wrap(~Race)
   }
   return(p)
+}
+# Basic segmented model
+basic_segmented <- function(df = cleaned, outcome, n_change_points = NULL,
+                            change_points = NULL) {
+  # Formula
+  f <- as.formula(paste0(outcome, "~ Days+Race + age_group + Insurance"))
+  # Basic linear model
+  lmod <- lm(f, data = df)
+  # Segmented model
+  lmod_seg <- segmented(lmod, seg.Z = ~Days, psi = 0, control = seg.control(it.max = 0))
+  # Plot
+  d <- lmod$model
+  d$pred <- fitted(lmod_seg)
 }
 ```
 
@@ -153,7 +178,9 @@ loess_plot <- function(df = cleaned, outcome, facet = F) {
 #| warning: false
 invisible(lapply(continuous_outcomes, function(o) {
   cat("\n")
+  cat("\n")
   cat("##", o)
+  cat("\n")
   cat("\n")
   print(loess_plot(outcome = o))
   print(loess_plot(outcome = o, facet = T))
@@ -163,6 +190,13 @@ invisible(lapply(continuous_outcomes, function(o) {
 # Segmented models
 
 The following models are adjusted for age group and insurance status.
+
+## FEV1
+
+Based on visual inspection of the LOESS plots, I expect there to be a change in slope at around 0 and maybe a second one at around 1 year.
+
+```{r}
+```
 
 ## A Bayesian approach
 
@@ -175,7 +209,7 @@ model <- list(
   gli_fev1_ppred_rn ~ 1, # intercept
   gli_fev1_ppred_rn ~ 1 ~ 0 + Days # joined slope
 )
-fit <- mcp(model, data = cleaned, chains = 4, cores = 4, iter = 1000, adapt = 0) # Increase iter and adapt later, because it will take forever to run
+fit <- mcp(model, data = cleaned, chains = 4, cores = 4)
 ```
 
 ```{r}
@@ -183,33 +217,28 @@ summary(fit)
 plot(fit)
 ```
 
-## Frequentist models
+<!-- ## Frequentist models -->
 
-First, a Gaussian mixed model is fit with random intercept for patient ID. Then, the `segmented.lme` function is applied to this mixed model, with 0 as the starting value for finding the optimal breakpoint.
+<!-- First, a Gaussian mixed model is fit with random intercept for patient ID and random slope for each patient. Then, the `segmented.lme` function is applied to this mixed model, with 0 as the starting value for finding the optimal breakpoint. The changepoint is also treated as a random effect and allowed to vary within a person. -->
 
-### FEV1
+<!-- ### FEV1 -->
 
-```{r}
-#| cache: true
-# Fit lme
-mod1 <- lme(gli_fev1_ppred_rn ~ Days * Race + Insurance,
-  random = ~ 1 | eDWID,
-  data = cleaned, na.action = na.omit
-)
-# mod1_seg <- segmented.lme(mod1, ~Days,
-#   psi = 0,
-#   random = list(eDWID = pdDiag(~ 1 + Days + U)), # ind. random eff. (changepoint fixed)
-#   control = seg.control(n.boot = 0, display = TRUE)
-# )
-mod1_seg <- segmented.lme(mod1, ~Days,
-  psi = 0,
-  random = list(eDWID = pdDiag(~ 1 + Days + U + G0)), # ind. random eff. (in the changepoint too)
-  control = seg.control(n.boot = 0, display = TRUE)
-)
-```
+<!-- ```{r} -->
+<!-- #| cache: true -->
+<!-- # Fit initial model -->
+<!-- ri_rs_mod_fev1 <- lme(gli_fev1_ppred_rn ~ Race * Days + age_group + Insurance, -->
+<!--   random = ~ 1 + Days | eDWID, data = cleaned, na.action = na.omit -->
+<!-- ) -->
+<!-- # Find change point -->
+<!-- ri_rs_mod_seg_fev <- segmented.lme(ri_rs_mod_fev1, ~Days, psi = 0, -->
+<!--   random = list(eDWID = pdDiag(~ 1 + Days + U + G0)), # ind. random eff. (in the changepoint too) -->
+<!--   control = seg.control(n.boot = 0, display = F) -->
+<!-- ) -->
+<!-- ``` -->
 
-```{r}
-```
+<!-- ```{r} -->
+<!-- plot(ri_rs_mod_seg_fev1) -->
+<!-- ``` -->
 
 # Questions for Scott and Kam
 
@@ -221,7 +250,22 @@ mod1_seg <- segmented.lme(mod1, ~Days,
 
 4. Are we interested in statistical inference on age group? Or are we simply adjusting for it? If we're not clinically interested in the age groups is would be worth treating it as a continuous variable.
 
+5. Do the linearity assumptions seem accurate to you?
+
+6. Why do you think the BMI, height, etc. percentiles look so strange? Do they normally look like this?
+
 ```{r}
 #| warning: false
 loess_plot(df = encounter, outcome = "gli_fev1_ppred_rn")
 ```
+
+- Is the second change point due to who is being collected after one year out?
+  - 
+- Kam will
+
+< 20% predicted and >=150 (Kam)
+
+Look at 3 years before and two after
+
+2 years for 12 and up
+1.5 years for 6
