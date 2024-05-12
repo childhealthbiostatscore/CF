@@ -136,6 +136,8 @@ binary_outcomes <- c(
   "staphylococcus_aureus", "haemophilus_influenzae", "pseudomonasaeruginosa",
   "burkho_complex"
 )
+# Save dataset for mcp model script
+save(encounter, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/mcp_dataset.RData")
 ```
 
 ```{r functions}
@@ -202,43 +204,29 @@ Based on visual inspection of the LOESS plots, I expect there to be a change in 
 
 ### FEV1
 
+## Frequentist models
+
+First, a Gaussian mixed model is fit with random intercept for patient ID and random slope for each patient. Then, the `segmented.lme` function is applied to this mixed model, with 0 as the starting value for finding the optimal breakpoint. The changepoint is also treated as a random effect and allowed to vary within a person.
+
+### FEV1
+
 ```{r}
 #| cache: true
-set.seed(1017)
-model <- list(
-  gli_fev1_ppred_rn ~ 1, # intercept
-  gli_fev1_ppred_rn ~ 1 ~ 0 + Days # joined slope
+#| eval: false
+# Fit initial model
+ri_rs_mod_fev1 <- lme(gli_fev1_ppred_rn ~ Race * Days + age_group + Insurance,
+  random = ~ 1 + Days | eDWID, data = cleaned, na.action = na.omit
 )
-fit <- mcp(model, data = cleaned, chains = 4, cores = 4)
+# Find change point
+ri_rs_mod_seg_fev <- segmented.lme(ri_rs_mod_fev1, ~Days, psi = 0,
+  random = list(eDWID = pdDiag(~ 1 + Days + U + G0)), # ind. random eff. (in the changepoint too)
+  control = seg.control(n.boot = 0, display = F)
+)
 ```
 
 ```{r}
-summary(fit)
-plot(fit)
+
 ```
-
-<!-- ## Frequentist models -->
-
-<!-- First, a Gaussian mixed model is fit with random intercept for patient ID and random slope for each patient. Then, the `segmented.lme` function is applied to this mixed model, with 0 as the starting value for finding the optimal breakpoint. The changepoint is also treated as a random effect and allowed to vary within a person. -->
-
-<!-- ### FEV1 -->
-
-<!-- ```{r} -->
-<!-- #| cache: true -->
-<!-- # Fit initial model -->
-<!-- ri_rs_mod_fev1 <- lme(gli_fev1_ppred_rn ~ Race * Days + age_group + Insurance, -->
-<!--   random = ~ 1 + Days | eDWID, data = cleaned, na.action = na.omit -->
-<!-- ) -->
-<!-- # Find change point -->
-<!-- ri_rs_mod_seg_fev <- segmented.lme(ri_rs_mod_fev1, ~Days, psi = 0, -->
-<!--   random = list(eDWID = pdDiag(~ 1 + Days + U + G0)), # ind. random eff. (in the changepoint too) -->
-<!--   control = seg.control(n.boot = 0, display = F) -->
-<!-- ) -->
-<!-- ``` -->
-
-<!-- ```{r} -->
-<!-- plot(ri_rs_mod_seg_fev1) -->
-<!-- ``` -->
 
 # Questions for Scott and Kam
 

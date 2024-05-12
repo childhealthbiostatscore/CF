@@ -554,5 +554,5 @@ tidy_labels <- names(labels)
 names(tidy_labels) <- sapply(labels, "[[", 1)
 # Save
 save(annual, encounter, demo, labels, tidy_labels, by_year,
-  file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/analysis_dataset.RData"
+  file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/prescription_dataset.RData"
 )
