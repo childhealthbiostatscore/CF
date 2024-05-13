@@ -10,7 +10,7 @@ home_dir <- switch(Sys.info()["sysname"],
 setwd(home_dir)
 # Data import and seed.
 # Data cleaning code in racial_and_ethnic_differences_in_eti_outcomes.qmd
-load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/data_for_mcp.RData")
+load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/mcp_dataset.RData")
 set.seed(1017)
 # FEV1 single changepoint
 fev1_single_cp_model <- list(

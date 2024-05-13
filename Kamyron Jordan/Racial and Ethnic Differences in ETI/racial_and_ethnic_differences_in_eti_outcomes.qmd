@@ -137,7 +137,7 @@ binary_outcomes <- c(
   "burkho_complex"
 )
 # Save dataset for mcp model script
-save(encounter, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/mcp_dataset.RData")
+save(cleaned, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/mcp_dataset.RData")
 ```
 
 ```{r functions}
