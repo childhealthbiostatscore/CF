@@ -46,15 +46,10 @@ insulin$Timepoint <- sub(" min", "", insulin$Timepoint)
 insulin$Timepoint <- as.numeric(insulin$Timepoint)
 # Remove exact duplicates
 insulin <- insulin %>% distinct()
-# For duplicates with different insulin values, average them
+# For duplicates with different insulin values, take the first (per Katie)
 insulin <- insulin %>%
   group_by(study_id, Date, Timepoint) %>%
-  summarise(Insulin = mean(Insulin, na.rm = T))
-# Write
-write.csv(insulin,
-  file = "./Christine Chan/EnVision CF/Data_Clean/tim_manual_dataset_insulin_only.csv",
-  row.names = F, na = ""
-)
+  summarise(Insulin = first(na.omit(Insulin)))
 # Make a wide version
 insulin_wide <- insulin %>%
   pivot_wider(
@@ -62,13 +57,38 @@ insulin_wide <- insulin %>%
     names_glue = "insulin_{Timepoint}_min"
   ) %>%
   rename(date_visit = Date)
-write.csv(insulin_wide,
-  file = "./Christine Chan/EnVision CF/Data_Clean/insulin_wide.csv",
+# Add a conversion to pmol/L
+insulin$Insulin_pmol_L <- insulin$Insulin * 6.945
+# Write
+write.csv(insulin,
+  file = "./Christine Chan/EnVision CF/Data_Clean/tim_insulin.csv",
+  row.names = F, na = ""
+)
+# Check which are missing based on wide data
+df <- read.csv("./Christine Chan/EnVision CF/Data_Raw/EnvisionCF_DATA_2024-03-14_1325.csv", na.strings = "")
+df$date_visit <- ymd(df$date_visit)
+df <- df %>%
+  group_by(study_id, redcap_event_name) %>%
+  fill(date_visit)
+df <- df %>%
+  select(study_id, redcap_event_name, date_visit) %>%
+  distinct()
+insulin_wide$date_visit <- ymd(insulin_wide$date_visit)
+df <- left_join(df, insulin_wide, by = join_by(study_id, date_visit))
+# Make a list of visits with no insulin data
+no_insulin <- df %>% filter(if_all(paste0("insulin_", c(0, 10, 30, 60, 90, 120, 150, 180), "_min"), ~ is.na(.)))
+# Write
+write.csv(df,
+  file = "./Christine Chan/EnVision CF/Data_Clean/tim_insulin_wide.csv",
+  row.names = F, na = ""
+)
+write.csv(no_insulin,
+  file = "./Christine Chan/EnVision CF/Data_Clean/tim_no_insulin.csv",
   row.names = F, na = ""
 )
 
 #-------------------------------------------------------------------------------
-# Catecholamines will need to be added manually
+# Catecholamines (will need to be added manually)
 #-------------------------------------------------------------------------------
 
 
