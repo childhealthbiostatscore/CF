@@ -1,5 +1,5 @@
 ---
-title: "Title"
+title: "CHEC Study Sweat Chloride"
 author: "Tim Vigers"
 date: "today"
 date-format: long
@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: ~/Documents/Miscellaneous/zotero.bib
-csl: ~/Documents/Miscellaneous/american-medical-association.csl
+bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /home/timvigers/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -24,6 +24,7 @@ editor: source
 #| include: false
 library(tidyverse)
 library(readxl)
+library(ggpmisc)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Test",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Edith Zemanick/Sweat Test",
@@ -34,10 +35,14 @@ github_dir <- switch(Sys.info()["sysname"],
   "Windows" = "C:/Users/Tim/GitHub",
   "Linux" = "/home/timvigers/GitHub"
 )
+source(paste0(github_dir, "/CF/genotype_class_severity.R"))
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
-```{r data cleaning}
+# CHCO data
+
+```{r}
+# Edith's data
 # Import exclusion data from Excel
 diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with CF or Non-CF.xlsx")
 exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) | diagnoses$Code == "Exclude"]
@@ -66,18 +71,190 @@ df$Modulator <- apply(df, 1, function(r) {
     labels = c("None", mod$Modulator), right = F
   ))
 })
+# Numeric variables
+num_vars <- c("Amount", "Na", "K", "Cl")
+num_vars <- c(paste0(num_vars, "_Left"), paste0(num_vars, "_Right"))
+df[, num_vars] <- suppressWarnings(lapply(df[, num_vars], as.numeric))
+# Filter per Maxie's code
+exclude2 <- c(22, 23, 24, 29, 31, 474, 483, 484, 485, 505, 510, 785, 791, 792, 793)
+no_dem <- unique(df$PatientID[df$Demographics.Available != "TRUE" | is.na(df$Demographics.Available) | df$Sex == ""])
+df <- df %>%
+  mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks * 7) %>%
+  filter(
+    Age.at.Test.in.Years < 50 & Age.at.Test.in.Days >= 2,
+    !(Diagnosis == "Non-CF" & PatientID %in% exclude2),
+    Modulator == "None"
+  ) %>%
+  distinct(.) %>%
+  filter(Sex != "", Demographics.Available == "TRUE")
+# Genotype info
+## By severity
+df$geno1 <- cf_genotype_class_severity(df$Genotypes1)
+df$geno2 <- cf_genotype_class_severity(df$Genotypes2)
+df$geno1[df$Diagnosis == "Non-CF"] <- "Not CF"
+df$geno2[df$Diagnosis == "Non-CF"] <- "Not CF"
+df$geno_risk <- paste(df$geno1, df$geno2, sep = "/")
+df$geno_risk <- factor(df$geno_risk)
+## By function
+df$geno1_class <- cf_genotype_class_severity(df$Genotypes1, out = "class")
+df$geno1_class[grep("508", df$Genotypes1)] <- "F508del"
+df$geno1_class <- replace(df$geno1_class, df$geno1_class %in% c("I", "II", "III"), "MF")
+df$geno1_class <- replace(df$geno1_class, df$geno1_class %in% c("IV", "V"), "RF")
+df$geno2_class <- cf_genotype_class_severity(df$Genotypes2, out = "class")
+df$geno2_class[grep("508", df$Genotypes2)] <- "F508del"
+df$geno2_class <- replace(df$geno2_class, df$geno2_class %in% c("I", "II", "III"), "MF")
+df$geno2_class <- replace(df$geno2_class, df$geno2_class %in% c("IV", "V"), "RF")
+df$geno_class <- factor(paste0(
+  pmin(df$geno1_class, df$geno2_class), "/",
+  pmax(df$geno1_class, df$geno2_class)
+))
+levels(df$geno_class) <- c(
+  "MF/MF", "MF/MF", "MF/RF", "MF/Unknown", "MF/MF",
+  "MF/RF", "MF/Unknown", "Both RF or Unknown", "Both RF or Unknown"
+)
+# Which arm?
+df$Arm <- apply(df[, c("Cl", "Cl_Left", "Cl_Right", "Na", "Na_Left", "Na_Right", "K", "K_Left", "K_Right")], 1, function(r) {
+  k <- sum(!is.na(r))
+  if (k == 6) {
+    return("Both")
+  } else if (k == 3) {
+    return("Arm Not Noted")
+  } else {
+    return(NA)
+  }
+})
+# Merge left and right values
+df$Amount <- apply(df[, c("Amount", "Amount_Left", "Amount_Right")], 1, function(r) {
+  amt <- suppressWarnings(as.numeric(as.character(r)))
+  mean(amt, na.rm = T)
+})
+df$Cl <- apply(df[, c("Cl", "Cl_Left", "Cl_Right")], 1, function(r) {
+  cl <- suppressWarnings(as.numeric(as.character(r)))
+  mean(cl, na.rm = T)
+})
+df$Na <- apply(df[, c("Na", "Na_Left", "Na_Right")], 1, function(r) {
+  na <- suppressWarnings(as.numeric(as.character(r)))
+  mean(na, na.rm = T)
+})
+df$K <- apply(df[, c("K", "K_Left", "K_Right")], 1, function(r) {
+  k <- suppressWarnings(as.numeric(as.character(r)))
+  mean(k, na.rm = T)
+})
+# Sodium to chloride ratio
+df$`Na/Cl Ratio` <- df$Na / df$Cl
+high_ratio <- unique(which(df$`Na/Cl Ratio` > 2))
+high_cl <- unique(which(df$Cl > 160))
+high_na <- unique(which(df$Na > 160))
+df <- df[-unique(c(high_ratio, high_cl, high_na)), ]
+# Sweat chloride group
+df$`Sweat Chloride Group` <- cut(df$Cl, c(-Inf, 30, 60, Inf),
+  right = F,
+  labels = c("< 30", "30-59", ">60")
+)
+# Sort
+df <- df %>% arrange(PatientID, Age.at.Test.in.Weeks)
+# First measure for everyone, remove those with no sweat chloride
+df <- df %>%
+  filter(!is.na(Cl)) %>%
+  group_by(PatientID) %>%
+  filter(row_number() == 1)
+# Order groups
+df$Diagnosis <- factor(df$Diagnosis, levels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "Non-CF"))
 ```
 
-# Table
+## By sweat chloride group
 
 ```{r}
-#| label: tbl-planets
-#| tbl-cap: Planets
+#| warning: false
+ggplot(df, aes(x = Na, y = Cl, colour = `Sweat Chloride Group`)) +
+  geom_point(alpha=0.2) +
+  stat_poly_line(se=F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw()
+ggplot(df, aes(x = Na, y = Cl)) +
+  geom_point(alpha=0.2) +
+  stat_poly_line(se=F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw() +
+  facet_wrap(~`Sweat Chloride Group`, scales = "free", ncol = 2)
 ```
 
-# Figure
+## By classification
 
 ```{r}
-#| label: fig-planets
-#| fig-cap: Planets
+#| warning: false
+ggplot(df, aes(x = Na, y = Cl, colour = Diagnosis)) +
+  geom_point(alpha=0.2) +
+  stat_poly_line(se=F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw()
+ggplot(df, aes(x = Na, y = Cl)) +
+  geom_point(alpha=0.2) +
+  stat_poly_line(se=F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw() +
+  facet_wrap(~Diagnosis, scales = "free", ncol = 2)
+```
+
+## By genotype severity
+
+```{r}
+#| warning: false
+ggplot(df, aes(x = Na, y = Cl, colour = geno_class)) +
+  geom_point(alpha=0.2) +
+  stat_poly_line(se=F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw()
+ggplot(df, aes(x = Na, y = Cl)) +
+  geom_point(alpha=0.2) +
+  stat_poly_line(se=F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw() +
+  facet_wrap(~geno_class, scales = "free", ncol = 2)
+```
+
+# CHEC data
+
+```{r data cleaning}
+# Import CHEC data
+chec <- read.csv("./Data_Raw/CHEC sweat sodium and chloride.csv")
+# Chloride groups
+chec$swc_group <- cut(chec$swcavg, c(-Inf, 30, 60, Inf),
+  right = F,
+  labels = c("< 30", "30-59", ">60")
+)
+```
+
+## By sweat chloride group
+
+```{r}
+#| warning: false
+ggplot(chec, aes(x = swsavg, y = swcavg, colour = swc_group)) +
+  geom_point(alpha=0.2) +
+  stat_poly_line(se=F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw()
+ggplot(chec, aes(x = swsavg, y = swcavg)) +
+  geom_point(alpha=0.2) +
+  stat_poly_line(se=F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw() +
+  facet_wrap(~swc_group, scales = "free", ncol = 2)
+```
+
+## By CHEC genotype group
+
+```{r}
+#| warning: false
+ggplot(chec, aes(x = swsavg, y = swcavg, colour = genotype_group)) +
+  geom_point(alpha=0.2) +
+  stat_poly_line(se=F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw()
+ggplot(chec, aes(x = swsavg, y = swcavg)) +
+  geom_point(alpha=0.2) +
+  stat_poly_line(se=F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw() +
+  facet_wrap(~genotype_group, scales = "free", ncol = 2)
 ```
