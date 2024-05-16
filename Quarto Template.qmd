@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: ~/Documents/Miscellaneous/zotero.bib
-csl: ~/Documents/Miscellaneous/american-medical-association.csl
+bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /home/timvigers/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
