@@ -1,6 +1,7 @@
 # Setup
 library(tidyverse)
 library(mcp)
+set.seed(1017)
 # Paths
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
@@ -8,26 +9,21 @@ home_dir <- switch(Sys.info()["sysname"],
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
 )
 setwd(home_dir)
-# Data import and seed.
+# Data import
 # Data cleaning code in racial_and_ethnic_differences_in_eti_outcomes.qmd
-load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/mcp_dataset.RData")
-set.seed(1017)
+load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/cleaned_outcomes_dataset.RData")
 # FEV1 single changepoint
 fev1_single_cp_model <- list(
   gli_fev1_ppred_rn ~ 1, # intercept
   ~ 0 + Days # joined slope
 )
-fev1_single_cp_fit <- mcp(fev1_single_cp_model,
-  data = cleaned, chains = 4, cores = 4
-)
-save(fev1_single_cp_fit, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/fev1_single_cp_fit.RData")
+fev1_single_cp_fit <- mcp(fev1_single_cp_model, data = encounter %>% filter(!is.na(gli_fev1_ppred_rn)))
+save(fev1_single_cp_fit, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/mcp/fev1_single_cp_fit.RData")
 # FEV1 double changepoint
 fev1_double_cp_model <- list(
   gli_fev1_ppred_rn ~ 1, # intercept
   ~ 0 + Days, # joined slope
   ~ 0 + Days # joined slope
 )
-fev1_double_cp_fit <- mcp(fev1_double_cp_model,
-  data = cleaned, chains = 4, cores = 4
-)
-save(fev1_double_cp_fit, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/fev1_double_cp_fit.RData")
+fev1_double_cp_fit <- mcp(fev1_double_cp_model, data = encounter %>% filter(!is.na(gli_fev1_ppred_rn)))
+save(fev1_double_cp_fit, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/mcp/fev1_double_cp_fit.RData")

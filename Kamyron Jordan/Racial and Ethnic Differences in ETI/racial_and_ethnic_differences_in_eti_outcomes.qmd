@@ -125,8 +125,12 @@ encounter$Modulator_trikafta_first_date <-
   mdy(encounter$Modulator_trikafta_first_date)
 encounter$encounterdate <- mdy(encounter$encounterdate)
 encounter$Days <- as.numeric(encounter$encounterdate - encounter$Modulator_trikafta_first_date)
+# Remove impossible lung function values
+encounter$gli_fev1_ppred_rn[encounter$gli_fev1_ppred_rn < 20 | encounter$gli_fev1_ppred_rn > 150] <- NA
+encounter$gli_fvc_ppred_rn[encounter$gli_fvc_ppred_rn < 20 | encounter$gli_fvc_ppred_rn > 150] <- NA
+encounter$gli_fev1fvc_ppred_rn[encounter$gli_fev1fvc_ppred_rn < 20 | encounter$gli_fev1fvc_ppred_rn > 150] <- NA
 # Separate cleaned set
-cleaned <- encounter %>% filter(gli_fev1_ppred_rn <= 200, !is.na(Days))
+encounter <- encounter %>% filter(!is.na(Days))
 # List of outcomes
 continuous_outcomes <- c(
   "gli_fev1_ppred_rn", "gli_fvc_ppred_rn", "gli_fev1fvc_ppred_rn",
@@ -137,12 +141,12 @@ binary_outcomes <- c(
   "burkho_complex"
 )
 # Save dataset for mcp model script
-save(cleaned, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/mcp_dataset.RData")
+save(encounter, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/cleaned_outcomes_dataset.RData")
 ```
 
 ```{r functions}
 # Plots
-loess_plot <- function(df = cleaned, outcome, facet = F) {
+loess_plot <- function(df = encounter, outcome, facet = F) {
   p <- ggplot(df, aes(x = Days, y = !!sym(outcome), color = Race)) +
     geom_point(
       shape = ".", aes(x = Days, y = !!sym(outcome)), inherit.aes = F,
@@ -155,24 +159,11 @@ loess_plot <- function(df = cleaned, outcome, facet = F) {
   }
   return(p)
 }
-# Basic segmented model
-basic_segmented <- function(df = cleaned, outcome, n_change_points = NULL,
-                            change_points = NULL) {
-  # Formula
-  f <- as.formula(paste0(outcome, "~ Days+Race + age_group + Insurance"))
-  # Basic linear model
-  lmod <- lm(f, data = df)
-  # Segmented model
-  lmod_seg <- segmented(lmod, seg.Z = ~Days, psi = 0, control = seg.control(it.max = 0))
-  # Plot
-  d <- lmod$model
-  d$pred <- fitted(lmod_seg)
-}
 ```
 
 # Data cleaning
 
-1. For now, I have excluded any rows where the FEV1 predicted values are over 200.
+1. Lung function percent predicted values < 20% or > 150% were excluded.
 
 # LOESS-smoothed outcome plots
 
@@ -191,7 +182,7 @@ invisible(lapply(continuous_outcomes, function(o) {
 
 # Segmented models
 
-The following models are adjusted for age group and insurance status.
+The following models are adjusted for age group and insurance status. First, a Gaussian mixed model is fit with random intercept for patient ID. Then, the `segmented.lme` function is applied to this mixed model, with no pre-specified starting values and `npsi = 2`. The change points are treated as random effects and allowed to vary within a person.
 
 ## FEV1
 
@@ -204,54 +195,13 @@ Based on visual inspection of the LOESS plots, I expect there to be a change in 
 
 ### FEV1
 
-## Frequentist models
-
-First, a Gaussian mixed model is fit with random intercept for patient ID and random slope for each patient. Then, the `segmented.lme` function is applied to this mixed model, with 0 as the starting value for finding the optimal breakpoint. The changepoint is also treated as a random effect and allowed to vary within a person.
-
-### FEV1
-
 ```{r}
-#| cache: true
 #| eval: false
-# Fit initial model
-ri_rs_mod_fev1 <- lme(gli_fev1_ppred_rn ~ Race * Days + age_group + Insurance,
-  random = ~ 1 + Days | eDWID, data = cleaned, na.action = na.omit
-)
-# Find change point
-ri_rs_mod_seg_fev <- segmented.lme(ri_rs_mod_fev1, ~Days, psi = 0,
-  random = list(eDWID = pdDiag(~ 1 + Days + U + G0)), # ind. random eff. (in the changepoint too)
-  control = seg.control(n.boot = 0, display = F)
-)
-```
-
-```{r}
-
-```
-
-# Questions for Scott and Kam
-
-1. Some of the predicted lung function measures are insanely high. How should we deal with outliers? Is there a limit that you would consider biologically impossible? Over 200%? What about FVC and FEV1/FVC?
-
-2. Similarly, what would be a good cutoff for the lower end? I assume that a value of 0 is not possible.
-
-3. I know we've discussed this before, but looking at the LOESS plots, do we want to cut off the pre-ETI at about 2000 days?
-
-4. Are we interested in statistical inference on age group? Or are we simply adjusting for it? If we're not clinically interested in the age groups is would be worth treating it as a continuous variable.
-
-5. Do the linearity assumptions seem accurate to you?
-
-6. Why do you think the BMI, height, etc. percentiles look so strange? Do they normally look like this?
-
-```{r}
-#| warning: false
-loess_plot(df = encounter, outcome = "gli_fev1_ppred_rn")
+load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/fev1_single_cp_fit.RData")
+load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/fev1_double_cp_fit.RData")
 ```
 
 - Is the second change point due to who is being collected after one year out?
-  - 
-- Kam will
-
-< 20% predicted and >=150 (Kam)
 
 Look at 3 years before and two after
 
