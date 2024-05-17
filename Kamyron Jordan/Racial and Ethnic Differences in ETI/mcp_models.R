@@ -14,16 +14,16 @@ setwd(home_dir)
 load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/cleaned_outcomes_dataset.RData")
 # FEV1 single changepoint
 fev1_single_cp_model <- list(
-  gli_fev1_ppred_rn ~ 1, # intercept
-  ~ 0 + Days # joined slope
+  gli_fev1_ppred_rn ~ 1 + Days,
+  1 + (1 | eDWID) ~ 0 + Days # Varying change point by person
 )
 fev1_single_cp_fit <- mcp(fev1_single_cp_model, data = encounter %>% filter(!is.na(gli_fev1_ppred_rn)))
 save(fev1_single_cp_fit, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/mcp/fev1_single_cp_fit.RData")
 # FEV1 double changepoint
 fev1_double_cp_model <- list(
-  gli_fev1_ppred_rn ~ 1, # intercept
-  ~ 0 + Days, # joined slope
-  ~ 0 + Days # joined slope
+  gli_fev1_ppred_rn ~ 1 + Days,
+  1 + (1 | eDWID) ~ 0 + Days, # Varying change point by person
+  1 + (1 | eDWID) ~ 0 + Days # Varying second change point by person (I think?)
 )
 fev1_double_cp_fit <- mcp(fev1_double_cp_model, data = encounter %>% filter(!is.na(gli_fev1_ppred_rn)))
 save(fev1_double_cp_fit, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/mcp/fev1_double_cp_fit.RData")

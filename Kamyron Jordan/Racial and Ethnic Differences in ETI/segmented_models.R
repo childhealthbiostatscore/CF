@@ -15,13 +15,14 @@ setwd(home_dir)
 load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/cleaned_outcomes_dataset.RData")
 # FEV1
 # Basic linear mixed model
-fev1_mod <- lme(gli_fev1_ppred_rn ~ Days,
-  data = encounter, random = ~ 1 | eDWID,
-  na.action = na.omit
+fev1_mod <- lm(gli_fev1_ppred_rn ~ Days, data = encounter, na.action = na.omit)
+# Segmented model, one change point
+fev1_single_cp_fit <- segmented(fev1_mod,
+  seg.Z = ~Days, npsi = 1, control = seg.control(display = T)
 )
-# Segmented model
-fev1_seg <- segmented(fev1_mod,
-  seg.Z = ~Days, npsi = 2, random = list(eDWID = pdDiag(~ 1 + Days + U + G0)),
-  control = seg.control(n.boot = 0, display = T)
+save(fev1_single_cp_fit, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/segmented/fev1_single_cp_fit.RData")
+# Segmented model, two change points
+fev1_double_cp_fit <- segmented(fev1_mod,
+  seg.Z = ~Days, npsi = 2, control = seg.control(display = T)
 )
-save(fev1_seg, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/segmented/fev1_segmented_fit.RData")
+save(fev1_double_cp_fit, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/segmented/fev1_double_cp_fit.RData")

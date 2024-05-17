@@ -129,8 +129,9 @@ encounter$Days <- as.numeric(encounter$encounterdate - encounter$Modulator_trika
 encounter$gli_fev1_ppred_rn[encounter$gli_fev1_ppred_rn < 20 | encounter$gli_fev1_ppred_rn > 150] <- NA
 encounter$gli_fvc_ppred_rn[encounter$gli_fvc_ppred_rn < 20 | encounter$gli_fvc_ppred_rn > 150] <- NA
 encounter$gli_fev1fvc_ppred_rn[encounter$gli_fev1fvc_ppred_rn < 20 | encounter$gli_fev1fvc_ppred_rn > 150] <- NA
-# Separate cleaned set
-encounter <- encounter %>% filter(!is.na(Days))
+# Filter
+encounter <- encounter %>%
+  filter(!is.na(Days))
 # List of outcomes
 continuous_outcomes <- c(
   "gli_fev1_ppred_rn", "gli_fvc_ppred_rn", "gli_fev1fvc_ppred_rn",
@@ -141,19 +142,30 @@ binary_outcomes <- c(
   "burkho_complex"
 )
 # Save dataset for mcp model script
-save(encounter, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/cleaned_outcomes_dataset.RData")
+# save(encounter, file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/cleaned_outcomes_dataset.RData")
 ```
 
 ```{r functions}
 # Plots
-loess_plot <- function(df = encounter, outcome, facet = F) {
-  p <- ggplot(df, aes(x = Days, y = !!sym(outcome), color = Race)) +
+loess_plot <- function(data = encounter, outcome, facet = F, smooth = "bs",
+                       df = 10) {
+  p <- ggplot(data, aes(x = Days, y = !!sym(outcome), color = Race)) +
     geom_point(
       shape = ".", aes(x = Days, y = !!sym(outcome)), inherit.aes = F,
       alpha = 0.1
     ) +
-    geom_smooth() +
     theme_classic()
+  if (smooth == "bs") {
+    p <- p + geom_smooth(method = "lm", formula = y ~ splines::bs(x,
+      degree = 3, df = df
+    ))
+  }
+  if (smooth == "loess") {
+    p <- p + geom_smooth(method = "loess")
+  }
+  if (smooth == "gam") {
+    p <- p + geom_smooth(method = "gam")
+  }
   if (facet) {
     p <- p + facet_wrap(~Race)
   }
@@ -175,8 +187,53 @@ invisible(lapply(continuous_outcomes, function(o) {
   cat("##", o)
   cat("\n")
   cat("\n")
-  print(loess_plot(outcome = o))
-  print(loess_plot(outcome = o, facet = T))
+  print(loess_plot(outcome = o, smooth = "loess"))
+  print(loess_plot(outcome = o, facet = T, smooth = "loess"))
+}))
+```
+
+# B-spline smoothing (cubic, df=10)
+
+```{r results='asis'}
+#| warning: false
+invisible(lapply(continuous_outcomes, function(o) {
+  cat("\n")
+  cat("\n")
+  cat("##", o)
+  cat("\n")
+  cat("\n")
+  print(loess_plot(outcome = o, smooth = "bs"))
+  print(loess_plot(outcome = o, facet = T, smooth = "bs"))
+}))
+```
+
+# B-spline smoothing (cubic, df=3)
+
+```{r results='asis'}
+#| warning: false
+invisible(lapply(continuous_outcomes, function(o) {
+  cat("\n")
+  cat("\n")
+  cat("##", o)
+  cat("\n")
+  cat("\n")
+  print(loess_plot(outcome = o, smooth = "bs", df = 3))
+  print(loess_plot(outcome = o, facet = T, smooth = "bs", df = 3))
+}))
+```
+
+# GAM smoothing
+
+```{r results='asis'}
+#| warning: false
+invisible(lapply(continuous_outcomes, function(o) {
+  cat("\n")
+  cat("\n")
+  cat("##", o)
+  cat("\n")
+  cat("\n")
+  print(loess_plot(outcome = o, smooth = "gam"))
+  print(loess_plot(outcome = o, facet = T, smooth = "gam"))
 }))
 ```
 
@@ -189,6 +246,12 @@ The following models are adjusted for age group and insurance status. First, a G
 Based on visual inspection of the LOESS plots, I expect there to be a change in slope at around 0 and maybe a second one at around 1 year.
 
 ```{r}
+load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/segmented/fev1_single_cp_fit.RData")
+plot(fev1_single_cp_fit)
+summary(fev1_single_cp_fit)
+load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/segmented/fev1_double_cp_fit.RData")
+plot(fev1_double_cp_fit)
+summary(fev1_double_cp_fit)
 ```
 
 ## A Bayesian approach
