@@ -167,13 +167,13 @@ df$Diagnosis <- factor(df$Diagnosis, levels = c("Cystic Fibrosis", "CFTR-RD or C
 ```{r}
 #| warning: false
 ggplot(df, aes(x = Na, y = Cl, colour = `Sweat Chloride Group`)) +
-  geom_point(alpha=0.2) +
-  stat_poly_line(se=F) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw()
 ggplot(df, aes(x = Na, y = Cl)) +
-  geom_point(alpha=0.2) +
-  stat_poly_line(se=F) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw() +
   facet_wrap(~`Sweat Chloride Group`, scales = "free", ncol = 2)
@@ -184,13 +184,13 @@ ggplot(df, aes(x = Na, y = Cl)) +
 ```{r}
 #| warning: false
 ggplot(df, aes(x = Na, y = Cl, colour = Diagnosis)) +
-  geom_point(alpha=0.2) +
-  stat_poly_line(se=F) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw()
 ggplot(df, aes(x = Na, y = Cl)) +
-  geom_point(alpha=0.2) +
-  stat_poly_line(se=F) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw() +
   facet_wrap(~Diagnosis, scales = "free", ncol = 2)
@@ -201,13 +201,13 @@ ggplot(df, aes(x = Na, y = Cl)) +
 ```{r}
 #| warning: false
 ggplot(df, aes(x = Na, y = Cl, colour = geno_class)) +
-  geom_point(alpha=0.2) +
-  stat_poly_line(se=F) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw()
 ggplot(df, aes(x = Na, y = Cl)) +
-  geom_point(alpha=0.2) +
-  stat_poly_line(se=F) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw() +
   facet_wrap(~geno_class, scales = "free", ncol = 2)
@@ -223,20 +223,79 @@ chec$swc_group <- cut(chec$swcavg, c(-Inf, 30, 60, Inf),
   right = F,
   labels = c("< 30", "30-59", ">60")
 )
+chec$swc_group_pm <- cut(chec$swhcavgpm, c(-Inf, 30, 60, Inf),
+  right = F,
+  labels = c("< 30", "30-59", ">60")
+)
 ```
+
+# Pre-modulator
+
+## By sweat chloride group
+
+```{r}
+#| warning: false
+ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm, colour = swc_group_pm)) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw()
+ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm)) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw() +
+  facet_wrap(~swc_group_pm, scales = "free", ncol = 2)
+```
+
+## By CHEC genotype group
+
+```{r}
+#| warning: false
+ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm, colour = genotype_group)) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw()
+ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm)) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw() +
+  facet_wrap(~genotype_group, scales = "free", ncol = 2)
+```
+
+## By CHEC genotype group
+
+```{r}
+#| warning: false
+ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm, colour = genotype_group)) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw()
+ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm)) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw() +
+  facet_wrap(~genotype_group, scales = "free", ncol = 2)
+```
+
+# Post-modulator
 
 ## By sweat chloride group
 
 ```{r}
 #| warning: false
 ggplot(chec, aes(x = swsavg, y = swcavg, colour = swc_group)) +
-  geom_point(alpha=0.2) +
-  stat_poly_line(se=F) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw()
 ggplot(chec, aes(x = swsavg, y = swcavg)) +
-  geom_point(alpha=0.2) +
-  stat_poly_line(se=F) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw() +
   facet_wrap(~swc_group, scales = "free", ncol = 2)
@@ -247,14 +306,48 @@ ggplot(chec, aes(x = swsavg, y = swcavg)) +
 ```{r}
 #| warning: false
 ggplot(chec, aes(x = swsavg, y = swcavg, colour = genotype_group)) +
-  geom_point(alpha=0.2) +
-  stat_poly_line(se=F) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw()
 ggplot(chec, aes(x = swsavg, y = swcavg)) +
-  geom_point(alpha=0.2) +
-  stat_poly_line(se=F) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw() +
   facet_wrap(~genotype_group, scales = "free", ncol = 2)
+```
+
+## By CHEC genotype group
+
+```{r}
+#| warning: false
+ggplot(chec, aes(x = swsavg, y = swcavg, colour = genotype_group)) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw()
+ggplot(chec, aes(x = swsavg, y = swcavg)) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw() +
+  facet_wrap(~genotype_group, scales = "free", ncol = 2)
+```
+
+## By modulator type
+
+```{r}
+#| warning: false
+ggplot(chec, aes(x = swsavg, y = swcavg, colour = modqual)) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw()
+ggplot(chec, aes(x = swsavg, y = swcavg)) +
+  geom_point(alpha = 0.2) +
+  stat_poly_line(se = F) +
+  stat_poly_eq(use_label(c("eq", "R2"))) +
+  theme_bw() +
+  facet_wrap(~modqual, scales = "free", ncol = 2)
 ```
