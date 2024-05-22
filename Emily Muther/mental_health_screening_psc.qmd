@@ -25,7 +25,13 @@ library(plotly)
 library(knitr)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF"
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+)
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/GitHub",
+  "Windows" = "C:/Users/Tim/GitHub",
+  "Linux" = "/home/timvigers/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -33,7 +39,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```{r data cleaning}
 #| warning: false
 # Import
-df <- read.csv("./Emily Muther/General - Muther Research Group/Mental Health Screening/Data_Raw/PSC_Full_Data_data_11-11-22.csv",
+df <- read.csv("./Emily Muther/General/Mental Health Screening/Data_Raw/PSC_Full_Data_data_11-11-22.csv",
   check.names = F, na.strings = ""
 )
 # Remove duplicate rows
@@ -90,6 +96,10 @@ df %>%
     missing_text = "Missing",
     type = list(`Internalizing subscale` ~ "continuous")
   )
+
+ggplot(df,aes(x=Score))+
+  geom_histogram(binwidth = 1) +
+  theme_bw()
 ```
 
 ## By person

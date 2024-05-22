@@ -25,6 +25,7 @@ editor: source
 library(tidyverse)
 library(readxl)
 library(ggpmisc)
+library(gtsummary)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Test",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Edith Zemanick/Sweat Test",
@@ -157,15 +158,36 @@ df <- df %>% arrange(PatientID, Age.at.Test.in.Weeks)
 df <- df %>%
   filter(!is.na(Cl)) %>%
   group_by(PatientID) %>%
-  filter(row_number() == 1)
+  filter(row_number() == 1) %>%
+  ungroup()
 # Order groups
-df$Diagnosis <- factor(df$Diagnosis, levels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "Non-CF"))
+df$Diagnosis <- factor(df$Diagnosis,
+  levels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "Non-CF")
+)
 ```
 
 ## By sweat chloride group
 
 ```{r}
 #| warning: false
+ggplot(df, aes(x = Na)) +
+  geom_histogram(aes(y = ..density.., fill = `Sweat Chloride Group`)) +
+  geom_density(aes(group = `Sweat Chloride Group`)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+ggplot(df, aes(x = Cl)) +
+  geom_histogram(aes(y = ..density.., fill = `Sweat Chloride Group`)) +
+  geom_density(aes(group = `Sweat Chloride Group`)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
 ggplot(df, aes(x = Na, y = Cl, colour = `Sweat Chloride Group`)) +
   geom_point(alpha = 0.2) +
   stat_poly_line(se = F) +
@@ -177,12 +199,33 @@ ggplot(df, aes(x = Na, y = Cl)) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw() +
   facet_wrap(~`Sweat Chloride Group`, scales = "free", ncol = 2)
+df %>%
+  select(Na, Cl, `Sweat Chloride Group`) %>%
+  tbl_summary(by = `Sweat Chloride Group`)
 ```
 
 ## By classification
 
 ```{r}
 #| warning: false
+ggplot(df, aes(x = Na)) +
+  geom_histogram(aes(y = ..density.., fill = Diagnosis)) +
+  geom_density(aes(group = Diagnosis)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+ggplot(df, aes(x = Cl)) +
+  geom_histogram(aes(y = ..density.., fill = Diagnosis)) +
+  geom_density(aes(group = Diagnosis)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
 ggplot(df, aes(x = Na, y = Cl, colour = Diagnosis)) +
   geom_point(alpha = 0.2) +
   stat_poly_line(se = F) +
@@ -194,12 +237,33 @@ ggplot(df, aes(x = Na, y = Cl)) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw() +
   facet_wrap(~Diagnosis, scales = "free", ncol = 2)
+df %>%
+  select(Na, Cl, Diagnosis) %>%
+  tbl_summary(by = Diagnosis)
 ```
 
 ## By genotype severity
 
 ```{r}
 #| warning: false
+ggplot(df, aes(x = Na)) +
+  geom_histogram(aes(y = ..density.., fill = geno_class)) +
+  geom_density(aes(group = geno_class)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+ggplot(df, aes(x = Cl)) +
+  geom_histogram(aes(y = ..density.., fill = geno_class)) +
+  geom_density(aes(group = geno_class)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
 ggplot(df, aes(x = Na, y = Cl, colour = geno_class)) +
   geom_point(alpha = 0.2) +
   stat_poly_line(se = F) +
@@ -211,6 +275,9 @@ ggplot(df, aes(x = Na, y = Cl)) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw() +
   facet_wrap(~geno_class, scales = "free", ncol = 2)
+df %>%
+  select(Na, Cl, geno_class) %>%
+  tbl_summary(by = geno_class)
 ```
 
 # CHEC data
@@ -235,6 +302,24 @@ chec$swc_group_pm <- cut(chec$swhcavgpm, c(-Inf, 30, 60, Inf),
 
 ```{r}
 #| warning: false
+ggplot(chec, aes(x = swhsavgpm)) +
+  geom_histogram(aes(y = ..density.., fill = swc_group_pm)) +
+  geom_density(aes(group = swc_group_pm)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+ggplot(chec, aes(x = swhcavgpm)) +
+  geom_histogram(aes(y = ..density.., fill = swc_group_pm)) +
+  geom_density(aes(group = swc_group_pm)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
 ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm, colour = swc_group_pm)) +
   geom_point(alpha = 0.2) +
   stat_poly_line(se = F) +
@@ -246,12 +331,33 @@ ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm)) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw() +
   facet_wrap(~swc_group_pm, scales = "free", ncol = 2)
+chec %>%
+  select(swhsavgpm, swhcavgpm, swc_group_pm) %>%
+  tbl_summary(by = swc_group_pm)
 ```
 
 ## By CHEC genotype group
 
 ```{r}
 #| warning: false
+ggplot(chec, aes(x = swhsavgpm)) +
+  geom_histogram(aes(y = ..density.., fill = genotype_group)) +
+  geom_density(aes(group = genotype_group)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+ggplot(chec, aes(x = swhcavgpm)) +
+  geom_histogram(aes(y = ..density.., fill = genotype_group)) +
+  geom_density(aes(group = genotype_group)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
 ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm, colour = genotype_group)) +
   geom_point(alpha = 0.2) +
   stat_poly_line(se = F) +
@@ -263,23 +369,9 @@ ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm)) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw() +
   facet_wrap(~genotype_group, scales = "free", ncol = 2)
-```
-
-## By CHEC genotype group
-
-```{r}
-#| warning: false
-ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm, colour = genotype_group)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw()
-ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw() +
-  facet_wrap(~genotype_group, scales = "free", ncol = 2)
+chec %>%
+  select(swhsavgpm, swhcavgpm, genotype_group) %>%
+  tbl_summary(by = genotype_group)
 ```
 
 # Post-modulator
@@ -288,6 +380,24 @@ ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm)) +
 
 ```{r}
 #| warning: false
+ggplot(chec, aes(x = swhsavgpm)) +
+  geom_histogram(aes(y = ..density.., fill = swc_group)) +
+  geom_density(aes(group = swc_group)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+ggplot(chec, aes(x = swhcavgpm)) +
+  geom_histogram(aes(y = ..density.., fill = swc_group)) +
+  geom_density(aes(group = swc_group)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
 ggplot(chec, aes(x = swsavg, y = swcavg, colour = swc_group)) +
   geom_point(alpha = 0.2) +
   stat_poly_line(se = F) +
@@ -299,12 +409,33 @@ ggplot(chec, aes(x = swsavg, y = swcavg)) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw() +
   facet_wrap(~swc_group, scales = "free", ncol = 2)
+chec %>%
+  select(swsavg, swcavg, swc_group) %>%
+  tbl_summary(by = swc_group)
 ```
 
 ## By CHEC genotype group
 
 ```{r}
 #| warning: false
+ggplot(chec, aes(x = swhsavgpm)) +
+  geom_histogram(aes(y = ..density.., fill = genotype_group)) +
+  geom_density(aes(group = genotype_group)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+ggplot(chec, aes(x = swhcavgpm)) +
+  geom_histogram(aes(y = ..density.., fill = genotype_group)) +
+  geom_density(aes(group = genotype_group)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
 ggplot(chec, aes(x = swsavg, y = swcavg, colour = genotype_group)) +
   geom_point(alpha = 0.2) +
   stat_poly_line(se = F) +
@@ -316,29 +447,33 @@ ggplot(chec, aes(x = swsavg, y = swcavg)) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw() +
   facet_wrap(~genotype_group, scales = "free", ncol = 2)
-```
-
-## By CHEC genotype group
-
-```{r}
-#| warning: false
-ggplot(chec, aes(x = swsavg, y = swcavg, colour = genotype_group)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw()
-ggplot(chec, aes(x = swsavg, y = swcavg)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw() +
-  facet_wrap(~genotype_group, scales = "free", ncol = 2)
+chec %>%
+  select(swsavg, swcavg, genotype_group) %>%
+  tbl_summary(by = genotype_group)
 ```
 
 ## By modulator type
 
 ```{r}
 #| warning: false
+ggplot(chec, aes(x = swhsavgpm)) +
+  geom_histogram(aes(y = ..density.., fill = modqual)) +
+  geom_density(aes(group = modqual)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+ggplot(chec, aes(x = swhcavgpm)) +
+  geom_histogram(aes(y = ..density.., fill = modqual)) +
+  geom_density(aes(group = modqual)) +
+  theme_bw() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
 ggplot(chec, aes(x = swsavg, y = swcavg, colour = modqual)) +
   geom_point(alpha = 0.2) +
   stat_poly_line(se = F) +
@@ -350,4 +485,7 @@ ggplot(chec, aes(x = swsavg, y = swcavg)) +
   stat_poly_eq(use_label(c("eq", "R2"))) +
   theme_bw() +
   facet_wrap(~modqual, scales = "free", ncol = 2)
+chec %>%
+  select(swsavg, swcavg, modqual) %>%
+  tbl_summary(by = modqual)
 ```
