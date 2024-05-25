@@ -56,7 +56,7 @@ db_demographics$age_group <- cut(db_demographics$age_at_cos, c(-Inf, 18, Inf),
 # Format
 df <- df %>%
   select(
-    record_id, redcap_data_access_group,
+    record_id,
     staphylococcus_aureus_cos:other_result_cos,
     staphylococcus_aureus_sos:other_result_sos
   ) %>%
