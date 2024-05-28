@@ -139,6 +139,8 @@ names(bug_list) <- bugs
 df <- left_join(df, db_demographics %>% select(record_id, group),
   by = join_by(record_id)
 )
+# Feasibility
+db_feasibility <- db_feasibility %>% filter(!record_id %in% exclude)
 ```
 
 # Data cleaning
@@ -177,6 +179,20 @@ db_medications %>%
   add_p() %>%
   separate_p_footnotes() %>%
   as_gt()
+```
+
+# Acceptability and feasibility
+
+```{r}
+db_feasibility %>%
+  select(
+    previous_home_sample:if_no_why_not___4, -barrier_other,
+    -barriers___5, -if_no_why_not___4
+  ) %>%
+  tbl_summary(
+    missing_text = "Missing",
+    type = all_dichotomous() ~ "categorical"
+  )
 ```
 
 # Agreement
