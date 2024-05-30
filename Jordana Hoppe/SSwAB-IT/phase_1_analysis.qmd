@@ -149,6 +149,8 @@ Participants 01-030_W, 01-038_W, 02-0038, 02-0039, and 04-001 were excluded from
 
 # Demographics
 
+## By randomization group
+
 ```{r}
 db_demographics %>%
   select(group, age_at_cos, age_group, sex, Race, Ethnicity) %>%
@@ -250,12 +252,12 @@ agreement <- function(bug, data = df) {
   cat("\n")
   cat("#### Euler diagram of negative results")
   cat("\n")
-  print(plot(euler(d == "Negative"), quantities = T))
+  print(plot(euler(d == "Negative"), quantities = list(cex = 3)))
   cat("\n")
   cat("\n")
   cat("#### Euler diagram of positive results")
   cat("\n")
-  print(plot(euler(d == "Positive"), quantities = T))
+  print(plot(euler(d == "Positive"), quantities = list(cex = 3)))
   cat("\n")
 }
 agreement_test <- function(bug, group = "group", data = df) {
