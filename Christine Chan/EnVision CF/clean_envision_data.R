@@ -20,17 +20,12 @@ setwd(home_dir)
 #-------------------------------------------------------------------------------
 # Insulin
 #-------------------------------------------------------------------------------
-# Import
-insulin_aug <- read.csv("./Christine Chan/EnVision CF/Data_Raw/insulin data/19-0422TestResultsAug2023.csv",
-  na.strings = c("", "-999.99", "NULL", "NA")
+# Import all files and combine
+files <- list.files("/home/timvigers/OneDrive/Vigers/CF/Christine Chan/EnVision CF/Data_Raw/EnVision insulin re-runs",
+  full.names = T
 )
-insulin_july <- read.csv("./Christine Chan/EnVision CF/Data_Raw/insulin data/19-0422TestResultsJuly2023 CHECK_ERROR_LOG.csv",
-  na.strings = c("", "-999.99", "NULL", "NA")
-)
-insulin_oct <- read.csv("./Christine Chan/EnVision CF/Data_Raw/insulin data/19-0422TestResultsOct2022.csv",
-  na.strings = c("", "-999.99", "NULL", "NA")
-)
-insulin <- rbind(insulin_aug, insulin_july, insulin_oct)
+dfs <- lapply(files, read.csv, na.strings = c("", -999.99))
+insulin <- do.call(rbind, dfs)
 # Only necessary columns
 insulin <- insulin %>%
   select(LastName, TestName, Result.Numeric, Collection.Date) %>%
@@ -57,8 +52,6 @@ insulin_wide <- insulin %>%
     names_glue = "insulin_{Timepoint}_min"
   ) %>%
   rename(date_visit = Date)
-# Add a conversion to pmol/L
-insulin$Insulin_pmol_L <- insulin$Insulin * 6.945
 # Write
 write.csv(insulin,
   file = "./Christine Chan/EnVision CF/Data_Clean/tim_insulin.csv",
