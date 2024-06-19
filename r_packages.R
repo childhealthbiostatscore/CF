@@ -1,7 +1,7 @@
 # List of regular R packages
 cran <- c(
-  "tidyverse", "gtsummary", "styler", "BiocManager", "rjags", "mcp",
-  "segmented", "kableExtra"
+  "tidyverse", "gtsummary", "styler", "BiocManager", "mcp", "segmented",
+  "kableExtra", "redcapAPI", "caret", "lmerTest"
 )
 install.packages(cran)
 # Bioconductor
