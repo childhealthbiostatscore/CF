@@ -72,15 +72,26 @@ label(df$BE_WEIGHT_MEAN) <- "Mean Body Esteem Scale (Weight)"
 
 ```{r}
 #| label: demographics
+normal_dist <- c("FRS_IdealBody")
 df %>%
-  select(Age, Gender, Race, Ethnicity) %>%
+  select(
+    PHQ9_Total, PHQ9_category, GAD7_Total, GAD7_category, FRStotal,
+    FRS_IdealBody, FRS_ThinkyouLook, FRS_Category, Age, Gender, Race,
+    Ethnicity
+  ) %>%
   tbl_summary(
     by = Gender,
-    statistic = list(
-      all_continuous() ~ "{mean} ({sd})"
-    ),
+    type = list(c("FRStotal", "FRS_IdealBody", "FRS_ThinkyouLook") ~
+      "continuous"),
+    statistic = list(all_of(normal_dist) ~ "{mean} [{sd}]"),
     missing_text = "(Missing)"
-  )
+  ) %>%
+  add_overall() %>%
+  add_p(
+    test = list(all_of(normal_dist) ~ "t.test"),
+    test.args = all_tests("wilcox.test") ~ list(exact = F)
+  ) %>%
+  separate_p_footnotes()
 ```
 
 ## Frequency of reported changes
@@ -293,21 +304,21 @@ tbl_regression(mod16)
 tbl_stack(
   list(
     mod %>%
-      tbl_regression(exponentiate = T,intercept = T),
+      tbl_regression(exponentiate = T, intercept = T),
     mod5 %>%
-      tbl_regression(exponentiate = T,intercept = T),
+      tbl_regression(exponentiate = T, intercept = T),
     mod7 %>%
-      tbl_regression(exponentiate = T,intercept = T),
+      tbl_regression(exponentiate = T, intercept = T),
     mod9 %>%
-      tbl_regression(exponentiate = T,intercept = T),
+      tbl_regression(exponentiate = T, intercept = T),
     mod3 %>%
-      tbl_regression(exponentiate = T,intercept = T),
+      tbl_regression(exponentiate = T, intercept = T),
     mod11 %>%
-      tbl_regression(exponentiate = T,intercept = T),
+      tbl_regression(exponentiate = T, intercept = T),
     mod13 %>%
-      tbl_regression(exponentiate = T,intercept = T),
+      tbl_regression(exponentiate = T, intercept = T),
     mod15 %>%
-      tbl_regression(exponentiate = T,intercept = T)
+      tbl_regression(exponentiate = T, intercept = T)
   ),
   group_header = c(
     rep("Elevated PHQ9", times = 4),
@@ -331,7 +342,8 @@ p <- ggcoef_compare(list(
 p
 # Save
 ggsave("./Emily Muther/General/BodyImage_Trikafta/Reports/forest_plot.png",
-       plot = p,width = 9,height = 6,units = "in")
+  plot = p, width = 9, height = 6, units = "in"
+)
 ```
 
 Figure 1 shows the unadjusted odds ratios and confidence intervals for an elevated score on the PHQ9 or GAD7. Filled circles indicate an odds ratio significantly different from 1. Estimates to the left of the vertical bar indicate lower odds of an elevated score.
