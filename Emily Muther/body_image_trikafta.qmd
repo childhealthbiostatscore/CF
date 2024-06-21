@@ -19,7 +19,7 @@ editor: source
 
 # Data Cleaning Steps
 
-1.  Participants who answered "I don't know" or "no" on the variable `TakingTrikafta` were excluded from these analyses.
+1. Participants who answered "I don't know" or "no" on the variable `TakingTrikafta` were excluded from these analyses.
 
 ```{r warning=FALSE}
 #| include: false
@@ -106,6 +106,23 @@ df %>%
     ),
     missing_text = "(Missing)"
   )
+```
+
+## Adherence
+
+```{r}
+#| label: adherence
+df %>%
+  select(contains("Adherence"),FRS_Category) %>%
+  mutate(PercentAdherence=as.numeric(sub("%","",as.character(PercentAdherence)))) %>%
+  tbl_summary(
+    by = "FRS_Category",
+    type = list("PercentAdherence"~"continuous"),
+    missing_text = "(Missing)"
+  ) %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
 ```
 
 # Mental health scores by FRS category
