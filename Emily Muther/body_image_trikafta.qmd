@@ -72,18 +72,26 @@ label(df$BE_WEIGHT_MEAN) <- "Mean Body Esteem Scale (Weight)"
 
 ```{r}
 #| label: demographics
-normal_dist <- c("FRS_IdealBody")
+normal_dist <- c("FRS_IdealBody", "FEV1")
 df %>%
   select(
     PHQ9_Total, PHQ9_category, GAD7_Total, GAD7_category, FRStotal,
     FRS_IdealBody, FRS_ThinkyouLook, FRS_Category, Age, Gender, Race,
-    Ethnicity
+    Ethnicity, InsuranceType, BMI, FEV1
   ) %>%
   tbl_summary(
     by = Gender,
-    type = list(c("FRStotal", "FRS_IdealBody", "FRS_ThinkyouLook") ~
-      "continuous"),
-    statistic = list(all_of(normal_dist) ~ "{mean} [{sd}]"),
+    type = list(
+      c("FRStotal", "FRS_IdealBody", "FRS_ThinkyouLook") ~ "continuous2",
+      all_continuous() ~ "continuous2"
+    ),
+    statistic = list(
+      all_continuous() ~ c(
+        "{median} ({p25}, {p75})",
+        "{min}, {max}"
+      ),
+      all_of(normal_dist) ~ "{mean} [{sd}]"
+    ),
     missing_text = "(Missing)"
   ) %>%
   add_overall() %>%
@@ -92,6 +100,14 @@ df %>%
     test.args = all_tests("wilcox.test") ~ list(exact = F)
   ) %>%
   separate_p_footnotes()
+# Skim (so Emily can see distributions)
+df %>%
+  select(
+    PHQ9_Total, PHQ9_category, GAD7_Total, GAD7_category, FRStotal,
+    FRS_IdealBody, FRS_ThinkyouLook, FRS_Category, Age, Gender, Race,
+    Ethnicity, InsuranceType, BMI, FEV1
+  ) %>%
+  skimr::skim()
 ```
 
 ## Frequency of reported changes
@@ -113,11 +129,14 @@ df %>%
 ```{r}
 #| label: adherence
 df %>%
-  select(contains("Adherence"),FRS_Category) %>%
-  mutate(PercentAdherence=as.numeric(sub("%","",as.character(PercentAdherence)))) %>%
+  select(contains("Adherence"), FRS_Category) %>%
+  mutate(
+    PercentAdherence = as.numeric(sub("%", "", as.character(PercentAdherence))),
+    over80 = PercentAdherence >= 80
+  ) %>%
   tbl_summary(
     by = "FRS_Category",
-    type = list("PercentAdherence"~"continuous"),
+    type = list("PercentAdherence" ~ "continuous"),
     missing_text = "(Missing)"
   ) %>%
   add_overall() %>%
