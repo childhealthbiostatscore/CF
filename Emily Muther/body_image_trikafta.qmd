@@ -72,7 +72,7 @@ label(df$BE_WEIGHT_MEAN) <- "Mean Body Esteem Scale (Weight)"
 
 ```{r}
 #| label: demographics
-normal_dist <- c("FRS_IdealBody", "FEV1")
+normal_dist <- c("FEV1", "Age", "BMI")
 df %>%
   select(
     PHQ9_Total, PHQ9_category, GAD7_Total, GAD7_category, FRStotal,
@@ -100,14 +100,6 @@ df %>%
     test.args = all_tests("wilcox.test") ~ list(exact = F)
   ) %>%
   separate_p_footnotes()
-# Skim (so Emily can see distributions)
-df %>%
-  select(
-    PHQ9_Total, PHQ9_category, GAD7_Total, GAD7_category, FRStotal,
-    FRS_IdealBody, FRS_ThinkyouLook, FRS_Category, Age, Gender, Race,
-    Ethnicity, InsuranceType, BMI, FEV1
-  ) %>%
-  skimr::skim()
 ```
 
 ## Frequency of reported changes
