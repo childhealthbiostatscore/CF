@@ -87,10 +87,10 @@ df %>%
     ),
     statistic = list(
       all_continuous() ~ c(
-        "{median} ({p25}, {p75})",
+        "{median} [{p25}, {p75}]",
         "{min}, {max}"
       ),
-      all_of(normal_dist) ~ "{mean} [{sd}]"
+      all_of(normal_dist) ~ c("{mean} ({sd})","{min}, {max}")
     ),
     missing_text = "(Missing)"
   ) %>%
