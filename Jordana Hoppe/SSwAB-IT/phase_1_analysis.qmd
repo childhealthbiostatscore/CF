@@ -52,7 +52,8 @@ db_demographics$age_at_cos <- as.numeric(difftime(db_demographics$cos_result_dat
   db_demographics$dob,
   units = "days"
 )) / 365.25
-db_demographics$age_group <- cut(db_demographics$age_at_cos, c(-Inf, 18, Inf),
+db_demographics$age_group <- cut(db_demographics$age_at_cos,
+  c(-Inf, 10, 18, 30, Inf),
   right = F
 )
 # Format
@@ -137,10 +138,11 @@ bugs <- c("overall", bugs)
 bug_names <- c("Across all bugs", bug_names)
 bug_list <- as.list(bug_names)
 names(bug_list) <- bugs
-# Add group to dataframe
-df <- left_join(df, db_demographics %>% select(record_id, group),
+# Add groups to dataframe
+df <- left_join(df, db_demographics %>% select(record_id, group, age_group),
   by = join_by(record_id)
 )
+df <- left_join(df, db_medications, by = join_by(record_id, group))
 # Feasibility
 db_feasibility <- db_feasibility %>% filter(!record_id %in% exclude)
 ```
@@ -305,5 +307,145 @@ invisible(lapply(names(bug_list), function(b) {
 ```
 
 # Sub-group comparisons
+
+## Age group
+
+```{r results='asis'}
+invisible(lapply(names(bug_list), function(b) {
+  cat("\n")
+  cat("###", as.character(bug_list[b]))
+  cat("\n")
+  cat("####", "Agreement by age group")
+  cat("\n")
+  agreement_test(b, group = "age_group")
+  cat("\n")
+}))
+```
+
+## Sex
+
+```{r results='asis'}
+invisible(lapply(names(bug_list), function(b) {
+  cat("\n")
+  cat("###", as.character(bug_list[b]))
+  cat("\n")
+  cat("####", "Agreement by gender assigned at birth")
+  cat("\n")
+  agreement_test(b, group = "age_group")
+  cat("\n")
+}))
+```
+
+## Azithromycin
+
+```{r results='asis'}
+invisible(lapply(names(bug_list), function(b) {
+  cat("\n")
+  cat("###", as.character(bug_list[b]))
+  cat("\n")
+  cat("####", "Agreement by Azithromycin status")
+  cat("\n")
+  agreement_test(b, group = "azithromycin")
+  cat("\n")
+}))
+```
+
+## Inhaled Tobramycin
+
+```{r results='asis'}
+invisible(lapply(names(bug_list), function(b) {
+  cat("\n")
+  cat("###", as.character(bug_list[b]))
+  cat("\n")
+  cat("####", "Agreement by inhaled Tobramycin status")
+  cat("\n")
+  agreement_test(b, group = "inhaled_tobramycin")
+  cat("\n")
+}))
+```
+
+## Inhaled Aztreonam
+
+```{r results='asis'}
+invisible(lapply(names(bug_list), function(b) {
+  cat("\n")
+  cat("###", as.character(bug_list[b]))
+  cat("\n")
+  cat("####", "Agreement by inhaled Aztreonam status")
+  cat("\n")
+  agreement_test(b, group = "inhaled_aztreonam")
+  cat("\n")
+}))
+```
+
+## Inhaled Colisitin
+
+```{r results='asis'}
+invisible(lapply(names(bug_list), function(b) {
+  cat("\n")
+  cat("###", as.character(bug_list[b]))
+  cat("\n")
+  cat("####", "Agreement by inhaled Colisitin status")
+  cat("\n")
+  agreement_test(b, group = "inhaled_colisitin")
+  cat("\n")
+}))
+```
+
+## Inhaled Vancomycin
+
+```{r results='asis'}
+invisible(lapply(names(bug_list), function(b) {
+  cat("\n")
+  cat("###", as.character(bug_list[b]))
+  cat("\n")
+  cat("####", "Agreement by inhaled Vancomycin status")
+  cat("\n")
+  agreement_test(b, group = "inhaled_vancomycin")
+  cat("\n")
+}))
+```
+
+## Other inhaled antibiotics
+
+```{r results='asis'}
+invisible(lapply(names(bug_list), function(b) {
+  cat("\n")
+  cat("###", as.character(bug_list[b]))
+  cat("\n")
+  cat("####", "Agreement by other inhaled antibiotics status")
+  cat("\n")
+  agreement_test(b, group = "other_inhaled_antibiotics")
+  cat("\n")
+}))
+```
+
+## Chronic oral antibiotic
+
+```{r results='asis'}
+invisible(lapply(names(bug_list), function(b) {
+  cat("\n")
+  cat("###", as.character(bug_list[b]))
+  cat("\n")
+  cat("####", "Agreement by chronic oral antibiotic status")
+  cat("\n")
+  agreement_test(b, group = "chronic_oral_antibiotic")
+  cat("\n")
+}))
+```
+
+## CFTR modulator status
+
+```{r results='asis'}
+invisible(lapply(names(bug_list), function(b) {
+  cat("\n")
+  cat("###", as.character(bug_list[b]))
+  cat("\n")
+  cat("####", "Agreement by CFTR modulator status")
+  cat("\n")
+  agreement_test(b, group = "cftr_modulator")
+  cat("\n")
+}))
+```
 
 # References
