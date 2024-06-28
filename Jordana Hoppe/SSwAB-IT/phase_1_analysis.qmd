@@ -15,6 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
+bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /home/timvigers/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -199,7 +201,7 @@ db_feasibility %>%
 
 # Agreement
 
-For these agreement analyses, we reported accuracy metrics that include all samples. Accuracy is the proportion of samples where the two tests agreed (positive/positive and negative/negative). Cohen's kappa accounts for agreement between the two tests by chance, and is interpreted analogously to correlation where -1 indicates perfect disagreement and 1 indicates perfect agreement. A Cohen's kappa of NaN or NA indicates a lack of variability between the two tests.
+For these agreement analyses, we reported accuracy metrics that include all samples. Accuracy is the proportion of samples where the two tests agreed (positive/positive and negative/negative). Cohen's kappa accounts for agreement between the two tests by chance, and is interpreted analogously to correlation where -1 indicates perfect disagreement and 1 indicates perfect agreement [@mchughInterraterReliabilityKappa2012;@ranganathanCommonPitfallsStatistical2017]. A Cohen's kappa of NaN or NA indicates a lack of variability between the two tests.
 
 | Cohen's Kappa | Interpretation         |
 |---------------|------------------------|
@@ -300,55 +302,8 @@ invisible(lapply(names(bug_list), function(b) {
   agreement_test(b)
   cat("\n")
 }))
-
-
-# invisible(lapply(names(bug_list), function(b) {
-#   cat("\n")
-#   cat("##", as.character(bug_list[b]))
-#   cat("\n")
-#   cos <- paste0(b, "_cos")
-#   sos <- paste0(b, "_sos")
-#   d <- df[, c(cos, sos)]
-#   d <- d[complete.cases(d), ]
-#   colnames(d) <- c("COS", "SOS")
-#   cat("\n")
-#   c <- confusionMatrix(d[, "SOS"],
-#     reference = d[, "COS"], positive = "Positive", mode = "everything"
-#   )
-#   metrics <- data.frame(c$overall)
-#   cat("### 2x2 table")
-#   cat("\n")
-#   two_by_two <- data.frame(c$table)
-#   print(gt(two_by_two))
-#   cat("\n")
-#   cat("### Accuracy")
-#   cat("\n")
-#   print(gt(metrics, rownames_to_stub = T) %>%
-#     fmt_number(n_sigfig = 3) %>%
-#     tab_options(column_labels.hidden = TRUE))
-#   cat("\n")
-#   cat("### Agreement plot")
-#   cat("\n")
-#   print(agreementplot(table(d)))
-#   cat("\n")
-#   cat("### Positive/Positive Excluded")
-#   cat("\n")
-#   t <- d[rowSums(d == "Positive") < 2, ]
-#   t$`Samples With a Negative Test` <- paste(
-#     "COS", t[, "COS"], "/", "SOS", t[, "SOS"]
-#   )
-#   t %>%
-#     select(`Samples With a Negative Test`) %>%
-#     tbl_summary() %>%
-#     add_ci() %>%
-#     as_gt() %>%
-#     print()
-#   cat("\n")
-#   cat("### Euler diagram of negative results")
-#   cat("\n")
-#   print(plot(euler(d == "Negative"), quantities = T))
-#   cat("\n")
-# }))
 ```
+
+# Sub-group comparisons
 
 # References
