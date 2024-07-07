@@ -103,7 +103,8 @@ encounter$age_group <- cut(encounter$encounterage,
 encounter$Modulator_trikafta_first_date <-
   mdy(encounter$Modulator_trikafta_first_date)
 encounter$encounterdate <- mdy(encounter$encounterdate)
-encounter$Days <- as.numeric(encounter$encounterdate - encounter$Modulator_trikafta_first_date)
+encounter$Days <- as.numeric(encounter$encounterdate -
+  encounter$Modulator_trikafta_first_date)
 # Hospitalization or home IVs
 hospitalizations$CareEpi_StartDt <- mdy(hospitalizations$CareEpi_StartDt)
 hospitalizations$CareEpi_EndDt <- mdy(hospitalizations$CareEpi_EndDt)
