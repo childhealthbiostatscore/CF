@@ -102,6 +102,7 @@ loess_plot <- function(data = encounter, outcome, facet = F, smooth = "bs",
 
 ```{r results='asis'}
 #| warning: false
+#| cache: true
 invisible(lapply(continuous_outcomes, function(o) {
   cat("\n")
   cat("\n")
@@ -117,6 +118,7 @@ invisible(lapply(continuous_outcomes, function(o) {
 
 ```{r results='asis'}
 #| warning: false
+#| cache: true
 invisible(lapply(continuous_outcomes, function(o) {
   cat("\n")
   cat("\n")
@@ -132,6 +134,7 @@ invisible(lapply(continuous_outcomes, function(o) {
 
 ```{r results='asis'}
 #| warning: false
+#| cache: true
 invisible(lapply(continuous_outcomes, function(o) {
   cat("\n")
   cat("\n")
@@ -147,6 +150,7 @@ invisible(lapply(continuous_outcomes, function(o) {
 
 ```{r results='asis'}
 #| warning: false
+#| cache: true
 invisible(lapply(continuous_outcomes, function(o) {
   cat("\n")
   cat("\n")
@@ -162,13 +166,32 @@ invisible(lapply(continuous_outcomes, function(o) {
 
 The following models are adjusted for age group and insurance status. We fit a Gaussian mixed model for continuous outcomes with random intercept for each subject.
 
+## With Asian subgroup
+
 ```{r}
-invisible(lapply(continuous_outcomes), function(o) {
+invisible(lapply(continuous_outcomes, function(o) {
   f <- as.formula(paste0(
     o,
     "~ age_group + Insurance + bs(Days, knots = 0, degree = 1) * Race + (1 | eDWID)"
   ))
   m <- lmer(f, data = encounter)
-  predict_response(model = m, terms = c("Days[all]", "Race")) %>% plot()
-})
+  predict_response(model = m, terms = c("Days[all]", "Race")) %>%
+    plot() %>%
+    print()
+}))
+```
+
+## Without Asian subgroup (for clearer plotting)
+
+```{r}
+invisible(lapply(continuous_outcomes, function(o) {
+  f <- as.formula(paste0(
+    o,
+    "~ age_group + Insurance + bs(Days, knots = 0, degree = 1) * Race + (1 | eDWID)"
+  ))
+  m <- lmer(f, data = encounter %>% filter(Race != "Asian"))
+  predict_response(model = m, terms = c("Days[all]", "Race")) %>%
+    plot() %>%
+    print()
+}))
 ```
