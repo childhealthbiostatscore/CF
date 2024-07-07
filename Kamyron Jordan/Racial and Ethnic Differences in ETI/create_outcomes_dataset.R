@@ -92,7 +92,7 @@ encounter <- left_join(
   demo %>% select(eDWID, Race, Modulator_trikafta_first_date)
 )
 encounter <- left_join(encounter,
-  annual %>% select(eDWID, ReviewYear, Insurance),
+  annual %>% select(eDWID, ReviewYear, Insurance, pregnant),
   by = join_by(eDWID, reviewyear == ReviewYear)
 )
 # Age group
@@ -107,14 +107,16 @@ encounter$Days <- as.numeric(encounter$encounterdate - encounter$Modulator_trika
 # Hospitalization or home IVs
 hospitalizations$CareEpi_StartDt <- mdy(hospitalizations$CareEpi_StartDt)
 hospitalizations$CareEpi_EndDt <- mdy(hospitalizations$CareEpi_EndDt)
-cl <- makeForkCluster(8)
+cl <- makeForkCluster(detectCores() * (3 / 4))
 hosps <- parApply(cl, hospitalizations, 1, function(r) {
   which(encounter$eDWID == r["eDWID"] &
     encounter$encounterdate >= r["CareEpi_StartDt"] &
     encounter$encounterdate <= r["CareEpi_EndDt"])
 })
-hosps <- unique(unlist(hosps))
 stopCluster(cl)
+hosps <- unique(unlist(hosps))
+encounter$hospitalized <- "No"
+encounter$hospitalized[hosps] <- "Yes"
 # Remove impossible lung function values
 encounter$gli_fev1_ppred_rn[encounter$gli_fev1_ppred_rn < 20 |
   encounter$gli_fev1_ppred_rn > 150] <- NA
@@ -126,7 +128,9 @@ encounter$gli_fev1fvc_ppred_rn[encounter$gli_fev1fvc_ppred_rn < 20 |
 encounter <- encounter %>%
   filter(
     !is.na(Days),
-    Days >= -365.25 * 3 & Days <= 365.25 * 2
+    Days >= -365.25 * 3 & Days <= 365.25 * 2,
+    hospitalized == "No",
+    pregnant != 1
   )
 # List of outcomes
 continuous_outcomes <- c(
@@ -138,6 +142,6 @@ binary_outcomes <- c(
   "burkho_complex"
 )
 # Save
-save(encounter,
+save(encounter, continuous_outcomes, binary_outcomes,
   file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/outcomes_dataset.RData"
 )

@@ -26,6 +26,8 @@ editor: source
 # Libraries
 library(tidyverse)
 library(lmerTest)
+library(splines)
+library(ggeffects)
 library(performance)
 library(segmented)
 # Paths
@@ -48,6 +50,7 @@ load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/outcome
 2. Limited to 3 years before and 2 years after ETI start.
   - Based on `Modulator_trikafta_first_date` variable provided by CFFPR.
 3. Hospitalizations and home IV episodes excluded.
+4. Years of pregnancy excluded (we only have annualized pregancy data, so don't know exact dates for this).
 
 ```{r functions}
 # Plots
@@ -137,36 +140,18 @@ invisible(lapply(continuous_outcomes, function(o) {
 }))
 ```
 
-<!-- # Segmented models -->
+# Segmented models
 
-<!-- The following models are adjusted for age group and insurance status. First, a Gaussian mixed model is fit with random intercept for patient ID. Then, the `segmented.lme` function is applied to this mixed model, with no pre-specified starting values and `npsi = 2`. The change points are treated as random effects and allowed to vary within a person. -->
+The following models are adjusted for age group and insurance status. We fit a Gaussian mixed model for continuous outcomes with random intercept for each subject.
 
-<!-- ## FEV1 -->
+```{r}
+invisible(lapply(continuous_outcomes), function(o) {
+  f <- as.formula(paste0(
+    o,
+    "~ age_group + Insurance + bs(Days, knots = 0, degree = 1) * Race + (1 | eDWID)"
+  ))
+  m = lmer(f,data = encounter)
+  predict_response(model = m, terms = c("Days[all]", "Race")) %>% plot()
+})
 
-<!-- Based on visual inspection of the LOESS plots, I expect there to be a change in slope at around 0 and maybe a second one at around 1 year. -->
-
-<!-- ```{r} -->
-<!-- load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/segmented/fev1_single_cp_fit.RData") -->
-<!-- plot(fev1_single_cp_fit) -->
-<!-- summary(fev1_single_cp_fit) -->
-<!-- load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/segmented/fev1_double_cp_fit.RData") -->
-<!-- plot(fev1_double_cp_fit) -->
-<!-- summary(fev1_double_cp_fit) -->
-<!-- ``` -->
-
-<!-- ## A Bayesian approach -->
-
-<!-- ### FEV1 -->
-
-<!-- ```{r} -->
-<!-- #| eval: false -->
-<!-- load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/fev1_single_cp_fit.RData") -->
-<!-- load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/fev1_double_cp_fit.RData") -->
-<!-- ``` -->
-
-<!-- - Is the second change point due to who is being collected after one year out? -->
-
-<!-- Look at 3 years before and two after -->
-
-<!-- 2 years for 12 and up -->
-<!-- 1.5 years for 6 -->
+```
