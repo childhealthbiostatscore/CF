@@ -107,7 +107,7 @@ encounter$Days <- as.numeric(encounter$encounterdate - encounter$Modulator_trika
 # Hospitalization or home IVs
 hospitalizations$CareEpi_StartDt <- mdy(hospitalizations$CareEpi_StartDt)
 hospitalizations$CareEpi_EndDt <- mdy(hospitalizations$CareEpi_EndDt)
-cl <- makeForkCluster(detectCores() * (3 / 4))
+cl <- makeForkCluster(detectCores() * (2 / 4))
 hosps <- parApply(cl, hospitalizations, 1, function(r) {
   which(encounter$eDWID == r["eDWID"] &
     encounter$encounterdate >= r["CareEpi_StartDt"] &

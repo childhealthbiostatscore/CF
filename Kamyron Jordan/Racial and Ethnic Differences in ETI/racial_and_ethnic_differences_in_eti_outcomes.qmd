@@ -150,8 +150,7 @@ invisible(lapply(continuous_outcomes), function(o) {
     o,
     "~ age_group + Insurance + bs(Days, knots = 0, degree = 1) * Race + (1 | eDWID)"
   ))
-  m = lmer(f,data = encounter)
+  m <- lmer(f, data = encounter)
   predict_response(model = m, terms = c("Days[all]", "Race")) %>% plot()
 })
-
 ```
