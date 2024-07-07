@@ -39,9 +39,27 @@ home_dir <- switch(Sys.info()["sysname"],
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
-```{r data import}
+```{r data import and minor cleaning}
+# Run code for base dataset (takes forever)
 # source("/home/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_outcomes_dataset.R")
+# Import
 load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/outcomes_dataset.RData")
+# Additional quick cleaning steps
+# Remove impossible lung function values
+encounter$gli_fev1_ppred_rn[encounter$gli_fev1_ppred_rn < 20 |
+  encounter$gli_fev1_ppred_rn > 150] <- NA
+encounter$gli_fvc_ppred_rn[encounter$gli_fvc_ppred_rn < 20 |
+  encounter$gli_fvc_ppred_rn > 150] <- NA
+encounter$gli_fev1fvc_ppred_rn[encounter$gli_fev1fvc_ppred_rn < 20 |
+  encounter$gli_fev1fvc_ppred_rn > 150] <- NA
+# Filter
+encounter <- encounter %>%
+  filter(
+    !is.na(Days),
+    Days >= -365.25 * 3 & Days <= 365.25 * 2,
+    hospitalized == "No",
+    pregnant != 1
+  )
 ```
 
 # Data cleaning

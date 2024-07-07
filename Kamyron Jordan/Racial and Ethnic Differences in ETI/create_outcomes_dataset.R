@@ -118,21 +118,6 @@ stopCluster(cl)
 hosps <- unique(unlist(hosps))
 encounter$hospitalized <- "No"
 encounter$hospitalized[hosps] <- "Yes"
-# Remove impossible lung function values
-encounter$gli_fev1_ppred_rn[encounter$gli_fev1_ppred_rn < 20 |
-  encounter$gli_fev1_ppred_rn > 150] <- NA
-encounter$gli_fvc_ppred_rn[encounter$gli_fvc_ppred_rn < 20 |
-  encounter$gli_fvc_ppred_rn > 150] <- NA
-encounter$gli_fev1fvc_ppred_rn[encounter$gli_fev1fvc_ppred_rn < 20 |
-  encounter$gli_fev1fvc_ppred_rn > 150] <- NA
-# Filter
-encounter <- encounter %>%
-  filter(
-    !is.na(Days),
-    Days >= -365.25 * 3 & Days <= 365.25 * 2,
-    hospitalized == "No",
-    pregnant != 1
-  )
 # List of outcomes
 continuous_outcomes <- c(
   "gli_fev1_ppred_rn", "gli_fvc_ppred_rn", "gli_fev1fvc_ppred_rn",
