@@ -28,8 +28,7 @@ library(tidyverse)
 library(lmerTest)
 library(splines)
 library(ggeffects)
-library(performance)
-library(segmented)
+library(gtsummary)
 # Paths
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
@@ -39,11 +38,28 @@ home_dir <- switch(Sys.info()["sysname"],
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
-```{r data import and minor cleaning}
+```{r data import}
 # Run code for base dataset (takes forever)
 # source("/home/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_outcomes_dataset.R")
 # Import
 load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/outcomes_dataset.RData")
+```
+
+# Data cleaning
+
+1. Lung function percent predicted values < 20% or > 150% were excluded.
+  - `r sum(encounter$gli_fev1_ppred_rn < 20,na.rm = T)` ppFEV1 values < 20% and `r sum(encounter$gli_fev1_ppred_rn > 150,na.rm = T)` over 150%.
+2. Limited to 3 years before and 2 years after ETI start.
+  - Based on `Modulator_trikafta_first_date` variable provided by CFFPR.
+3. Hospitalizations and home IV episodes excluded.
+  - Based on the care episodes dataset, there were `r length(unique(encounter$eDWID[encounter$hospitalized=="Yes"]))` unique participants with at least one care episode and a total of `r sum(encounter$hospitalized=="Yes")` encounters that were part of a care episode.
+  - After filtering out these episodes, there were still 914 encounters with `encounterlocation` variable indicating either hospitalization or home IV, so these were also excluded.
+4. Years of pregnancy excluded (we only have annualized pregnancy data, so don't know exact dates for this).
+  - `r length(unique(encounter$eDWID[encounter$pregnant==1]))` unique participants with at least one care episode and a total of `r sum(encounter$pregnant==1, na.rm = T)` encounters during a pregnancy year.
+5. Those missing `Modulator_trikafta_first_date` were automatically excluded from the models because they don't have a value for `Days`. This naturally means that people not eligible for Trikafta are not included in the models. 
+6. 990 people with no encounters post-ETI were excluded.
+
+```{r filtering}
 # Additional quick cleaning steps
 # Remove impossible lung function values
 encounter$gli_fev1_ppred_rn[encounter$gli_fev1_ppred_rn < 20 |
@@ -57,40 +73,66 @@ encounter <- encounter %>%
   filter(
     !is.na(Days),
     Days >= -365.25 * 3 & Days <= 365.25 * 2,
-    hospitalized == "No",
-    pregnant != 1
+    hospitalized == "No", !encounterlocation %in% c("Hospital", "Home IV"),
+    pregnant != 1,
+    !is.na(Modulator_trikafta_first_date)
   )
+# Get some summary statistics by participant
+t1_participant <- encounter %>%
+  group_by(eDWID) %>%
+  summarise(
+    `Years With Data` = length(unique(reviewyear)),
+    `Number of Encounters` = n(),
+    `Number of Encounters Pre-ETI` = sum(Days <= 0),
+    `Number of Encounters Post-ETI` = sum(Days > 0),
+    Age = mean(encounterage, na.rm = T),
+    across(all_of(continuous_outcomes), \(x) mean(x, na.rm = TRUE)),
+    Race = names(sort(table(Race), decreasing = TRUE))[1],
+    Insurance = names(sort(table(Insurance), decreasing = TRUE))[1],
+    .groups = "drop"
+  )
+no_post <- t1_participant$eDWID[t1_participant$`Number of Encounters Post-ETI` == 0]
+encounter <- encounter %>% filter(!eDWID %in% no_post)
+t1_participant <- t1_participant %>% filter(!eDWID %in% no_post)
 ```
 
-# Data cleaning
+# Table 1
 
-1. Lung function percent predicted values < 20% or > 150% were excluded.
-2. Limited to 3 years before and 2 years after ETI start.
-  - Based on `Modulator_trikafta_first_date` variable provided by CFFPR.
-3. Hospitalizations and home IV episodes excluded.
-4. Years of pregnancy excluded (we only have annualized pregancy data, so don't know exact dates for this).
+## By person
+
+Continuous variables were averaged across all years for each person, and categorical variables are reported as the most common value.
+
+```{r}
+t1_participant %>%
+  select(-eDWID) %>%
+  tbl_summary(
+    by = Race,
+    type = list(`Years With Data` ~ "continuous"),
+    missing_text = "Missing"
+  ) %>%
+  add_overall()
+```
+
+# Encounter-level
+
+```{r}
+encounter %>%
+  select(Race, encounterlocation, bacterialculturedone:othermicroorganisms1) %>%
+  tbl_summary(by = Race, missing_text = "Missing")
+```
+
+# LOESS-smoothed outcome plots
 
 ```{r functions}
 # Plots
-loess_plot <- function(data = encounter, outcome, facet = F, smooth = "bs",
-                       df = 10) {
+loess_plot <- function(data = encounter, outcome, facet = F) {
   p <- ggplot(data, aes(x = Days, y = !!sym(outcome), color = Race)) +
     geom_point(
       shape = ".", aes(x = Days, y = !!sym(outcome)), inherit.aes = F,
       alpha = 0.1
     ) +
+    geom_smooth(method = "loess",se = F) +
     theme_classic()
-  if (smooth == "bs") {
-    p <- p + geom_smooth(method = "lm", formula = y ~ splines::bs(x,
-      degree = 3, df = df
-    ))
-  }
-  if (smooth == "loess") {
-    p <- p + geom_smooth(method = "loess")
-  }
-  if (smooth == "gam") {
-    p <- p + geom_smooth(method = "gam")
-  }
   if (facet) {
     p <- p + facet_wrap(~Race)
   }
@@ -98,67 +140,15 @@ loess_plot <- function(data = encounter, outcome, facet = F, smooth = "bs",
 }
 ```
 
-# LOESS-smoothed outcome plots
-
 ```{r results='asis'}
 #| warning: false
-#| cache: true
 invisible(lapply(continuous_outcomes, function(o) {
   cat("\n")
   cat("\n")
   cat("##", o)
   cat("\n")
   cat("\n")
-  print(loess_plot(outcome = o, smooth = "loess"))
-  print(loess_plot(outcome = o, facet = T, smooth = "loess"))
-}))
-```
-
-# B-spline smoothing (cubic, df=10)
-
-```{r results='asis'}
-#| warning: false
-#| cache: true
-invisible(lapply(continuous_outcomes, function(o) {
-  cat("\n")
-  cat("\n")
-  cat("##", o)
-  cat("\n")
-  cat("\n")
-  print(loess_plot(outcome = o, smooth = "bs"))
-  print(loess_plot(outcome = o, facet = T, smooth = "bs"))
-}))
-```
-
-# B-spline smoothing (cubic, df=3)
-
-```{r results='asis'}
-#| warning: false
-#| cache: true
-invisible(lapply(continuous_outcomes, function(o) {
-  cat("\n")
-  cat("\n")
-  cat("##", o)
-  cat("\n")
-  cat("\n")
-  print(loess_plot(outcome = o, smooth = "bs", df = 3))
-  print(loess_plot(outcome = o, facet = T, smooth = "bs", df = 3))
-}))
-```
-
-# GAM smoothing
-
-```{r results='asis'}
-#| warning: false
-#| cache: true
-invisible(lapply(continuous_outcomes, function(o) {
-  cat("\n")
-  cat("\n")
-  cat("##", o)
-  cat("\n")
-  cat("\n")
-  print(loess_plot(outcome = o, smooth = "gam"))
-  print(loess_plot(outcome = o, facet = T, smooth = "gam"))
+  print(loess_plot(outcome = o))
 }))
 ```
 
@@ -195,3 +185,7 @@ invisible(lapply(continuous_outcomes, function(o) {
     print()
 }))
 ```
+
+# Questions
+
+1. Do we want to combine the Asian and "Other" groups? It makes sense from a statistical point of view.

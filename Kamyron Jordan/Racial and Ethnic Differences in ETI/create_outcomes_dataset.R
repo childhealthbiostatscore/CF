@@ -86,6 +86,18 @@ annual$Insurance <- factor(annual$Insurance,
     "No Insurance", "Public", "Tricare"
   )
 )
+# Other factor variables
+encounter$encounterlocation <- factor(encounter$encounterlocation,
+  levels = 1:6, labels = c("Clinic", "Hospital", "Home IV", "Other", "5", "6")
+)
+encounter$bacterialculturedone[is.na(encounter$bacterialculturedone)] <- 0
+encounter$bacterialculturedone <- factor(encounter$bacterialculturedone,
+  levels = 0:1, labels = c("No", "Yes")
+)
+encounter$cultureresults <- factor(encounter$cultureresults,
+  levels = 1:3,
+  labels = c("No growth/sterile culture", "Normal flora", "Microorganisms")
+)
 # Merge
 encounter <- left_join(
   encounter,
