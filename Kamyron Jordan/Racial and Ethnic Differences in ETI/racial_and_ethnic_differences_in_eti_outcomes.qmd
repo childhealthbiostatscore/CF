@@ -39,29 +39,21 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data import}
-# Run code for base dataset (takes forever)
 # source("/home/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_outcomes_dataset.R")
-# Import
 load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/outcomes_dataset.RData")
 ```
 
-# Data cleaning
-
-1. Lung function percent predicted values < 20% or > 150% were excluded.
-  - `r sum(encounter$gli_fev1_ppred_rn < 20,na.rm = T)` ppFEV1 values < 20% and `r sum(encounter$gli_fev1_ppred_rn > 150,na.rm = T)` over 150%.
-2. Limited to 3 years before and 2 years after ETI start.
-  - Based on `Modulator_trikafta_first_date` variable provided by CFFPR.
-3. Hospitalizations and home IV episodes excluded.
-  - Based on the care episodes dataset, there were `r length(unique(encounter$eDWID[encounter$hospitalized=="Yes"]))` unique participants with at least one care episode and a total of `r sum(encounter$hospitalized=="Yes")` encounters that were part of a care episode.
-  - After filtering out these episodes, there were still 914 encounters with `encounterlocation` variable indicating either hospitalization or home IV, so these were also excluded.
-4. Years of pregnancy excluded (we only have annualized pregnancy data, so don't know exact dates for this).
-  - `r length(unique(encounter$eDWID[encounter$pregnant==1]))` unique participants with at least one care episode and a total of `r sum(encounter$pregnant==1, na.rm = T)` encounters during a pregnancy year.
-5. Those missing `Modulator_trikafta_first_date` were automatically excluded from the models because they don't have a value for `Days`. This naturally means that people not eligible for Trikafta are not included in the models. 
-6. 990 people with no encounters post-ETI were excluded.
-
-```{r filtering}
-# Additional quick cleaning steps
+```{r filtering and flowchart}
+# Variables for flowchart
+n_enc_1 <- nrow(encounter)
+n_people_1 <- length(unique(encounter$eDWID))
+n_hosp_1 <- nrow(hospitalizations)
+n_people_hosp_1 <- length(unique(hospitalizations$eDWID))
+# Lung function cutoffs
+lower <- 20
+upper <- 150
 # Remove impossible lung function values
+low_fev1 = which(encounter$gli_fev1_ppred_rn)
 encounter$gli_fev1_ppred_rn[encounter$gli_fev1_ppred_rn < 20 |
   encounter$gli_fev1_ppred_rn > 150] <- NA
 encounter$gli_fvc_ppred_rn[encounter$gli_fvc_ppred_rn < 20 |
@@ -94,6 +86,25 @@ t1_participant <- encounter %>%
 no_post <- t1_participant$eDWID[t1_participant$`Number of Encounters Post-ETI` == 0]
 encounter <- encounter %>% filter(!eDWID %in% no_post)
 t1_participant <- t1_participant %>% filter(!eDWID %in% no_post)
+```
+
+# Data cleaning
+
+1. Lung function percent predicted values < 20% or > 150% were excluded.
+  - `r sum(encounter$gli_fev1_ppred_rn < 20,na.rm = T)` ppFEV1 values < 20% and `r sum(encounter$gli_fev1_ppred_rn > 150,na.rm = T)` over 150%.
+2. Limited to 3 years before and 2 years after ETI start.
+  - Based on `Modulator_trikafta_first_date` variable provided by CFFPR.
+3. Hospitalizations and home IV episodes excluded.
+  - Based on the care episodes dataset, there were `r length(unique(encounter$eDWID[encounter$hospitalized=="Yes"]))` unique participants with at least one care episode and a total of `r sum(encounter$hospitalized=="Yes")` encounters that were part of a care episode.
+  - After filtering out these episodes, there were still 914 encounters with `encounterlocation` variable indicating either hospitalization or home IV, so these were also excluded.
+4. Years of pregnancy excluded (we only have annualized pregnancy data, so don't know exact dates for this).
+  - `r length(unique(encounter$eDWID[encounter$pregnant==1]))` unique participants with at least one care episode and a total of `r sum(encounter$pregnant==1, na.rm = T)` encounters during a pregnancy year.
+5. Those missing `Modulator_trikafta_first_date` were automatically excluded from the models because they don't have a value for `Days`. This naturally means that people not eligible for Trikafta are not included in the models. 
+6. 990 people with no encounters post-ETI were excluded.
+
+```{r filtering}
+# Additional quick cleaning steps
+
 ```
 
 # Table 1
@@ -131,7 +142,7 @@ loess_plot <- function(data = encounter, outcome, facet = F) {
       shape = ".", aes(x = Days, y = !!sym(outcome)), inherit.aes = F,
       alpha = 0.1
     ) +
-    geom_smooth(method = "loess",se = F) +
+    geom_smooth(method = "loess", se = F) +
     theme_classic()
   if (facet) {
     p <- p + facet_wrap(~Race)
