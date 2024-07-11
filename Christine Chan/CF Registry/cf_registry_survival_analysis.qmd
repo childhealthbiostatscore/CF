@@ -146,6 +146,7 @@ annual$NumPulmExacerbation <- cut(annual$NumPulmExacerbation,
   labels = c("0", "1", "2", ">=3"),
   breaks = c(0, 1, 2, 3, Inf), right = F
 )
+# Age groups 10 - 18 inclusive, 19 - 30 inclusive, >= 31
 annual$age_group <- cut(annual$Age_YrEnd,
   breaks = c(-Inf, 10, 19, 31, Inf),
   right = F
@@ -197,6 +198,10 @@ annual <- annual %>%
   group_by(eDWID) %>%
   mutate(entry_date = tstart[1]) %>%
   ungroup()
+# Remove those under 10
+annual$age_group <- relevel(annual$age_group, ref = "[10,19)")
+annual <- annual %>% filter(Age_YrEnd != 0, Age_YrEnd >= 10)
+annual$age_group <- droplevels(annual$age_group)
 # List of covariates
 vars <- c(
   "age_group", "Gender", "bmi_perc", "bmi_perc_cat", "MutClass", "Race",
@@ -288,10 +293,6 @@ year_inc <- function(df = annual, year, py = 1000) {
   total_at_risk <- sum(inc$n)
   total_inc <- new_cases / (total_at_risk / py)
 
-  new_cases_10 <- sum(inc$n[inc$CFRD == "CFRD+" & inc$age_group == "[-Inf,10)"])
-  at_risk_10 <- sum(inc$n[inc$age_group == "[-Inf,10)"])
-  inc_10 <- new_cases_10 / (at_risk_10 / py)
-
   new_cases_10_18 <- sum(inc$n[inc$CFRD == "CFRD+" & inc$age_group == "[10,19)"])
   at_risk_10_18 <- sum(inc$n[inc$age_group == "[10,19)"])
   inc_10_18 <- new_cases_10_18 / (at_risk_10_18 / py)
@@ -310,9 +311,6 @@ year_inc <- function(df = annual, year, py = 1000) {
     `Total New Cases` = new_cases,
     `Total At Risk` = total_at_risk,
     `Total Incidence` = total_inc,
-    `Total New Cases Age < 10` = new_cases_10,
-    `Total At Risk Age < 10` = at_risk_10,
-    `Total Incidence Age < 10` = inc_10,
     `Total New Cases Age 10-18` = new_cases_10_18,
     `Total At Risk Age 10-18` = at_risk_10_18,
     `Total Incidence Age 10-18` = inc_10_18,
@@ -378,7 +376,7 @@ ggplot(screening, aes(x = ReviewYear, y = value, color = age_group)) +
   facet_wrap(~name) +
   theme_bw() +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-  scale_color_discrete(name = "Age Group", labels = c("10-17", "18-29", "30+"))
+  scale_color_discrete(name = "Age Group")
 ```
 
 ## Who is getting OGTTs?
@@ -418,10 +416,6 @@ Based on CFFPR annualized data. These data are interval censored because we know
 ### Base model
 
 ```{r}
-# Remove those under 10
-annual$age_group <- relevel(annual$age_group, ref = "[10,19)")
-annual <- annual %>% filter(Age_YrEnd != 0, Age_YrEnd >= 10)
-annual$age_group <- droplevels(annual$age_group)
 # Origin for survival analyses
 og <- ymd("2003-01-01")
 # Formula for base model
