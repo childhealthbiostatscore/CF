@@ -15,8 +15,6 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
@@ -30,21 +28,24 @@ library(eulerr)
 library(kableExtra)
 library(caret)
 library(likert)
-switch(Sys.info()[["sysname"]],
-  Windows = {
-    home_dir <- "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF"
-  },
-  Darwin = {
-    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF"
-  }
+library(patchwork)
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+)
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/GitHub",
+  "Windows" = "C:/Users/Tim/GitHub",
+  "Linux" = "/home/timvigers/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning, include=FALSE}
 # Use REDCap import
-source("/Users/timvigers/GitHub/CF/Jordana Hoppe/Home Collection/home_collection_data.r")
-source("/Users/timvigers/GitHub/CF/Jordana Hoppe/Home Collection/home_collection_surveys.r")
+source(paste0(github_dir, "/CF/Jordana Hoppe/Home Collection/home_collection_data.r"))
+source(paste0(github_dir, "/CF/Jordana Hoppe/Home Collection/home_collection_surveys.r"))
 # Exclude missing subjects
 data_exclude <- c("009-07", "009-17", "009-25", "009-37")
 survey_exclude <- c(15, 27, 30, 34, 47)
@@ -140,11 +141,11 @@ survey_data %>%
   as_kable_extra()
 ```
 
-## Table 3: Clinic Culture Results
+## Table 3: Immediate Culture Results
 
 ```{r}
 #| label: tbl-3
-#| tbl-cap: Clinic Culture Results
+#| tbl-cap: Immediate Culture Results
 data %>%
   filter(!subject_id %in% data_exclude) %>%
   select(clinic_cx_source.factor:clinic_burk_sp.factor) %>%
@@ -205,7 +206,7 @@ agreement <- function(result_pattern, df = data) {
     paste0(result_pattern, ".factor")
   )
   d <- df[, cols]
-  colnames(d) <- c("Clinic", "Delayed", "Home")
+  colnames(d) <- c("Immediate", "Delayed", "Home")
   d <- d %>%
     mutate(across(everything(), ~ as.character(.)))
   d[d == "NA"] <- NA
@@ -247,14 +248,14 @@ agreement <- function(result_pattern, df = data) {
   cat("\n")
   d <- data.frame(lapply(d, factor, levels = c("Absent", "Present")))
   cat("\n")
-  cat("#### Clinic vs. delayed (clinic as reference)")
+  cat("#### Immediate vs. delayed (immediate as reference)")
   cat("\n")
   cat("\n")
   cat("##### Confusion matrix")
   cat("\n")
   cat("\n")
   c <- confusionMatrix((d[, "Delayed"]),
-    reference = d[, "Clinic"], positive = "Present", mode = "everything"
+    reference = d[, "Immediate"], positive = "Present", mode = "everything"
   )
   print(kable(c$table, digits = 3))
   cat("\n")
@@ -271,14 +272,14 @@ agreement <- function(result_pattern, df = data) {
   print(kable(c$byClass, digits = 3, col.names = NULL))
   cat("\n")
   cat("\n")
-  cat("#### Clinic vs. home (clinic as reference)")
+  cat("#### Immediate vs. home (immediate as reference)")
   cat("\n")
   cat("\n")
   cat("##### Confusion matrix")
   cat("\n")
   cat("\n")
   c <- confusionMatrix((d[, "Home"]),
-    reference = d[, "Clinic"], positive = "Present", mode = "everything"
+    reference = d[, "Immediate"], positive = "Present", mode = "everything"
   )
   print(kable(c$table, digits = 3))
   cat("\n")
@@ -454,26 +455,71 @@ yn_df <- t %>%
   select(all_of(yn)) %>%
   rename(any_of(setNames(names(labels), labels)))
 yn_df <- data.frame(lapply(yn_df, factor, levels = c("No", "Yes")), check.names = F)
-plot(likert(yn_df))
+p <- plot(likert(yn_df))
+ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/yn.png",
+  plot = p,
+  width = 8, height = 6, units = "in"
+)
 ```
 
 ```{r}
 check_df <- t %>%
   select(all_of(checkboxes)) %>%
   rename(any_of(setNames(names(labels), labels)))
-plot(likert(check_df))
+colnames(check_df) <- c(
+  "Uncooperative child", "Written instructions for collection were not clear",
+  "I did not think the sample I obtained was a good sample", "Other",
+  "Decreased travel time", "Less missed work",
+  "Financial reasons - costs to travel to clinic can be a burden",
+  "Health concerns with coming to clinic", "Other",
+  "I do not feel comfortable with home collection",
+  "I do not feel collection at home is reliable",
+  "We prefer in-clinic visits only", "Other"
+)
+benefits_df <- check_df[, c(
+  "Decreased travel time", "Less missed work",
+  "Financial reasons - costs to travel to clinic can be a burden",
+  "Health concerns with coming to clinic"
+)]
+barriers_df <- check_df[, c(
+  "Uncooperative child",
+  "I did not think the sample I obtained was a good sample",
+  "Written instructions for collection were not clear",
+  "I do not feel collection at home is reliable",
+  "I do not feel comfortable with home collection"
+)]
+
+p_benefits <- plot(likert(benefits_df)) + ggtitle("Benefits") +
+  theme(
+    axis.text.x = element_blank(), axis.title.x = element_blank(),
+    legend.position = "none"
+  )
+p_barriers <- plot(likert(barriers_df)) + ggtitle("Barriers")
+p <- p_benefits / p_barriers
+ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/check.png",
+  plot = p,
+  width = 8, height = 6, units = "in"
+)
 ```
 
 ```{r}
 df3 <- t %>%
   select(all_of(levels3)) %>%
   rename(any_of(setNames(names(labels), labels)))
-plot(likert(df3))
+p <- plot(likert(df3))
+ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/q2.png",
+  plot = p,
+  width = 8, height = 6, units = "in"
+)
 ```
 
 ```{r}
 df5 <- t %>%
   select(all_of(levels5)) %>%
   rename(any_of(setNames(names(labels), labels)))
-plot(likert(df5))
+p <- plot(likert(df5))
+ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/difficulty.png",
+  plot = p,
+  width = 9, height = 6, units = "in"
+)
 ```
