@@ -1,5 +1,5 @@
 ---
-title: "Title"
+title: "SSwAB-IT Process Data"
 author: "Tim Vigers"
 date: "today"
 date-format: long
@@ -38,26 +38,37 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
-#| message: false
+#| include: false
 # Import from REDCap
-unlockREDCap(c(rcon = ""),
+unlockREDCap(c(rcon = "SSwAB-IT Process Data"),
   keyring = "API_KEYs",
   envir = 1,
   url = "https://redcap.ucdenver.edu/api/"
 )
 exportBulkRecords(list(db = rcon), envir = 1)
+# Select columns and convert to long
+df <- db_sswabit_process_data %>%
+  select(cf_center, week, total_swabs_ordered:total_swabs_resulted) %>%
+  pivot_longer(cols = starts_with("total_"))
+# Nicer names
+df$name <- gsub("_", " ", df$name)
+df$name <- str_to_title(df$name)
 ```
 
-# Table
+# Run chart
 
 ```{r}
-#| label: tbl-planets
-#| tbl-cap: Planets
-```
-
-# Figure
-
-```{r}
-#| label: fig-planets
-#| fig-cap: Planets
+#| label: fig-run
+#| fig-width: 12
+#| fig-height: 9
+ggplot(df, aes(x = week, y = value, colour = cf_center, group = cf_center)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+  facet_wrap(vars(name), scales = "free_y") +
+  theme(
+    legend.title = element_blank(), axis.title.y = element_blank(),
+    axis.title.x = element_blank(), text = element_text(size = 20)
+  )
 ```
