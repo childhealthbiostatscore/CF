@@ -1,31 +1,137 @@
 ---
 title: "Pre-/Post-Trikafta in CFRD"
 author: "Tim Vigers"
-date: "`r format(Sys.time(), '%d %B %Y')`"
-output:
-  html_document:
-    number_sections: yes
-    toc: yes
-    toc_depth: 5
-    toc_float: yes
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+    theme:
+      light: flatly
+      dark: darkly
+bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /home/timvigers/GitHub/styles/american-medical-association.csl
+editor: source
 ---
 
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(lubridate)
 library(gtsummary)
 library(arsenal)
 library(rspiro)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Colleen Wood",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Colleen Wood"
 )
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
+```{r data cleaning}
+#| include: false
+# CHCO data
+chco_bmi_pft <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/chco_bmi_pft.csv",
+  na.strings = ""
+)
+chco_bmi_pft$Date <- mdy(chco_bmi_pft$Date)
+chco_cgm <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/chco_cgm.csv",
+  na.strings = ""
+)
+chco_cgm$Date <- date(parse_date_time(chco_cgm$date_cgm_placement,
+  orders = c("mdyHM", "mdy")
+))
+chco_glycemic <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/chco_glycemic.csv",
+  na.strings = ""
+)
+chco_glycemic$Date <- mdy(chco_glycemic$Date)
+chco_registry <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/chco_registry.csv",
+  na.strings = ""
+)
+# Montana
+montana_bmi_pft <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/montana_bmi_pft.csv",
+  na.strings = ""
+)
+montana_cgm <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/montana_cgm.csv",
+  na.strings = ""
+)
+montana_cgm$Date <- date(parse_date_time(montana_cgm$date_cgm_placement,
+  orders = c("mdyHM", "mdy")
+))
+montana_demo <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/montana_demo.csv",
+  na.strings = ""
+)
+montana_genotypes <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/montana_genotypes.csv",
+  na.strings = ""
+)
+montana_gtubes <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/montana_gtubes.csv",
+  na.strings = ""
+)
+montana_pancreatic <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/montana_pancreatic.csv",
+  na.strings = ""
+)
+montana_glycemic_registry <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/montana_glycemic_registry.csv",
+  na.strings = ""
+)
+montana_glycemic_registry$Date <- mdy(montana_glycemic_registry$Date)
+# UW
+uw_registry <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/uw_registry.csv",
+  na.strings = ""
+)
+uw_bmi <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/uw_bmi.csv",
+  na.strings = ""
+)
+uw_pft <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/uw_pft.csv",
+  na.strings = ""
+)
+uw_cgm <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/uw_cgm.csv",
+  na.strings = ""
+)
+uw_demo <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/uw_demo.csv",
+  na.strings = ""
+)
+uw_genotypes <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/uw_registry.csv",
+  na.strings = ""
+)
+uw_glycemic <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/uw_glycemic.csv",
+  na.strings = ""
+)
+uw_gtubes <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/uw_gtubes.csv",
+  na.strings = ""
+)
+uw_pancreatic <- read.csv(
+  "./Prepost Trikafta/Data_Cleaned/uw_pancreatic.csv",
+  na.strings = ""
+)
+```
+
 ```{r}
-load("./Colleen Wood/Prepost Trikafta/Data_Cleaned/analysis_dataset.rdata")
 # Baseline HbA1c, BMI group pre- and post-modulator
 df <- df %>%
   group_by(`CFF ID`) %>%
