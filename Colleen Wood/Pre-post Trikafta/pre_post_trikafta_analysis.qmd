@@ -37,98 +37,187 @@ knitr::opts_knit$set(root.dir = home_dir)
 
 ```{r data cleaning}
 #| include: false
-# CHCO data
-chco_bmi_pft <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/chco_bmi_pft.csv",
-  na.strings = ""
-)
-chco_bmi_pft$Date <- mdy(chco_bmi_pft$Date)
-chco_cgm <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/chco_cgm.csv",
-  na.strings = ""
-)
-chco_cgm$Date <- date(parse_date_time(chco_cgm$date_cgm_placement,
-  orders = c("mdyHM", "mdy")
-))
-chco_glycemic <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/chco_glycemic.csv",
-  na.strings = ""
-)
-chco_glycemic$Date <- mdy(chco_glycemic$Date)
-chco_registry <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/chco_registry.csv",
-  na.strings = ""
-)
-# Montana
-montana_bmi_pft <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/montana_bmi_pft.csv",
-  na.strings = ""
-)
-montana_cgm <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/montana_cgm.csv",
-  na.strings = ""
-)
-montana_cgm$Date <- date(parse_date_time(montana_cgm$date_cgm_placement,
-  orders = c("mdyHM", "mdy")
-))
-montana_demo <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/montana_demo.csv",
-  na.strings = ""
-)
-montana_genotypes <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/montana_genotypes.csv",
-  na.strings = ""
-)
-montana_gtubes <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/montana_gtubes.csv",
-  na.strings = ""
-)
-montana_pancreatic <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/montana_pancreatic.csv",
-  na.strings = ""
-)
-montana_glycemic_registry <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/montana_glycemic_registry.csv",
-  na.strings = ""
-)
-montana_glycemic_registry$Date <- mdy(montana_glycemic_registry$Date)
-# UW
-uw_registry <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/uw_registry.csv",
-  na.strings = ""
-)
-uw_bmi <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/uw_bmi.csv",
-  na.strings = ""
-)
-uw_pft <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/uw_pft.csv",
-  na.strings = ""
-)
-uw_cgm <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/uw_cgm.csv",
-  na.strings = ""
-)
-uw_demo <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/uw_demo.csv",
-  na.strings = ""
-)
-uw_genotypes <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/uw_registry.csv",
-  na.strings = ""
-)
-uw_glycemic <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/uw_glycemic.csv",
-  na.strings = ""
-)
-uw_gtubes <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/uw_gtubes.csv",
-  na.strings = ""
-)
-uw_pancreatic <- read.csv(
-  "./Prepost Trikafta/Data_Cleaned/uw_pancreatic.csv",
-  na.strings = ""
-)
+# # Import CHCO data
+# chco_bmi_pft <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/chco_bmi_pft.csv",
+#   na.strings = "", check.names = F
+# )
+# chco_bmi_pft$Date <- mdy(chco_bmi_pft$Date)
+# chco_cgm <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/chco_cgm.csv",
+#   na.strings = "", check.names = F
+# )
+# chco_cgm$Date <- date(parse_date_time(chco_cgm$date_cgm_placement,
+#   orders = c("mdyHM", "mdy")
+# ))
+# chco_cgm$`CFF ID` <- as.numeric(sub("_.*", "", chco_cgm$subject_id))
+# chco_cgm$Visit <- sub(".*_", "", chco_cgm$subject_id)
+# chco_glycemic <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/chco_glycemic.csv",
+#   na.strings = "", check.names = F
+# )
+# chco_glycemic$Date <- mdy(chco_glycemic$Date)
+# chco_registry <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/chco_registry.csv",
+#   na.strings = "", check.names = F
+# )
+# chco_registry$Start <- NULL
+# # Import Montana
+# montana_bmi_pft <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/montana_bmi_pft.csv",
+#   na.strings = "", check.names = F
+# )
+# montana_bmi_pft$Date <- mdy(montana_bmi_pft$Date)
+# montana_cgm <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/montana_cgm.csv",
+#   na.strings = "", check.names = F
+# )
+# montana_cgm$Date <- date(parse_date_time(montana_cgm$date_cgm_placement,
+#   orders = c("mdyHM", "mdy")
+# ))
+# montana_cgm$`CFF ID` <- as.numeric(sub("_.*", "", montana_cgm$subject_id))
+# montana_cgm$Visit <- sub(".*_", "", montana_cgm$subject_id)
+# montana_cgm$Date <- mdy(montana_cgm$Date)
+# montana_demo <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/montana_demo.csv",
+#   na.strings = "", check.names = F
+# )
+# montana_genotypes <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/montana_genotypes.csv",
+#   na.strings = "", check.names = F
+# )
+# montana_gtubes <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/montana_gtubes.csv",
+#   na.strings = "", check.names = F
+# )
+# montana_gtubes$Date <- NULL
+# montana_pancreatic <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/montana_pancreatic.csv",
+#   na.strings = "", check.names = F
+# )
+# montana_pancreatic$Date <- NULL
+# montana_pancreatic$`Pancreatic Status` <- "Insufficient"
+# montana_glycemic_registry <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/montana_glycemic_registry.csv",
+#   na.strings = "", check.names = F
+# )
+# montana_glycemic_registry$Date <- mdy(montana_glycemic_registry$Date)
+# # Import UW
+# uw_registry <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/uw_registry.csv",
+#   na.strings = "", check.names = F
+# )
+# uw_registry <- uw_registry %>% rename(Date = Start)
+# uw_registry$Date <- mdy(uw_registry$Date)
+# uw_bmi <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/uw_bmi.csv",
+#   na.strings = "", check.names = F
+# )
+# uw_bmi$Date <- mdy(uw_bmi$Date)
+# uw_pft <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/uw_pft.csv",
+#   na.strings = "", check.names = F
+# )
+# uw_pft$Date <- mdy(uw_pft$Date)
+# uw_cgm <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/uw_cgm.csv",
+#   na.strings = "", check.names = F
+# )
+# uw_cgm$`CFF ID` <- as.numeric(sub("_.*", "", uw_cgm$subject_id))
+# uw_cgm$Visit <- sub(".*_", "", uw_cgm$subject_id)
+# uw_demo <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/uw_demo.csv",
+#   na.strings = "", check.names = F
+# )
+# uw_genotypes <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/uw_registry.csv",
+#   na.strings = "", check.names = F
+# )
+# uw_glycemic <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/uw_glycemic.csv",
+#   na.strings = "", check.names = F
+# )
+# uw_glycemic$Date <- mdy(uw_glycemic$Date)
+# uw_gtubes <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/uw_gtubes.csv",
+#   na.strings = "", check.names = F
+# )
+# uw_gtubes$`Date of Encounter` <- NULL
+# uw_pancreatic <- read.csv(
+#   "./Prepost Trikafta/Data_Cleaned/uw_pancreatic.csv",
+#   na.strings = "", check.names = F
+# )
+# uw_pancreatic$Date <- NULL
+# # Format and merge
+# # CHCO
+# chco_long <- full_join(chco_glycemic, chco_bmi_pft)
+# chco_long <- full_join(chco_registry, chco_long)
+# chco_long <- full_join(chco_long, chco_cgm)
+# chco_long$site <- "CHCO"
+# chco_long$`Hispanic/Latinx`[chco_long$`Hispanic/Latinx`] <- "Yes"
+# chco_long$`Hispanic/Latinx`[chco_long$`Hispanic/Latinx` == "FALSE"] <- "No"
+# # Montana
+# montana_registry <- full_join(montana_demo, montana_genotypes)
+# montana_registry <- full_join(montana_registry, montana_pancreatic)
+# montana_registry <- full_join(montana_registry, montana_gtubes)
+# montana_long <- full_join(montana_glycemic_registry, montana_bmi_pft)
+# montana_long <- full_join(montana_registry, montana_long)
+# montana_long <- full_join(montana_long, montana_cgm)
+# montana_long <- montana_long %>% rename(HbA1c_original = HbA1c)
+# montana_long <- montana_long %>% mutate(
+#   hba1c_spc = str_detect(HbA1c_original, " "),
+#   HbA1c = as.numeric(ifelse(hba1c_spc, sub(" .*", "", montana_long$HbA1c_original), HbA1c_original))
+# )
+# montana_long <- montana_long %>% select(-c(hba1c_spc, HbA1c_original))
+# montana_long$site <- "Montana"
+# montana_long <- montana_long %>%
+#   rename(`Hispanic/Latinx` = `Is Patient of Hispanic Origin`)
+# # UW
+# uw_bmi_pft <- full_join(uw_bmi, uw_pft)
+# uw_registry <- full_join(uw_registry, uw_demo)
+# uw_registry <- full_join(uw_registry, uw_gtubes)
+# uw_long <- full_join(uw_glycemic, uw_bmi_pft)
+# uw_long <- full_join(uw_registry, uw_long)
+# uw_long <- full_join(uw_long, uw_cgm)
+# uw_long$site <- "UW"
+# uw_long <- uw_long %>%
+#   rename(`Hispanic/Latinx` = `Is Patient of Hispanic Origin`)
+# # Put everything together
+# analysis_data <- full_join(chco_long, montana_long)
+# analysis_data <- full_join(analysis_data, uw_long)
+# # Race
+# analysis_data$Race <- factor(analysis_data$Race,
+#   levels = c(
+#     "American Indian or Alaska Native", "Black", "Black or African American",
+#     "Caucasian", "Other", "Some other race", "Two or more races", "Unknown",
+#     "White"
+#   ),
+#   labels = c(
+#     "Other", "Black", "Black", "White", "Other", "Other", "Other",
+#     "Unknown", "White"
+#   )
+# )
+# df <- analysis_data
+load("/home/timvigers/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/analysis_dataset.rdata")
+# Ethnicity
+chco_demo <- read.csv("/home/timvigers/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Raw/Data From CHCO/Registry/Copy of Earliest Trikafta Dates in Registry_updated 2.2.21 cc modified_cfrdyn.csv")
+chco_demo$Hispanic <- NA
+chco_demo$Hispanic[chco_demo$Hispanic.Latinx] <- "Yes"
+chco_demo$Hispanic[!chco_demo$Hispanic.Latinx] <- "No"
+chco_demo <- chco_demo[, c("CFF.ID", "Hispanic")]
+
+montana_demo <- read.csv("/home/timvigers/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/montana_demo.csv")
+montana_demo$Hispanic <- montana_demo$Is.Patient.of.Hispanic.Origin
+montana_demo <- montana_demo[, c("CFF.ID", "Hispanic")]
+
+uw_demo <- read.csv("/home/timvigers/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/uw_demo.csv")
+uw_demo$Hispanic <- uw_demo$Is.Patient.of.Hispanic.Origin
+uw_demo <- uw_demo[, c("CFF.ID", "Hispanic")]
+
+eth <- do.call(rbind, list(chco_demo, montana_demo, uw_demo))
+colnames(eth) <- c("CFF ID", "Hispanic")
+
+df <- left_join(df, eth)
 ```
 
 ```{r}
@@ -141,7 +230,9 @@ df <- df %>%
     `Post BMI` = `BMI Percentile`[`Pre or Post` == "Post"]
   ) %>%
   ungroup()
-df$`Baseline HbA1c` <- cut(df$`Baseline HbA1c`, c(-Inf, 6.5, Inf), right = F)
+df$`Baseline HbA1c` <- cut(df$`Baseline HbA1c`, c(-Inf, 6.5, Inf),
+  right = F
+)
 df$`Baseline BMI` <- cut(df$`Baseline BMI`, c(-Inf, 85, Inf), right = F)
 df$`Post BMI` <- cut(df$`Post BMI`, c(-Inf, 85, Inf), right = F)
 # Pre-modulator BMI percentile
@@ -169,10 +260,11 @@ df %>%
   select(
     Age, `BMI Percentile`, Weight, Sex, ppFEV1, ppFEV1gl, ppFVC,
     ppFVCgl, `G-tube in past 12 months`, `Pancreatic Status`, Site,
-    Genotype, `Age Group`, Race
+    Genotype, `Age Group`, Race,Hispanic
   ) %>%
   tbl_summary(
-    statistic = list(c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~ "{mean} ± {sd}"),
+    statistic = list(c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~ 
+                       "{mean} ± {sd}"),
     missing_text = "Missing"
   )
 ```
@@ -434,7 +526,7 @@ Only 13 of those with CGM also had HbA1c values pre- and post-CFTR modulator.
 ### Demographics
 
 ```{r}
-cgm <- df[!is.na(df$average_sensor), ]
+cgm <- df[!is.na(df$mean_sensor), ]
 cgm %>%
   filter(`Pre or Post` == "Pre") %>%
   select(

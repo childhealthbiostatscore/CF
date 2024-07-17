@@ -18,14 +18,12 @@ library(performance)
 library(knitr)
 library(lubridate)
 library(stringr)
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Colleen Wood",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Colleen Wood"
+)
 knitr::opts_chunk$set(echo = FALSE)
-if(Sys.info()["sysname"] == "Windows"){
-  home_dir = "S:/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood"
-} else if (Sys.info()["sysname"] == "Linux"){
-  home_dir = "~/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Colleen Wood"
-} else if (Sys.info()["sysname"] == "Darwin"){
-  home_dir = "/Volumes/Documents/Work/Vigers/CF/Colleen Wood"
-}
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
@@ -36,20 +34,20 @@ Import the datasets (I'll be doing this one site at a time to look at the variab
 
 # bmi, pulm function 577 obs
 # 8 vars MRN - ID, date for visits; start - ? start of trt?, fev, bmi, height, weight, fec 
-chco_bmi_pft = read_csv("./Prepost Triakfta/Data_Cleaned/chco_bmi_pft.csv")
+chco_bmi_pft = read_csv("./Prepost Trikafta/Data_Cleaned/chco_bmi_pft.csv")
 chco_bmi_pft$Date = mdy(chco_bmi_pft$Date) 
 # continuous glucose monitoring, 23 obs
 # 105 vars subjectid - number_pre/post for visit and a date; numbers dont seem to correspond to mrn in bmi pft
-chco_cgm = read_csv("./Prepost Triakfta/Data_Cleaned/chco_cgm.csv")
+chco_cgm = read_csv("./Prepost Trikafta/Data_Cleaned/chco_cgm.csv")
 chco_cgm$Date = date(parse_date_time(chco_cgm$date_cgm_placement,
                                                 orders = c("mdyHM","mdy")))
 # chco glycemic, 261 obs
 # 7 var MRN and CFF id (=subjectid?), date for visits; start... etc
-chco_glycemic = read_csv("./Prepost Triakfta/Data_Cleaned/chco_glycemic.csv")
+chco_glycemic = read_csv("./Prepost Trikafta/Data_Cleaned/chco_glycemic.csv")
 chco_glycemic$Date = mdy(chco_glycemic$Date)
 # chco registry 108 obs
 # CFF ID and MRN, start date
-chco_registry = read_csv("./Prepost Triakfta/Data_Cleaned/chco_registry.csv")
+chco_registry = read_csv("./Prepost Trikafta/Data_Cleaned/chco_registry.csv")
 ###################################
 
 
@@ -57,41 +55,41 @@ chco_registry = read_csv("./Prepost Triakfta/Data_Cleaned/chco_registry.csv")
 
 # NEED TO RENAME VARIABLES TO MATCH CHCO#
 # bmi, pulm function 975 obs
-montana_bmi_pft <- read_csv("./Prepost Triakfta/Data_Cleaned/montana_bmi_pft.csv")
+montana_bmi_pft <- read_csv("./Prepost Trikafta/Data_Cleaned/montana_bmi_pft.csv")
 
 # cgm 16 obs
-montana_cgm <- read_csv("./Prepost Triakfta/Data_Cleaned/montana_cgm.csv")
+montana_cgm <- read_csv("./Prepost Trikafta/Data_Cleaned/montana_cgm.csv")
 montana_cgm$Date = date(parse_date_time(montana_cgm$date_cgm_placement,
                                                 orders = c("mdyHM","mdy")))
 
 # registry: we need to combine demo (126), genotypes (126), pancreatic (241), gtubes (155)
-montana_demo <- read_csv("./Prepost Triakfta/Data_Cleaned/montana_demo.csv")
-montana_genotypes <- read_csv("./Prepost Triakfta/Data_Cleaned/montana_genotypes.csv")
-montana_gtubes <- read_csv("./Prepost Triakfta/Data_Cleaned/montana_gtubes.csv") # what are the dates here
-montana_pancreatic <- read_csv("./Prepost Triakfta/Data_Cleaned/montana_pancreatic.csv") # what is this? just dates and cffid
+montana_demo <- read_csv("./Prepost Trikafta/Data_Cleaned/montana_demo.csv")
+montana_genotypes <- read_csv("./Prepost Trikafta/Data_Cleaned/montana_genotypes.csv")
+montana_gtubes <- read_csv("./Prepost Trikafta/Data_Cleaned/montana_gtubes.csv") # what are the dates here
+montana_pancreatic <- read_csv("./Prepost Trikafta/Data_Cleaned/montana_pancreatic.csv") # what is this? just dates and cffid
 # ask tim:what do we need to do with gtubes and pancreatic dates? dont look like chco data
 
 # glycemic 279
-montana_glycemic_registry <- read_csv("./Prepost Triakfta/Data_Cleaned/montana_glycemic_registry.csv")
+montana_glycemic_registry <- read_csv("./Prepost Trikafta/Data_Cleaned/montana_glycemic_registry.csv")
 montana_glycemic_registry$Date = mdy(montana_glycemic_registry$Date)
 # looks identical
 ###################################
 
 ###### IMPORT UW DATA #############
-uw_registry <- read_csv("./Prepost Triakfta/Data_Cleaned/uw_registry.csv") #cffid and start
-uw_bmi <- read_csv("./Prepost Triakfta/Data_Cleaned/uw_bmi.csv") # date, cffid, height, bmi (height bmi need rename)
-uw_pft <- read_csv("./Prepost Triakfta/Data_Cleaned/uw_pft.csv") # datee, cffid, fev, fvc need renaming
-uw_cgm <- read_csv("./Prepost Triakfta/Data_Cleaned/uw_cgm.csv") # same code as montana
-uw_demo <- read_csv("./Prepost Triakfta/Data_Cleaned/uw_demo.csv") 
-uw_genotypes <- read_csv("./Prepost Triakfta/Data_Cleaned/uw_registry.csv") # no genotype data here?
-uw_glycemic <- read_csv("./Prepost Triakfta/Data_Cleaned/uw_glycemic.csv") # looks good, same as chco
-uw_gtubes <- read_csv("./Prepost Triakfta/Data_Cleaned/uw_gtubes.csv") # rename date of encounter to date
-uw_pancreatic <- read_csv("./Prepost Triakfta/Data_Cleaned/uw_pancreatic.csv") # same as montana, no pancreatic data though
+uw_registry <- read_csv("./Prepost Trikafta/Data_Cleaned/uw_registry.csv") #cffid and start
+uw_bmi <- read_csv("./Prepost Trikafta/Data_Cleaned/uw_bmi.csv") # date, cffid, height, bmi (height bmi need rename)
+uw_pft <- read_csv("./Prepost Trikafta/Data_Cleaned/uw_pft.csv") # datee, cffid, fev, fvc need renaming
+uw_cgm <- read_csv("./Prepost Trikafta/Data_Cleaned/uw_cgm.csv") # same code as montana
+uw_demo <- read_csv("./Prepost Trikafta/Data_Cleaned/uw_demo.csv") 
+uw_genotypes <- read_csv("./Prepost Trikafta/Data_Cleaned/uw_registry.csv") # no genotype data here?
+uw_glycemic <- read_csv("./Prepost Trikafta/Data_Cleaned/uw_glycemic.csv") # looks good, same as chco
+uw_gtubes <- read_csv("./Prepost Trikafta/Data_Cleaned/uw_gtubes.csv") # rename date of encounter to date
+uw_pancreatic <- read_csv("./Prepost Trikafta/Data_Cleaned/uw_pancreatic.csv") # same as montana, no pancreatic data though
 
 ###################################
 
 ###### IMPORT UM DATA ########
-#um_all <- read_csv("./Prepost Triakfta/Data_Cleaned/um_all.csv")
+#um_all <- read_csv("./Prepost Trikafta/Data_Cleaned/um_all.csv")
 ###################################
 
 ```
@@ -134,10 +132,10 @@ montana_demo = montana_demo %>% mutate(Race = case_when(race_original == "White"
                                                         race_original == NA ~ "Unknown",
                                                         TRUE ~ "Other"))
 # rename the bmi_pft to chco names
-montana_bmi_pft = montana_bmi_pft %>% rename(FVC = `Measure of FVC`,
-                                             FEV1 = `Measure of FEV1`,
-                                             Height = `Patients height`,
-                                             Weight = `Weight of Patient`)
+# montana_bmi_pft = montana_bmi_pft %>% rename(FVC = `Measure of FVC`,
+#                                              FEV1 = `Measure of FEV1`,
+#                                              Height = `Patients height`,
+#                                              Weight = `Weight of Patient`)
 montana_bmi_pft$Date = mdy(montana_bmi_pft$Date)
 
 # make registry dataframe
@@ -195,10 +193,10 @@ uw_demo = uw_demo %>% mutate(Race = case_when(race_original == "White" ~ "Caucas
 # make bmi pft
 uw_bmi_pft = full_join(uw_bmi, uw_pft)
 # rename the bmi_pft to chco names
-uw_bmi_pft = uw_bmi_pft %>% rename(FVC = `Measure of FVC`,
-                                   FEV1 = `Measure of FEV1`,
-                                   Height = `Patients height`,
-                                   BMI = `BMI Value`)
+# uw_bmi_pft = uw_bmi_pft %>% rename(FVC = `Measure of FVC`,
+#                                    FEV1 = `Measure of FEV1`,
+#                                    Height = `Patients height`,
+#                                    BMI = `BMI Value`)
 
 # CGM looks like this is the same as CHCO (GROOVY)
 # cgm data cleaning
@@ -237,5 +235,5 @@ analysis_data = full_join(chco_long, montana_long)
 analysis_data = full_join(analysis_data, uw_long)
 
 # export csv analysis_data
-write.csv(analysis_data, file = "./Prepost Triakfta/Data_Cleaned/analysis_data.csv")
+write.csv(analysis_data, file = "./Prepost Trikafta/Data_Cleaned/analysis_data.csv")
 ```
