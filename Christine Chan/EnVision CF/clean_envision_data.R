@@ -48,11 +48,9 @@ insulin <- insulin %>% distinct()
 insulin <- insulin %>%
   group_by(study_id, Date, Timepoint) %>%
   summarise(Insulin = first(na.omit(Insulin)))
-
 #-------------------------------------------------------------------------------
 # Catecholamines (Excel files needed some manual cleaning prior to this)
 #-------------------------------------------------------------------------------
-
 files <- list.files("./Christine Chan/EnVision CF/Data_Clean/Catecholamines",
   full.names = T
 )
@@ -62,11 +60,9 @@ catecholamines$Date <- mdy(catecholamines$Date)
 colnames(catecholamines) <- c(
   "study_id", "Date", "Timepoint", "Norepinephrine", "Epinephrine"
 )
-
 #-------------------------------------------------------------------------------
 # Glucose
 #-------------------------------------------------------------------------------
-
 redcap <- read.csv("./Christine Chan/EnVision CF/Data_Raw/EnvisionCF_DATA_2024-07-19_1236.csv",
   na.strings = ""
 )
@@ -86,12 +82,9 @@ glucose$Timepoint <- sub("timepoint_", "", glucose$Timepoint)
 glucose$Timepoint <- sub("_min", "", glucose$Timepoint)
 glucose$Timepoint <- as.numeric(glucose$Timepoint)
 glucose$Date <- ymd(glucose$Date)
-
-
 #-------------------------------------------------------------------------------
 # Demographics
 #-------------------------------------------------------------------------------
-
 demo <- redcap %>%
   select(
     study_id, date_visit, age_visit, height, weight, sex, origin_race, ethnicity
@@ -100,24 +93,78 @@ demo <- redcap %>%
   rename(Date = date_visit) %>%
   filter(!if_all(age_visit:ethnicity, is.na))
 demo$Date <- ymd(demo$Date)
-
+#-------------------------------------------------------------------------------
+# Date fixes per Holly's 7/19 email
+#-------------------------------------------------------------------------------
+insulin$Date[insulin$study_id == "CC0014" &
+  insulin$Date == "2022-11-16"] <- "2022-11-21"
+insulin$Date[insulin$study_id == "CC0026" &
+  insulin$Date == "2021-05-26"] <- "2022-05-26"
+insulin$Date[insulin$study_id == "CC0035" &
+  insulin$Date == "2020-08-01"] <- "2020-08-10"
+insulin$Date[insulin$study_id == "CC0041" &
+  insulin$Date == "2021-09-30"] <- "2020-09-30"
+insulin$Date[insulin$study_id == "CC0065" &
+  insulin$Date == "2021-09-07"] <- "2021-09-08"
+insulin$Date[insulin$study_id == "IA0002" &
+  insulin$Date == "2021-10-28"] <- "2019-10-28"
+insulin$Date[insulin$study_id == "IA0013" &
+  insulin$Date == "2019-11-17"] <- "2019-11-07"
+insulin$Date[insulin$study_id == "IA0034" &
+  insulin$Date == "2019-10-30"] <- "2019-10-29"
+insulin$Date[insulin$study_id == "IA0040" &
+  insulin$Date == "2021-08-03"] <- "2020-08-03"
+insulin$Date[insulin$study_id == "IA0068" &
+  insulin$Date == "2020-08-10"] <- "2020-06-17"
+insulin$Date[insulin$study_id == "MN0004" &
+  insulin$Date == "2021-04-14"] <- "2021-04-21"
+insulin$Date[insulin$study_id == "MN0004" &
+  insulin$Date == "2021-04-14"] <- "2021-04-21"
+insulin$Date[insulin$study_id == "MN0019" &
+  insulin$Date == "2021-01-04"] <- "2021-01-06"
+insulin$Date[insulin$study_id == "MN0020" &
+  insulin$Date == "2021-06-19"] <- "2021-06-17"
+insulin$Date[insulin$study_id == "MN0023" &
+  insulin$Date == "2016-12-15"] <- "2019-12-05"
+insulin$Date[insulin$study_id == "MN0046" &
+  insulin$Date == "2020-04-02"] <- "2020-09-02"
+insulin$Date[insulin$study_id == "MN0056" &
+  insulin$Date == "2021-05-27"] <- "2021-05-26"
+insulin$Date[insulin$study_id == "MN0078" &
+  insulin$Date == "2021-09-16"] <- "2021-09-15"
+insulin$Date[insulin$study_id == "WU0003" &
+  insulin$Date == "2020-11-16"] <- "2020-11-19"
+insulin$Date[insulin$study_id == "WU0004" &
+  insulin$Date == "2019-08-29"] <- "2019-08-30"
+insulin$Date[insulin$study_id == "WU0013" &
+  insulin$Date == "2019-11-15"] <- "2019-11-05"
+insulin$study_id[insulin$study_id == "EVUI00001"] <- "IA0001"
+insulin$study_id[insulin$study_id == "IA0119"] <- "ia0119"
+insulin <-
+  insulin[-which(insulin$study_id == "IA0075" & insulin$Date == "2020-02-18"), ]
+insulin <-
+  insulin[-which(insulin$study_id == "MN0010" & insulin$Date == "2020-01-14"), ]
+catecholamines$Date[catecholamines$study_id == "IA0091" &
+  catecholamines$Date == "2020-02-16"] <- "2020-12-16"
+catecholamines$Date[catecholamines$study_id == "IA0096" &
+  catecholamines$Date == "2021-01-09"] <- "2021-01-08"
+catecholamines$Date[catecholamines$study_id == "IA0110" &
+  catecholamines$Date == "2021-07-06"] <- "2021-07-08"
 #-------------------------------------------------------------------------------
 # Combine everything
 #-------------------------------------------------------------------------------
-
 # Merge
 final_df <- full_join(glucose, insulin)
 final_df <- full_join(final_df, catecholamines)
 final_df <- full_join(final_df, demo)
-
 # Format
 final_df <- final_df %>%
   select(
     study_id, Date, age_visit, height, weight, sex, origin_race, ethnicity,
     Timepoint, Glucose, Insulin, Norepinephrine, Epinephrine
   ) %>%
+  filter(!is.na(Timepoint), !is.na(Date)) %>%
   arrange(study_id, Date, Timepoint)
-
 # Write
 write.csv(final_df,
   file = "./Christine Chan/EnVision CF/Data_Clean/analysis_dataset.csv",
