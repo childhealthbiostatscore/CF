@@ -192,36 +192,36 @@ encounter %>%
   tbl_summary(by = Race, missing_text = "Missing")
 ```
 
-<!-- # LOESS-smoothed outcome plots -->
+# LOESS-smoothed outcome plots
 
-<!-- ```{r functions} -->
-<!-- # Plots -->
-<!-- loess_plot <- function(data = encounter, outcome, facet = F) { -->
-<!--   p <- ggplot(data, aes(x = Days, y = !!sym(outcome), color = Race)) + -->
-<!--     geom_point( -->
-<!--       shape = ".", aes(x = Days, y = !!sym(outcome)), inherit.aes = F, -->
-<!--       alpha = 0.1 -->
-<!--     ) + -->
-<!--     geom_smooth(method = "loess", se = F) + -->
-<!--     theme_classic() -->
-<!--   if (facet) { -->
-<!--     p <- p + facet_wrap(~Race) -->
-<!--   } -->
-<!--   return(p) -->
-<!-- } -->
-<!-- ``` -->
+```{r functions}
+# Plots
+loess_plot <- function(data = encounter, outcome, facet = F) {
+  p <- ggplot(data, aes(x = Days, y = !!sym(outcome), color = Race)) +
+    geom_point(
+      shape = ".", aes(x = Days, y = !!sym(outcome)), inherit.aes = F,
+      alpha = 0.1
+    ) +
+    geom_smooth(method = "loess", se = F) +
+    theme_classic()
+  if (facet) {
+    p <- p + facet_wrap(~Race)
+  }
+  return(p)
+}
+```
 
-<!-- ```{r results='asis'} -->
-<!-- #| warning: false -->
-<!-- invisible(lapply(continuous_outcomes, function(o) { -->
-<!--   cat("\n") -->
-<!--   cat("\n") -->
-<!--   cat("##", o) -->
-<!--   cat("\n") -->
-<!--   cat("\n") -->
-<!--   print(loess_plot(outcome = o)) -->
-<!-- })) -->
-<!-- ``` -->
+```{r results='asis'}
+#| warning: false
+invisible(lapply(continuous_outcomes, function(o) {
+  cat("\n")
+  cat("\n")
+  cat("##", o)
+  cat("\n")
+  cat("\n")
+  print(loess_plot(outcome = o))
+}))
+```
 
 # Segmented models
 
