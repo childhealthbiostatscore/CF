@@ -48,7 +48,7 @@ demo$Race <- factor(demo$Race,
   ),
   labels = c(
     "Non-Hispanic White", "Black or African American", "Hispanic or Latino",
-    "Asian", "Other", "Other", "Other"
+    "Other", "Other", "Other", "Other"
   )
 )
 # Insurance
@@ -140,6 +140,6 @@ binary_outcomes <- c(
   "burkho_complex"
 )
 # Save
-save(encounter, continuous_outcomes, binary_outcomes,
+save(encounter, hospitalizations, continuous_outcomes, binary_outcomes,
   file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/outcomes_dataset.RData"
 )
