@@ -94,7 +94,7 @@ demo <- redcap %>%
   filter(!if_all(age_visit:ethnicity, is.na))
 demo$Date <- ymd(demo$Date)
 #-------------------------------------------------------------------------------
-# Date fixes per Holly's 7/19 email
+# Date fixes per Holly's 7/19 emails
 #-------------------------------------------------------------------------------
 insulin$Date[insulin$study_id == "CC0014" &
   insulin$Date == "2022-11-16"] <- "2022-11-21"
@@ -138,6 +138,8 @@ insulin$Date[insulin$study_id == "WU0004" &
   insulin$Date == "2019-08-29"] <- "2019-08-30"
 insulin$Date[insulin$study_id == "WU0013" &
   insulin$Date == "2019-11-15"] <- "2019-11-05"
+insulin$Date[insulin$study_id == "IA0103" &
+  insulin$Date == "2021-07-26"] <- "2021-08-02"
 insulin$study_id[insulin$study_id == "EVUI00001"] <- "IA0001"
 insulin$study_id[insulin$study_id == "IA0119"] <- "ia0119"
 insulin <-
@@ -150,6 +152,13 @@ catecholamines$Date[catecholamines$study_id == "IA0096" &
   catecholamines$Date == "2021-01-09"] <- "2021-01-08"
 catecholamines$Date[catecholamines$study_id == "IA0110" &
   catecholamines$Date == "2021-07-06"] <- "2021-07-08"
+# Manually add insulin for IA005 6/22/20
+ia005 <- data.frame(
+  "study_id" = rep("IA005", 8), "Date" = rep(ymd("2020-06-22"), 8),
+  "Timepoint" = c(0, 10, 30, 60, 90, 120, 150, 180),
+  "Insulin" = as.character(c(6, NA, 40, 49, 31, 26, 7, 6))
+)
+insulin <- rbind(insulin, ia005)
 #-------------------------------------------------------------------------------
 # Combine everything
 #-------------------------------------------------------------------------------
