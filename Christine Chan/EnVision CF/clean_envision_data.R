@@ -154,7 +154,7 @@ catecholamines$Date[catecholamines$study_id == "IA0110" &
   catecholamines$Date == "2021-07-06"] <- "2021-07-08"
 # Manually add insulin for IA005 6/22/20
 ia005 <- data.frame(
-  "study_id" = rep("IA005", 8), "Date" = rep(ymd("2020-06-22"), 8),
+  "study_id" = rep("IA0005", 8), "Date" = rep(ymd("2020-06-22"), 8),
   "Timepoint" = c(0, 10, 30, 60, 90, 120, 150, 180),
   "Insulin" = as.character(c(6, NA, 40, 49, 31, 26, 7, 6))
 )
