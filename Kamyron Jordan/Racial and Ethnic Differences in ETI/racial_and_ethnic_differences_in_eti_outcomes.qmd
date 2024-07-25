@@ -25,9 +25,6 @@ editor: source
 #| include: false
 # Libraries
 library(tidyverse)
-library(lmerTest)
-library(splines)
-library(ggeffects)
 library(gtsummary)
 library(ggflowchart)
 # Paths
@@ -110,7 +107,6 @@ invisible(lapply(continuous_outcomes, function(o) {
 The following models are adjusted for age group and insurance status. We fit a Gaussian mixed model for continuous outcomes with random intercept for each subject.
 
 ```{r}
-
 ```
 
 # Questions
