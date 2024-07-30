@@ -35,7 +35,7 @@ library(eulerr)
 library(broom)
 library(emmeans)
 library(ggstats)
-library(rprev)
+library(forestmodel)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry",
@@ -338,8 +338,9 @@ annual %>%
   filter(ReviewYear %in% c(2004, 2011, 2018)) %>%
   select(
     ReviewYear, CFRD, Age_YrEnd, Gender, Race, Hispanicrace, bmi_perc,
-    bmi_perc_cat, MutClass, tube_feeding, liver_disease, A_FEV1_pct_predicted,
-    A_FVC_pct_predicted, NumPulmExacerbation, A_corticosteroids1
+    bmi_perc_cat, MutClass, tube_feeding, liver_disease,
+    A_FEV1_pct_predicted, A_FVC_pct_predicted, NumPulmExacerbation,
+    A_corticosteroids1
   ) %>%
   tbl_strata(
     strata = ReviewYear,
@@ -386,14 +387,15 @@ ggsave("./Dissemination/Figures/screening_rates.png",
 
 ## Who is getting OGTTs?
 
-```{r}
+```{r results='asis'}
 # How many OGTTs are non-CFRD people getting 2016-2018
 ogtts <- annual %>%
   filter(ReviewYear %in% 2016:2018, CFRD == "CFRD-") %>%
   group_by(eDWID) %>%
   summarise(
     `Age Group` = last(na.omit(age_group)),
-    `OGTTs` = sum(!is.na(A_twohour_bloodglucose) | !is.na(A_ogttfast_bloodglucose))
+    `OGTTs` = sum(!is.na(A_twohour_bloodglucose) |
+      !is.na(A_ogttfast_bloodglucose))
   )
 # Add demographics
 ogtts$eDWID <- as.numeric(ogtts$eDWID)
@@ -405,11 +407,32 @@ ogtts$OGTTs <- factor(ogtts$OGTTs,
     "No OGTT", "At least 1 OGTT", "At least 1 OGTT", "At least 1 OGTT"
   )
 )
-# Compare no OGTT to at least 1 OGTT
-ogtts %>%
-  select(-eDWID) %>%
-  tbl_summary(by = OGTTs, missing_text = "Missing") %>%
-  add_p()
+# Make table for each variable
+age <- ogtts %>%
+  select(`Age Group`, OGTTs) %>%
+  tbl_summary(by = `Age Group`) %>%
+  add_p() %>%
+  print()
+gender <- ogtts %>%
+  select(Gender, OGTTs) %>%
+  tbl_summary(by = Gender) %>%
+  add_p() %>%
+  print()
+muts <- ogtts %>%
+  select(MutClass, OGTTs) %>%
+  tbl_summary(by = MutClass) %>%
+  add_p() %>%
+  print()
+race <- ogtts %>%
+  select(Race, OGTTs) %>%
+  tbl_summary(by = Race) %>%
+  add_p() %>%
+  print()
+eth <- ogtts %>%
+  select(Hispanicrace, OGTTs) %>%
+  tbl_summary(by = Hispanicrace) %>%
+  add_p() %>%
+  print()
 ```
 
 # Survival analysis - first CFRD diagnosis
@@ -429,28 +452,50 @@ xvars <- c(
   "A_IsOnEnzymes", "tube_feeding", "liver_disease", "ppFEV1_cat",
   "NumPulmExacerbation", "A_corticosteroids1"
 )
-y <- "Surv(as.numeric(tstart), as.numeric(tstop), as.numeric(CFRD) == 2)"
+y <- "Surv(time = as.numeric(tstart), time2 = as.numeric(tstop), event = as.numeric(CFRD) == 2)"
 f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
-cox_res <- coxph(f, data = annual, id = eDWID)
-# Plot survival
-# ggsurvplot(survfit(cox_res),
-#   data = s, risk.table = T, cumevents = T, fun = "event",
-#   xlim = c(2003, 2018), break.x.by = 1
-# )
+cox_res <- coxph(f, data = annual, cluster = eDWID)
 # Forest plot and coefficients table
 cox_res %>%
-  tbl_regression() %>%
-  add_n(location = "level") %>%
-  add_nevent(location = "level")
-ggcoef_model(cox_res,
-  show_p_values = F, add_reference_rows = F,
-  signif_stars = F, colour = F,
-)
+  tbl_regression()
+ggcoef_model(cox_res, show_p_values = F, signif_stars = F, colour = F)
 # Diagnostics
 test.ph <- data.frame(cox.zph(cox_res)$table)
 test.ph <- test.ph[rownames(test.ph) != "GLOBAL", ]
 # Find which variables technically violate PH assumption
 time_varying <- rownames(test.ph)[test.ph$p < 0.05]
+```
+
+### Number of events by variable and year
+
+```{r results='asis'}
+invisible(lapply(xvars, function(v) {
+  cat("\n")
+  cat("#### By group")
+  cat("\n")
+  annual %>%
+    group_by_at(v) %>%
+    summarise(
+      n = length(unique(eDWID)),
+      `CFRD+` = sum(CFRD == "CFRD+"),
+      .groups = "drop"
+    ) %>%
+    gt() %>%
+    print()
+  cat("\n")
+  cat("#### By and year")
+  cat("\n")
+  annual %>%
+    group_by_at(c(v, "ReviewYear")) %>%
+    summarise(
+      n = length(unique(eDWID)),
+      `CFRD+` = sum(CFRD == "CFRD+"),
+      .groups = "drop"
+    ) %>%
+    gt() %>%
+    print()
+  cat("\n")
+}))
 ```
 
 ### Time varying coefficients
@@ -497,8 +542,6 @@ invisible(lapply(time_varying, function(v) {
   cat("\n")
   cox_res_split %>%
     tbl_regression() %>%
-    add_n(location = "level") %>%
-    add_nevent(location = "level") %>%
     print()
   cat("\n")
   cat("\n")
@@ -517,8 +560,19 @@ invisible(lapply(time_varying, function(v) {
   cat("\n")
   cat("\n")
   # Plot marginal means
-  time_varying_forest_plot(emm, x = "emmean", var = v, var_label = labels[v]) %>%
-    print()
+  tvfp <- time_varying_forest_plot(emm,
+    x = "emmean", var = v,
+    var_label = labels[v]
+  ) +
+    theme(text = element_text(size = 20))
+  print(tvfp)
+  ggsave(
+    paste0(
+      "./Dissemination/Figures/", v,
+      "_time_varying_forest_plot.png"
+    ),
+    plot = tvfp, width = 12, height = 9, units = "in"
+  )
   cat("\n")
   cat("\n")
 }))
