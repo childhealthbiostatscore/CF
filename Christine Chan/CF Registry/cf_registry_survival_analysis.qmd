@@ -293,15 +293,18 @@ year_inc <- function(df = annual, year, py = 1000) {
   total_at_risk <- sum(inc$n)
   total_inc <- new_cases / (total_at_risk / py)
 
-  new_cases_10_18 <- sum(inc$n[inc$CFRD == "CFRD+" & inc$age_group == "[10,19)"])
+  new_cases_10_18 <- sum(inc$n[inc$CFRD == "CFRD+" &
+    inc$age_group == "[10,19)"])
   at_risk_10_18 <- sum(inc$n[inc$age_group == "[10,19)"])
   inc_10_18 <- new_cases_10_18 / (at_risk_10_18 / py)
 
-  new_cases_19_30 <- sum(inc$n[inc$CFRD == "CFRD+" & inc$age_group == "[19,31)"])
+  new_cases_19_30 <- sum(inc$n[inc$CFRD == "CFRD+" &
+    inc$age_group == "[19,31)"])
   at_risk_19_30 <- sum(inc$n[inc$age_group == "[19,31)"])
   inc_19_30 <- new_cases_19_30 / (at_risk_19_30 / py)
 
-  new_cases_30 <- sum(inc$n[inc$CFRD == "CFRD+" & inc$age_group == "[31, Inf)"])
+  new_cases_30 <- sum(inc$n[inc$CFRD == "CFRD+" &
+    inc$age_group == "[31, Inf)"])
   at_risk_30 <- sum(inc$n[inc$age_group == "[31, Inf)"])
   inc_30 <- new_cases_30 / (at_risk_30 / py)
 
@@ -340,7 +343,7 @@ annual %>%
     ReviewYear, CFRD, Age_YrEnd, Gender, Race, Hispanicrace, bmi_perc,
     bmi_perc_cat, MutClass, tube_feeding, liver_disease,
     A_FEV1_pct_predicted, A_FVC_pct_predicted, NumPulmExacerbation,
-    A_corticosteroids1
+    A_corticosteroids1, A_IsOnEnzymes, A_Vx770, A_VX809comb
   ) %>%
   tbl_strata(
     strata = ReviewYear,
@@ -372,14 +375,18 @@ screening <- annual %>%
     .groups = "drop"
   ) %>%
   pivot_longer(`Screened HbA1c`:`Screened Either`)
-screening_plot <- ggplot(screening, aes(x = ReviewYear, y = value, color = age_group)) +
+screening_plot <- ggplot(screening, aes(
+  x = ReviewYear, y = value,
+  color = age_group
+)) +
   geom_line() +
   xlab("Year") +
-  facet_wrap(~name) +
+  facet_wrap(~name, nrow = 3) +
   theme_bw() +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
   scale_color_discrete(name = "Age Group") +
   theme(text = element_text(size = 20), axis.title.y = element_blank())
+screening_plot
 ggsave("./Dissemination/Figures/screening_rates.png",
   plot = screening_plot, width = 12, height = 9, units = "in"
 )
@@ -411,26 +418,31 @@ ogtts$OGTTs <- factor(ogtts$OGTTs,
 age <- ogtts %>%
   select(`Age Group`, OGTTs) %>%
   tbl_summary(by = `Age Group`) %>%
+  add_ci() %>%
   add_p() %>%
   print()
 gender <- ogtts %>%
   select(Gender, OGTTs) %>%
   tbl_summary(by = Gender) %>%
+  add_ci() %>%
   add_p() %>%
   print()
 muts <- ogtts %>%
   select(MutClass, OGTTs) %>%
   tbl_summary(by = MutClass) %>%
+  add_ci() %>%
   add_p() %>%
   print()
 race <- ogtts %>%
   select(Race, OGTTs) %>%
   tbl_summary(by = Race) %>%
+  add_ci() %>%
   add_p() %>%
   print()
 eth <- ogtts %>%
   select(Hispanicrace, OGTTs) %>%
   tbl_summary(by = Hispanicrace) %>%
+  add_ci() %>%
   add_p() %>%
   print()
 ```
@@ -439,7 +451,7 @@ eth <- ogtts %>%
 
 Based on CFFPR annualized data. These data are interval censored because we know the first visit at which people with CFRD were diagnosed, but we do not know the exact time that they developed CFRD. These data are also left truncated because not all participants enter the study at the same time.
 
-## Cox PH model
+## Cox PH models
 
 ### Base model
 
@@ -466,10 +478,58 @@ test.ph <- test.ph[rownames(test.ph) != "GLOBAL", ]
 time_varying <- rownames(test.ph)[test.ph$p < 0.05]
 ```
 
+### Vx770
+
+Years prior to 2011 were excluded from the following model
+
+```{r results='asis'}
+annual %>%
+  group_by(ReviewYear) %>%
+  count(A_Vx770) %>%
+  gt()
+```
+
+```{r results='asis'}
+f_vx770 <- update(f, . ~ . + A_Vx770)
+vx770_cox_res <- coxph(f_vx770,
+  data = annual[annual$ReviewYear >= 2011, ],
+  cluster = eDWID
+)
+vx770_cox_res %>%
+  tbl_regression()
+ggcoef_model(vx770_cox_res,
+  show_p_values = F, signif_stars = F, colour = F
+)
+```
+
+### Vx809comb
+
+Years prior to 2015 were excluded from the following model due to missing data.
+
+```{r results='asis'}
+annual %>%
+  group_by(ReviewYear) %>%
+  count(A_VX809comb) %>%
+  gt()
+```
+
+```{r}
+f_vx809comb <- update(f, . ~ . + A_VX809comb)
+vx809comb_cox_res <- coxph(f_vx809comb,
+  data = annual[annual$ReviewYear >= 2015, ],
+  cluster = eDWID
+)
+vx809comb_cox_res %>%
+  tbl_regression()
+ggcoef_model(vx809comb_cox_res,
+  show_p_values = F, signif_stars = F, colour = F
+)
+```
+
 ### Number of events by variable and year
 
 ```{r results='asis'}
-invisible(lapply(xvars, function(v) {
+invisible(lapply(c(xvars, "A_Vx770", "A_VX809comb"), function(v) {
   cat("\n")
   cat("#### By group")
   cat("\n")
