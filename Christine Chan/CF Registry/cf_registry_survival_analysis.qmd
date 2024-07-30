@@ -371,12 +371,17 @@ screening <- annual %>%
     .groups = "drop"
   ) %>%
   pivot_longer(`Screened HbA1c`:`Screened Either`)
-ggplot(screening, aes(x = ReviewYear, y = value, color = age_group)) +
+screening_plot <- ggplot(screening, aes(x = ReviewYear, y = value, color = age_group)) +
   geom_line() +
+  xlab("Year") +
   facet_wrap(~name) +
   theme_bw() +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-  scale_color_discrete(name = "Age Group")
+  scale_color_discrete(name = "Age Group") +
+  theme(text = element_text(size = 20), axis.title.y = element_blank())
+ggsave("./Dissemination/Figures/screening_rates.png",
+  plot = screening_plot, width = 12, height = 9, units = "in"
+)
 ```
 
 ## Who is getting OGTTs?
