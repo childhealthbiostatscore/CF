@@ -38,10 +38,12 @@ knitr::opts_knit$set(root.dir = home_dir)
 df <- read.csv("./Christine Chan/EnVision CF/Data_Clean/analysis_dataset.csv",
   na.strings = ""
 )
-# For this analysis, we only want those with catecholamines 
-df = df %>% group_by(study_id,Date) %>%
-  mutate(catecholamines = any(!is.na(Epinephrine)|!is.na(Norepinephrine))) %>%
-  filter(catecholamines) %>% ungroup()
+# For this analysis, we only want those with catecholamines
+df <- df %>%
+  group_by(study_id, Date) %>%
+  mutate(catecholamines = any(!is.na(Epinephrine) | !is.na(Norepinephrine))) %>%
+  filter(catecholamines) %>%
+  ungroup()
 ```
 
 # Demographics at first visit
@@ -72,191 +74,215 @@ IA0005, IA0006, IA0017, IA0042, and IA0079 had catecholamines measured at multip
 ```{r}
 #| label: tbl-70
 #| tbl-cap: BG < 70 at Any Point
+#| warning: false
 df %>%
   filter(Timepoint %in% c(0, 120, 150, 180)) %>%
   pivot_wider(
     names_from = Timepoint, values_from = c(Epinephrine, Norepinephrine),
-    id_cols = c(study_id:cftr_mutation_2,Hypo60,Hypo70)
+    id_cols = c(study_id:cftr_mutation_2, Hypo70)
   ) %>%
-  select(Hypo70,age_visit:cftr_mutation_2,Epinephrine_0:Norepinephrine_180) %>%
+  select(Hypo70, age_visit:cftr_mutation_2, Epinephrine_0:Norepinephrine_180) %>%
   tbl_summary(by = Hypo70, missing_text = "Missing") %>%
   add_overall() %>%
   add_p() %>%
   separate_p_footnotes()
 ```
 
-## LS mean glucose by hypoglycemia status
-
-```{r mixed models 70}
-# Time as a factor
-long_df$Time <- factor(long_df$Time, levels = c(0, 10, 30, 60, 90, 120, 150, 180))
-# Fit
-mod <- lmer(Glucose ~ Time * Hypo70 + (1 | study_id), data = long_df)
-means <- data.frame(emmeans(mod, ~ Hypo70 | Time, pbkrtest.limit = 1e4))
-# Long insulins
-insulin_long_df <- df %>%
-  pivot_longer(all_of(insulin),
-    names_to = "Time", values_to = "Insulin",
-    names_pattern = "insulin_(.*)_min"
-  )
-# Time as a factor
-insulin_long_df$Time <- factor(insulin_long_df$Time,
-  levels = c(0, 10, 30, 60, 90, 120, 150, 180)
-)
-# Fit
-ins_mod <- lmer(Insulin ~ Time * Hypo70 + (1 | study_id), data = insulin_long_df)
-ins_means <- data.frame(emmeans(ins_mod, ~ Hypo70 | Time, pbkrtest.limit = 1e4))
-# Combine
-means <- means %>% select(-SE, -df)
-means$Variable <- "Glucose"
-ins_means <- ins_means %>% select(-SE, -df)
-ins_means$Variable <- "Insulin"
-plot_df <- data.frame(rbind(means, ins_means))
-levels(plot_df$Hypo70) <- c("No Hypoglycemia", "Hypoglycemia")
-```
-
-```{r}
-#| label: fig-mixed-model70
-#| fig-cap: Model means by timepoint
-ggplot(plot_df, aes(x = Time, y = emmean, color = Variable, group = Variable)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
-  geom_line() +
-  ylab("EM Mean") +
-  theme_bw() +
-  facet_wrap(~Hypo70)
-```
-
 # Hypoglycemia defined as < 60 mg/dL at any point
 
 ## Demographics
 
+IA0005, IA0006, IA0017, IA0042, and IA0079 had catecholamines measured at multiple timepoints but these are treated as independent in the table below.
+
 ```{r}
 #| label: tbl-60
 #| tbl-cap: BG < 60 at Any Point
+#| warning: false
 df %>%
-  select(
-    age_at_current_date:origin_race, cftr_mutation_1, cftr_mutation_2,
-    all_of(glucose), Hypo60, all_of(insulin), hypoglycemia_symptoms_yesno,
-    iAUC30gluc:iAUC180ins, homa_ir
+  filter(Timepoint %in% c(0, 120, 150, 180)) %>%
+  pivot_wider(
+    names_from = Timepoint, values_from = c(Epinephrine, Norepinephrine),
+    id_cols = c(study_id:cftr_mutation_2, Hypo60)
   ) %>%
+  select(Hypo60, age_visit:cftr_mutation_2, Epinephrine_0:Norepinephrine_180) %>%
   tbl_summary(by = Hypo60, missing_text = "Missing") %>%
   add_overall() %>%
   add_p() %>%
   separate_p_footnotes()
 ```
 
-## LS mean glucose by hypoglycemia status
+<!-- ## LS mean glucose by hypoglycemia status -->
 
-```{r mixed models 60}
-# Long OGTTs
-long_df <- df %>%
-  pivot_longer(timepoint_0_min:timepoint_180_min,
-    names_to = "Time", values_to = "Glucose",
-    names_pattern = "timepoint_(.*)_min"
-  )
-# Time as a factor
-long_df$Time <- factor(long_df$Time, levels = c(0, 10, 30, 60, 90, 120, 150, 180))
-# Fit
-mod <- lmer(Glucose ~ Time * Hypo60 + (1 | study_id), data = long_df)
-means <- data.frame(emmeans(mod, ~ Hypo60 | Time, pbkrtest.limit = 1e4))
-# Long insulins
-insulin_long_df <- df %>%
-  pivot_longer(all_of(insulin),
-    names_to = "Time", values_to = "Insulin",
-    names_pattern = "insulin_(.*)_min"
-  )
-# Time as a factor
-insulin_long_df$Time <- factor(insulin_long_df$Time,
-  levels = c(0, 10, 30, 60, 90, 120, 150, 180)
-)
-# Fit
-ins_mod <- lmer(Insulin ~ Time * Hypo60 + (1 | study_id), data = insulin_long_df)
-ins_means <- data.frame(emmeans(ins_mod, ~ Hypo60 | Time, pbkrtest.limit = 1e4))
-# Combine
-means <- means %>% select(-SE, -df)
-means$Variable <- "Glucose"
-ins_means <- ins_means %>% select(-SE, -df)
-ins_means$Variable <- "Insulin"
-plot_df <- data.frame(rbind(means, ins_means))
-levels(plot_df$Hypo60) <- c("No Hypoglycemia", "Hypoglycemia")
-```
+<!-- ```{r mixed models 70} -->
+<!-- # Time as a factor -->
+<!-- long_df$Time <- factor(long_df$Time, levels = c(0, 10, 30, 60, 90, 120, 150, 180)) -->
+<!-- # Fit -->
+<!-- mod <- lmer(Glucose ~ Time * Hypo70 + (1 | study_id), data = long_df) -->
+<!-- means <- data.frame(emmeans(mod, ~ Hypo70 | Time, pbkrtest.limit = 1e4)) -->
+<!-- # Long insulins -->
+<!-- insulin_long_df <- df %>% -->
+<!--   pivot_longer(all_of(insulin), -->
+<!--     names_to = "Time", values_to = "Insulin", -->
+<!--     names_pattern = "insulin_(.*)_min" -->
+<!--   ) -->
+<!-- # Time as a factor -->
+<!-- insulin_long_df$Time <- factor(insulin_long_df$Time, -->
+<!--   levels = c(0, 10, 30, 60, 90, 120, 150, 180) -->
+<!-- ) -->
+<!-- # Fit -->
+<!-- ins_mod <- lmer(Insulin ~ Time * Hypo70 + (1 | study_id), data = insulin_long_df) -->
+<!-- ins_means <- data.frame(emmeans(ins_mod, ~ Hypo70 | Time, pbkrtest.limit = 1e4)) -->
+<!-- # Combine -->
+<!-- means <- means %>% select(-SE, -df) -->
+<!-- means$Variable <- "Glucose" -->
+<!-- ins_means <- ins_means %>% select(-SE, -df) -->
+<!-- ins_means$Variable <- "Insulin" -->
+<!-- plot_df <- data.frame(rbind(means, ins_means)) -->
+<!-- levels(plot_df$Hypo70) <- c("No Hypoglycemia", "Hypoglycemia") -->
+<!-- ``` -->
 
-```{r}
-#| label: fig-mixed-model60
-#| fig-cap: Model means by timepoint
-ggplot(plot_df, aes(x = Time, y = emmean, color = Variable, group = Variable)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
-  geom_line() +
-  ylab("EM Mean") +
-  theme_bw() +
-  facet_wrap(~Hypo60)
-```
+<!-- ```{r} -->
+<!-- #| label: fig-mixed-model70 -->
+<!-- #| fig-cap: Model means by timepoint -->
+<!-- ggplot(plot_df, aes(x = Time, y = emmean, color = Variable, group = Variable)) + -->
+<!--   geom_point() + -->
+<!--   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) + -->
+<!--   geom_line() + -->
+<!--   ylab("EM Mean") + -->
+<!--   theme_bw() + -->
+<!--   facet_wrap(~Hypo70) -->
+<!-- ``` -->
 
-# Hypoglycemia defined as <= 50 mg/dL at any point
+<!-- # Hypoglycemia defined as < 60 mg/dL at any point -->
 
-## Participant demographics
+<!-- ## Demographics -->
 
-```{r}
-#| label: tbl-50
-#| tbl-cap: BG <= 50 at Any Point
-df %>%
-  select(
-    age_at_current_date:origin_race, cftr_mutation_1, cftr_mutation_2,
-    all_of(glucose), Hypo50, all_of(insulin), hypoglycemia_symptoms_yesno,
-    iAUC30gluc:iAUC180ins, homa_ir
-  ) %>%
-  tbl_summary(by = Hypo50, missing_text = "Missing") %>%
-  add_overall() %>%
-  add_p() %>%
-  separate_p_footnotes()
-```
+<!-- ```{r} -->
+<!-- #| label: tbl-60 -->
+<!-- #| tbl-cap: BG < 60 at Any Point -->
+<!-- df %>% -->
+<!--   select( -->
+<!--     age_at_current_date:origin_race, cftr_mutation_1, cftr_mutation_2, -->
+<!--     all_of(glucose), Hypo60, all_of(insulin), hypoglycemia_symptoms_yesno, -->
+<!--     iAUC30gluc:iAUC180ins, homa_ir -->
+<!--   ) %>% -->
+<!--   tbl_summary(by = Hypo60, missing_text = "Missing") %>% -->
+<!--   add_overall() %>% -->
+<!--   add_p() %>% -->
+<!--   separate_p_footnotes() -->
+<!-- ``` -->
 
-## LS mean glucose by hypoglycemia status
+<!-- ## LS mean glucose by hypoglycemia status -->
 
-```{r mixed models 50}
-# Long OGTTs
-long_df <- df %>%
-  pivot_longer(timepoint_0_min:timepoint_180_min,
-    names_to = "Time", values_to = "Glucose",
-    names_pattern = "timepoint_(.*)_min"
-  )
-# Time as a factor
-long_df$Time <- factor(long_df$Time, levels = c(0, 10, 30, 60, 90, 120, 150, 180))
-# Fit
-mod <- lmer(Glucose ~ Time * Hypo50 + (1 | study_id), data = long_df)
-means <- data.frame(emmeans(mod, ~ Hypo50 | Time, pbkrtest.limit = 1e4))
-# Long insulins
-insulin_long_df <- df %>%
-  pivot_longer(all_of(insulin),
-    names_to = "Time", values_to = "Insulin",
-    names_pattern = "insulin_(.*)_min"
-  )
-# Time as a factor
-insulin_long_df$Time <- factor(insulin_long_df$Time,
-  levels = c(0, 10, 30, 60, 90, 120, 150, 180)
-)
-# Fit
-ins_mod <- lmer(Insulin ~ Time * Hypo50 + (1 | study_id), data = insulin_long_df)
-ins_means <- data.frame(emmeans(ins_mod, ~ Hypo50 | Time, pbkrtest.limit = 1e4))
-# Combine
-means <- means %>% select(-SE, -df)
-means$Variable <- "Glucose"
-ins_means <- ins_means %>% select(-SE, -df)
-ins_means$Variable <- "Insulin"
-plot_df <- data.frame(rbind(means, ins_means))
-levels(plot_df$Hypo50) <- c("No Hypoglycemia", "Hypoglycemia")
-```
+<!-- ```{r mixed models 60} -->
+<!-- # Long OGTTs -->
+<!-- long_df <- df %>% -->
+<!--   pivot_longer(timepoint_0_min:timepoint_180_min, -->
+<!--     names_to = "Time", values_to = "Glucose", -->
+<!--     names_pattern = "timepoint_(.*)_min" -->
+<!--   ) -->
+<!-- # Time as a factor -->
+<!-- long_df$Time <- factor(long_df$Time, levels = c(0, 10, 30, 60, 90, 120, 150, 180)) -->
+<!-- # Fit -->
+<!-- mod <- lmer(Glucose ~ Time * Hypo60 + (1 | study_id), data = long_df) -->
+<!-- means <- data.frame(emmeans(mod, ~ Hypo60 | Time, pbkrtest.limit = 1e4)) -->
+<!-- # Long insulins -->
+<!-- insulin_long_df <- df %>% -->
+<!--   pivot_longer(all_of(insulin), -->
+<!--     names_to = "Time", values_to = "Insulin", -->
+<!--     names_pattern = "insulin_(.*)_min" -->
+<!--   ) -->
+<!-- # Time as a factor -->
+<!-- insulin_long_df$Time <- factor(insulin_long_df$Time, -->
+<!--   levels = c(0, 10, 30, 60, 90, 120, 150, 180) -->
+<!-- ) -->
+<!-- # Fit -->
+<!-- ins_mod <- lmer(Insulin ~ Time * Hypo60 + (1 | study_id), data = insulin_long_df) -->
+<!-- ins_means <- data.frame(emmeans(ins_mod, ~ Hypo60 | Time, pbkrtest.limit = 1e4)) -->
+<!-- # Combine -->
+<!-- means <- means %>% select(-SE, -df) -->
+<!-- means$Variable <- "Glucose" -->
+<!-- ins_means <- ins_means %>% select(-SE, -df) -->
+<!-- ins_means$Variable <- "Insulin" -->
+<!-- plot_df <- data.frame(rbind(means, ins_means)) -->
+<!-- levels(plot_df$Hypo60) <- c("No Hypoglycemia", "Hypoglycemia") -->
+<!-- ``` -->
 
-```{r}
-#| label: fig-mixed-model50
-#| fig-cap: Model means by timepoint
-ggplot(plot_df, aes(x = Time, y = emmean, color = Variable, group = Variable)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
-  geom_line() +
-  ylab("EM Mean") +
-  theme_bw() +
-  facet_wrap(~Hypo50)
-```
+<!-- ```{r} -->
+<!-- #| label: fig-mixed-model60 -->
+<!-- #| fig-cap: Model means by timepoint -->
+<!-- ggplot(plot_df, aes(x = Time, y = emmean, color = Variable, group = Variable)) + -->
+<!--   geom_point() + -->
+<!--   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) + -->
+<!--   geom_line() + -->
+<!--   ylab("EM Mean") + -->
+<!--   theme_bw() + -->
+<!--   facet_wrap(~Hypo60) -->
+<!-- ``` -->
+
+<!-- # Hypoglycemia defined as <= 50 mg/dL at any point -->
+
+<!-- ## Participant demographics -->
+
+<!-- ```{r} -->
+<!-- #| label: tbl-50 -->
+<!-- #| tbl-cap: BG <= 50 at Any Point -->
+<!-- df %>% -->
+<!--   select( -->
+<!--     age_at_current_date:origin_race, cftr_mutation_1, cftr_mutation_2, -->
+<!--     all_of(glucose), Hypo50, all_of(insulin), hypoglycemia_symptoms_yesno, -->
+<!--     iAUC30gluc:iAUC180ins, homa_ir -->
+<!--   ) %>% -->
+<!--   tbl_summary(by = Hypo50, missing_text = "Missing") %>% -->
+<!--   add_overall() %>% -->
+<!--   add_p() %>% -->
+<!--   separate_p_footnotes() -->
+<!-- ``` -->
+
+<!-- ## LS mean glucose by hypoglycemia status -->
+
+<!-- ```{r mixed models 50} -->
+<!-- # Long OGTTs -->
+<!-- long_df <- df %>% -->
+<!--   pivot_longer(timepoint_0_min:timepoint_180_min, -->
+<!--     names_to = "Time", values_to = "Glucose", -->
+<!--     names_pattern = "timepoint_(.*)_min" -->
+<!--   ) -->
+<!-- # Time as a factor -->
+<!-- long_df$Time <- factor(long_df$Time, levels = c(0, 10, 30, 60, 90, 120, 150, 180)) -->
+<!-- # Fit -->
+<!-- mod <- lmer(Glucose ~ Time * Hypo50 + (1 | study_id), data = long_df) -->
+<!-- means <- data.frame(emmeans(mod, ~ Hypo50 | Time, pbkrtest.limit = 1e4)) -->
+<!-- # Long insulins -->
+<!-- insulin_long_df <- df %>% -->
+<!--   pivot_longer(all_of(insulin), -->
+<!--     names_to = "Time", values_to = "Insulin", -->
+<!--     names_pattern = "insulin_(.*)_min" -->
+<!--   ) -->
+<!-- # Time as a factor -->
+<!-- insulin_long_df$Time <- factor(insulin_long_df$Time, -->
+<!--   levels = c(0, 10, 30, 60, 90, 120, 150, 180) -->
+<!-- ) -->
+<!-- # Fit -->
+<!-- ins_mod <- lmer(Insulin ~ Time * Hypo50 + (1 | study_id), data = insulin_long_df) -->
+<!-- ins_means <- data.frame(emmeans(ins_mod, ~ Hypo50 | Time, pbkrtest.limit = 1e4)) -->
+<!-- # Combine -->
+<!-- means <- means %>% select(-SE, -df) -->
+<!-- means$Variable <- "Glucose" -->
+<!-- ins_means <- ins_means %>% select(-SE, -df) -->
+<!-- ins_means$Variable <- "Insulin" -->
+<!-- plot_df <- data.frame(rbind(means, ins_means)) -->
+<!-- levels(plot_df$Hypo50) <- c("No Hypoglycemia", "Hypoglycemia") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- #| label: fig-mixed-model50 -->
+<!-- #| fig-cap: Model means by timepoint -->
+<!-- ggplot(plot_df, aes(x = Time, y = emmean, color = Variable, group = Variable)) + -->
+<!--   geom_point() + -->
+<!--   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) + -->
+<!--   geom_line() + -->
+<!--   ylab("EM Mean") + -->
+<!--   theme_bw() + -->
+<!--   facet_wrap(~Hypo50) -->
+<!-- ``` -->

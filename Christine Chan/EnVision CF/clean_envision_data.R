@@ -175,7 +175,7 @@ final_df <- full_join(final_df, demo)
 final_df$bmi <- final_df$weight / ((final_df$height^2) / 10000)
 final_df$bmi_perc <- sds(
   value = final_df$bmi,
-  age = ifelse(final_df$age_visit<20,final_df$age_visit,20),
+  age = ifelse(final_df$age_visit < 20, final_df$age_visit, 20),
   sex = final_df$sex, male = 1, female = 2,
   ref = cdc.ref, item = "bmi", type = "perc"
 ) * 100
@@ -183,6 +183,14 @@ final_df$bmi_perc <- sds(
 final_df <- final_df %>%
   group_by(study_id, Date) %>%
   mutate(Hypo70 = any(Glucose < 70), Hypo60 = any(Glucose < 60))
+final_df$Hypo70 <- factor(final_df$Hypo70,
+  levels = c(T, F),
+  labels = c("Hypoglycemia < 70", "No Hypoglycemia < 70")
+)
+final_df$Hypo60 <- factor(final_df$Hypo60,
+  levels = c(T, F),
+  labels = c("Hypoglycemia < 60", "No Hypoglycemia < 60")
+)
 # Format
 final_df <- final_df %>%
   select(
