@@ -4,6 +4,7 @@
 # Libraries
 library(tidyverse)
 library(readxl)
+library(childsds)
 # Home directory
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
@@ -42,12 +43,6 @@ insulin$Timepoint <- sub("Insulin ", "", insulin$Timepoint)
 insulin$Timepoint <- sub("Insulin-endo ", "", insulin$Timepoint)
 insulin$Timepoint <- sub(" min", "", insulin$Timepoint)
 insulin$Timepoint <- as.numeric(insulin$Timepoint)
-# Remove exact duplicates
-insulin <- insulin %>% distinct()
-# For duplicates with different insulin values, take the first (per Katie)
-insulin <- insulin %>%
-  group_by(study_id, Date, Timepoint) %>%
-  summarise(Insulin = first(na.omit(Insulin)))
 #-------------------------------------------------------------------------------
 # Catecholamines (Excel files needed some manual cleaning prior to this)
 #-------------------------------------------------------------------------------
@@ -87,7 +82,8 @@ glucose$Date <- ymd(glucose$Date)
 #-------------------------------------------------------------------------------
 demo <- redcap %>%
   select(
-    study_id, date_visit, age_visit, height, weight, sex, origin_race, ethnicity
+    study_id, date_visit, age_visit, height, weight, sex, origin_race,
+    ethnicity, redcap_data_access_group, cftr_mutation_1, cftr_mutation_2
   ) %>%
   filter(!is.na(date_visit)) %>%
   rename(Date = date_visit) %>%
@@ -159,6 +155,12 @@ ia005 <- data.frame(
   "Insulin" = as.character(c(6, NA, 40, 49, 31, 26, 7, 6))
 )
 insulin <- rbind(insulin, ia005)
+# Remove exact duplicates
+insulin <- insulin %>% distinct()
+# For duplicates with different insulin values, take the first (per Katie)
+insulin <- insulin %>%
+  group_by(study_id, Date, Timepoint) %>%
+  summarise(Insulin = first(na.omit(Insulin)))
 #-------------------------------------------------------------------------------
 # Combine everything
 #-------------------------------------------------------------------------------
@@ -166,14 +168,32 @@ insulin <- rbind(insulin, ia005)
 final_df <- full_join(glucose, insulin)
 final_df <- full_join(final_df, catecholamines)
 final_df <- full_join(final_df, demo)
+#-------------------------------------------------------------------------------
+# Calculated fields
+#-------------------------------------------------------------------------------
+# BMI
+final_df$bmi <- final_df$weight / ((final_df$height^2) / 10000)
+final_df$bmi_perc <- sds(
+  value = final_df$bmi,
+  age = ifelse(final_df$age_visit<20,final_df$age_visit,20),
+  sex = final_df$sex, male = 1, female = 2,
+  ref = cdc.ref, item = "bmi", type = "perc"
+) * 100
+# Check for hypoglycemia
+final_df <- final_df %>%
+  group_by(study_id, Date) %>%
+  mutate(Hypo70 = any(Glucose < 70), Hypo60 = any(Glucose < 60))
 # Format
 final_df <- final_df %>%
   select(
-    study_id, Date, age_visit, height, weight, sex, origin_race, ethnicity,
-    Timepoint, Glucose, Insulin, Norepinephrine, Epinephrine
+    study_id, redcap_data_access_group, Date, age_visit, height, weight, bmi,
+    bmi_perc, sex, origin_race, ethnicity, cftr_mutation_1, cftr_mutation_2,
+    Timepoint, Glucose, Insulin, Norepinephrine, Epinephrine, Hypo60, Hypo70
   ) %>%
   filter(!is.na(Timepoint), !is.na(Date)) %>%
   arrange(study_id, Date, Timepoint)
+final_df$redcap_data_access_group[final_df$study_id == "IA0005" |
+  final_df$study_id == "ia0119"] <- "iowa"
 # Write
 write.csv(final_df,
   file = "./Christine Chan/EnVision CF/Data_Clean/analysis_dataset.csv",
