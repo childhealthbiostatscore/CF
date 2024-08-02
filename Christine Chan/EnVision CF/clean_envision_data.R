@@ -182,7 +182,10 @@ final_df$bmi_perc <- sds(
 # Check for hypoglycemia
 final_df <- final_df %>%
   group_by(study_id, Date) %>%
-  mutate(Hypo70 = any(Glucose < 70), Hypo60 = any(Glucose < 60))
+  mutate(
+    Hypo70 = any(na.omit(Glucose) < 70),
+    Hypo60 = any(na.omit(Glucose) < 60)
+  )
 final_df$Hypo70 <- factor(final_df$Hypo70,
   levels = c(T, F),
   labels = c("Hypoglycemia < 70", "No Hypoglycemia < 70")
