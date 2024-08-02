@@ -5,7 +5,7 @@ library(ggeffects)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/timvigers/UCD/PEDS/RI Biostatistics Core/Shared/Shared Projects/Tim/CF"
+  "Linux" = "/home/tim/CF"
 )
 setwd(home_dir)
 # Load dataset
