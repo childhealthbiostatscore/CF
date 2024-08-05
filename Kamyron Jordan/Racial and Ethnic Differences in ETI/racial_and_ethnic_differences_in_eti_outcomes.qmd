@@ -25,6 +25,7 @@ editor: source
 #| include: false
 # Libraries
 library(tidyverse)
+library(gt)
 library(gtsummary)
 library(ggflowchart)
 library(lmerTest)
