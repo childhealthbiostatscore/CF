@@ -111,7 +111,7 @@ invisible(lapply(continuous_outcomes, function(o) {
   cat("\n")
   cat("\n")
   pred <- predict_response(m, terms = c("Days[-1095,0,730]", "Race"))
-  pred %>% gt()
+  pred %>% gt() %>% print()
   cat("\n")
   cat("\n")
   cat("### Plot")
