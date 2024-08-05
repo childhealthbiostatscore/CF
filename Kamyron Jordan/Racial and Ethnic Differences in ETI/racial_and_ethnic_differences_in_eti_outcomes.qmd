@@ -27,6 +27,8 @@ editor: source
 library(tidyverse)
 library(gtsummary)
 library(ggflowchart)
+library(lmerTest)
+library(splines)
 # Paths
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
@@ -106,7 +108,23 @@ invisible(lapply(continuous_outcomes, function(o) {
 
 The following models are adjusted for age group and insurance status. We fit a Gaussian mixed model for continuous outcomes with random intercept for each subject.
 
-```{r}
+```{r results='asis'}
+invisible(lapply(continuous_outcomes, function(o) {
+  # Formula
+  f <-
+    as.formula(paste0(
+      o,
+      "~ bs(Days, knots = 0, degree = 1) * Race + (1 | eDWID)"
+    ))
+  m <- lmer(f, data = encounter)
+  # Print table
+  m %>%
+    tbl_regression() %>%
+    print()
+  # Plot
+  predict_response(m, terms = c("Days[-1095,0,730]", "Race")) %>% 
+    plot()
+}))
 ```
 
 # Questions
