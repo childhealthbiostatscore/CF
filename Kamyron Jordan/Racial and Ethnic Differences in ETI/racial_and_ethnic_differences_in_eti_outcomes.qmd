@@ -80,6 +80,7 @@ encounter %>%
 The following models are adjusted for age group and insurance status. We fit a Gaussian mixed model for continuous outcomes with random intercept for each subject.
 
 ```{r results='asis'}
+#| message: false
 invisible(lapply(continuous_outcomes, function(o) {
   # Formula
   f <-
@@ -91,7 +92,7 @@ invisible(lapply(continuous_outcomes, function(o) {
   # Print table
   cat("\n")
   cat("\n")
-  cat("##",o)
+  cat("##", o)
   cat("\n")
   cat("\n")
   cat("### Model results")
@@ -104,10 +105,18 @@ invisible(lapply(continuous_outcomes, function(o) {
   cat("\n")
   # Plot
   cat("\n")
+  cat("\n")
+  cat("## Model predictions")
+  cat("\n")
+  cat("\n")
+  pred <- predict_response(m, terms = c("Days[-1095,0,730]", "Race"))
+  pred %>% gt()
+  cat("\n")
+  cat("\n")
   cat("### Plot")
   cat("\n")
   cat("\n")
-  predict_response(m, terms = c("Days[-1095,0,730]", "Race")) %>% 
+  pred %>%
     plot() %>%
     print()
   cat("\n")
