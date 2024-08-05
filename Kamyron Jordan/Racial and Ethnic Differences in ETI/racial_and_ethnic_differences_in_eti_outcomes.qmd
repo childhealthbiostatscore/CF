@@ -90,22 +90,27 @@ invisible(lapply(continuous_outcomes, function(o) {
   m <- lmer(f, data = encounter)
   # Print table
   cat("\n")
+  cat("\n")
   cat("##",o)
   cat("\n")
   cat("\n")
   cat("### Model results")
   cat("\n")
+  cat("\n")
   m %>%
     tbl_regression() %>%
     print()
+  cat("\n")
   cat("\n")
   # Plot
   cat("\n")
   cat("### Plot")
   cat("\n")
+  cat("\n")
   predict_response(m, terms = c("Days[-1095,0,730]", "Race")) %>% 
     plot() %>%
     print()
+  cat("\n")
   cat("\n")
 }))
 ```
