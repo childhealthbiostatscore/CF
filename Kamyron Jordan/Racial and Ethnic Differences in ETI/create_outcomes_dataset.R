@@ -252,6 +252,5 @@ flow_chart <- tibble(
 )
 # Save
 save(encounter, t1_participant, flow_chart, continuous_outcomes,
-  binary_outcomes,
   file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/outcomes_dataset.RData"
 )
