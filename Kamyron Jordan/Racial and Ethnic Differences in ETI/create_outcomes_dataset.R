@@ -5,7 +5,7 @@ library(parallel)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+  "Linux" = "/home/tim/CF"
 )
 setwd(home_dir)
 # Import
@@ -178,8 +178,9 @@ t1_participant <- encounter %>%
     `Number of Encounters` = n(),
     `Number of Encounters Pre-ETI` = sum(Days <= 0),
     `Number of Encounters Post-ETI` = sum(Days > 0),
-    Age = mean(encounterage, na.rm = T),
-    across(all_of(continuous_outcomes), \(x) mean(x, na.rm = TRUE)),
+    Age = max(encounterage[Days <= 0], na.rm = T),
+    across(all_of(continuous_outcomes), \(x) max(x[Days <= 0], na.rm = TRUE)),
+    Sex = names(sort(table(Sex), decreasing = TRUE))[1],
     Race = names(sort(table(Race), decreasing = TRUE))[1],
     Insurance = names(sort(table(Insurance), decreasing = TRUE))[1],
     .groups = "drop"

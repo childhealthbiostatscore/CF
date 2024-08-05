@@ -35,7 +35,7 @@ library(ggeffects)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/tim/CF"
+  "Linux" = "/home/timvigers//OneDrive/Vigers/CF"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -55,7 +55,7 @@ ggflowchart(flow_chart)
 
 ## By person
 
-Continuous variables were averaged across all years for each person, and categorical variables are reported as the most common value.
+Continuous variables are reported at the most recent visit prior to ETI start for each person, and categorical variables are reported as the most common value.
 
 ```{r}
 t1_participant %>%
@@ -82,7 +82,7 @@ The following models are adjusted for age group and insurance status. We fit a G
 
 ```{r results='asis'}
 #| message: false
-invisible(lapply(continuous_outcomes, function(o) {
+invisible(lapply(continuous_outcomes[1:3], function(o) {
   # Formula
   f <-
     as.formula(paste0(
@@ -111,7 +111,7 @@ invisible(lapply(continuous_outcomes, function(o) {
   cat("\n")
   cat("\n")
   pred <- predict_response(m, terms = c("Days[-1095,0,730]", "Race"))
-  pred %>% gt() %>% print()
+  pred %>% print()
   cat("\n")
   cat("\n")
   cat("### Plot")
