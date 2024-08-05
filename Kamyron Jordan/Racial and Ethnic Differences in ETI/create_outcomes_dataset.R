@@ -106,7 +106,7 @@ encounter$cultureresults <- factor(encounter$cultureresults,
 # Merge
 encounter <- left_join(
   encounter,
-  demo %>% select(eDWID, Race, Modulator_trikafta_first_date)
+  demo %>% select(eDWID, Race, Gender, Modulator_trikafta_first_date)
 )
 encounter <- left_join(encounter,
   annual %>% select(eDWID, ReviewYear, Insurance, pregnant),
