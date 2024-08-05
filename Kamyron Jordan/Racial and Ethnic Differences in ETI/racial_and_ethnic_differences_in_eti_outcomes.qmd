@@ -29,6 +29,7 @@ library(gtsummary)
 library(ggflowchart)
 library(lmerTest)
 library(splines)
+library(ggeffects)
 # Paths
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
