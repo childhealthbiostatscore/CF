@@ -75,36 +75,6 @@ encounter %>%
   tbl_summary(by = Race, missing_text = "Missing")
 ```
 
-# LOESS-smoothed outcome plots
-
-```{r functions}
-# Plots
-loess_plot <- function(data = encounter, outcome, facet = F) {
-  p <- ggplot(data, aes(x = Days, y = !!sym(outcome), color = Race)) +
-    geom_point(
-      shape = ".", aes(x = Days, y = !!sym(outcome)), inherit.aes = F,
-      alpha = 0.1
-    ) +
-    geom_smooth(method = "loess", se = F) +
-    theme_classic()
-  if (facet) {
-    p <- p + facet_wrap(~Race)
-  }
-  return(p)
-}
-```
-
-```{r}
-invisible(lapply(continuous_outcomes, function(o) {
-  cat("\n")
-  cat("\n")
-  cat("##", o)
-  cat("\n")
-  cat("\n")
-  print(loess_plot(outcome = o))
-}))
-```
-
 # Segmented models
 
 The following models are adjusted for age group and insurance status. We fit a Gaussian mixed model for continuous outcomes with random intercept for each subject.
@@ -119,11 +89,23 @@ invisible(lapply(continuous_outcomes, function(o) {
     ))
   m <- lmer(f, data = encounter)
   # Print table
+  cat("\n")
+  cat("##",o)
+  cat("\n")
+  cat("\n")
+  cat("### Model results")
+  cat("\n")
   m %>%
     tbl_regression() %>%
     print()
+  cat("\n")
   # Plot
+  cat("\n")
+  cat("### Plot")
+  cat("\n")
   predict_response(m, terms = c("Days[-1095,0,730]", "Race")) %>% 
-    plot()
+    plot() %>%
+    print()
+  cat("\n")
 }))
 ```
