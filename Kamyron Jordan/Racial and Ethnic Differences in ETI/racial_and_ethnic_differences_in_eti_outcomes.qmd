@@ -78,7 +78,6 @@ encounter %>%
 # LOESS-smoothed outcome plots
 
 ```{r functions}
-#| eval: false
 # Plots
 loess_plot <- function(data = encounter, outcome, facet = F) {
   p <- ggplot(data, aes(x = Days, y = !!sym(outcome), color = Race)) +
@@ -96,7 +95,6 @@ loess_plot <- function(data = encounter, outcome, facet = F) {
 ```
 
 ```{r}
-#| eval: false
 invisible(lapply(continuous_outcomes, function(o) {
   cat("\n")
   cat("\n")
@@ -129,7 +127,3 @@ invisible(lapply(continuous_outcomes, function(o) {
     plot()
 }))
 ```
-
-# Questions
-
-1. 
