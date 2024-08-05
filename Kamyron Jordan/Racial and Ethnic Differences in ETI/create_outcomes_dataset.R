@@ -26,10 +26,6 @@ continuous_outcomes <- c(
   "gli_fev1_ppred_rn", "gli_fvc_ppred_rn", "gli_fev1fvc_ppred_rn",
   "bmipercentile", "heightpercentile", "weightpercentile"
 )
-binary_outcomes <- c(
-  "staphylococcus_aureus", "haemophilus_influenzae", "pseudomonasaeruginosa",
-  "burkho_complex"
-)
 # Race variable
 races <- list(
   "Race1" = "White",
@@ -180,7 +176,7 @@ t1_participant <- encounter %>%
     `Number of Encounters Post-ETI` = sum(Days > 0),
     Age = last(na.omit(encounterage[Days <= 0])),
     across(all_of(continuous_outcomes), \(x) last(na.omit(x[Days <= 0]))),
-    Sex = names(sort(table(Sex), decreasing = TRUE))[1],
+    Gender = names(sort(table(Gender), decreasing = TRUE))[1],
     Race = names(sort(table(Race), decreasing = TRUE))[1],
     Insurance = names(sort(table(Insurance), decreasing = TRUE))[1],
     .groups = "drop"
