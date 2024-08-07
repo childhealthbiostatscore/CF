@@ -113,15 +113,15 @@ roc_df <- encounter %>%
   ungroup() %>%
   mutate(
     `OGTT 2-hour` = cut(twohour_bloodglucose,
-      breaks = c(-Inf, 140, 200, Inf), 
+      breaks = c(-Inf, 140, 200, Inf),
       labels = c("<140", "[140,200)", ">=200")
     ),
     `Age Group` = cut(Age_YrEnd, breaks = c(10, 18, 30, Inf), right = F)
   )
 # Metrics to report
 metrics <- c(
-  "thresh", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn", 
-  "fp","npv", "ppv"
+  "thresh", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn",
+  "fp", "npv", "ppv"
 )
 ```
 
@@ -196,7 +196,9 @@ ggplot(roc_df, aes(x = `OGTT 2-hour`, y = hgba1c)) +
 
 # ROC analysis
 
-## Three groups, two cutoffs
+For each ROC curve, we performed 2000 bootstrap replicates. Here the median best threshold (based on Youden index), sensitivity, and specificity are presented along with the bootstrapped 95% confidence intervals. Column names are printed in terms of percentiles, so `threshold.2.5.` indicates the lower limit of the confidence interval, `threshold.50.` indicates the median best threshold, and `threshold.97.5.` indicates the upper limit of the confidence interval.
+
+## NGT vs. AGT and AGT vs. CFRD
 
 For the following analyses, we considered those with a two hour glucose value >= 140 and < 200 as a distinct group (AGT) and use receiver operating characteristic curves to find cutoffs that predict: 
 
@@ -211,7 +213,7 @@ agt_cfrd <- roc_df %>% filter(`OGTT 2-hour` != "<140")
 agt_cfrd$ogtt <- droplevels(agt_cfrd$`OGTT 2-hour`)
 ```
 
-### Peds and adults
+### Full cohort
 
 #### NGT vs. AGT
 
@@ -219,7 +221,7 @@ agt_cfrd$ogtt <- droplevels(agt_cfrd$`OGTT 2-hour`)
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = ngt_agt)
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### AGT vs. CFRD
@@ -228,64 +230,179 @@ gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = agt_cfrd)
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
 ```
 
-### Peds
+### Peds vs. Adults
+
+#### Peds
 
 ```{r}
 peds_ngt_agt <- ngt_agt %>% filter(Age_YrEnd < 18)
 peds_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd < 18)
 ```
 
-#### NGT vs. AGT
+##### NGT vs. AGT
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = peds_ngt_agt)
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
 ```
 
-#### AGT vs. CFRD
+##### AGT vs. CFRD
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = peds_agt_cfrd)
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
 ```
 
-### Adults
+#### Adults
 
 ```{r}
 adult_ngt_agt <- ngt_agt %>% filter(Age_YrEnd >= 18)
 adult_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd >= 18)
 ```
 
-### By race
-
-
-
-#### NGT vs. AGT
+##### NGT vs. AGT
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = adult_ngt_agt)
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
 ```
 
-#### AGT vs. CFRD
+##### AGT vs. CFRD
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = adult_agt_cfrd)
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
 ```
 
-## Two groups, one cutoffs
+### By race
+
+#### White
+
+```{r}
+white_ngt_agt <- ngt_agt %>% filter(Race == "White")
+white_agt_cfrd <- agt_cfrd %>% filter(Race == "White")
+```
+
+##### NGT vs. AGT
+
+```{r}
+#| message: false
+r <- roc(ogtt ~ hgba1c, data = white_ngt_agt)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+```
+
+##### AGT vs. CFRD
+
+```{r}
+#| message: false
+r <- roc(ogtt ~ hgba1c, data = white_agt_cfrd)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+```
+
+#### Black or African American
+
+```{r}
+black_ngt_agt <- ngt_agt %>% filter(Race == "Black or African American")
+black_agt_cfrd <- agt_cfrd %>% filter(Race == "Black or African American")
+```
+
+##### NGT vs. AGT
+
+```{r}
+#| message: false
+r <- roc(ogtt ~ hgba1c, data = black_ngt_agt)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+```
+
+##### AGT vs. CFRD
+
+Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
+
+```{r}
+#| message: false
+r <- roc(ogtt ~ hgba1c, data = black_agt_cfrd)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(coords(r, "best"))) %>%
+  fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
+  fmt_number(n_sigfig = 3)
+```
+
+#### More than one race
+
+```{r}
+more_ngt_agt <- ngt_agt %>% filter(Race == "More than one race")
+more_agt_cfrd <- agt_cfrd %>% filter(Race == "More than one race")
+```
+
+##### NGT vs. AGT
+
+```{r}
+#| message: false
+r <- roc(ogtt ~ hgba1c, data = more_ngt_agt)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+```
+
+##### AGT vs. CFRD
+
+```{r}
+#| message: false
+r <- roc(ogtt ~ hgba1c, data = more_agt_cfrd)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+```
+
+#### Other race
+
+```{r}
+other_ngt_agt <- ngt_agt %>% filter(Race == "Other race")
+other_agt_cfrd <- agt_cfrd %>% filter(Race == "Other race")
+```
+
+##### NGT vs. AGT
+
+Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
+
+```{r}
+#| message: false
+r <- roc(ogtt ~ hgba1c, data = other_ngt_agt)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(coords(r, "best"))) %>%
+  fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
+  fmt_number(n_sigfig = 3)
+```
+
+##### AGT vs. CFRD
+
+Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
+
+```{r}
+#| message: false
+r <- roc(ogtt ~ hgba1c, data = other_agt_cfrd)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(coords(r, "best"))) %>%
+  fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
+  fmt_number(n_sigfig = 3)
+```
+
+## Two hour OGTT >= 140 or >= 200
 
 For the following analyses, we examined HbA1c cutoffs that best predict a two hour OGTT value either >= 140 or >= 200
 
@@ -294,7 +411,7 @@ roc_df$agt <- as.numeric(roc_df$twohour_bloodglucose >= 140)
 roc_df$cfrd <- as.numeric(roc_df$twohour_bloodglucose >= 200)
 ```
 
-### Peds and adults
+### Full cohort
 
 #### $\geq$ 140
 
@@ -302,7 +419,7 @@ roc_df$cfrd <- as.numeric(roc_df$twohour_bloodglucose >= 200)
 #| message: false
 r <- roc(agt ~ hgba1c, data = roc_df)
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### $\geq$ 200
@@ -311,53 +428,163 @@ gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
 #| message: false
 r <- roc(cfrd ~ hgba1c, data = roc_df)
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
 ```
 
-### Peds
+### Peds vs. Adults
+
+#### Peds
 
 ```{r}
 peds_roc <- roc_df %>% filter(Age_YrEnd < 18)
 ```
 
-#### $\geq$ 140
+##### $\geq$ 140
 
 ```{r}
 #| message: false
 r <- roc(agt ~ hgba1c, data = peds_roc)
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
 ```
 
-#### $\geq$ 200
+##### $\geq$ 200
 
 ```{r}
 #| message: false
 r <- roc(cfrd ~ hgba1c, data = peds_roc)
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
 ```
 
-### Adults
+#### Adults
 
 ```{r}
 adult_roc <- roc_df %>% filter(Age_YrEnd >= 18)
 ```
 
-#### $\geq$ 140
+##### $\geq$ 140
 
 ```{r}
 #| message: false
 r <- roc(agt ~ hgba1c, data = adult_roc)
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
 ```
 
-#### $\geq$ 200
+##### $\geq$ 200
 
 ```{r}
 #| message: false
 r <- roc(cfrd ~ hgba1c, data = adult_roc)
 plot(r, print.auc = T, print.thres = T)
-gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+```
+
+### By race
+
+#### White
+
+```{r}
+white_roc <- roc_df %>% filter(Race == "White")
+```
+
+##### $\geq$ 140
+
+```{r}
+#| message: false
+r <- roc(agt ~ hgba1c, data = white_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+```
+
+##### $\geq$ 200
+
+```{r}
+#| message: false
+r <- roc(cfrd ~ hgba1c, data = white_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+```
+
+#### Black or African American
+
+```{r}
+black_roc <- roc_df %>% filter(Race == "Black or African American")
+```
+
+##### $\geq$ 140
+
+```{r}
+#| message: false
+r <- roc(agt ~ hgba1c, data = black_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+```
+
+##### $\geq$ 200
+
+```{r}
+#| message: false
+r <- roc(cfrd ~ hgba1c, data = black_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+```
+
+#### More than one race
+
+```{r}
+more_roc <- roc_df %>% filter(Race == "More than one race")
+```
+
+##### $\geq$ 140
+
+```{r}
+#| message: false
+r <- roc(agt ~ hgba1c, data = more_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+```
+
+##### $\geq$ 200
+
+```{r}
+#| message: false
+r <- roc(cfrd ~ hgba1c, data = more_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+```
+
+#### Other race
+
+```{r}
+other_roc <- roc_df %>% filter(Race == "Other race")
+```
+
+##### $\geq$ 140
+
+Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
+
+```{r}
+#| message: false
+r <- roc(agt ~ hgba1c, data = other_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(coords(r, "best"))) %>%
+  fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
+  fmt_number(n_sigfig = 3)
+```
+
+##### $\geq$ 200
+
+Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
+
+```{r}
+#| message: false
+r <- roc(cfrd ~ hgba1c, data = other_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(coords(r, "best"))) %>%
+  fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
+  fmt_number(n_sigfig = 3)
 ```
