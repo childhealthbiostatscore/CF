@@ -39,12 +39,12 @@ library(forestmodel)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry"
+  "Linux" = "/home/tim/OneDrive/Vigers/CF/Christine Chan/CF Registry"
 )
 github_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/GitHub",
   "Windows" = "C:/Users/Tim/GitHub",
-  "Linux" = "/home/timvigers/GitHub"
+  "Linux" = "/home/tim/GitHub"
 )
 source(paste0(github_dir, "/shared-resources/Visualization/forest_plots.R"))
 knitr::opts_knit$set(root.dir = home_dir)

@@ -14,8 +14,8 @@ format:
     fig-width: 8
     fig-height: 8
     page-layout: full
-bibliography: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Miscellaneous/american-medical-association.csl
+bibliography: /home/tim/Documents/Miscellaneous/zotero.bib
+csl: /home/tim/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -25,13 +25,15 @@ library(tidyverse)
 library(gtsummary)
 library(gt)
 library(pROC)
-switch(Sys.info()[["sysname"]],
-  Windows = {
-    home_dir <- "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry"
-  },
-  Darwin = {
-    home_dir <- "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry"
-  }
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry",
+  "Linux" = "/home/tim/OneDrive/Vigers/CF/Christine Chan/CF Registry"
+)
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/GitHub",
+  "Windows" = "C:/Users/Tim/GitHub",
+  "Linux" = "/home/tim/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -111,14 +113,15 @@ roc_df <- encounter %>%
   ungroup() %>%
   mutate(
     `OGTT 2-hour` = cut(twohour_bloodglucose,
-      breaks = c(-Inf, 140, 200, Inf), labels = c("<140", "[140,200)", ">=200")
+      breaks = c(-Inf, 140, 200, Inf), 
+      labels = c("<140", "[140,200)", ">=200")
     ),
     `Age Group` = cut(Age_YrEnd, breaks = c(10, 18, 30, Inf), right = F)
   )
 # Metrics to report
 metrics <- c(
-  "thresh", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn", "fp",
-  "npv", "ppv"
+  "thresh", "specificity", "sensitivity", "accuracy", "tn", "tp", "fn", 
+  "fp","npv", "ppv"
 )
 ```
 
@@ -259,6 +262,10 @@ gt(coords(r, ret = metrics)) %>% fmt_number(n_sigfig = 3)
 adult_ngt_agt <- ngt_agt %>% filter(Age_YrEnd >= 18)
 adult_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd >= 18)
 ```
+
+### By race
+
+
 
 #### NGT vs. AGT
 
