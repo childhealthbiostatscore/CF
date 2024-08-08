@@ -28,7 +28,7 @@ library(pROC)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry",
-  "Linux" = "/home/tim/CF/Christine Chan/CF Registry"
+  "Linux" = "/home/tim/OneDrive/Vigers/CF/Christine Chan/CF Registry"
 )
 github_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/GitHub",
@@ -36,6 +36,7 @@ github_dir <- switch(Sys.info()["sysname"],
   "Linux" = "/home/tim/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
+set.seed(1017)
 ```
 
 ```{r data cleaning}
