@@ -43,13 +43,17 @@ insulin <- paste0("Insulin_", c(0, 10, 30, 60, 90, 120, 150, 180))
 # Get diagnosis
 df$Diagnosis <- NA
 df$Diagnosis[df[, glucose[1]] < 100 &
-  (rowSums(df[, glucose[2:5]] < 200, na.rm = T) == rowSums(!is.na(df[, glucose[2:5]]))) &
-  (rowSums(df[, glucose[6:8]] < 140, na.rm = T) == rowSums(!is.na(df[, glucose[6:8]])))] <- "NGT"
+  (rowSums(df[, glucose[2:5]] < 200, na.rm = T) ==
+    rowSums(!is.na(df[, glucose[2:5]]))) &
+  (rowSums(df[, glucose[6:8]] < 140, na.rm = T) ==
+    rowSums(!is.na(df[, glucose[6:8]])))] <- "NGT"
 df$Diagnosis[df[, glucose[1]] >= 100] <- "IFG"
 df$Diagnosis[rowSums(df[, glucose[2:5]] >= 200, na.rm = T) > 0] <- "INDET"
 df$Diagnosis[rowSums(df[, glucose[6:8]] >= 140, na.rm = T) > 0] <- "IGF"
 df$Diagnosis[df$timepoint_0_min >= 126 | df$timepoint_120_min >= 200] <- "CFRD"
-df$Diagnosis <- factor(df$Diagnosis, levels = c("NGT", "IFG", "INDET", "IGF", "CFRD"))
+df$Diagnosis <- factor(df$Diagnosis,
+  levels = c("NGT", "IFG", "INDET", "IGF", "CFRD")
+)
 # iAUCs
 df$iAUC30gluc <- apply(df, 1, function(r) {
   y <- as.numeric(r[glucose[1:3]]) - as.numeric(r[glucose[1]])
@@ -142,7 +146,7 @@ df$iAUC180ins <- apply(df, 1, function(r) {
 # HOMA IR
 df$homa_ir <- (df$Glucose_0 * df$Insulin_0) / 405
 # Filter out those with no CGM data and those with no associated OGTT
-df = df %>% filter(!is.na(mean_sensor),!is.na(Date))
+df <- df %>% filter(!is.na(mean_sensor), !is.na(Date))
 ```
 
 # Demographics at first visit
