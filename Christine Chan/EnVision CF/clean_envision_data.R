@@ -2,14 +2,18 @@
 # Setup
 #-------------------------------------------------------------------------------
 # Libraries
-library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(lubridate)
 library(readxl)
+library(stringi)
 library(childsds)
+library(cgmanalysis)
 # Home directory
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+  "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
 setwd(home_dir)
 #-------------------------------------------------------------------------------
@@ -161,13 +165,56 @@ insulin <- insulin %>% distinct()
 insulin <- insulin %>%
   group_by(study_id, Date, Timepoint) %>%
   summarise(Insulin = first(na.omit(Insulin)))
+# Convert to numeric
+insulin$Insulin <- as.numeric(insulin$Insulin)
 #-------------------------------------------------------------------------------
-# Combine everything
+# CGM data
+#-------------------------------------------------------------------------------
+# Clean data (does not need to be run every time)
+# Many of these files appeared to be manually edited and are missing some or all
+# of the first 2 rows. Some were saved as XLSX or TXT files as well.
+# cleandata(
+#   inputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM/Manually Edited",
+#   outputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM/Cleaned",
+#   id_filename = T
+# )
+# cgmvariables(
+#   inputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM/Cleaned",
+#   outputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM",
+#   outputname = "cgm_variables"
+# )
+# Add to visit dates
+cgm <- read.csv("./Christine Chan/EnVision CF/Data_Clean/CGM/cgm_variables.csv",
+  na.strings = ""
+)
+cgm$subject_id <- sub("_sensor_raw_data_upload", "", cgm$subject_id)
+cgm$study_id <- sapply(
+  stri_split_fixed(str = cgm$subject_id, pattern = "_", n = 2),
+  "[", 1
+)
+cgm$redcap_event_name <- sapply(
+  stri_split_fixed(str = cgm$subject_id, pattern = "_", n = 2),
+  "[", 2
+)
+cgm <- left_join(cgm, redcap %>% select(study_id, redcap_event_name, date_visit) %>% distinct() %>% drop_na(),
+  by = join_by(study_id, redcap_event_name)
+)
+cgm <- cgm %>% rename(Date = date_visit)
+cgm$Date <- ymd(cgm$Date)
+cgm$subject_id <- NULL
+cgm$date_cgm_placement <- NULL
+#-------------------------------------------------------------------------------
+# Combine everything in a wide format
 #-------------------------------------------------------------------------------
 # Merge
 final_df <- full_join(glucose, insulin)
 final_df <- full_join(final_df, catecholamines)
+final_df <- final_df %>% pivot_wider(
+  names_from = Timepoint, values_from = c(Glucose:Epinephrine)
+)
+final_df <- full_join(final_df, cgm)
 final_df <- full_join(final_df, demo)
+
 #-------------------------------------------------------------------------------
 # Calculated fields
 #-------------------------------------------------------------------------------
@@ -180,12 +227,14 @@ final_df$bmi_perc <- sds(
   ref = cdc.ref, item = "bmi", type = "perc"
 ) * 100
 # Check for hypoglycemia
-final_df <- final_df %>%
-  group_by(study_id, Date) %>%
-  mutate(
-    Hypo70 = any(na.omit(Glucose) < 70),
-    Hypo60 = any(na.omit(Glucose) < 60)
-  )
+final_df$Hypo70 <-
+  apply(final_df[, grep("Glucose", colnames(final_df))], 1, function(r) {
+    any(r < 70, na.rm = T)
+  })
+final_df$Hypo60 <-
+  apply(final_df[, grep("Glucose", colnames(final_df))], 1, function(r) {
+    any(r < 60, na.rm = T)
+  })
 final_df$Hypo70 <- factor(final_df$Hypo70,
   levels = c(T, F),
   labels = c("Hypoglycemia < 70", "No Hypoglycemia < 70")
@@ -194,15 +243,7 @@ final_df$Hypo60 <- factor(final_df$Hypo60,
   levels = c(T, F),
   labels = c("Hypoglycemia < 60", "No Hypoglycemia < 60")
 )
-# Format
-final_df <- final_df %>%
-  select(
-    study_id, redcap_data_access_group, Date, age_visit, height, weight, bmi,
-    bmi_perc, sex, origin_race, ethnicity, cftr_mutation_1, cftr_mutation_2,
-    Timepoint, Glucose, Insulin, Norepinephrine, Epinephrine, Hypo60, Hypo70
-  ) %>%
-  filter(!is.na(Timepoint), !is.na(Date)) %>%
-  arrange(study_id, Date, Timepoint)
+# Final formatting
 final_df$redcap_data_access_group[final_df$study_id == "IA0005" |
   final_df$study_id == "ia0119"] <- "iowa"
 # Write

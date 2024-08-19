@@ -1,0 +1,227 @@
+---
+title: "CGM and OGTT Categories"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+    theme:
+      light: flatly
+      dark: darkly
+editor: source
+---
+
+```{r setup}
+#| include: false
+library(gtsummary)
+library(dplyr)
+library(pracma)
+library(ggplot2)
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/tim/OneDrive/Vigers/CF"
+)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r data cleaning}
+# Import
+df <- read.csv("./Christine Chan/EnVision CF/Data_Clean/analysis_dataset.csv",
+  na.strings = ""
+)
+# Columns
+glucose <- paste0("Glucose_", c(0, 10, 30, 60, 90, 120, 150, 180))
+insulin <- paste0("Insulin_", c(0, 10, 30, 60, 90, 120, 150, 180))
+# Get diagnosis
+df$Diagnosis <- NA
+df$Diagnosis[df[, glucose[1]] < 100 &
+  (rowSums(df[, glucose[2:5]] < 200, na.rm = T) == rowSums(!is.na(df[, glucose[2:5]]))) &
+  (rowSums(df[, glucose[6:8]] < 140, na.rm = T) == rowSums(!is.na(df[, glucose[6:8]])))] <- "NGT"
+df$Diagnosis[df[, glucose[1]] >= 100] <- "IFG"
+df$Diagnosis[rowSums(df[, glucose[2:5]] >= 200, na.rm = T) > 0] <- "INDET"
+df$Diagnosis[rowSums(df[, glucose[6:8]] >= 140, na.rm = T) > 0] <- "IGF"
+df$Diagnosis[df$timepoint_0_min >= 126 | df$timepoint_120_min >= 200] <- "CFRD"
+df$Diagnosis <- factor(df$Diagnosis, levels = c("NGT", "IFG", "INDET", "IGF", "CFRD"))
+# iAUCs
+df$iAUC30gluc <- apply(df, 1, function(r) {
+  y <- as.numeric(r[glucose[1:3]]) - as.numeric(r[glucose[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+df$iAUC60gluc <- apply(df, 1, function(r) {
+  y <- as.numeric(r[glucose[1:4]]) - as.numeric(r[glucose[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+df$iAUC120gluc <- apply(df, 1, function(r) {
+  y <- as.numeric(r[glucose[1:6]]) - as.numeric(r[glucose[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60, 90, 120)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+df$iAUC180gluc <- apply(df, 1, function(r) {
+  y <- as.numeric(r[glucose]) - as.numeric(r[glucose[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60, 90, 120, 150, 180)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+df$iAUC30ins <- apply(df, 1, function(r) {
+  y <- as.numeric(r[insulin[1:3]]) - as.numeric(r[insulin[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+df$iAUC60ins <- apply(df, 1, function(r) {
+  y <- as.numeric(r[insulin[1:4]]) - as.numeric(r[insulin[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+df$iAUC120ins <- apply(df, 1, function(r) {
+  y <- as.numeric(r[insulin[1:6]]) - as.numeric(r[insulin[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60, 90, 120)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+df$iAUC180ins <- apply(df, 1, function(r) {
+  y <- as.numeric(r[insulin]) - as.numeric(r[insulin[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60, 90, 120, 150, 180)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+# HOMA IR
+df$homa_ir <- (df$Glucose_0 * df$Insulin_0) / 405
+# Filter out those with no CGM data and those with no associated OGTT
+df = df %>% filter(!is.na(mean_sensor),!is.na(Date))
+```
+
+# Demographics at first visit
+
+`r sum(duplicated(df$study_id))` participants wore a CGM more than once.
+
+```{r}
+#| label: tbl-1
+#| tbl-cap: Participant characteristics (overall)
+df %>%
+  group_by(study_id) %>%
+  filter(row_number() == 1) %>%
+  ungroup() %>%
+  select(
+    redcap_data_access_group, age_visit:origin_race, cftr_mutation_1,
+    cftr_mutation_2, weight
+  ) %>%
+  tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
+  add_overall()
+```
+
+# Glycemic metrics
+
+iAUC was calculated as the area under the glucose curve from baseline to the timepoint of interest, excluding the area under the fasting glucose level.
+
+## All visits
+
+```{r}
+#| label: tbl-2
+#| tbl-cap: Participant diagnoses based on OGTT
+df %>%
+  select(
+    redcap_data_access_group, Diagnosis, Glucose_0, Glucose_30,
+    Glucose_60, Glucose_120, Glucose_180,
+    iAUC30gluc:iAUC180ins, homa_ir
+  ) %>%
+  tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
+  add_overall()
+```
+
+## Visit 1 only
+
+```{r}
+#| label: tbl-3
+#| tbl-cap: Participant diagnoses based on OGTT (visit 1 only)
+df %>%
+  group_by(study_id) %>%
+  filter(row_number() == 1) %>%
+  ungroup() %>%
+  select(
+    redcap_data_access_group, Diagnosis, Glucose_0, Glucose_30,
+    Glucose_60, Glucose_120, Glucose_180,
+    iAUC30gluc:iAUC180ins, homa_ir
+  ) %>%
+  tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
+  add_overall()
+```
+
+# Figure
+
+```{r}
+#| label: fig-1
+#| fig-cap: Percentages by visit
+#| fig-width: 12
+#| fig-height: 8
+df %>%
+  group_by(study_id) %>%
+  mutate(`Visit Num.` = row_number()) %>%
+  group_by(`Visit Num.`) %>%
+  count(Diagnosis) %>%
+  mutate(total = sum(n), perc = n / total) %>%
+  ggplot(., aes(x = `Visit Num.`, y = perc, fill = Diagnosis)) +
+  geom_bar(position = "stack", stat = "identity") +
+  geom_text(aes(label = paste0(scales::percent(perc), " (n = ", n, ")")),
+    position = position_stack(vjust = 0.5)
+  ) +
+  theme_bw() +
+  theme(
+    axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+    axis.title.y = element_blank()
+  )
+```
