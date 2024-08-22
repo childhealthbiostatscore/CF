@@ -35,7 +35,7 @@ library(Hmisc)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+  "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -59,6 +59,7 @@ df$FRS_Category <- relevel(df$FRS_Category, ref = "neutral")
 levels(df$FRS_Category) <- c(
   "Neutral", "Want to be larger", "Want to be smaller"
 )
+levels(df$WeightBody_Adherence) = c("Agree","Agree","Neutral","Disagree","Disagree")
 # Labels
 label(df$FRS_Category) <- "FRS Category"
 label(df$BE_APPEARANCE_MEAN) <- "Mean Body Esteem Scale (Appearance)"
