@@ -9,6 +9,7 @@ library(readxl)
 library(stringi)
 library(childsds)
 library(cgmanalysis)
+library(pracma)
 # Home directory
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
@@ -183,10 +184,10 @@ insulin$Insulin <- as.numeric(insulin$Insulin)
 #   outputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM",
 #   outputname = "cgm_variables"
 # )
-# Add to visit dates
 cgm <- read.csv("./Christine Chan/EnVision CF/Data_Clean/CGM/cgm_variables.csv",
   na.strings = ""
 )
+cgm = cgm[-which(cgm$percent_cgm_wear==0),]
 cgm$subject_id <- sub("_sensor_raw_data_upload", "", cgm$subject_id)
 cgm$study_id <- sapply(
   stri_split_fixed(str = cgm$subject_id, pattern = "_", n = 2),
@@ -201,6 +202,29 @@ cgm <- left_join(cgm, redcap %>% select(study_id, redcap_event_name, date_visit)
 )
 cgm <- cgm %>% rename(Date = date_visit)
 cgm$Date <- ymd(cgm$Date)
+# Manually fix dates for CGM replacements/unscheduled visits
+# CC0010 unscheduled_visit_arm_1 starts 2019-10-26. CC0010 visit_1_arm_1 on 2020-07-14 has a CGM associated with it. What is the CGM from 2019-10-26?
+
+# IA0003 unscheduled_visit_arm_1 starts 2019-12-10. IA0003 visit_1_arm_1 has a CGM associated with it on 2019-09-16. What is the CGM from 2019-12-10?
+
+
+cgm$Date[cgm$study_id == "IA0001" &
+  cgm$redcap_event_name == "visit_2_arm_1_replacement_cgm_raw_data_upload"] <-
+  "2020-11-09"
+
+cgm$Date[cgm$study_id == "IA0002" &
+  cgm$redcap_event_name == "visit_2_arm_1_replacement_cgm_raw_data_upload"] <-
+  "2020-08-10"
+
+cgm$Date[cgm$study_id == "IA0014" &
+  cgm$redcap_event_name == "visit_2_arm_1_replacement_cgm_raw_data_upload"] <-
+  "2020-09-03"
+
+cgm$Date[cgm$study_id == "IA0096" &
+  cgm$redcap_event_name == "visit_1_arm_1_replacement_cgm_raw_data_upload"] <-
+  "2021-01-08"
+
+# Remove unnecessary columns
 cgm$subject_id <- NULL
 cgm$date_cgm_placement <- NULL
 #-------------------------------------------------------------------------------
@@ -214,7 +238,13 @@ final_df <- final_df %>% pivot_wider(
 )
 final_df <- full_join(final_df, cgm)
 final_df <- full_join(final_df, demo)
-
+# Add HbA1c, etc.
+a1c <- redcap %>%
+  select(study_id, date_visit, a1c_result) %>%
+  rename(Date = date_visit) %>%
+  drop_na(a1c_result)
+a1c$Date <- ymd(a1c$Date)
+final_df <- full_join(final_df, a1c)
 #-------------------------------------------------------------------------------
 # Calculated fields
 #-------------------------------------------------------------------------------
@@ -226,13 +256,121 @@ final_df$bmi_perc <- sds(
   sex = final_df$sex, male = 1, female = 2,
   ref = cdc.ref, item = "bmi", type = "perc"
 ) * 100
+# Columns
+glucose <- paste0("Glucose_", c(0, 10, 30, 60, 90, 120, 150, 180))
+insulin <- paste0("Insulin_", c(0, 10, 30, 60, 90, 120, 150, 180))
+# Get diagnosis
+final_df$Diagnosis <- NA
+final_df$Diagnosis[final_df[, glucose[1]] < 100 &
+  (rowSums(final_df[, glucose[2:5]] < 200, na.rm = T) ==
+    rowSums(!is.na(final_df[, glucose[2:5]]))) &
+  (rowSums(final_df[, glucose[6:8]] < 140, na.rm = T) ==
+    rowSums(!is.na(final_df[, glucose[6:8]])))] <- "NGT"
+final_df$Diagnosis[final_df[, glucose[1]] >= 100] <- "IFG"
+final_df$Diagnosis[rowSums(final_df[, glucose[2:5]] >= 200, na.rm = T) > 0] <- "INDET"
+final_df$Diagnosis[rowSums(final_df[, glucose[6:8]] >= 140, na.rm = T) > 0] <- "IGF"
+final_df$Diagnosis[final_df$Glucose_0 >= 126 | final_df$Glucose_120 >= 200] <- "CFRD"
+final_df$Diagnosis <- factor(final_df$Diagnosis,
+  levels = c("NGT", "IFG", "INDET", "IGF", "CFRD")
+)
+# iAUCs
+final_df$iAUC30gluc <- apply(final_df, 1, function(r) {
+  y <- as.numeric(r[glucose[1:3]]) - as.numeric(r[glucose[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+final_df$iAUC60gluc <- apply(final_df, 1, function(r) {
+  y <- as.numeric(r[glucose[1:4]]) - as.numeric(r[glucose[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+final_df$iAUC120gluc <- apply(final_df, 1, function(r) {
+  y <- as.numeric(r[glucose[1:6]]) - as.numeric(r[glucose[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60, 90, 120)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+final_df$iAUC180gluc <- apply(final_df, 1, function(r) {
+  y <- as.numeric(r[glucose]) - as.numeric(r[glucose[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60, 90, 120, 150, 180)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+final_df$iAUC30ins <- apply(final_df, 1, function(r) {
+  y <- as.numeric(r[insulin[1:3]]) - as.numeric(r[insulin[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+final_df$iAUC60ins <- apply(final_df, 1, function(r) {
+  y <- as.numeric(r[insulin[1:4]]) - as.numeric(r[insulin[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+final_df$iAUC120ins <- apply(final_df, 1, function(r) {
+  y <- as.numeric(r[insulin[1:6]]) - as.numeric(r[insulin[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60, 90, 120)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+final_df$iAUC180ins <- apply(final_df, 1, function(r) {
+  y <- as.numeric(r[insulin]) - as.numeric(r[insulin[1]])
+  if (is.na(last(y))) {
+    return(NA)
+  } else {
+    x <- c(0, 10, 30, 60, 90, 120, 150, 180)[!is.na(y)]
+    y <- y[!is.na(y)]
+    auc <- trapz(x, y)
+    return(auc)
+  }
+})
+# HOMA IR
+final_df$homa_ir <- (final_df$Glucose_0 * final_df$Insulin_0) / 405
 # Check for hypoglycemia
 final_df$Hypo70 <-
-  apply(final_df[, grep("Glucose", colnames(final_df))], 1, function(r) {
+  apply(final_df[, glucose], 1, function(r) {
     any(r < 70, na.rm = T)
   })
 final_df$Hypo60 <-
-  apply(final_df[, grep("Glucose", colnames(final_df))], 1, function(r) {
+  apply(final_df[, glucose], 1, function(r) {
     any(r < 60, na.rm = T)
   })
 final_df$Hypo70 <- factor(final_df$Hypo70,
