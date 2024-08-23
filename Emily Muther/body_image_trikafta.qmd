@@ -12,8 +12,6 @@ format:
     self-contained: true
     fig-cap-location: top
     page-layout: full
-execute:
-  echo: false
 editor: source
 ---
 
@@ -59,7 +57,7 @@ df$FRS_Category <- relevel(df$FRS_Category, ref = "neutral")
 levels(df$FRS_Category) <- c(
   "Neutral", "Want to be larger", "Want to be smaller"
 )
-levels(df$WeightBody_Adherence) = c("Agree","Agree","Neutral","Disagree","Disagree")
+levels(df$WeightBody_Adherence) <- c("Agree", "Agree", "Neutral", "Disagree", "Disagree")
 # Labels
 label(df$FRS_Category) <- "FRS Category"
 label(df$BE_APPEARANCE_MEAN) <- "Mean Body Esteem Scale (Appearance)"
@@ -91,7 +89,7 @@ df %>%
         "{median} [{p25}, {p75}]",
         "{min}, {max}"
       ),
-      all_of(normal_dist) ~ c("{mean} ({sd})","{min}, {max}")
+      all_of(normal_dist) ~ c("{mean} ({sd})", "{min}, {max}")
     ),
     missing_text = "(Missing)"
   ) %>%
@@ -117,7 +115,7 @@ df %>%
   )
 ```
 
-## Adherence
+## Adherence by FRS category
 
 ```{r}
 #| label: adherence

@@ -32,6 +32,23 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
-
+# Import data
+chco <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv",
+  na.strings = ""
+)
+njh <- read_excel("./Data_Raw/SweatVariability2025_CFgenotypes 2024-08-21.xlsx")
+chec <- read.csv("./Data_Raw/CHEC sweat sodium and chloride.csv")
+# Fix diagnoses/exclusion data for CHCO (based on Angela's review)
+diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with CF or Non-CF.xlsx")
+exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) | diagnoses$Code == "Exclude"]
+exclude <- exclude[!is.na(exclude)]
+chco <- chco[!(chco$PatientID %in% exclude), ]
+chco$Diagnosis <- factor(
+  diagnoses$Diagnosis[match(
+    chco$PatientID,
+    diagnoses$PatientID
+  )],
+  levels = c("CFTR-related disorder", "CRMS", "Cystic Fibrosis", "Non-CF"),
+  labels = c("CFTR-RD or CRMS", "CFTR-RD or CRMS", "Cystic Fibrosis", "Non-CF")
+)
 ```
-
