@@ -29,6 +29,7 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(pROC)
+library(gtsummary)
 library(gt)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
@@ -71,12 +72,45 @@ df <- df %>%
   mutate(id = sub("--1|--2|-1|-2", "", subject_id...1)) %>%
   group_by(id) %>%
   filter(row_number() == 1) %>%
+  ungroup() %>%
   select(
     id, gender2:ethnic_origin_race___6, age_at_enrollment_years,
     pancreatic_exocrine_insuff, Diagnosis, Dysglycemia,
     plasma_glucose, capillary, plasma_glu_val, hour_capillary_glucose_val,
     hemo_a1c, plas_pre_gluc, plasma_gluc_1_hr, plas_gluc_2_hr
   )
+```
+
+# Demographics
+
+```{r}
+#| label: table1a
+#| tbl-cap: Participant characteristics by diagnosis
+#| message: false
+df %>%
+  select(
+    age_at_enrollment_years, gender2:ethnic_origin_race___6,
+    pancreatic_exocrine_insuff, Diagnosis
+  ) %>%
+  tbl_summary(by = Diagnosis) %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
+```
+
+```{r}
+#| label: table1b
+#| tbl-cap: Participant characteristics by dysglycemia
+#| message: false
+df %>%
+  select(
+    age_at_enrollment_years, gender2:ethnic_origin_race___6,
+    pancreatic_exocrine_insuff, Dysglycemia
+  ) %>%
+  tbl_summary(by = Dysglycemia) %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
 ```
 
 # OGTT Figures
