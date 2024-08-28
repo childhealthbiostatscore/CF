@@ -47,52 +47,91 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```{r data cleaning}
 #| warning: false
 # Import from REDCap
-df <- read_excel("./Christine Chan/CFF GCT Study/Data_Raw/CFF Study REDCap Export 2021-09-09a LSP.xlsx")
-# Get diagnosis
-df$Diagnosis <- "NGT"
-df$Diagnosis[df$plas_pre_gluc >= 100] <- "IFG"
-df$Diagnosis[df$plasma_gluc_1_hr >= 200] <- "INDET"
-df$Diagnosis[df$plas_gluc_2_hr >= 140] <- "IGF"
-df$Diagnosis[df$plas_pre_gluc >= 126 | df$plas_gluc_2_hr >= 200] <- "CFRD"
-df$Diagnosis <- factor(df$Diagnosis,
-  levels = c("NGT", "IFG", "INDET", "IGF", "CFRD")
+df <- read.csv("./Christine Chan/CFF GCT Study/Data_Raw/CysticFibrosisScreen_DATA_LABELS_2024-04-19_1740.csv",
+  na.strings = ""
 )
-df$Dysglycemia <- factor(df$Diagnosis,
-  levels = c("NGT", "IFG", "INDET", "IGF", "CFRD"),
-  labels = c("NGT", "AGT", "AGT", "AGT", "AGT")
-)
+# Create standardized study ID
+df$ID <- sub("--1|--2|--01|-1|-2", "", df[, 1])
 # Numeric variables
-df$plasma_glu_val <- as.numeric(df$plasma_glu_val)
-df$plasma_glucose <- as.numeric(df$plasma_glucose)
-# Data were double entered but it wasn't completed so most participants have 3
-# rows
+df$Plasma.Glucose <- as.numeric(df$Plasma.Glucose)
+df$X1.hour.Plasma.Glucose.Value <- as.numeric(df$X1.hour.Plasma.Glucose.Value)
+# Combine race and ethnicity columns
+races <- c(
+  "White", "Black/African American", "American Indian/Alaska Native",
+  "Asian Non-Indian", "Asian Indian", "Native Hawaiian/Other Pacific Islander"
+)
+ethnicities <- c("Hispanic/Latino", "Not Hispanic/Latino", "N/A")
+df$Race <- apply(
+  df[, grep("Ethnic.Origin.Race", colnames(df))], 1,
+  function(r) {
+    paste0(races[which(r == "Checked")], collapse = "/")
+  }
+)
+df$Race <- factor(df$Race, levels = races)
+df$Ethnicity <- apply(
+  df[, grep("Ethnicity", colnames(df))], 1,
+  function(r) {
+    paste0(ethnicities[which(r == "Checked")], collapse = "/")
+  }
+)
+df$Ethnicity <- factor(df$Ethnicity, levels = ethnicities[1:2])
+# Fill in missing data for every column and take the first row, then select and
+# rename columns
 df <- df %>%
-  arrange(subject_id...1) %>%
-  filter(grepl("--1|--2|-1|-2", subject_id...1)) %>%
-  mutate(id = sub("--1|--2|-1|-2", "", subject_id...1)) %>%
-  group_by(id) %>%
+  group_by(ID) %>%
+  fill(everything(), .direction = "downup") %>%
   filter(row_number() == 1) %>%
   ungroup() %>%
+  rename(
+    "OGTT 0 min" = Plasma.Glucose..pre.glucose.drink...mg.dl.,
+    "OGTT 60 min" = Plasma.Glucose..1.hour.after.glucose.drink...mg.dl.,
+    "OGTT 120 min" = Plasma.Glucose..2.hour.after.glucose.drink...mg.dl.,
+    "GCT 0 min plasma" = Plasma.Glucose,
+    "GCT 0 min capillary" = Capillary,
+    "GCT 60 min plasma" = X1.hour.Plasma.Glucose.Value,
+    "GCT 60 min capillary" = X1.hour.Capillary.Glucose.Value,
+    "HbA1c" = Hemoglobin.A1c..,
+    "Age" = Age.at.enrollment..years.,
+    "Pancreatic insufficient" = Pancreatic.exocrine.insufficient
+  ) %>%
   select(
-    id, gender2:ethnic_origin_race___6, age_at_enrollment_years,
-    pancreatic_exocrine_insuff, Diagnosis, Dysglycemia,
-    plasma_glucose, capillary, plasma_glu_val, hour_capillary_glucose_val,
-    hemo_a1c, plas_pre_gluc, plasma_gluc_1_hr, plas_gluc_2_hr
+    ID, HbA1c, Age, Gender, Race, Ethnicity, `Pancreatic insufficient`,
+    contains("GCT"), contains("OGTT ")
   )
+# Get diagnosis
+df$Diagnosis <- "NGT"
+df$Diagnosis[df$`OGTT 0 min` >= 100] <- "IFG"
+df$Diagnosis[df$`OGTT 60 min` >= 200] <- "INDET"
+df$Diagnosis[df$`OGTT 120 min` >= 140] <- "IGT"
+df$Diagnosis[df$`OGTT 120 min` >= 200] <- "CFRD"
+df[which(rowSums(is.na(df[, grep("OGTT", colnames(df))])) == 3), "Diagnosis"] <- NA
+df$Diagnosis <- factor(df$Diagnosis,
+  levels = c("NGT", "IFG", "INDET", "IGT", "CFRD")
+)
+df$Dysglycemia <- factor(df$Diagnosis,
+  levels = c("NGT", "IFG", "INDET", "IGT", "CFRD"),
+  labels = c("NGT", "AGT", "AGT", "AGT", "AGT")
+)
+# Write for Christine to check
+write.csv(df,
+          file = "./Christine Chan/CFF GCT Study/Data_Clean/gct_analysis_data.csv",
+          row.names = F,na = "")
+# Remove those without OGTT data
+no_ogtt <- df$ID[which(is.na(df$Diagnosis))]
+df <- df %>% filter(!ID %in% no_ogtt)
 ```
 
 # Demographics
+
+A total of `r length(no_ogtt)` participants were excluded because they had no OGTT data.
 
 ```{r}
 #| label: table1a
 #| tbl-cap: Participant characteristics by diagnosis
 #| message: false
 df %>%
-  select(
-    age_at_enrollment_years, gender2:ethnic_origin_race___6,
-    pancreatic_exocrine_insuff, Diagnosis
-  ) %>%
-  tbl_summary(by = Diagnosis) %>%
+  select(-ID, -Dysglycemia) %>%
+  tbl_summary(by = Diagnosis, missing_text = "(Missing)") %>%
   add_overall() %>%
   add_p() %>%
   separate_p_footnotes()
@@ -103,10 +142,7 @@ df %>%
 #| tbl-cap: Participant characteristics by dysglycemia
 #| message: false
 df %>%
-  select(
-    age_at_enrollment_years, gender2:ethnic_origin_race___6,
-    pancreatic_exocrine_insuff, Dysglycemia
-  ) %>%
+  select(-ID) %>%
   tbl_summary(by = Dysglycemia) %>%
   add_overall() %>%
   add_p() %>%
@@ -119,17 +155,18 @@ df %>%
 #| label: fig-boxplot
 #| fig-cap: Boxplot of OGTT glucose values by diabetes status
 #| warning: false
-plot_df <- df %>% pivot_longer(plas_pre_gluc:plas_gluc_2_hr,
-  names_to = "ogtt_timepoint", values_to = "glucose"
+plot_df <- df %>% pivot_longer(contains("OGTT"),
+  names_to = "OGTT Timepoint", values_to = "Glucose"
 )
-plot_df$ogtt_timepoint <- factor(plot_df$ogtt_timepoint,
-  levels = c("plas_pre_gluc", "plasma_gluc_1_hr", "plas_gluc_2_hr")
+plot_df$`OGTT Timepoint` <- factor(plot_df$`OGTT Timepoint`,
+  levels = c("OGTT 0 min", "OGTT 60 min", "OGTT 120 min")
 )
 box_p <- ggplot(
   plot_df,
-  aes(x = ogtt_timepoint, y = glucose, fill = ogtt_timepoint)
+  aes(x = `OGTT Timepoint`, y = Glucose, fill = `OGTT Timepoint`)
 ) +
   geom_boxplot() +
+  scale_y_continuous(breaks = c(100, 140, 200, 300)) +
   facet_wrap(~Diagnosis) +
   theme(legend.position = "none")
 box_p
@@ -139,17 +176,12 @@ box_p
 #| label: fig-point
 #| fig-cap: Point plot of OGTT glucose values by diabetes status
 #| warning: false
-plot_df <- df %>% pivot_longer(plas_pre_gluc:plas_gluc_2_hr,
-  names_to = "ogtt_timepoint", values_to = "glucose"
-)
-plot_df$ogtt_timepoint <- factor(plot_df$ogtt_timepoint,
-  levels = c("plas_pre_gluc", "plasma_gluc_1_hr", "plas_gluc_2_hr")
-)
 point_p <- ggplot(
   plot_df,
-  aes(x = ogtt_timepoint, y = glucose, color = ogtt_timepoint)
+  aes(x = `OGTT Timepoint`, y = Glucose, color = `OGTT Timepoint`)
 ) +
-  geom_point() +
+  geom_jitter() +
+  scale_y_continuous(breaks = c(100, 140, 200, 300)) +
   facet_wrap(~Diagnosis) +
   theme(legend.position = "none")
 point_p
@@ -159,17 +191,12 @@ point_p
 #| label: fig-violin
 #| fig-cap: Violin plot of OGTT glucose values by diabetes status
 #| warning: false
-plot_df <- df %>% pivot_longer(plas_pre_gluc:plas_gluc_2_hr,
-  names_to = "ogtt_timepoint", values_to = "glucose"
-)
-plot_df$ogtt_timepoint <- factor(plot_df$ogtt_timepoint,
-  levels = c("plas_pre_gluc", "plasma_gluc_1_hr", "plas_gluc_2_hr")
-)
 violin_p <- ggplot(
   plot_df,
-  aes(x = ogtt_timepoint, y = glucose, fill = ogtt_timepoint)
+  aes(x = `OGTT Timepoint`, y = Glucose, fill = `OGTT Timepoint`)
 ) +
   geom_violin() +
+  scale_y_continuous(breaks = c(100, 140, 200, 300)) +
   facet_wrap(~Diagnosis) +
   theme(legend.position = "none")
 violin_p
@@ -183,12 +210,12 @@ Dysglycemia was defined as any diagnosis on OGTT other than normal glucose toler
 #| label: tbl-roc-dysglycemia
 #| tbl-cap: Accuracy of different screening tests to predict dysglycemia using ROC curve analyses
 #| message: false
-gctpl_roc <- roc(Dysglycemia ~ plasma_glu_val, data = df)
-gctcap_roc <- roc(Dysglycemia ~ hour_capillary_glucose_val, data = df)
-ogtt1_roc <- roc(Dysglycemia ~ plasma_gluc_1_hr, data = df)
-rpg_roc <- roc(Dysglycemia ~ plasma_glucose, data = df)
-rcg_roc <- roc(Dysglycemia ~ capillary, data = df)
-a1c_roc <- roc(Dysglycemia ~ hemo_a1c, data = df)
+gctpl_roc <- roc(Dysglycemia ~ `GCT 60 min plasma`, data = df)
+gctcap_roc <- roc(Dysglycemia ~ `GCT 60 min capillary`, data = df)
+ogtt1_roc <- roc(Dysglycemia ~ `OGTT 60 min`, data = df)
+rpg_roc <- roc(Dysglycemia ~ `GCT 0 min plasma`, data = df)
+rcg_roc <- roc(Dysglycemia ~ `GCT 0 min capillary`, data = df)
+a1c_roc <- roc(Dysglycemia ~ HbA1c, data = df)
 roc_table <-
   lapply(
     list(gctpl_roc, gctcap_roc, ogtt1_roc, rpg_roc, rcg_roc, a1c_roc),
