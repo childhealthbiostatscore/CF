@@ -11,8 +11,8 @@ format:
     code-fold: true
     self-contained: true
     fig-cap-location: top
-    fig-width: 8
-    fig-height: 8
+    fig-width: 12
+    fig-height: 9
     page-layout: full
 bibliography: /home/tim/Documents/Miscellaneous/zotero.bib
 csl: /home/tim/GitHub/styles/american-medical-association.csl
@@ -225,7 +225,7 @@ agt_cfrd$ogtt <- droplevels(agt_cfrd$`OGTT 2-hour`)
 r <- roc(ogtt ~ hgba1c, data = ngt_agt)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### AGT vs. CFRD
@@ -235,7 +235,7 @@ gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(ogtt ~ hgba1c, data = agt_cfrd)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ### Peds vs. Adults
@@ -254,7 +254,7 @@ peds_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd < 18)
 r <- roc(ogtt ~ hgba1c, data = peds_ngt_agt)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ##### AGT vs. CFRD
@@ -264,7 +264,7 @@ gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(ogtt ~ hgba1c, data = peds_agt_cfrd)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### Adults
@@ -281,7 +281,7 @@ adult_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd >= 18)
 r <- roc(ogtt ~ hgba1c, data = adult_ngt_agt)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ##### AGT vs. CFRD
@@ -291,7 +291,7 @@ gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(ogtt ~ hgba1c, data = adult_agt_cfrd)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ### By race
@@ -310,7 +310,7 @@ white_agt_cfrd <- agt_cfrd %>% filter(Race == "White")
 r <- roc(ogtt ~ hgba1c, data = white_ngt_agt)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ##### AGT vs. CFRD
@@ -320,7 +320,7 @@ gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(ogtt ~ hgba1c, data = white_agt_cfrd)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### Black or African American
@@ -337,7 +337,7 @@ black_agt_cfrd <- agt_cfrd %>% filter(Race == "Black or African American")
 r <- roc(ogtt ~ hgba1c, data = black_ngt_agt)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ##### AGT vs. CFRD
@@ -352,7 +352,7 @@ gt(data.frame(coords(r, "best"))) %>%
   fmt_number(n_sigfig = 3)
 gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
   fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### More than one race
@@ -369,7 +369,7 @@ more_agt_cfrd <- agt_cfrd %>% filter(Race == "More than one race")
 r <- roc(ogtt ~ hgba1c, data = more_ngt_agt)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ##### AGT vs. CFRD
@@ -379,7 +379,7 @@ gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(ogtt ~ hgba1c, data = more_agt_cfrd)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### Other race
@@ -401,7 +401,7 @@ gt(data.frame(coords(r, "best"))) %>%
   fmt_number(n_sigfig = 3)
 gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
   fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ##### AGT vs. CFRD
@@ -416,7 +416,70 @@ gt(data.frame(coords(r, "best"))) %>%
   fmt_number(n_sigfig = 3)
 gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
   fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+```
+
+### By ethnicity
+
+#### Hispanic
+
+```{r}
+hispanic_ngt_agt <- ngt_agt %>% filter(Hispanicrace == "Yes")
+hispanic_agt_cfrd <- agt_cfrd %>% filter(Hispanicrace == "No")
+```
+
+##### NGT vs. AGT
+
+```{r}
+#| message: false
+r <- roc(ogtt ~ hgba1c, data = hispanic_ngt_agt)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+```
+
+##### AGT vs. CFRD
+
+```{r}
+#| message: false
+r <- roc(ogtt ~ hgba1c, data = hispanic_agt_cfrd)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+```
+
+#### Non-Hispanic
+
+```{r}
+non_hispanic_ngt_agt <-
+  ngt_agt %>% filter(Race == "Black or African American")
+non_hispanic_agt_cfrd <-
+  agt_cfrd %>% filter(Race == "Black or African American")
+```
+
+##### NGT vs. AGT
+
+```{r}
+#| message: false
+r <- roc(ogtt ~ hgba1c, data = non_hispanic_ngt_agt)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+```
+
+##### AGT vs. CFRD
+
+Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
+
+```{r}
+#| message: false
+r <- roc(ogtt ~ hgba1c, data = non_hispanic_agt_cfrd)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(coords(r, "best"))) %>%
+  fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
+  fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ## Two hour OGTT >= 140 or >= 200
@@ -437,7 +500,7 @@ roc_df$cfrd <- as.numeric(roc_df$twohour_bloodglucose >= 200)
 r <- roc(agt ~ hgba1c, data = roc_df)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### $\geq$ 200
@@ -447,7 +510,7 @@ gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(cfrd ~ hgba1c, data = roc_df)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ### Peds vs. Adults
@@ -465,7 +528,7 @@ peds_roc <- roc_df %>% filter(Age_YrEnd < 18)
 r <- roc(agt ~ hgba1c, data = peds_roc)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ##### $\geq$ 200
@@ -475,7 +538,7 @@ gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(cfrd ~ hgba1c, data = peds_roc)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### Adults
@@ -491,7 +554,7 @@ adult_roc <- roc_df %>% filter(Age_YrEnd >= 18)
 r <- roc(agt ~ hgba1c, data = adult_roc)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ##### $\geq$ 200
@@ -501,7 +564,7 @@ gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(cfrd ~ hgba1c, data = adult_roc)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ### By race
@@ -519,7 +582,7 @@ white_roc <- roc_df %>% filter(Race == "White")
 r <- roc(agt ~ hgba1c, data = white_roc)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ##### $\geq$ 200
@@ -529,7 +592,7 @@ gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(cfrd ~ hgba1c, data = white_roc)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### Black or African American
@@ -545,17 +608,20 @@ black_roc <- roc_df %>% filter(Race == "Black or African American")
 r <- roc(agt ~ hgba1c, data = black_roc)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ##### $\geq$ 200
+
+Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
 
 ```{r}
 #| message: false
 r <- roc(cfrd ~ hgba1c, data = black_roc)
 plot(r, print.auc = T, print.thres = T)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
+  fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### More than one race
@@ -571,7 +637,7 @@ more_roc <- roc_df %>% filter(Race == "More than one race")
 r <- roc(agt ~ hgba1c, data = more_roc)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ##### $\geq$ 200
@@ -581,7 +647,7 @@ gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(cfrd ~ hgba1c, data = more_roc)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 #### Other race
@@ -602,12 +668,10 @@ gt(data.frame(coords(r, "best"))) %>%
   fmt_number(n_sigfig = 3)
 gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
   fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
 
 ##### $\geq$ 200
-
-Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
 
 ```{r}
 #| message: false
@@ -615,7 +679,61 @@ r <- roc(cfrd ~ hgba1c, data = other_roc)
 plot(r, print.auc = T, print.thres = T)
 gt(data.frame(coords(r, "best"))) %>%
   fmt_number(n_sigfig = 3)
-gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
+gt(data.frame(ci.coords(r, "best"))) %>%
   fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+```
+
+### By ethnicity
+
+#### Hispanic
+
+```{r}
+hispanic_roc <- roc_df %>% filter(Hispanicrace == "Yes")
+```
+
+##### $\geq$ 140
+
+```{r}
+#| message: false
+r <- roc(agt ~ hgba1c, data = hispanic_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+```
+
+##### $\geq$ 200
+
+```{r}
+#| message: false
+r <- roc(cfrd ~ hgba1c, hispanic_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+```
+
+#### Non-Hispanic
+
+```{r}
+non_hispanic_roc <- roc_df %>% filter(Hispanicrace == "No")
+```
+
+##### $\geq$ 140
+
+```{r}
+#| message: false
+r <- roc(agt ~ hgba1c, data = non_hispanic_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+```
+
+##### $\geq$ 200
+
+```{r}
+#| message: false
+r <- roc(cfrd ~ hgba1c, data = non_hispanic_roc)
+plot(r, print.auc = T, print.thres = T)
+gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 ```
