@@ -15,19 +15,20 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Miscellaneous/american-medical-association.csl
+bibliography: /home/tim/Documents/Miscellaneous/zotero.bib
+csl: /home/tim/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
 ```{r setup}
 #| include: false
-library(tidyverse)
+library(dplyr)
+library(tidyr)
 library(lubridate)
 library(gtsummary)
 library(ggpubr)
 library(rspiro)
-knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Scott Sagel/PEx in CF")
+knitr::opts_knit$set(root.dir = "/home/tim/OneDrive/Vigers/CF/Scott Sagel/PEx in CF")
 # Colors for plots
 yellow <- "#f8b80a"
 red <- "#e30022"
@@ -50,19 +51,43 @@ df$redcap_data_access_group <- factor(df$redcap_data_access_group,
 )
 # CFTR modulators
 df$cftr_mod <- factor(df$cftr_mod, levels = 0:1, labels = c("No", "Yes"))
+df$cftr_mod_spec[df$cftr_mod == "No"] <- 5
 df$cftr_mod_spec <- factor(df$cftr_mod_spec,
-  levels = 1:4, labels = c("Kalydeco", "Orkambi", "Symdeko", "Trikafta")
+  levels = 1:5,
+  labels = c("Kalydeco", "Orkambi", "Symdeko", "Trikafta", "None")
 )
 df$Trikafta <- factor(df$cftr_mod_spec == "Trikafta",
   levels = c(F, T), labels = c("No", "Yes")
 )
+# Other medications
+df$azithro <- factor(df$azithro, levels = 0:1, labels = c("No", "Yes"))
+df$inhaled_abx <- factor(df$inhaled_abx,
+  levels = 0:1,
+  labels = c("No", "Yes")
+)
+df$steroids_system <- factor(df$steroids_system,
+  levels = 0:1,
+  labels = c("No", "Yes")
+)
+# Tests
+df$fungal_test <- factor(df$fungal_test, levels = 0:1, labels = c("No", "Yes"))
+df$ntm_test <- factor(df$ntm_test, levels = 0:1, labels = c("No", "Yes"))
+df$viral_test <- factor(df$viral_test, levels = 0:1, labels = c("No", "Yes"))
+df$viral_test_results <- factor(df$viral_test_results,
+  levels = 0:1, labels = c("Negative", "Positive")
+)
 # % predicted FEV1
 df$sex <- factor(df$sex, levels = c(2, 1), labels = c("Male", "Female"))
 df$fev1_baseline <- rowMeans(df[, paste0("fev1_baseline", 1:6)], na.rm = T)
+# Add fill in demographic variables
 df <- df %>%
   group_by(sid) %>%
-  fill(sex) %>%
+  fill(
+    sex, race, ethnicity, mutation1, mutation2,
+    insurance___1:insurance___8
+  ) %>%
   ungroup()
+# Predicted lung function
 df$ppfev1_admit <- pctpred_GLIgl(
   age = df$age_at_admit, height = df$height / 100, gender = as.numeric(df$sex),
   FEV1 = df$fev1_admit
@@ -75,14 +100,79 @@ df$ppfev1_discharge <- pctpred_GLIgl(
   age = df$age_at_admit, height = df$height / 100, gender = as.numeric(df$sex),
   FEV1 = df$fev1_discharge
 )
+# Demographic variables
+df$age_group <- cut(df$age_at_admit, c(-Inf, 6, 12, 18, Inf),
+  right = F,
+  labels = c("<6 yrs", "≥6-<12 yrs", "≥12-<18 yrs", "≥18 yrs")
+)
+df$race <- factor(df$race,
+  levels = 1:8,
+  labels = c(
+    "White", "Black or African-American", "Other", "Asian", "Other",
+    "Other", "Other", "Unknown/not reported"
+  )
+)
+df$ethnicity <- factor(df$ethnicity,
+  levels = 1:3,
+  labels = c(
+    "Hispanic or Latino", "Not Hispanic or Latino", "Unknown or not reported"
+  )
+)
+df$mutation1 <- factor(df$mutation1,
+  levels = 1:15,
+  labels = c("F508del", rep("Other", times = 14))
+)
+df$mutation2 <- factor(df$mutation2,
+  levels = 1:15,
+  labels = c("F508del", rep("Other", times = 14))
+)
+df$Genotype <- factor(
+  paste0(as.character(df$mutation1), "/", as.character(df$mutation2)),
+  levels = c(
+    "F508del/F508del", "F508del/Other", "Other/F508del", "Other/Other"
+  ),
+  labels = c(
+    "F508del Homozygous", "F508del Heterozygous", "F508del Heterozygous",
+    "Other"
+  )
+)
+insurances <- c(
+  "Private insurance", "Medicare", "Medicaid", "Other",
+  "Tricare/other military health plan", "Other", "Other", "None"
+)
+df$Insurance <- apply(
+  df[, grep("insurance___", colnames(df))], 1,
+  function(r) {
+    w <- which(r == 1)
+    if (length(w) == 0) {
+      return("None")
+    } else {
+      return(paste0(insurances[which(r == 1)], collapse = "/"))
+    }
+  }
+)
 # Labels
 labels <- list(
+  "Age group at admission" = "age_group",
+  "Age at admission" = "age_at_admit", "Sex" = "sex",
+  "Race" = "race", "Ethnicity" = "ethnicity",
+  "Azithromycin" = "azithro", "Inhaled antibiotics" = "inhaled_abx",
+  "Systemic steroids" = "steroids_system",
+  "Source of respiratory culture at admit" = "admit_cx_source",
   "Aspergillus fumigatus" = "fungi___1",
   "Aspergillus (other species)" = "fungi___2",
   "Scedosporium apiospermum" = "fungi___3",
   "Candidia (any species)" = "fungi___4",
   "Other fungus" = "fungi___5",
   "NTM testing performed?" = "ntm_test",
+  "Fungal testing performed?" = "fungal_test",
+  "Viral testing performed?" = "viral_test",
+  "Viral testing results" = "viral_test_results",
+  "Influenza A or B" = "viruses___1",
+  "Respiratory Syncytial Virus" = "viruses___2",
+  "Rhinovirus/enterovirus" = "viruses___3",
+  "SARS CoV-2" = "viruses___4",
+  "Other virus" = "viruses___5",
   "M. abscessus species" = "ntm___1",
   "M. avium complex species" = "ntm___2",
   "Other NTM species" = "ntm___3",
@@ -101,20 +191,74 @@ labels <- list(
   "Length of Admission" = "days_admit",
   "Systemic Steroids" = "steroids_system",
   "Oral Steroids" = "steroids_oral",
-  "IV Steroids" = "steroids_iv"
+  "IV Steroids" = "steroids_iv",
+  "Baseline FEV1pp (2022)" = "ppfev1_baseline",
+  "Admission FEV1pp (2022)" = "ppfev1_admit",
+  "Discharge FEV1pp (2022)" = "ppfev1_discharge",
+  "Change in mean FEV1pp from admit to discharge" = "ppfev1_change"
 )
-labels <- setNames(names(labels), labels)
+labels <- as.list(setNames(names(labels), labels))
 # Format
 df <- df %>%
   select(
-    sid, redcap_event_name, redcap_data_access_group, year, days_admit,
-    cftr_mod, cftr_mod_spec, Trikafta, fungal_test, fungi___1:fungi___5,
+    sid,
+    redcap_data_access_group, year, sex, age_group, age_at_admit, race,
+    ethnicity, Genotype, Insurance, cftr_mod, cftr_mod_spec,
+    Trikafta, azithro, inhaled_abx, steroids_system, admit_cx_source,
+    ppfev1_baseline, ppfev1_admit, ppfev1_discharge, days_admit,
+    fungal_test, fungi___1:fungi___5,
     ntm_test, ntm___1:ntm___3,
+    viral_test, viruses___1:viruses___5,
     admit_cx_results___1:admit_cx_results___9,
-    ppfev1_admit, ppfev1_discharge, ppfev1_baseline,
     contains("steroids")
   ) %>%
   filter(!is.na(year))
+# Write for Scott and Yaron to check
+write.csv(df,file = "./Data_Clean/analysis_dataset.csv",row.names = F,na = "")
+```
+
+# Demographics
+
+```{r}
+#| label: tbl-table-1
+#| tbl-cap: Participant characteristics at admission
+df %>%
+  select(redcap_data_access_group:days_admit) %>%
+  tbl_summary(
+    by = year, missing_text = "(Missing)", label = labels,
+    statistic =
+      list(
+        all_continuous() ~ "{median} [{p25}, {p75}]",
+        c(age_at_admit, ppfev1_baseline, ppfev1_admit, ppfev1_discharge) ~
+          "{mean} ({sd})"
+      )
+  ) %>%
+  add_p(
+    test =
+      list(
+        c(age_at_admit, ppfev1_baseline, ppfev1_admit, ppfev1_discharge) ~
+          "t.test"
+      ),
+    test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
+  ) %>%
+  separate_p_footnotes()
+```
+
+```{r}
+#| label: tbl-table-1-eti-2022
+#| tbl-cap: Participant characteristics on ETI in 2022
+df %>%
+  filter(Trikafta == "Yes", year == 2022) %>%
+  select(redcap_data_access_group:days_admit, -year) %>%
+  tbl_summary(
+    missing_text = "(Missing)", label = labels,
+    statistic =
+      list(
+        all_continuous() ~ "{median} [{p25}, {p75}]",
+        c(age_at_admit, ppfev1_baseline, ppfev1_admit, ppfev1_discharge) ~
+          "{mean} ({sd})"
+      )
+  )
 ```
 
 # Fungi
@@ -125,7 +269,7 @@ The tables below are limited to patients who had fungal testing performed.
 #| label: tbl-fungi
 #| tbl-cap: Fungi
 df %>%
-  filter(fungal_test == 1) %>%
+  filter(fungal_test == "Yes") %>%
   select(year, redcap_data_access_group, fungi___1:fungi___5) %>%
   tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
   add_overall() %>%
@@ -134,11 +278,11 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-fungi_center
-#| tbl-cap: Fungi by Center
+#| label: tbl-fungi-center
+#| tbl-cap: Fungi by center
 #| message: false
 df %>%
-  filter(fungal_test == 1) %>%
+  filter(fungal_test == "Yes") %>%
   select(year, redcap_data_access_group, fungi___1:fungi___5) %>%
   tbl_strata(
     strata = redcap_data_access_group,
@@ -152,17 +296,17 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-fungi_cftr_mod
-#| tbl-cap: Fungi by Modulator Status
+#| label: tbl-fungi-cftr-mod
+#| tbl-cap: Fungi by modulator status
 #| message: false
 df %>%
-  filter(fungal_test == 1) %>%
-  select(year, cftr_mod_spec, fungi___1:fungi___5) %>%
+  filter(fungal_test == "Yes") %>%
+  select(year, cftr_mod, fungi___1:fungi___5) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
       ~ .x %>%
-        tbl_summary(by = cftr_mod_spec, missing_text = "Missing", label = labels) %>%
+        tbl_summary(by = cftr_mod, missing_text = "Missing", label = labels) %>%
         add_overall() %>%
         add_p() %>%
         separate_p_footnotes()
@@ -170,11 +314,32 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-fungi_trikafta
-#| tbl-cap: Fungi by Trikafta Status
+#| label: tbl-fungi-cftr-mod-spec
+#| tbl-cap: Fungi by specific modulator status
 #| message: false
 df %>%
-  filter(fungal_test == 1) %>%
+  filter(fungal_test == "Yes") %>%
+  select(year, cftr_mod_spec, fungi___1:fungi___5) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(
+          by = cftr_mod_spec, missing_text = "Missing",
+          label = labels
+        ) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+```{r}
+#| label: tbl-fungi-trikafta
+#| tbl-cap: Fungi by Trikafta status
+#| message: false
+df %>%
+  filter(fungal_test == "Yes") %>%
   select(year, Trikafta, fungi___1:fungi___5) %>%
   tbl_strata(
     strata = year,
@@ -195,7 +360,7 @@ The tables below are limited to patients who had NTM testing performed.
 #| label: tbl-ntm
 #| tbl-cap: NTM
 df %>%
-  filter(ntm_test == 1) %>%
+  filter(ntm_test == "Yes") %>%
   select(year, redcap_data_access_group, ntm___1:ntm___3) %>%
   tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
   add_overall() %>%
@@ -204,11 +369,11 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-ntm_center
-#| tbl-cap: NTM by Center
+#| label: tbl-ntm-center
+#| tbl-cap: NTM by center
 #| message: false
 df %>%
-  filter(ntm_test == 1) %>%
+  filter(ntm_test == "Yes") %>%
   select(year, redcap_data_access_group, ntm___1:ntm___3) %>%
   tbl_strata(
     strata = redcap_data_access_group,
@@ -222,17 +387,20 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-ntm_cftr_mod
-#| tbl-cap: NTM by Modulator Status
+#| label: tbl-ntm-cftr-mod
+#| tbl-cap: NTM by modulator status
 #| message: false
 df %>%
-  filter(ntm_test == 1) %>%
-  select(year, cftr_mod_spec, ntm___1:ntm___3) %>%
+  filter(ntm_test == "Yes") %>%
+  select(year, cftr_mod, ntm___1:ntm___3) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
       ~ .x %>%
-        tbl_summary(by = cftr_mod_spec, missing_text = "Missing", label = labels) %>%
+        tbl_summary(
+          by = cftr_mod, missing_text = "Missing",
+          label = labels
+        ) %>%
         add_overall() %>%
         add_p() %>%
         separate_p_footnotes()
@@ -240,12 +408,106 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-ntm_trikafta
-#| tbl-cap: NTM by Trikafta Status
+#| label: tbl-ntm-cftr-mod-spec
+#| tbl-cap: NTM by specific modulator status
 #| message: false
 df %>%
-  filter(ntm_test == 1) %>%
+  filter(ntm_test == "Yes") %>%
+  select(year, cftr_mod_spec, ntm___1:ntm___3) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(
+          by = cftr_mod_spec, missing_text = "Missing",
+          label = labels
+        ) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+```{r}
+#| label: tbl-ntm-trikafta
+#| tbl-cap: NTM by Trikafta status
+#| message: false
+df %>%
+  filter(ntm_test == "Yes") %>%
   select(year, Trikafta, ntm___1:ntm___3) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(by = Trikafta, missing_text = "Missing", label = labels) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+# Viruses
+
+The tables below are limited to patients who had viral testing performed.
+
+```{r}
+#| label: tbl-viruses
+#| tbl-cap: Viruses
+df %>%
+  filter(viral_test == "Yes") %>%
+  select(year, redcap_data_access_group, viruses___1:viruses___5) %>%
+  tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
+```
+
+```{r}
+#| label: tbl-viruses-cftr-mod
+#| tbl-cap: Viruses by modulator status
+#| message: false
+df %>%
+  filter(viral_test == "Yes") %>%
+  select(year, cftr_mod, viruses___1:viruses___5) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(by = cftr_mod, missing_text = "Missing", label = labels) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+```{r}
+#| label: tbl-viruses-cftr-mod-spec
+#| tbl-cap: Viruses by specific modulator status
+#| message: false
+df %>%
+  filter(viral_test == "Yes") %>%
+  select(year, cftr_mod_spec, viruses___1:viruses___5) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(
+          by = cftr_mod_spec, missing_text = "Missing",
+          label = labels
+        ) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+```{r}
+#| label: tbl-viruses-trikafta
+#| tbl-cap: Viruses by Trikafta status
+#| message: false
+df %>%
+  filter(viral_test == "Yes") %>%
+  select(year, Trikafta, viruses___1:viruses___5) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
@@ -264,7 +526,8 @@ df %>%
 #| tbl-cap: Bacteria
 df %>%
   select(
-    year, redcap_data_access_group, admit_cx_results___1:admit_cx_results___9
+    year, redcap_data_access_group,
+    admit_cx_results___1:admit_cx_results___9
   ) %>%
   tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
   add_overall() %>%
@@ -273,8 +536,8 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-bacteria_center
-#| tbl-cap: Bacteria by Center
+#| label: tbl-bacteria-center
+#| tbl-cap: Bacteria by center
 #| message: false
 df %>%
   select(
@@ -292,16 +555,19 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-bacteria_cftr_mod
-#| tbl-cap: Bacteria by Modulator Status
+#| label: tbl-bacteria-cftr-mod
+#| tbl-cap: Bacteria by modulator status
 #| message: false
 df %>%
-  select(year, cftr_mod_spec, admit_cx_results___1:admit_cx_results___9) %>%
+  select(year, cftr_mod, admit_cx_results___1:admit_cx_results___9) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
       ~ .x %>%
-        tbl_summary(by = cftr_mod_spec, missing_text = "Missing", label = labels) %>%
+        tbl_summary(
+          by = cftr_mod, missing_text = "Missing",
+          label = labels
+        ) %>%
         add_overall() %>%
         add_p() %>%
         separate_p_footnotes()
@@ -309,8 +575,28 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-bacteria_trikafta
-#| tbl-cap: Bacteria by Trikafta Status
+#| label: tbl-bacteria-cftr-mod-spec
+#| tbl-cap: Bacteria by specfic modulator status
+#| message: false
+df %>%
+  select(year, cftr_mod_spec, admit_cx_results___1:admit_cx_results___9) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(
+          by = cftr_mod_spec, missing_text = "Missing",
+          label = labels
+        ) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+```{r}
+#| label: tbl-bacteria-trikafta
+#| tbl-cap: Bacteria by Trikafta status
 #| message: false
 df %>%
   select(year, Trikafta, admit_cx_results___1:admit_cx_results___9) %>%
@@ -329,7 +615,7 @@ df %>%
 
 ```{r}
 #| label: tbl-days
-#| tbl-cap: Length of Admission
+#| tbl-cap: Length of admission
 df %>%
   select(year, days_admit) %>%
   tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
@@ -339,8 +625,8 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-days_center
-#| tbl-cap: Length of Admission by Center
+#| label: tbl-days-center
+#| tbl-cap: Length of admission by center
 #| message: false
 df %>%
   select(year, redcap_data_access_group, days_admit) %>%
@@ -356,8 +642,27 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-days_cftr_mod
-#| tbl-cap: Length of Admission by Modulator Status
+#| label: tbl-days-cftr-mod
+#| tbl-cap: Length of admission by modulator status
+#| message: false
+df %>%
+  select(year, cftr_mod, days_admit) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(
+          by = cftr_mod, missing_text = "Missing", label = labels
+        ) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+```{r}
+#| label: tbl-days-cftr-mod-spec
+#| tbl-cap: Length of admission by specific modulator status
 #| message: false
 df %>%
   select(year, cftr_mod_spec, days_admit) %>%
@@ -375,8 +680,8 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-days_trikafta
-#| tbl-cap: Length of Admission by Trikafta Status
+#| label: tbl-days-trikafta
+#| tbl-cap: Length of admission by Trikafta status
 #| message: false
 df %>%
   select(year, Trikafta, days_admit) %>%
@@ -405,8 +710,8 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-steroids_center
-#| tbl-cap: Steroids by Center
+#| label: tbl-steroids-center
+#| tbl-cap: Steroids by center
 #| message: false
 df %>%
   select(year, redcap_data_access_group, contains("steroids")) %>%
@@ -422,8 +727,27 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-steroids_cftr_mod
-#| tbl-cap: Steroids by Modulator Status
+#| label: tbl-steroids-cftr-mod
+#| tbl-cap: Steroids by modulator status
+#| message: false
+df %>%
+  select(year, cftr_mod, contains("steroids")) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(
+          by = cftr_mod, missing_text = "Missing", label = labels
+        ) %>%
+        add_overall() %>%
+        add_p() %>%
+        separate_p_footnotes()
+  )
+```
+
+```{r}
+#| label: tbl-steroids-cftr-mod-spec
+#| tbl-cap: Steroids by specific modulator status
 #| message: false
 df %>%
   select(year, cftr_mod_spec, contains("steroids")) %>%
@@ -441,8 +765,8 @@ df %>%
 ```
 
 ```{r}
-#| label: tbl-steroids_trikafta
-#| tbl-cap: Steroids by Trikafta Status
+#| label: tbl-steroids-trikafta
+#| tbl-cap: Steroids by Trikafta status
 #| message: false
 df %>%
   select(year, Trikafta, contains("steroids")) %>%
@@ -460,13 +784,14 @@ df %>%
 # Plots
 
 ```{r}
-# Number of hospitalizations
+#| label: fig-num-hosps
+#| fig-cap: Number of hospitalizations
 df %>%
   group_by(year) %>%
   summarise(n = n()) %>%
   ggplot(aes(x = factor(year), y = n, fill = factor(year))) +
   geom_bar(position = "dodge", stat = "identity") +
-  geom_label(aes(label = n),nudge_y = -20, fill = "white") +
+  geom_label(aes(label = n), nudge_y = -20, fill = "white") +
   ylab("Num. of Hospitalizations") +
   theme_bw() +
   theme(legend.position = "none", axis.title.x = element_blank()) +
@@ -474,7 +799,8 @@ df %>%
 ```
 
 ```{r}
-# % hospitalized 2 or more times in both years
+#| label: fig-perc-hosp-2-plus
+#| fig-cap: Percent hospitalized 2 or more times in both years
 df %>%
   group_by(sid, year) %>%
   summarise(n = n(), .groups = "drop") %>%
@@ -503,7 +829,8 @@ df %>%
 ```
 
 ```{r}
-# Number hospitalized 2 or more times in both years
+#| label: fig-num-hosp-2-plus
+#| fig-cap: Number hospitalized 2 or more times in both years
 df %>%
   group_by(sid, year) %>%
   summarise(n = n(), .groups = "drop") %>%
@@ -523,6 +850,8 @@ df %>%
 ```
 
 ```{r}
+#| label: fig-fev1-year
+#| fig-cap: FEV1 % predicted by year
 #| warning: false
 df %>%
   group_by(year, sid) %>%
@@ -556,7 +885,8 @@ df %>%
 FEV1 percent predicted was calculated using the GLI global (2022) equations with the `rspiro` R package.
 
 ```{r}
-# Proportions who returned to >= 90% and >= 100% at discharge
+#| label: fig-return-90-100
+#| fig-cap: Proportions who returned to >= 90% and >= 100% at discharge
 df %>%
   mutate(
     returned_90 = ppfev1_discharge >= ppfev1_baseline * 0.9,
@@ -607,3 +937,143 @@ df %>%
 ```
 
 The above plot represents the proportion of admissions where the patient returned to close to baseline lung function, and was not aggregated by patient. In other words, multiple admissions for the same patient were considered independent in this case.
+
+# Comparisons by race
+
+Due to small numbers, Asian participants were included in the "Other" race category for the following analyses. Also, Hispanic ethnicity was considered its own racial category and superseded other racial groups for these analyses (i.e., if someone had both "Other" for race and "Hispanic or Latino" for ethnicity, they were considered Hispanic). 
+
+```{r}
+# Make dataframe for race comparisons
+df$race <- as.character(df$race)
+df$race[df$ethnicity == "Hispanic or Latino"] <- "Hispanic or Latino"
+df$race <- factor(df$race,
+  levels = c(
+    "White", "Black or African-American", "Hispanic or Latino",
+    "Unknown/not reported", "Other", "Asian"
+  ),
+  labels = c(
+    "White", "Black or African-American", "Hispanic or Latino",
+    "Unknown/Other", "Unknown/Other", "Unknown/Other"
+  )
+)
+race_df <- df %>%
+  group_by(sid) %>%
+  filter(row_number() == 1) %>%
+  ungroup()
+```
+
+## CFTR modulator
+
+```{r}
+#| label: tbl-cftr-mod-overall
+#| tbl-cap: Any CFTR modulator prescription by race
+race_df %>%
+  select(race, cftr_mod) %>%
+  tbl_summary(by = race, label = labels, missing_text = "(Missing)") %>%
+  add_p() %>%
+  add_overall()
+```
+
+```{r}
+#| label: tbl-cftr-mod-year
+#| tbl-cap: Any CFTR modulator prescription by race and year
+race_df %>%
+  select(year, race, cftr_mod) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(
+          by = race, label = labels, missing_text = "(Missing)"
+        ) %>%
+        add_p() %>%
+        add_overall()
+  )
+```
+
+```{r}
+#| label: tbl-cftr-mod-specific-overall
+#| tbl-cap: CFTR modulator type by race
+race_df %>%
+  select(race, cftr_mod_spec) %>%
+  tbl_summary(by = race, label = labels, missing_text = "(Missing)") %>%
+  add_p(test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)) %>%
+  add_overall()
+```
+
+```{r}
+#| label: tbl-cftr-mod-specific-year
+#| tbl-cap: CFTR modulator type by race and year
+race_df %>%
+  select(race, cftr_mod_spec, year) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(
+          by = race, label = labels, missing_text = "(Missing)"
+        ) %>%
+        add_p(test.args = all_tests("fisher.test") ~
+          list(simulate.p.value = T)) %>%
+        add_overall()
+  )
+```
+
+```{r}
+#| label: tbl-eti-2022
+#| tbl-cap: ETI by race in 2022
+race_df %>%
+  filter(year == 2022) %>%
+  select(race, Trikafta) %>%
+  tbl_summary(by = race, label = labels, missing_text = "(Missing)") %>%
+  add_p(test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)) %>%
+  add_overall()
+```
+
+## Genotype
+
+```{r}
+#| label: tbl-genotype-overall
+#| tbl-cap: Genotype by race
+race_df %>%
+  select(race, Genotype) %>%
+  tbl_summary(by = race, label = labels, missing_text = "(Missing)") %>%
+  add_p() %>%
+  add_overall()
+```
+
+```{r}
+#| label: tbl-genotype-year
+#| tbl-cap: Genotype by race and year
+race_df %>%
+  select(year, race, Genotype) %>%
+  tbl_strata(
+    strata = year,
+    .tbl_fun =
+      ~ .x %>%
+        tbl_summary(
+          by = race, label = labels, missing_text = "(Missing)"
+        ) %>%
+        add_p() %>%
+        add_overall()
+  )
+```
+
+# FEV1 response (from admission to discharge) on ETI vs not on ETI
+
+Hospitalizations within a person were considered independent in the table below.
+
+```{r}
+#| label: tbl-fev1-change-eti
+#| tbl-cap: Change in FEV1pp by ETI status
+df %>%
+  mutate(ppfev1_change = ppfev1_discharge - ppfev1_admit) %>%
+  filter(year == 2022) %>%
+  select(ppfev1_change, Trikafta) %>%
+  tbl_summary(
+    by = Trikafta, label = labels, missing_text = "(Missing)",
+    statistic = list(all_continuous() ~ "{mean} ({sd})")
+  ) %>%
+  add_p(test = list(all_continuous() ~ "t.test")) %>%
+  add_overall()
+```
