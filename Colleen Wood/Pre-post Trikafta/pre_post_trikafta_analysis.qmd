@@ -15,21 +15,23 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /home/timvigers/GitHub/styles/american-medical-association.csl
+bibliography: /home/tim/Documents/Miscellaneous/zotero.bib
+csl: /home/tim/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
 ```{r setup, include=FALSE}
-library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggpmisc)
 library(lubridate)
 library(gtsummary)
-library(arsenal)
 library(rspiro)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood",
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Colleen Wood",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Colleen Wood"
+  "Linux" = "/home/tim/OneDrive/Vigers/CF/Colleen Wood"
 )
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 knitr::opts_knit$set(root.dir = home_dir)
@@ -37,180 +39,19 @@ knitr::opts_knit$set(root.dir = home_dir)
 
 ```{r data cleaning}
 #| include: false
-# # Import CHCO data
-# chco_bmi_pft <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/chco_bmi_pft.csv",
-#   na.strings = "", check.names = F
-# )
-# chco_bmi_pft$Date <- mdy(chco_bmi_pft$Date)
-# chco_cgm <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/chco_cgm.csv",
-#   na.strings = "", check.names = F
-# )
-# chco_cgm$Date <- date(parse_date_time(chco_cgm$date_cgm_placement,
-#   orders = c("mdyHM", "mdy")
-# ))
-# chco_cgm$`CFF ID` <- as.numeric(sub("_.*", "", chco_cgm$subject_id))
-# chco_cgm$Visit <- sub(".*_", "", chco_cgm$subject_id)
-# chco_glycemic <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/chco_glycemic.csv",
-#   na.strings = "", check.names = F
-# )
-# chco_glycemic$Date <- mdy(chco_glycemic$Date)
-# chco_registry <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/chco_registry.csv",
-#   na.strings = "", check.names = F
-# )
-# chco_registry$Start <- NULL
-# # Import Montana
-# montana_bmi_pft <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/montana_bmi_pft.csv",
-#   na.strings = "", check.names = F
-# )
-# montana_bmi_pft$Date <- mdy(montana_bmi_pft$Date)
-# montana_cgm <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/montana_cgm.csv",
-#   na.strings = "", check.names = F
-# )
-# montana_cgm$Date <- date(parse_date_time(montana_cgm$date_cgm_placement,
-#   orders = c("mdyHM", "mdy")
-# ))
-# montana_cgm$`CFF ID` <- as.numeric(sub("_.*", "", montana_cgm$subject_id))
-# montana_cgm$Visit <- sub(".*_", "", montana_cgm$subject_id)
-# montana_cgm$Date <- mdy(montana_cgm$Date)
-# montana_demo <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/montana_demo.csv",
-#   na.strings = "", check.names = F
-# )
-# montana_genotypes <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/montana_genotypes.csv",
-#   na.strings = "", check.names = F
-# )
-# montana_gtubes <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/montana_gtubes.csv",
-#   na.strings = "", check.names = F
-# )
-# montana_gtubes$Date <- NULL
-# montana_pancreatic <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/montana_pancreatic.csv",
-#   na.strings = "", check.names = F
-# )
-# montana_pancreatic$Date <- NULL
-# montana_pancreatic$`Pancreatic Status` <- "Insufficient"
-# montana_glycemic_registry <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/montana_glycemic_registry.csv",
-#   na.strings = "", check.names = F
-# )
-# montana_glycemic_registry$Date <- mdy(montana_glycemic_registry$Date)
-# # Import UW
-# uw_registry <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/uw_registry.csv",
-#   na.strings = "", check.names = F
-# )
-# uw_registry <- uw_registry %>% rename(Date = Start)
-# uw_registry$Date <- mdy(uw_registry$Date)
-# uw_bmi <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/uw_bmi.csv",
-#   na.strings = "", check.names = F
-# )
-# uw_bmi$Date <- mdy(uw_bmi$Date)
-# uw_pft <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/uw_pft.csv",
-#   na.strings = "", check.names = F
-# )
-# uw_pft$Date <- mdy(uw_pft$Date)
-# uw_cgm <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/uw_cgm.csv",
-#   na.strings = "", check.names = F
-# )
-# uw_cgm$`CFF ID` <- as.numeric(sub("_.*", "", uw_cgm$subject_id))
-# uw_cgm$Visit <- sub(".*_", "", uw_cgm$subject_id)
-# uw_demo <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/uw_demo.csv",
-#   na.strings = "", check.names = F
-# )
-# uw_genotypes <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/uw_registry.csv",
-#   na.strings = "", check.names = F
-# )
-# uw_glycemic <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/uw_glycemic.csv",
-#   na.strings = "", check.names = F
-# )
-# uw_glycemic$Date <- mdy(uw_glycemic$Date)
-# uw_gtubes <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/uw_gtubes.csv",
-#   na.strings = "", check.names = F
-# )
-# uw_gtubes$`Date of Encounter` <- NULL
-# uw_pancreatic <- read.csv(
-#   "./Prepost Trikafta/Data_Cleaned/uw_pancreatic.csv",
-#   na.strings = "", check.names = F
-# )
-# uw_pancreatic$Date <- NULL
-# # Format and merge
-# # CHCO
-# chco_long <- full_join(chco_glycemic, chco_bmi_pft)
-# chco_long <- full_join(chco_registry, chco_long)
-# chco_long <- full_join(chco_long, chco_cgm)
-# chco_long$site <- "CHCO"
-# chco_long$`Hispanic/Latinx`[chco_long$`Hispanic/Latinx`] <- "Yes"
-# chco_long$`Hispanic/Latinx`[chco_long$`Hispanic/Latinx` == "FALSE"] <- "No"
-# # Montana
-# montana_registry <- full_join(montana_demo, montana_genotypes)
-# montana_registry <- full_join(montana_registry, montana_pancreatic)
-# montana_registry <- full_join(montana_registry, montana_gtubes)
-# montana_long <- full_join(montana_glycemic_registry, montana_bmi_pft)
-# montana_long <- full_join(montana_registry, montana_long)
-# montana_long <- full_join(montana_long, montana_cgm)
-# montana_long <- montana_long %>% rename(HbA1c_original = HbA1c)
-# montana_long <- montana_long %>% mutate(
-#   hba1c_spc = str_detect(HbA1c_original, " "),
-#   HbA1c = as.numeric(ifelse(hba1c_spc, sub(" .*", "", montana_long$HbA1c_original), HbA1c_original))
-# )
-# montana_long <- montana_long %>% select(-c(hba1c_spc, HbA1c_original))
-# montana_long$site <- "Montana"
-# montana_long <- montana_long %>%
-#   rename(`Hispanic/Latinx` = `Is Patient of Hispanic Origin`)
-# # UW
-# uw_bmi_pft <- full_join(uw_bmi, uw_pft)
-# uw_registry <- full_join(uw_registry, uw_demo)
-# uw_registry <- full_join(uw_registry, uw_gtubes)
-# uw_long <- full_join(uw_glycemic, uw_bmi_pft)
-# uw_long <- full_join(uw_registry, uw_long)
-# uw_long <- full_join(uw_long, uw_cgm)
-# uw_long$site <- "UW"
-# uw_long <- uw_long %>%
-#   rename(`Hispanic/Latinx` = `Is Patient of Hispanic Origin`)
-# # Put everything together
-# analysis_data <- full_join(chco_long, montana_long)
-# analysis_data <- full_join(analysis_data, uw_long)
-# # Race
-# analysis_data$Race <- factor(analysis_data$Race,
-#   levels = c(
-#     "American Indian or Alaska Native", "Black", "Black or African American",
-#     "Caucasian", "Other", "Some other race", "Two or more races", "Unknown",
-#     "White"
-#   ),
-#   labels = c(
-#     "Other", "Black", "Black", "White", "Other", "Other", "Other",
-#     "Unknown", "White"
-#   )
-# )
-# df <- analysis_data
-load("/home/timvigers/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/analysis_dataset.rdata")
+load("/home/tim/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/analysis_dataset.rdata")
 # Ethnicity
-chco_demo <- read.csv("/home/timvigers/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Raw/Data From CHCO/Registry/Copy of Earliest Trikafta Dates in Registry_updated 2.2.21 cc modified_cfrdyn.csv")
+chco_demo <- read.csv("/home/tim/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Raw/Data From CHCO/Registry/Copy of Earliest Trikafta Dates in Registry_updated 2.2.21 cc modified_cfrdyn.csv")
 chco_demo$Hispanic <- NA
 chco_demo$Hispanic[chco_demo$Hispanic.Latinx] <- "Yes"
 chco_demo$Hispanic[!chco_demo$Hispanic.Latinx] <- "No"
 chco_demo <- chco_demo[, c("CFF.ID", "Hispanic")]
 
-montana_demo <- read.csv("/home/timvigers/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/montana_demo.csv")
+montana_demo <- read.csv("/home/tim/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/montana_demo.csv")
 montana_demo$Hispanic <- montana_demo$Is.Patient.of.Hispanic.Origin
 montana_demo <- montana_demo[, c("CFF.ID", "Hispanic")]
 
-uw_demo <- read.csv("/home/timvigers/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/uw_demo.csv")
+uw_demo <- read.csv("/home/tim/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/uw_demo.csv")
 uw_demo$Hispanic <- uw_demo$Is.Patient.of.Hispanic.Origin
 uw_demo <- uw_demo[, c("CFF.ID", "Hispanic")]
 
@@ -221,11 +62,12 @@ df <- left_join(df, eth)
 ```
 
 ```{r}
-# Baseline HbA1c, BMI group pre- and post-modulator
+# Baseline HbA1c, BMI group pre- and post-modulator, age group
 df <- df %>%
   group_by(`CFF ID`) %>%
   mutate(
     `Baseline HbA1c` = HbA1c[`Pre or Post` == "Pre"],
+    `Age group at baseline` = Age[`Pre or Post` == "Pre"],
     `Baseline BMI` = `BMI Percentile`[`Pre or Post` == "Pre"],
     `Post BMI` = `BMI Percentile`[`Pre or Post` == "Post"]
   ) %>%
@@ -233,14 +75,12 @@ df <- df %>%
 df$`Baseline HbA1c` <- cut(df$`Baseline HbA1c`, c(-Inf, 6.5, Inf),
   right = F
 )
+df$`Age group at baseline` <- cut(df$`Age group at baseline`,
+  c(-Inf, 18, Inf),
+  right = F
+)
 df$`Baseline BMI` <- cut(df$`Baseline BMI`, c(-Inf, 85, Inf), right = F)
 df$`Post BMI` <- cut(df$`Post BMI`, c(-Inf, 85, Inf), right = F)
-# Pre-modulator BMI percentile
-df <- df %>%
-  group_by(`CFF ID`) %>%
-  mutate(`Baseline HbA1c` = HbA1c[`Pre or Post` == "Pre"]) %>%
-  ungroup()
-df$`Baseline HbA1c` <- cut(df$`Baseline HbA1c`, c(-Inf, 6.5, Inf), right = F)
 # Race neutral equations
 df$ppFEV1gl <- pctpred_GLIgl(
   age = df$Age, height = df$Height / 100, gender = df$Sex, FEV1 = df$FEV1
@@ -248,6 +88,8 @@ df$ppFEV1gl <- pctpred_GLIgl(
 df$ppFVCgl <- pctpred_GLIgl(
   age = df$Age, height = df$Height / 100, gender = df$Sex, FVC = df$FEV1
 )
+# TDD per kg
+df$TDD <- df$TDD / df$Weight
 # Columns formats
 df$`Num. A1c Values` <- as.numeric(df$`Num. A1c Values`)
 ```
@@ -260,11 +102,11 @@ df %>%
   select(
     Age, `BMI Percentile`, Weight, Sex, ppFEV1, ppFEV1gl, ppFVC,
     ppFVCgl, `G-tube in past 12 months`, `Pancreatic Status`, Site,
-    Genotype, `Age Group`, Race,Hispanic
+    Genotype, `Age Group`, Race, Hispanic
   ) %>%
   tbl_summary(
-    statistic = list(c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~ 
-                       "{mean} ± {sd}"),
+    statistic = list(c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~
+      "{mean} ± {sd}"),
     missing_text = "Missing"
   )
 ```
@@ -339,7 +181,7 @@ df %>%
           c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~
             c("{mean} ± {sd}", "{min}, {max}"),
           c("Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile") ~
-            c("{median} [{p25}, {p75}]", "{min}, {max}")
+            c("{median} [{p25}, {p75}]")
         ),
         include = -`CFF ID`, digits = list(everything() ~ 2),
         missing_text = "Missing"
@@ -363,6 +205,56 @@ ggplot(df, aes(x = `Pre or Post`, y = HbA1c, group = `CFF ID`)) +
   theme_classic() +
   theme(axis.title.x = element_blank()) +
   facet_wrap(~Site)
+```
+
+### By age group at baseline
+
+```{r}
+# Table
+df %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Age group at baseline`, `Num. A1c Values`, HbA1c, Time,
+    Weight, `BMI Percentile`, ppFEV1, ppFEV1gl, ppFVC, ppFVCgl, TDD,
+  ) %>%
+  tbl_strata(
+    strata = `Age group at baseline`,
+    .tbl_fun = ~ .x %>%
+      tbl_summary(
+        by = `Pre or Post`,
+        type = list(
+          c(
+            "Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile",
+            "ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl", "TDD"
+          ) ~ "continuous2"
+        ),
+        statistic = list(
+          c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~
+            c("{mean} ± {sd}", "{min}, {max}"),
+          c("Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile") ~
+            c("{median} [{p25}, {p75}]", "{min}, {max}")
+        ),
+        include = -`CFF ID`, digits = list(everything() ~ 2),
+        missing_text = "Missing"
+      ) %>%
+      add_p(
+        test = list(
+          c(
+            "Num. A1c Values", "HbA1c", "Time", "Weight", "BMI Percentile",
+            "TDD"
+          ) ~ "paired.wilcox.test",
+          c("ppFEV1", "ppFEV1gl", "ppFVC", "ppFVCgl") ~ "paired.t.test"
+        ),
+        group = `CFF ID`
+      ) %>%
+      separate_p_footnotes()
+  )
+# Plot
+ggplot(df, aes(x = `Pre or Post`, y = HbA1c, group = `CFF ID`)) +
+  geom_point(alpha = 0.2) +
+  geom_line(alpha = 0.2) +
+  theme_classic() +
+  theme(axis.title.x = element_blank()) +
+  facet_wrap(~`Age group at baseline`)
 ```
 
 ### By baseline HbA1c
@@ -557,7 +449,7 @@ cgm %>%
     by = `Pre or Post`,
     type = list(everything() ~ "continuous2"),
     statistic = list(
-      everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+      everything() ~ c("{median} [{p25}, {p75}]")
     ),
     include = -`CFF ID`, digits = list(everything() ~ 2),
     missing_text = "Missing"
@@ -567,6 +459,33 @@ cgm %>%
     group = `CFF ID`
   ) %>%
   separate_p_footnotes()
+```
+
+#### By age group at baseline
+
+```{r}
+cgm %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Age group at baseline`, all_of(cgm_vars)
+  ) %>%
+  tbl_strata(
+    strata = `Age group at baseline`,
+    .tbl_fun = ~ .x %>%
+      tbl_summary(
+        by = `Pre or Post`,
+        type = list(everything() ~ "continuous2"),
+        statistic = list(
+          everything() ~ c("{median} [{p25}, {p75}]")
+        ),
+        include = -`CFF ID`, digits = list(everything() ~ 2),
+        missing_text = "Missing"
+      ) %>%
+      add_p(
+        test = list(everything() ~ "paired.wilcox.test"),
+        group = `CFF ID`
+      ) %>%
+      separate_p_footnotes()
+  )
 ```
 
 #### By baseline HbA1c
@@ -583,7 +502,7 @@ cgm %>%
         by = `Pre or Post`,
         type = list(everything() ~ "continuous2"),
         statistic = list(
-          everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+          everything() ~ c("{median} [{p25}, {p75}]")
         ),
         include = -`CFF ID`, digits = list(everything() ~ 2),
         missing_text = "Missing"
@@ -610,7 +529,7 @@ cgm %>%
         by = `Pre or Post`,
         type = list(everything() ~ "continuous2"),
         statistic = list(
-          everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+          everything() ~ c("{median} [{p25}, {p75}]")
         ),
         include = -`CFF ID`, digits = list(everything() ~ 2),
         missing_text = "Missing"
@@ -637,7 +556,7 @@ cgm %>%
         by = `Pre or Post`,
         type = list(everything() ~ "continuous2"),
         statistic = list(
-          everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+          everything() ~ c("{median} [{p25}, {p75}]")
         ),
         include = -`CFF ID`, digits = list(everything() ~ 2),
         missing_text = "Missing"
@@ -672,6 +591,33 @@ cgm %>%
     group = `CFF ID`
   ) %>%
   separate_p_footnotes()
+```
+
+#### By age group at baseline
+
+```{r}
+cgm %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Age group at baseline`, all_of(day_cgm)
+  ) %>%
+  tbl_strata(
+    strata = `Age group at baseline`,
+    .tbl_fun = ~ .x %>%
+      tbl_summary(
+        by = `Pre or Post`,
+        type = list(everything() ~ "continuous2"),
+        statistic = list(
+          everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+        ),
+        include = -`CFF ID`, digits = list(everything() ~ 2),
+        missing_text = "Missing"
+      ) %>%
+      add_p(
+        test = list(everything() ~ "paired.wilcox.test"),
+        group = `CFF ID`
+      ) %>%
+      separate_p_footnotes()
+  )
 ```
 
 #### By baseline HbA1c
@@ -779,6 +725,33 @@ cgm %>%
   separate_p_footnotes()
 ```
 
+#### By age group at baseline
+
+```{r}
+cgm %>%
+  select(
+    `CFF ID`, `Pre or Post`, `Age group at baseline`, all_of(night_cgm)
+  ) %>%
+  tbl_strata(
+    strata = `Age group at baseline`,
+    .tbl_fun = ~ .x %>%
+      tbl_summary(
+        by = `Pre or Post`,
+        type = list(everything() ~ "continuous2"),
+        statistic = list(
+          everything() ~ c("{median} [{p25}, {p75}]", "{min}, {max}")
+        ),
+        include = -`CFF ID`, digits = list(everything() ~ 2),
+        missing_text = "Missing"
+      ) %>%
+      add_p(
+        test = list(everything() ~ "paired.wilcox.test"),
+        group = `CFF ID`
+      ) %>%
+      separate_p_footnotes()
+  )
+```
+
 #### By baseline HbA1c
 
 ```{r}
@@ -858,4 +831,71 @@ cgm %>%
       ) %>%
       separate_p_footnotes()
   )
+```
+
+# Additional analyses
+
+## Longitudinal HbA1c
+
+The vast majority of participants have 2 A1c values pre-ETI and 2 after.
+
+```{r}
+df %>%
+  mutate(`Num. A1c Values` = factor(`Num. A1c Values`)) %>%
+  select(`Pre or Post`, `Num. A1c Values`) %>%
+  tbl_summary(by = `Pre or Post`)
+```
+
+## Change in HbA1c and change in FEV1
+
+```{r}
+change <- df %>%
+  group_by(`CFF ID`) %>%
+  summarise(
+    `Baseline HbA1c` = HbA1c[`Pre or Post` == "Pre"],
+    `Baseline ppFEV1gl` = ppFEV1gl[`Pre or Post` == "Pre"],
+    `Post ppFEV1gl` = ppFEV1gl[`Pre or Post` == "Post"],
+    `Change in HbA1c` =
+      HbA1c[`Pre or Post` == "Post"] - HbA1c[`Pre or Post` == "Pre"],
+    `Change in FEV1` =
+      ppFEV1gl[`Pre or Post` == "Post"] - ppFEV1gl[`Pre or Post` == "Pre"],
+    `% Change in FEV1` =
+      ((ppFEV1gl[`Pre or Post` == "Post"] - ppFEV1gl[`Pre or Post` == "Pre"]) /
+        ppFEV1gl[`Pre or Post` == "Pre"]) * 100
+  )
+change$`HbA1c group` <- cut(change$`Change in HbA1c`,
+  breaks = c(-Inf, -0.5, 0.5, Inf), right = F,
+  labels = c("Decreased", "No change", "Increased")
+)
+ggplot(change, aes(x = `Change in FEV1`, y = `Change in HbA1c`)) +
+  geom_point() +
+  stat_poly_line(se = F) +
+  stat_poly_eq(use_label(c("eq", "R2", "p", "n"))) +
+  theme_bw()
+ggplot(change, aes(x = `% Change in FEV1`, y = `Change in HbA1c`)) +
+  geom_point() +
+  stat_poly_line(se = F) +
+  stat_poly_eq(use_label(c("eq", "R2", "p", "n"))) +
+  theme_bw()
+```
+
+## Change in FEV1 by HbA1c group
+
+```{r}
+df <- df %>%
+  group_by(`CFF ID`) %>%
+  mutate(
+    `Change in HbA1c` =
+      HbA1c[`Pre or Post` == "Post"] - HbA1c[`Pre or Post` == "Pre"]
+  )
+df$`HbA1c group` <- cut(df$`Change in HbA1c`,
+  breaks = c(-Inf, -0.5, 0.5, Inf), right = F,
+  labels = c("HbA1c decreased", "HbA1 no change", "HbA1c increased")
+)
+ggplot(df, aes(x = `Pre or Post`, y = ppFEV1gl, group = `CFF ID`)) +
+  geom_point(alpha = 0.2) +
+  geom_line(alpha = 0.2) +
+  theme_classic() +
+  theme(axis.title.x = element_blank()) +
+  facet_wrap(~`HbA1c group`)
 ```

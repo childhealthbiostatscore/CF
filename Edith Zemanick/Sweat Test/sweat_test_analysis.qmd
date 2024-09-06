@@ -21,8 +21,10 @@ editor: source
 
 ```{r setup}
 #| include: false
-library(tidyverse)
+library(dplyr)
+library(tidyr)
 library(readxl)
+library(gtsummary)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Test",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Edith Zemanick/Sweat Test",
@@ -38,6 +40,14 @@ chco <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.c
 )
 njh <- read_excel("./Data_Raw/SweatVariability2025_CFgenotypes 2024-08-21.xlsx")
 chec <- read.csv("./Data_Raw/CHEC sweat sodium and chloride.csv")
+# Numeric variables
+num_vars <- c(
+  "Na", "K", "Cl", "Amount_Left", "Amount_Right", "Na_Left", "Na_Right",
+  "K_Left", "K_Right", "Cl_Left", "Cl_Right"
+)
+chco[, num_vars] <- lapply(chco[, num_vars], function(c) {
+  suppressWarnings(as.numeric(c))
+})
 # Fix diagnoses/exclusion data for CHCO (based on Angela's review)
 diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with CF or Non-CF.xlsx")
 exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) | diagnoses$Code == "Exclude"]
@@ -51,4 +61,14 @@ chco$Diagnosis <- factor(
   levels = c("CFTR-related disorder", "CRMS", "Cystic Fibrosis", "Non-CF"),
   labels = c("CFTR-RD or CRMS", "CFTR-RD or CRMS", "Cystic Fibrosis", "Non-CF")
 )
+```
+
+```{r}
+chco %>%
+  group_by(PatientID) %>%
+  filter(row_number() == 1) %>%
+  ungroup() %>%
+  select(-PatientID, -Genotypes1, -Genotypes2, -T_Tract, -Notes) %>%
+  tbl_summary(by = Diagnosis, missing_text = "(Missing)")%>%
+  add_overall()
 ```
