@@ -20,7 +20,9 @@ editor: source
 
 ```{r setup}
 #| include: false
-library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
 library(gt)
 library(gtsummary)
 library(lmerTest)
@@ -28,7 +30,7 @@ library(emmeans)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+  "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -44,14 +46,29 @@ knitr::opts_knit$set(root.dir = home_dir)
 df <- read.csv("./Christine Chan/EnVision CF/Data_Clean/analysis_dataset.csv",
   na.strings = ""
 )
-# For this analysis, we only want those with catecholamines
-df <- df %>%
-  group_by(study_id, Date) %>%
-  mutate(catecholamines = any(!is.na(Epinephrine) | !is.na(Norepinephrine))) %>%
-  filter(catecholamines) %>%
-  ungroup()
-# # Time as a factor
-df$Timepoint <- factor(df$Timepoint, levels = c(0, 10, 30, 60, 90, 120, 150, 180))
+# Timepoint and variables lists
+timepoints <- c(0, 10, 30, 60, 90, 120, 150, 180)
+glucoses <- paste0("Glucose_", timepoints)
+insulins <- paste0("Insulin_", timepoints)
+epinephrines <- paste0("Epinephrine_", timepoints)
+norepinephrines <- paste0("Norepinephrine_", timepoints)
+# For this analysis, we only want those with catecholamines measured
+df$catecholamines <- apply(
+  df[, c(epinephrines, norepinephrines)], 1,
+  function(r) {
+    any(!is.na(r))
+  }
+)
+df <- df %>% filter(catecholamines)
+# To long format
+t <- df %>%
+  select(
+    study_id, Date,
+    all_of(c(glucoses, insulins, epinephrines, norepinephrines))
+  ) %>%
+  pivot_longer(all_of(c(glucoses, insulins, epinephrines, norepinephrines)),
+               names_to = c(".value", "Timepoint"),
+    names_pattern = "(.*)_(.*)")
 ```
 
 # Demographics at first visit
