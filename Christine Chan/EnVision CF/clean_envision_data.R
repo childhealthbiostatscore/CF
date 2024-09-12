@@ -2,8 +2,7 @@
 # Setup
 #-------------------------------------------------------------------------------
 # Libraries
-library(dplyr)
-library(tidyr)
+library(tidyverse)
 library(lubridate)
 library(readxl)
 library(stringi)
@@ -83,17 +82,18 @@ glucose$Timepoint <- sub("_min", "", glucose$Timepoint)
 glucose$Timepoint <- as.numeric(glucose$Timepoint)
 glucose$Date <- ymd(glucose$Date)
 #-------------------------------------------------------------------------------
-# Demographics
+# Demographics and visit data
 #-------------------------------------------------------------------------------
-demo <- redcap %>%
+visits <- redcap %>%
   select(
     study_id, date_visit, age_visit, height, weight, sex, origin_race,
-    ethnicity, redcap_data_access_group, cftr_mutation_1, cftr_mutation_2
+    ethnicity, redcap_data_access_group, cftr_mutation_1, cftr_mutation_2,
+    hypoglycemia_symptoms_yesno
   ) %>%
   filter(!is.na(date_visit)) %>%
   rename(Date = date_visit) %>%
   filter(!if_all(age_visit:ethnicity, is.na))
-demo$Date <- ymd(demo$Date)
+visits$Date <- ymd(visits$Date)
 #-------------------------------------------------------------------------------
 # Date fixes per Holly's 7/19 emails
 #-------------------------------------------------------------------------------
@@ -187,7 +187,7 @@ insulin$Insulin <- as.numeric(insulin$Insulin)
 cgm <- read.csv("./Christine Chan/EnVision CF/Data_Clean/CGM/cgm_variables.csv",
   na.strings = ""
 )
-cgm = cgm[-which(cgm$percent_cgm_wear==0),]
+cgm <- cgm[-which(cgm$percent_cgm_wear == 0), ]
 cgm$subject_id <- sub("_sensor_raw_data_upload", "", cgm$subject_id)
 cgm$study_id <- sapply(
   stri_split_fixed(str = cgm$subject_id, pattern = "_", n = 2),
@@ -203,27 +203,18 @@ cgm <- left_join(cgm, redcap %>% select(study_id, redcap_event_name, date_visit)
 cgm <- cgm %>% rename(Date = date_visit)
 cgm$Date <- ymd(cgm$Date)
 # Manually fix dates for CGM replacements/unscheduled visits
-# CC0010 unscheduled_visit_arm_1 starts 2019-10-26. CC0010 visit_1_arm_1 on 2020-07-14 has a CGM associated with it. What is the CGM from 2019-10-26?
-
-# IA0003 unscheduled_visit_arm_1 starts 2019-12-10. IA0003 visit_1_arm_1 has a CGM associated with it on 2019-09-16. What is the CGM from 2019-12-10?
-
-
 cgm$Date[cgm$study_id == "IA0001" &
   cgm$redcap_event_name == "visit_2_arm_1_replacement_cgm_raw_data_upload"] <-
   "2020-11-09"
-
 cgm$Date[cgm$study_id == "IA0002" &
   cgm$redcap_event_name == "visit_2_arm_1_replacement_cgm_raw_data_upload"] <-
   "2020-08-10"
-
 cgm$Date[cgm$study_id == "IA0014" &
   cgm$redcap_event_name == "visit_2_arm_1_replacement_cgm_raw_data_upload"] <-
   "2020-09-03"
-
 cgm$Date[cgm$study_id == "IA0096" &
   cgm$redcap_event_name == "visit_1_arm_1_replacement_cgm_raw_data_upload"] <-
   "2021-01-08"
-
 # Remove unnecessary columns
 cgm$subject_id <- NULL
 cgm$date_cgm_placement <- NULL
@@ -237,7 +228,7 @@ final_df <- final_df %>% pivot_wider(
   names_from = Timepoint, values_from = c(Glucose:Epinephrine)
 )
 final_df <- full_join(final_df, cgm)
-final_df <- full_join(final_df, demo)
+final_df <- full_join(final_df, visits)
 # Add HbA1c, etc.
 a1c <- redcap %>%
   select(study_id, date_visit, a1c_result) %>%
@@ -380,6 +371,9 @@ final_df$Hypo70 <- factor(final_df$Hypo70,
 final_df$Hypo60 <- factor(final_df$Hypo60,
   levels = c(T, F),
   labels = c("Hypoglycemia < 60", "No Hypoglycemia < 60")
+)
+final_df$hypoglycemia_symptoms_yesno <- factor(final_df$hypoglycemia_symptoms_yesno,
+  levels = 0:1, labels = c("No", "Yes")
 )
 # Final formatting
 final_df$redcap_data_access_group[final_df$study_id == "IA0005" |

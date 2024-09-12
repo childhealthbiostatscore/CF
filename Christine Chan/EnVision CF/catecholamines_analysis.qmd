@@ -20,9 +20,7 @@ editor: source
 
 ```{r setup}
 #| include: false
-library(dplyr)
-library(tidyr)
-library(ggplot2)
+library(tidyverse)
 library(gt)
 library(gtsummary)
 library(lmerTest)
@@ -39,7 +37,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 
 - BMI percentiles were calculated using the `childsds` R package, assuming that male = 1 and female = 2 for the `Sex` variable. Those with age > 20 were considered age = 20 for the purposes of percentile calculations.
 
-- Epinephrine and norepinephrine were log transformed for modeling purposes.
+- Epinephrine, norepinephrine, and insulin were log transformed for modeling purposes.
 
 ```{r data cleaning}
 # Import cleaned data
@@ -48,6 +46,7 @@ df <- read.csv("./Christine Chan/EnVision CF/Data_Clean/analysis_dataset.csv",
 )
 # Timepoint and variables lists
 timepoints <- c(0, 10, 30, 60, 90, 120, 150, 180)
+limited_timepoints <- c(0, 120, 150, 180)
 glucoses <- paste0("Glucose_", timepoints)
 insulins <- paste0("Insulin_", timepoints)
 epinephrines <- paste0("Epinephrine_", timepoints)
@@ -60,15 +59,16 @@ df$catecholamines <- apply(
   }
 )
 df <- df %>% filter(catecholamines)
-# To long format
-t <- df %>%
+# Make a long dataset for mixed models
+lmm_df <- df %>%
   select(
-    study_id, Date,
+    study_id, Hypo60, Hypo70,
     all_of(c(glucoses, insulins, epinephrines, norepinephrines))
   ) %>%
   pivot_longer(all_of(c(glucoses, insulins, epinephrines, norepinephrines)),
-               names_to = c(".value", "Timepoint"),
-    names_pattern = "(.*)_(.*)")
+    names_to = c(".value", "Timepoint"),
+    names_pattern = "(.*)_(.*)"
+  )
 ```
 
 # Demographics at first visit
@@ -77,9 +77,6 @@ t <- df %>%
 #| label: tbl-1
 #| tbl-cap: Participant characteristics (overall)
 df %>%
-  group_by(study_id) %>%
-  filter(row_number() == 1) %>%
-  ungroup() %>%
   select(
     redcap_data_access_group, age_visit:ethnicity, cftr_mutation_1,
     cftr_mutation_2
@@ -99,16 +96,87 @@ IA0005, IA0006, IA0017, IA0042, and IA0079 had catecholamines measured at multip
 #| tbl-cap: BG < 70 at Any Point
 #| warning: false
 df %>%
-  filter(Timepoint %in% c(0, 120, 150, 180)) %>%
-  pivot_wider(
-    names_from = Timepoint, values_from = c(Epinephrine, Norepinephrine),
-    id_cols = c(study_id:cftr_mutation_2, Hypo70)
+  select(
+    Hypo70, age_visit:cftr_mutation_2, hypoglycemia_symptoms_yesno,
+    all_of(paste0("Glucose_", timepoints)),
+    all_of(paste0("Insulin_", timepoints)),
+    all_of(paste0("Epinephrine_", limited_timepoints)),
+    all_of(paste0("Norepinephrine_", limited_timepoints))
   ) %>%
-  select(Hypo70, age_visit:cftr_mutation_2, Epinephrine_0:Norepinephrine_180) %>%
   tbl_summary(by = Hypo70, missing_text = "Missing") %>%
   add_overall() %>%
   add_p() %>%
   separate_p_footnotes()
+```
+
+## Glucose
+
+Glucose was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable.
+
+```{r}
+#| warning: false
+# Fit
+mod <- lmer(Glucose ~ Timepoint * Hypo70 + (1 | study_id),
+  data = lmm_df
+)
+mod %>% tbl_regression(intercept = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Means") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
+  group = Hypo70
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = timepoints) +
+  ylab("LS Mean Glucose") +
+  xlab("Timepoint") +
+  theme_bw() +
+  theme(legend.title = element_blank())
+```
+
+## Insulin
+
+Insulin was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable.
+
+```{r}
+#| warning: false
+# Fit
+mod <- lmer(log(Insulin) ~ Timepoint * Hypo70 + (1 | study_id),
+  data = lmm_df
+)
+mod %>% tbl_regression(intercept = T, exponentiate = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Means") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
+  group = Hypo70
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = timepoints) +
+  ylab("LS Mean Insulin") +
+  xlab("Timepoint") +
+  theme_bw() +
+  theme(legend.title = element_blank())
 ```
 
 ## Epinephrine
@@ -118,12 +186,30 @@ Epinephrine was modeled using a linear mixed effect model with random intercept 
 ```{r}
 #| warning: false
 # Fit
-mod <- lmer(log(Epinephrine) ~ Timepoint * Hypo70 + (1 | study_id), data = df)
+mod <- lmer(log(Epinephrine) ~ Timepoint * Hypo70 + (1 | study_id),
+  data = lmm_df
+)
 mod %>% tbl_regression(intercept = T, exponentiate = T)
 means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"), type = "response"))
-means %>% gt(caption = "LS Means")
+colnames(means) <- c(
+  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Means") %>%
+  fmt_number(decimals = 2)
 # Plot
-emmip(mod, Hypo70 ~ Timepoint, CIs = T, type = "response") +
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
+  group = Hypo70
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Mean Epinephrine") +
+  xlab("Timepoint") +
   theme_bw() +
   theme(legend.title = element_blank())
 ```
@@ -135,12 +221,30 @@ Norepinephrine was modeled using a linear mixed effect model with random interce
 ```{r}
 #| warning: false
 # Fit
-mod <- lmer(log(Norepinephrine) ~ Timepoint * Hypo70 + (1 | study_id), data = df)
+mod <- lmer(log(Norepinephrine) ~ Timepoint * Hypo70 + (1 | study_id),
+  data = lmm_df
+)
 mod %>% tbl_regression(intercept = T, exponentiate = T)
 means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"), type = "response"))
-means %>% gt(caption = "LS Means")
+colnames(means) <- c(
+  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Means") %>%
+  fmt_number(decimals = 2)
 # Plot
-emmip(mod, Hypo70 ~ Timepoint, CIs = T, type = "response") +
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
+  group = Hypo70
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Mean Norepinephrine") +
+  xlab("Timepoint") +
   theme_bw() +
   theme(legend.title = element_blank())
 ```
@@ -156,16 +260,87 @@ IA0005, IA0006, IA0017, IA0042, and IA0079 had catecholamines measured at multip
 #| tbl-cap: BG < 60 at Any Point
 #| warning: false
 df %>%
-  filter(Timepoint %in% c(0, 120, 150, 180)) %>%
-  pivot_wider(
-    names_from = Timepoint, values_from = c(Epinephrine, Norepinephrine),
-    id_cols = c(study_id:cftr_mutation_2, Hypo60)
+  select(
+    Hypo60, age_visit:cftr_mutation_2, hypoglycemia_symptoms_yesno,
+    all_of(paste0("Glucose_", timepoints)),
+    all_of(paste0("Insulin_", timepoints)),
+    all_of(paste0("Epinephrine_", limited_timepoints)),
+    all_of(paste0("Norepinephrine_", limited_timepoints))
   ) %>%
-  select(Hypo60, age_visit:cftr_mutation_2, Epinephrine_0:Norepinephrine_180) %>%
   tbl_summary(by = Hypo60, missing_text = "Missing") %>%
   add_overall() %>%
   add_p() %>%
   separate_p_footnotes()
+```
+
+## Glucose
+
+Glucose was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable.
+
+```{r}
+#| warning: false
+# Fit
+mod <- lmer(Glucose ~ Timepoint * Hypo60 + (1 | study_id),
+  data = lmm_df
+)
+mod %>% tbl_regression(intercept = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Means") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
+  group = Hypo60
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = timepoints) +
+  ylab("LS Mean Glucose") +
+  xlab("Timepoint") +
+  theme_bw() +
+  theme(legend.title = element_blank())
+```
+
+## Insulin
+
+Insulin was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable.
+
+```{r}
+#| warning: false
+# Fit
+mod <- lmer(log(Insulin) ~ Timepoint * Hypo60 + (1 | study_id),
+  data = lmm_df
+)
+mod %>% tbl_regression(intercept = T, exponentiate = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Means") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
+  group = Hypo60
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = timepoints) +
+  ylab("LS Mean Insulin") +
+  xlab("Timepoint") +
+  theme_bw() +
+  theme(legend.title = element_blank())
 ```
 
 ## Epinephrine
@@ -175,12 +350,30 @@ Epinephrine was modeled using a linear mixed effect model with random intercept 
 ```{r}
 #| warning: false
 # Fit
-mod <- lmer(log(Epinephrine) ~ Timepoint * Hypo60 + (1 | study_id), data = df)
+mod <- lmer(log(Epinephrine) ~ Timepoint * Hypo60 + (1 | study_id),
+  data = lmm_df
+)
 mod %>% tbl_regression(intercept = T, exponentiate = T)
 means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"), type = "response"))
-means %>% gt(caption = "LS Means")
+colnames(means) <- c(
+  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Means") %>%
+  fmt_number(decimals = 2)
 # Plot
-emmip(mod, Hypo60 ~ Timepoint, CIs = T, type = "response") +
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
+  group = Hypo60
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Mean Epinephrine") +
+  xlab("Timepoint") +
   theme_bw() +
   theme(legend.title = element_blank())
 ```
@@ -192,12 +385,30 @@ Norepinephrine was modeled using a linear mixed effect model with random interce
 ```{r}
 #| warning: false
 # Fit
-mod <- lmer(log(Norepinephrine) ~ Timepoint * Hypo60 + (1 | study_id), data = df)
+mod <- lmer(log(Norepinephrine) ~ Timepoint * Hypo60 + (1 | study_id),
+  data = lmm_df
+)
 mod %>% tbl_regression(intercept = T, exponentiate = T)
 means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"), type = "response"))
-means %>% gt(caption = "LS Means")
+colnames(means) <- c(
+  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Means") %>%
+  fmt_number(decimals = 2)
 # Plot
-emmip(mod, Hypo60 ~ Timepoint, CIs = T, type = "response") +
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
+  group = Hypo60
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Mean Norepinephrine") +
+  xlab("Timepoint") +
   theme_bw() +
   theme(legend.title = element_blank())
 ```
