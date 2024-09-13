@@ -21,8 +21,7 @@ editor: source
 
 ```{r setup}
 #| include: false
-library(dplyr)
-library(tidyr)
+library(tidyverse)
 library(readxl)
 library(gtsummary)
 home_dir <- switch(Sys.info()["sysname"],
@@ -48,7 +47,8 @@ chco[, num_vars] <- lapply(chco[, num_vars], function(c) {
 })
 # Fix diagnoses/exclusion data for CHCO (based on Angela's review)
 diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with CF or Non-CF.xlsx")
-exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) | diagnoses$Code == "Exclude"]
+exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) |
+  diagnoses$Code == "Exclude"]
 exclude <- exclude[!is.na(exclude)]
 chco <- chco[!(chco$PatientID %in% exclude), ]
 chco$Diagnosis <- factor(
@@ -111,12 +111,81 @@ chec <- chec %>%
     subject, Diagnosis, sex, Genotypes1, Genotypes2, age, Method, site,
     swsavg, K, swcavg, Na_Left, Na_Right, K_Left, K_Right, Cl_Left, Cl_Right
   )
-colnames(chec) = colnames(chco)
+colnames(chec) <- colnames(chco)
 # Put everything together
-df = full_join(chco,njh)
-df$PatientID = as.character(df$PatientID)
-df = full_join(df,chec)
+df <- full_join(chco, njh)
+df$PatientID <- as.character(df$PatientID)
+df <- full_join(df, chec)
+# Average the left and right values
+df$NaAvg <- rowMeans(df[, c("Na_Left", "Na_Right")], na.rm = T)
+df$NaAvg[is.nan(df$NaAvg)] <- NA
+df$KAvg <- rowMeans(df[, c("K_Left", "K_Right")], na.rm = T)
+df$KAvg[is.nan(df$KAvg)] <- NA
+df$ClAvg <- rowMeans(df[, c("Cl_Left", "Cl_Right")], na.rm = T)
+df$ClAvg[is.nan(df$ClAvg)] <- NA
+df <- df %>%
+  unite(Na, c("Na", "NaAvg"), na.rm = T) %>%
+  unite(K, c("K", "KAvg"), na.rm = T) %>%
+  unite(Cl, c("Cl", "ClAvg"), na.rm = T)
+# Genotype function
+genotype_function <- read.csv("./Data_Cleaned/genotype_function.csv")
+# Get single genes and add them together
+genotype_function <-
+  genotype_function[grep("NULL", genotype_function$genotype), ]
+genotype_function$genotype <- sub("/NULL", "", genotype_function$genotype)
+df$Genotype1Function <-
+  genotype_function$percent_wildtype_cftr_function[match(
+    df$Genotypes1,
+    genotype_function$genotype
+  )]
+df$Genotype2Function <-
+  genotype_function$percent_wildtype_cftr_function[match(
+    df$Genotypes2,
+    genotype_function$genotype
+  )]
+df$TotalGenotypeFunction <- rowSums(
+  df[, c("Genotype1Function", "Genotype2Function")],
+  na.rm = T
+)
+df$TotalGenotypeFunction[df$TotalGenotypeFunction == 0] <- NA
+# Numeric variables
+df[, c("Na", "K", "Cl")] <- lapply(df[, c("Na", "K", "Cl")], as.numeric)
+# As data frame
+df <- as.data.frame(df)
+# Write for checking
+write.csv(df, "./Data_Cleaned/analysis_dataset.csv", row.names = F, na = "")
+```
+
+# Excluding those with no genotype function estimate
+
+```{r}
+df %>%
+  filter(!is.na(TotalGenotypeFunction)) %>%
+  select(
+    Diagnosis, Genotypes1, Genotypes2, Genotype1Function, Genotype2Function,
+    TotalGenotypeFunction, Na, K, Cl
+  ) %>%
+  droplevels(.) %>%
+  tbl_summary(by = Diagnosis)
 ```
 
 ```{r}
+df %>%
+  filter(!is.na(TotalGenotypeFunction)) %>%
+  ggplot(
+    aes(x = Cl, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
+  ) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())
+
+df %>%
+  filter(!is.na(TotalGenotypeFunction)) %>%
+  ggplot(
+    aes(x = Cl, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
+  ) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F) +
+  ylim(c(0, 20)) +
+  theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())
 ```
