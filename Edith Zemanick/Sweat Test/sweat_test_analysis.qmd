@@ -38,8 +38,6 @@ knitr::opts_knit$set(root.dir = home_dir)
 chco <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv",
   na.strings = ""
 )
-njh <- read_excel("./Data_Raw/SweatVariability2025_CFgenotypes 2024-08-21.xlsx")
-chec <- read.csv("./Data_Raw/CHEC sweat sodium and chloride.csv")
 # Numeric variables
 num_vars <- c(
   "Na", "K", "Cl", "Amount_Left", "Amount_Right", "Na_Left", "Na_Right",
@@ -61,14 +59,64 @@ chco$Diagnosis <- factor(
   levels = c("CFTR-related disorder", "CRMS", "Cystic Fibrosis", "Non-CF"),
   labels = c("CFTR-RD or CRMS", "CFTR-RD or CRMS", "Cystic Fibrosis", "Non-CF")
 )
+# Exclude those without demographics (not confident in diagnosis per Edith)
+chco <- chco %>% filter(Demographics.Available == "TRUE")
+# Limit to the columns that we need for analysis
+chco <- chco %>% select(
+  PatientID, Diagnosis, Sex, Genotypes1, Genotypes2,
+  Age.at.Test.in.Years, Method, Site, Na, K, Cl, Na_Left, Na_Right, K_Left,
+  K_Right, Cl_Left, Cl_Right
+)
+# Get each person's first test
+chco <- chco %>%
+  group_by(PatientID) %>%
+  slice_min(Age.at.Test.in.Years, na_rm = T)
+# Import NJH data
+njh <- read_excel("./Data_Raw/SweatVariability2025_CFgenotypes.xlsx")
+# Filter and select similar to CHCO
+njh <- njh %>%
+  filter(`Demographics Available`) %>%
+  select(
+    `Patient ID`, Diagnosis, Sex, `Genotype 1`, `Genotype 2`,
+    `Age at test (in years)`, `Test Method`, `Site of test`, `Sweat sodium`,
+    `Sweat potassium`, `Sweat chloride`, `Sweat sodium left arm`,
+    `Sweat sodium right arm`, `Sweat potassium left arm`,
+    `Sweat potassium right arm`, `Sweat chloride left arm`,
+    `Sweat chloride right arm`
+  )
+colnames(njh) <- colnames(chco)
+njh <- njh %>%
+  group_by(PatientID) %>%
+  slice_min(Age.at.Test.in.Years, na_rm = T)
+# Import detailed diagnoses from Katie
+diagnoses <- read.csv("./Data_Cleaned/SweatVariability2025_CFgenotypes.csv",
+  na.strings = c("", ".")
+)
+# Merge NJH and diagnoses
+diagnoses <- diagnoses %>% select(Patient.ID, Diagnosis...DataScout)
+colnames(diagnoses) <- c("PatientID", "Diagnosis")
+njh <- full_join(njh, diagnoses)
+# Import CHEC data
+chec <- read.csv("./Data_Raw/CHEC sweat sodium and chloride.csv")
+# Filter and select as above (need to add some empty columns and split genotype)
+chec$Genotypes1 <- trimws(sapply(strsplit(chec$gntyp_pair, "/"), "[[", 1))
+chec$Genotypes2 <- trimws(sapply(strsplit(chec$gntyp_pair, "/"), "[[", 2))
+chec$Diagnosis <- "CF"
+chec[, c(
+  "Method", "K", "Na_Left", "Na_Right", "K_Left", "K_Right", "Cl_Left",
+  "Cl_Right"
+)] <- NA
+chec <- chec %>%
+  select(
+    subject, Diagnosis, sex, Genotypes1, Genotypes2, age, Method, site,
+    swsavg, K, swcavg, Na_Left, Na_Right, K_Left, K_Right, Cl_Left, Cl_Right
+  )
+colnames(chec) = colnames(chco)
+# Put everything together
+df = full_join(chco,njh)
+df$PatientID = as.character(df$PatientID)
+df = full_join(df,chec)
 ```
 
 ```{r}
-chco %>%
-  group_by(PatientID) %>%
-  filter(row_number() == 1) %>%
-  ungroup() %>%
-  select(-PatientID, -Genotypes1, -Genotypes2, -T_Tract, -Notes) %>%
-  tbl_summary(by = Diagnosis, missing_text = "(Missing)")%>%
-  add_overall()
 ```
