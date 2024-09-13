@@ -33,6 +33,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
+#| message: false
 # Import data
 chco <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv",
   na.strings = ""
@@ -159,6 +160,7 @@ write.csv(df, "./Data_Cleaned/analysis_dataset.csv", row.names = F, na = "")
 # Excluding those with no genotype function estimate
 
 ```{r}
+#| message: false
 df %>%
   filter(!is.na(TotalGenotypeFunction)) %>%
   select(
@@ -170,6 +172,8 @@ df %>%
 ```
 
 ```{r}
+#| message: false
+#| warning: false
 df %>%
   filter(!is.na(TotalGenotypeFunction)) %>%
   ggplot(
