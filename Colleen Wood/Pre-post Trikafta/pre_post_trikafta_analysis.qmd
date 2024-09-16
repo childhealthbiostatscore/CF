@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /home/tim/Documents/Miscellaneous/zotero.bib
-csl: /home/tim/GitHub/styles/american-medical-association.csl
+bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
+csl: /Users/timvigers/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -27,11 +27,12 @@ library(ggplot2)
 library(ggpmisc)
 library(lubridate)
 library(gtsummary)
+library(knitr)
 library(rspiro)
+library(lmerTest)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Colleen Wood",
-  "Linux" = "/home/tim/OneDrive/Vigers/CF/Colleen Wood"
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Colleen Wood"
 )
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 knitr::opts_knit$set(root.dir = home_dir)
@@ -39,25 +40,22 @@ knitr::opts_knit$set(root.dir = home_dir)
 
 ```{r data cleaning}
 #| include: false
-load("/home/tim/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/analysis_dataset.rdata")
+load("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/analysis_dataset.rdata")
+load("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/hba1c_dataset.rdata")
 # Ethnicity
-chco_demo <- read.csv("/home/tim/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Raw/Data From CHCO/Registry/Copy of Earliest Trikafta Dates in Registry_updated 2.2.21 cc modified_cfrdyn.csv")
+chco_demo <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Raw/Data From CHCO/Registry/Copy of Earliest Trikafta Dates in Registry_updated 2.2.21 cc modified_cfrdyn.csv")
 chco_demo$Hispanic <- NA
 chco_demo$Hispanic[chco_demo$Hispanic.Latinx] <- "Yes"
 chco_demo$Hispanic[!chco_demo$Hispanic.Latinx] <- "No"
 chco_demo <- chco_demo[, c("CFF.ID", "Hispanic")]
-
-montana_demo <- read.csv("/home/tim/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/montana_demo.csv")
+montana_demo <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/montana_demo.csv")
 montana_demo$Hispanic <- montana_demo$Is.Patient.of.Hispanic.Origin
 montana_demo <- montana_demo[, c("CFF.ID", "Hispanic")]
-
-uw_demo <- read.csv("/home/tim/OneDrive/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/uw_demo.csv")
+uw_demo <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/uw_demo.csv")
 uw_demo$Hispanic <- uw_demo$Is.Patient.of.Hispanic.Origin
 uw_demo <- uw_demo[, c("CFF.ID", "Hispanic")]
-
 eth <- do.call(rbind, list(chco_demo, montana_demo, uw_demo))
 colnames(eth) <- c("CFF ID", "Hispanic")
-
 df <- left_join(df, eth)
 ```
 
@@ -92,6 +90,32 @@ df$ppFVCgl <- pctpred_GLIgl(
 df$TDD <- df$TDD / df$Weight
 # Columns formats
 df$`Num. A1c Values` <- as.numeric(df$`Num. A1c Values`)
+```
+
+# HbA1c longitudinal analysis
+
+```{r}
+# Simple model with random intercept (can't fit random slope)
+hba1cs$Change <- (hba1cs$Time > 0) * hba1cs$Time
+mod <- lmer(HbA1c ~ Time + Change + (1 | `CFF ID`), data = hba1cs)
+hba1c_df <- mod@frame
+hba1c_df$pop_pred <- predict(mod, re.form = NA)
+hba1c_df$pred <- predict(mod)
+# Plot
+ggplot(hba1c_df, aes(x = Time)) +
+  geom_point(
+    aes(y = HbA1c, colour = factor(`CFF ID`), group = factor(`CFF ID`)),
+    alpha = 0.1
+  ) +
+  geom_line(
+    aes(y = pred, colour = factor(`CFF ID`), group = factor(`CFF ID`)),
+    alpha = 0.1
+  ) +
+  geom_line(aes(y = pop_pred)) +
+  theme_bw() +
+  theme(legend.position = "none")
+# Print table
+kable(summary(mod)$coefficients)
 ```
 
 # Participant characteristics prior to CFTR modulator start
