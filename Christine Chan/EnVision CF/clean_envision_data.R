@@ -399,8 +399,12 @@ final_df$CFTR <- factor(final_df$CFTR,
 final_df$cftr_mutation_1 <- NULL
 final_df$cftr_mutation_2 <- NULL
 # Final formatting
-final_df$redcap_data_access_group[final_df$study_id == "IA0005" |
-  final_df$study_id == "ia0119"] <- "iowa"
+final_df$redcap_data_access_group <- gsub("\\d", "", final_df$study_id)
+final_df$redcap_data_access_group <- factor(
+  final_df$redcap_data_access_group,
+  levels = c("CC", "ia", "IA", "MN", "WU"),
+  labels = c("Colorado", "Iowa", "Iowa", "Minnesota", "Washington University")
+)
 # Write
 write.csv(final_df,
   file = "./Christine Chan/EnVision CF/Data_Clean/analysis_dataset.csv",
