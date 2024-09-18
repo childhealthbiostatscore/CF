@@ -258,6 +258,7 @@ final_df <- full_join(final_df, a1c)
 # Calculated fields
 #-------------------------------------------------------------------------------
 # BMI
+final_df$bmi_study_visit <- NULL
 final_df$bmi <- final_df$weight / ((final_df$height^2) / 10000)
 final_df$bmi_perc <- sds(
   value = final_df$bmi,
