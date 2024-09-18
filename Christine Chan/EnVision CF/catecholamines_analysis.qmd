@@ -32,6 +32,7 @@ home_dir <- switch(Sys.info()["sysname"],
   "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
 knitr::opts_knit$set(root.dir = home_dir)
+emm_options(lmerTest.limit = 1e6, pbkrtest.limit = 1e6)
 ```
 
 # Data cleaning
@@ -57,18 +58,17 @@ neuro_survey <- paste0("neuro_score_", limited_timepoints)
 total_survey <- paste0("total_score_", limited_timepoints)
 num_symptoms_survey <- paste0("num_symptoms_", limited_timepoints)
 hypo_surveys <- c(adren_survey, neuro_survey, total_survey, num_symptoms_survey)
-# For this analysis, we only want those with catecholamines measured
+# For some of this analysis, we only want those with catecholamines measured
 df$catecholamines <- apply(
   df[, c(epinephrines, norepinephrines)], 1,
   function(r) {
     any(!is.na(r))
   }
 )
-df <- df %>% filter(catecholamines)
 # Make a long dataset for mixed models
 lmm_df <- df %>%
   select(
-    study_id, Hypo60, Hypo70,
+    study_id, catecholamines, Hypo60, Hypo70,
     all_of(c(glucoses, insulins, epinephrines, norepinephrines, hypo_surveys))
   ) %>%
   pivot_longer(
@@ -80,6 +80,8 @@ lmm_df$Timepoint <- factor(lmm_df$Timepoint, levels = timepoints)
 # Remove BMI percentile for those >= 20
 df$bmi_perc[df$age_visit >= 20] <- NA
 df$bmi[df$age_visit < 20] <- NA
+# Remove 0 values
+lmm_df$Insulin[lmm_df$Insulin == 0] <- NA
 ```
 
 # Demographics at first visit
@@ -88,6 +90,9 @@ df$bmi[df$age_visit < 20] <- NA
 #| label: tbl-1
 #| tbl-cap: Participant characteristics (overall)
 df %>%
+  group_by(study_id) %>%
+  slice_min(age_visit) %>%
+  ungroup() %>%
   select(
     redcap_data_access_group, age_visit:ethnicity, bmi, bmi_perc, CFTR
   ) %>%
@@ -97,9 +102,11 @@ df %>%
 
 # Hypoglycemia defined as < 70 mg/dL at any point
 
-## Demographics
+## Full cohort
 
-IA0005, IA0006, IA0017, IA0042, and IA0079 had catecholamines measured at multiple timepoints but these are treated as independent in the table below.
+### Demographics
+
+Repeat visits are treated as independent in the table below.
 
 ```{r}
 #| label: tbl-70
@@ -109,9 +116,7 @@ df %>%
   select(
     Hypo70, age_visit:ethnicity, bmi, bmi_perc, CFTR,
     all_of(paste0("Glucose_", timepoints)),
-    all_of(paste0("Insulin_", timepoints)),
-    all_of(paste0("Epinephrine_", limited_timepoints)),
-    all_of(paste0("Norepinephrine_", limited_timepoints))
+    all_of(paste0("Insulin_", timepoints))
   ) %>%
   tbl_summary(by = Hypo70, missing_text = "Missing") %>%
   add_overall() %>%
@@ -119,7 +124,7 @@ df %>%
   separate_p_footnotes()
 ```
 
-## Glucose
+### Glucose
 
 Glucose was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable.
 
@@ -150,11 +155,11 @@ ggplot(means, aes(
   scale_x_continuous(breaks = timepoints) +
   ylab("LS Mean Glucose") +
   xlab("Timepoint") +
-  theme_bw() +
+  theme_bw(base_size = 14) +
   theme(legend.title = element_blank())
 ```
 
-## Insulin
+### Insulin
 
 Insulin was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable.
 
@@ -185,83 +190,13 @@ ggplot(means, aes(
   scale_x_continuous(breaks = timepoints) +
   ylab("LS Mean Insulin") +
   xlab("Timepoint") +
-  theme_bw() +
+  theme_bw(base_size = 14) +
   theme(legend.title = element_blank())
 ```
 
-## Epinephrine
+### Hypoglycemia symptoms
 
-Epinephrine was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable. Plot error bars indicate 95% confidence intervals around the least square mean.
-
-```{r}
-#| warning: false
-# Fit
-mod <- lmer(log(Epinephrine) ~ Timepoint * Hypo70 + (1 | study_id),
-  data = lmm_df
-)
-mod %>% tbl_regression(intercept = T, exponentiate = T)
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"), type = "response"))
-colnames(means) <- c(
-  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
-)
-means %>%
-  gt(caption = "LS Means") %>%
-  fmt_number(decimals = 2)
-# Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
-  group = Hypo70
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = limited_timepoints) +
-  ylab("LS Mean Epinephrine") +
-  xlab("Timepoint") +
-  theme_bw() +
-  theme(legend.title = element_blank())
-```
-
-## Norepinephrine
-
-Norepinephrine was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable. Plot error bars indicate 95% confidence intervals around the least square mean.
-
-```{r}
-#| warning: false
-# Fit
-mod <- lmer(log(Norepinephrine) ~ Timepoint * Hypo70 + (1 | study_id),
-  data = lmm_df
-)
-mod %>% tbl_regression(intercept = T, exponentiate = T)
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"), type = "response"))
-colnames(means) <- c(
-  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
-)
-means %>%
-  gt(caption = "LS Means") %>%
-  fmt_number(decimals = 2)
-# Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
-  group = Hypo70
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = limited_timepoints) +
-  ylab("LS Mean Norepinephrine") +
-  xlab("Timepoint") +
-  theme_bw() +
-  theme(legend.title = element_blank())
-```
-
-## Hypoglycemia symptoms
-
-### `adren_score`
+#### `adren_score`
 
 `adren_score` was modeled using a generalized linear mixed effect model assuming a Poisson distribution for the outcome and a log link function. We also considered a negative binomial model, but the Poisson model was better by AIC. AICs for the Poisson and a zero-inflated Poisson were similar, so the Poisson was chosen for ease of interpretation. The following models were also determined based on AIC.
 
@@ -294,11 +229,11 @@ ggplot(means, aes(
   scale_x_continuous(breaks = limited_timepoints) +
   ylab("LS Rates adren_score") +
   xlab("Timepoint") +
-  theme_bw() +
+  theme_bw(base_size = 14) +
   theme(legend.title = element_blank())
 ```
 
-### `neuro_score`
+#### `neuro_score`
 
 `neuro_score` was modeled using a zero-inflated Poisson model with random intercept for participant and an intercept as the only fixed effect in the zero part of the model.
 
@@ -332,11 +267,11 @@ ggplot(means, aes(
   scale_x_continuous(breaks = limited_timepoints) +
   ylab("LS Rates neuro_score") +
   xlab("Timepoint") +
-  theme_bw() +
+  theme_bw(base_size = 14) +
   theme(legend.title = element_blank())
 ```
 
-### `num_symptoms`
+#### `num_symptoms`
 
 `num_symptoms` was modeled using a Poisson model with random intercept for participant.
 
@@ -369,11 +304,11 @@ ggplot(means, aes(
   scale_x_continuous(breaks = limited_timepoints) +
   ylab("LS Rates num_symptoms") +
   xlab("Timepoint") +
-  theme_bw() +
+  theme_bw(base_size = 14) +
   theme(legend.title = element_blank())
 ```
 
-### `total_score`
+#### `total_score`
 
 `total_score` was modeled using a zero-inflated Poisson model with random intercept for participant and an intercept and hypoglycemia group as the fixed effects in the zero part of the model.
 
@@ -405,15 +340,116 @@ ggplot(means, aes(
   scale_x_continuous(breaks = limited_timepoints) +
   ylab("LS Rates total_score") +
   xlab("Timepoint") +
-  theme_bw() +
+  theme_bw(base_size = 14) +
+  theme(legend.title = element_blank())
+```
+
+## Catecholamines only
+
+```{r}
+cat_df <- df %>% filter(catecholamines)
+cat_lmm_df <- lmm_df %>% filter(catecholamines)
+```
+
+### Demographics
+
+IA0005, IA0006, IA0017, IA0042, and IA0079 had catecholamines measured at multiple timepoints but these are treated as independent in the table below.
+
+```{r}
+#| label: tbl-70-catecholamines
+#| tbl-cap: BG < 70 at Any Point (Catecholamines Only)
+#| warning: false
+cat_df %>%
+  select(
+    Hypo70, age_visit:ethnicity, bmi, bmi_perc, CFTR,
+    all_of(paste0("Glucose_", timepoints)),
+    all_of(paste0("Insulin_", timepoints)),
+    all_of(paste0("Epinephrine_", limited_timepoints)),
+    all_of(paste0("Norepinephrine_", limited_timepoints))
+  ) %>%
+  tbl_summary(by = Hypo70, missing_text = "Missing") %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
+```
+
+### Epinephrine
+
+Epinephrine was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable. Plot error bars indicate 95% confidence intervals around the least square mean.
+
+```{r}
+#| warning: false
+# Fit
+mod <- lmer(log(Epinephrine) ~ Timepoint * Hypo70 + (1 | study_id),
+  data = cat_lmm_df
+)
+mod %>% tbl_regression(intercept = T, exponentiate = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Means") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
+  group = Hypo70
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Mean Epinephrine") +
+  xlab("Timepoint") +
+  theme_bw(base_size = 14) +
+  theme(legend.title = element_blank())
+```
+
+### Norepinephrine
+
+Norepinephrine was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable. Plot error bars indicate 95% confidence intervals around the least square mean.
+
+```{r}
+#| warning: false
+# Fit
+mod <- lmer(log(Norepinephrine) ~ Timepoint * Hypo70 + (1 | study_id),
+  data = cat_lmm_df
+)
+mod %>% tbl_regression(intercept = T, exponentiate = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Means") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
+  group = Hypo70
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Mean Norepinephrine") +
+  xlab("Timepoint") +
+  theme_bw(base_size = 14) +
   theme(legend.title = element_blank())
 ```
 
 # Hypoglycemia defined as < 60 mg/dL at any point
 
-## Demographics
+## Full cohort
 
-IA0005, IA0006, IA0017, IA0042, and IA0079 had catecholamines measured at multiple timepoints but these are treated as independent in the table below.
+### Demographics
+
+Repeat visits are treated as independent in the table below.
 
 ```{r}
 #| label: tbl-60
@@ -423,9 +459,7 @@ df %>%
   select(
     Hypo60, age_visit:ethnicity, bmi, bmi_perc, CFTR,
     all_of(paste0("Glucose_", timepoints)),
-    all_of(paste0("Insulin_", timepoints)),
-    all_of(paste0("Epinephrine_", limited_timepoints)),
-    all_of(paste0("Norepinephrine_", limited_timepoints))
+    all_of(paste0("Insulin_", timepoints))
   ) %>%
   tbl_summary(by = Hypo60, missing_text = "Missing") %>%
   add_overall() %>%
@@ -433,7 +467,7 @@ df %>%
   separate_p_footnotes()
 ```
 
-## Glucose
+### Glucose
 
 Glucose was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable.
 
@@ -464,11 +498,11 @@ ggplot(means, aes(
   scale_x_continuous(breaks = timepoints) +
   ylab("LS Mean Glucose") +
   xlab("Timepoint") +
-  theme_bw() +
+  theme_bw(base_size = 14) +
   theme(legend.title = element_blank())
 ```
 
-## Insulin
+### Insulin
 
 Insulin was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable.
 
@@ -499,83 +533,13 @@ ggplot(means, aes(
   scale_x_continuous(breaks = timepoints) +
   ylab("LS Mean Insulin") +
   xlab("Timepoint") +
-  theme_bw() +
+  theme_bw(base_size = 14) +
   theme(legend.title = element_blank())
 ```
 
-## Epinephrine
+### Hypoglycemia symptoms
 
-Epinephrine was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable. Plot error bars indicate 95% confidence intervals around the least square mean.
-
-```{r}
-#| warning: false
-# Fit
-mod <- lmer(log(Epinephrine) ~ Timepoint * Hypo60 + (1 | study_id),
-  data = lmm_df
-)
-mod %>% tbl_regression(intercept = T, exponentiate = T)
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"), type = "response"))
-colnames(means) <- c(
-  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
-)
-means %>%
-  gt(caption = "LS Means") %>%
-  fmt_number(decimals = 2)
-# Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
-  group = Hypo60
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = limited_timepoints) +
-  ylab("LS Mean Epinephrine") +
-  xlab("Timepoint") +
-  theme_bw() +
-  theme(legend.title = element_blank())
-```
-
-## Norepinephrine
-
-Norepinephrine was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable. Plot error bars indicate 95% confidence intervals around the least square mean.
-
-```{r}
-#| warning: false
-# Fit
-mod <- lmer(log(Norepinephrine) ~ Timepoint * Hypo60 + (1 | study_id),
-  data = lmm_df
-)
-mod %>% tbl_regression(intercept = T, exponentiate = T)
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"), type = "response"))
-colnames(means) <- c(
-  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
-)
-means %>%
-  gt(caption = "LS Means") %>%
-  fmt_number(decimals = 2)
-# Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
-  group = Hypo60
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = limited_timepoints) +
-  ylab("LS Mean Norepinephrine") +
-  xlab("Timepoint") +
-  theme_bw() +
-  theme(legend.title = element_blank())
-```
-
-## Hypoglycemia symptoms
-
-### `adren_score`
+#### `adren_score`
 
 `adren_score` was modeled using a generalized linear mixed effect model assuming a Poisson distribution for the outcome and a log link function. We also considered a negative binomial model, but the Poisson model was better by AIC. AICs for the Poisson and a zero-inflated Poisson were similar, so the Poisson was chosen for ease of interpretation. The following models were also determined based on AIC.
 
@@ -608,11 +572,11 @@ ggplot(means, aes(
   scale_x_continuous(breaks = limited_timepoints) +
   ylab("LS Rates adren_score") +
   xlab("Timepoint") +
-  theme_bw() +
+  theme_bw(base_size = 14) +
   theme(legend.title = element_blank())
 ```
 
-### `neuro_score`
+#### `neuro_score`
 
 `neuro_score` was modeled using a zero-inflated Poisson model with random intercept for participant and an intercept as the only fixed effect in the zero part of the model.
 
@@ -646,11 +610,11 @@ ggplot(means, aes(
   scale_x_continuous(breaks = limited_timepoints) +
   ylab("LS Rates neuro_score") +
   xlab("Timepoint") +
-  theme_bw() +
+  theme_bw(base_size = 14) +
   theme(legend.title = element_blank())
 ```
 
-### `num_symptoms`
+#### `num_symptoms`
 
 `num_symptoms` was modeled using a Poisson model with random intercept for participant.
 
@@ -683,11 +647,11 @@ ggplot(means, aes(
   scale_x_continuous(breaks = limited_timepoints) +
   ylab("LS Rates num_symptoms") +
   xlab("Timepoint") +
-  theme_bw() +
+  theme_bw(base_size = 14) +
   theme(legend.title = element_blank())
 ```
 
-### `total_score`
+#### `total_score`
 
 `total_score` was modeled using a zero-inflated Poisson model with random intercept for participant and an intercept and hypoglycemia group as the fixed effects in the zero part of the model.
 
@@ -719,6 +683,100 @@ ggplot(means, aes(
   scale_x_continuous(breaks = limited_timepoints) +
   ylab("LS Rates total_score") +
   xlab("Timepoint") +
-  theme_bw() +
+  theme_bw(base_size = 14) +
+  theme(legend.title = element_blank())
+```
+
+## Catecholamines only
+
+### Demographics
+
+IA0005, IA0006, IA0017, IA0042, and IA0079 had catecholamines measured at multiple timepoints but these are treated as independent in the table below.
+
+```{r}
+#| label: tbl-60-catecholamines
+#| tbl-cap: BG < 60 at Any Point (Catecholamines Only)
+#| warning: false
+cat_df %>%
+  select(
+    Hypo60, age_visit:ethnicity, bmi, bmi_perc, CFTR,
+    all_of(paste0("Glucose_", timepoints)),
+    all_of(paste0("Insulin_", timepoints)),
+    all_of(paste0("Epinephrine_", limited_timepoints)),
+    all_of(paste0("Norepinephrine_", limited_timepoints))
+  ) %>%
+  tbl_summary(by = Hypo60, missing_text = "Missing") %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
+```
+
+### Epinephrine
+
+Epinephrine was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable. Plot error bars indicate 95% confidence intervals around the least square mean.
+
+```{r}
+#| warning: false
+# Fit
+mod <- lmer(log(Epinephrine) ~ Timepoint * Hypo60 + (1 | study_id),
+  data = cat_lmm_df
+)
+mod %>% tbl_regression(intercept = T, exponentiate = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Means") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
+  group = Hypo60
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Mean Epinephrine") +
+  xlab("Timepoint") +
+  theme_bw(base_size = 14) +
+  theme(legend.title = element_blank())
+```
+
+### Norepinephrine
+
+Norepinephrine was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable. Plot error bars indicate 95% confidence intervals around the least square mean.
+
+```{r}
+#| warning: false
+# Fit
+mod <- lmer(log(Norepinephrine) ~ Timepoint * Hypo60 + (1 | study_id),
+  data = cat_lmm_df
+)
+mod %>% tbl_regression(intercept = T, exponentiate = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Means") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
+  group = Hypo60
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Mean Norepinephrine") +
+  xlab("Timepoint") +
+  theme_bw(base_size = 14) +
   theme(legend.title = element_blank())
 ```
