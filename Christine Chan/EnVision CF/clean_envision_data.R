@@ -86,9 +86,9 @@ glucose$Date <- ymd(glucose$Date)
 #-------------------------------------------------------------------------------
 visits <- redcap %>%
   select(
-    study_id, date_visit, age_visit, height, weight, sex, origin_race,
-    ethnicity, redcap_data_access_group, cftr_mutation_1, cftr_mutation_2,
-    hypoglycemia_symptoms_yesno
+    study_id, date_visit, age_visit, height, weight, bmi_study_visit,
+    sex, origin_race, ethnicity, redcap_data_access_group,
+    cftr_mutation_1, cftr_mutation_2
   ) %>%
   filter(!is.na(date_visit)) %>%
   rename(Date = date_visit) %>%
@@ -169,6 +169,23 @@ insulin <- insulin %>%
 # Convert to numeric
 insulin$Insulin <- as.numeric(insulin$Insulin)
 #-------------------------------------------------------------------------------
+# Hypoglycemia symptom surveys
+#-------------------------------------------------------------------------------
+hypo_surveys <- c(
+  "adren_score_baseline", "adren_score_120", "adren_score_150", "adren_score_180",
+  "neuro_score_baseline", "neuro_score_120", "neuro_score_150", "neuro_score_180",
+  "total_score_baseline", "total_score_120", "total_score_150", "total_score_180",
+  "num_symptoms_base", "num_symptoms_120", "num_symptoms_150", "num_symptoms_180"
+)
+hypo_symptoms <- redcap %>%
+  select(study_id, date_visit, all_of(hypo_surveys)) %>%
+  rename(
+    Date = date_visit, adren_score_0 = adren_score_baseline,
+    neuro_score_0 = neuro_score_baseline, total_score_0 = total_score_baseline,
+    num_symptoms_0 = num_symptoms_base
+  )
+hypo_symptoms$Date <- ymd(hypo_symptoms$Date)
+#-------------------------------------------------------------------------------
 # CGM data
 #-------------------------------------------------------------------------------
 # Clean data (does not need to be run every time)
@@ -229,6 +246,7 @@ final_df <- final_df %>% pivot_wider(
 )
 final_df <- full_join(final_df, cgm)
 final_df <- full_join(final_df, visits)
+final_df <- full_join(final_df, hypo_symptoms)
 # Add HbA1c, etc.
 a1c <- redcap %>%
   select(study_id, date_visit, a1c_result) %>%
@@ -372,9 +390,14 @@ final_df$Hypo60 <- factor(final_df$Hypo60,
   levels = c(T, F),
   labels = c("Hypoglycemia < 60", "No Hypoglycemia < 60")
 )
-final_df$hypoglycemia_symptoms_yesno <- factor(final_df$hypoglycemia_symptoms_yesno,
-  levels = 0:1, labels = c("No", "Yes")
+# CFTR groups
+final_df$CFTR <- paste0(final_df$cftr_mutation_1, final_df$cftr_mutation_2)
+final_df$CFTR <- factor(final_df$CFTR,
+  levels = c("11", "12", "22", "NANA"),
+  labels = c("F508del homozygous", "F508del heterozygous", "Other/Other", "Unknown")
 )
+final_df$cftr_mutation_1 <- NULL
+final_df$cftr_mutation_2 <- NULL
 # Final formatting
 final_df$redcap_data_access_group[final_df$study_id == "IA0005" |
   final_df$study_id == "ia0119"] <- "iowa"

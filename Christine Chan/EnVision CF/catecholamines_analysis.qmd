@@ -25,6 +25,7 @@ library(gt)
 library(gtsummary)
 library(lmerTest)
 library(emmeans)
+library(GLMMadaptive)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
@@ -51,6 +52,11 @@ glucoses <- paste0("Glucose_", timepoints)
 insulins <- paste0("Insulin_", timepoints)
 epinephrines <- paste0("Epinephrine_", timepoints)
 norepinephrines <- paste0("Norepinephrine_", timepoints)
+adren_survey <- paste0("adren_score_", limited_timepoints)
+neuro_survey <- paste0("neuro_score_", limited_timepoints)
+total_survey <- paste0("total_score_", limited_timepoints)
+num_symptoms_survey <- paste0("num_symptoms_", limited_timepoints)
+hypo_surveys <- c(adren_survey, neuro_survey, total_survey, num_symptoms_survey)
 # For this analysis, we only want those with catecholamines measured
 df$catecholamines <- apply(
   df[, c(epinephrines, norepinephrines)], 1,
@@ -63,12 +69,17 @@ df <- df %>% filter(catecholamines)
 lmm_df <- df %>%
   select(
     study_id, Hypo60, Hypo70,
-    all_of(c(glucoses, insulins, epinephrines, norepinephrines))
+    all_of(c(glucoses, insulins, epinephrines, norepinephrines, hypo_surveys))
   ) %>%
-  pivot_longer(all_of(c(glucoses, insulins, epinephrines, norepinephrines)),
+  pivot_longer(
+    all_of(c(glucoses, insulins, epinephrines, norepinephrines, hypo_surveys)),
     names_to = c(".value", "Timepoint"),
-    names_pattern = "(.*)_(.*)"
+    names_pattern = "(.*)_([0-9]{1,3})"
   )
+lmm_df$Timepoint <- factor(lmm_df$Timepoint, levels = timepoints)
+# Remove BMI percentile for those >= 20
+df$bmi_perc[df$age_visit >= 20] <- NA
+df$bmi[df$age_visit < 20] <- NA
 ```
 
 # Demographics at first visit
@@ -78,8 +89,7 @@ lmm_df <- df %>%
 #| tbl-cap: Participant characteristics (overall)
 df %>%
   select(
-    redcap_data_access_group, age_visit:ethnicity, cftr_mutation_1,
-    cftr_mutation_2
+    redcap_data_access_group, age_visit:ethnicity, bmi, bmi_perc, CFTR
   ) %>%
   tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
   add_overall()
@@ -97,7 +107,7 @@ IA0005, IA0006, IA0017, IA0042, and IA0079 had catecholamines measured at multip
 #| warning: false
 df %>%
   select(
-    Hypo70, age_visit:cftr_mutation_2, hypoglycemia_symptoms_yesno,
+    Hypo70, age_visit:ethnicity, bmi, bmi_perc, CFTR,
     all_of(paste0("Glucose_", timepoints)),
     all_of(paste0("Insulin_", timepoints)),
     all_of(paste0("Epinephrine_", limited_timepoints)),
@@ -249,6 +259,156 @@ ggplot(means, aes(
   theme(legend.title = element_blank())
 ```
 
+## Hypoglycemia symptoms
+
+### `adren_score`
+
+`adren_score` was modeled using a generalized linear mixed effect model assuming a Poisson distribution for the outcome and a log link function. We also considered a negative binomial model, but the Poisson model was better by AIC. AICs for the Poisson and a zero-inflated Poisson were similar, so the Poisson was chosen for ease of interpretation. The following models were also determined based on AIC.
+
+```{r}
+#| warning: false
+# Fit
+# Poisson model better than NB by AIC and BIC
+mod <- glmer(adren_score ~ Timepoint * Hypo70 + (1 | study_id),
+  data = lmm_df,
+  family = "poisson"
+)
+mod %>% tbl_regression(intercept = T, exponentiate = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo70", "Rate", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Rates") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Rate, colour = Hypo70,
+  group = Hypo70
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Rates adren_score") +
+  xlab("Timepoint") +
+  theme_bw() +
+  theme(legend.title = element_blank())
+```
+
+### `neuro_score`
+
+`neuro_score` was modeled using a zero-inflated Poisson model with random intercept for participant and an intercept as the only fixed effect in the zero part of the model.
+
+```{r}
+#| warning: false
+# Fit
+# Poisson model no different from NB by AIC
+t <- lmm_df %>% filter(Timepoint %in% limited_timepoints)
+mod <- mixed_model(neuro_score ~ Timepoint * Hypo70,
+  random = ~ 1 | study_id, data = t,
+  family = zi.poisson(), zi_fixed = ~1
+)
+mod %>% tbl_regression(intercept = T, exponentiate = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo70", "Rate", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Rates") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Rate, colour = Hypo70,
+  group = Hypo70
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Rates neuro_score") +
+  xlab("Timepoint") +
+  theme_bw() +
+  theme(legend.title = element_blank())
+```
+
+### `num_symptoms`
+
+`num_symptoms` was modeled using a Poisson model with random intercept for participant.
+
+```{r}
+#| warning: false
+# Fit
+# Poisson better than NB by AIC
+mod <- glmer(num_symptoms ~ Timepoint * Hypo70 + (1 | study_id),
+  data = lmm_df,
+  family = "poisson"
+)
+mod %>% tbl_regression(intercept = T, exponentiate = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo70", "Rate", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Rates") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Rate, colour = Hypo70,
+  group = Hypo70
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Rates num_symptoms") +
+  xlab("Timepoint") +
+  theme_bw() +
+  theme(legend.title = element_blank())
+```
+
+### `total_score`
+
+`total_score` was modeled using a zero-inflated Poisson model with random intercept for participant and an intercept and hypoglycemia group as the fixed effects in the zero part of the model.
+
+```{r}
+#| warning: false
+# Fit
+mod <- mixed_model(total_score ~ Timepoint * Hypo70,
+  random = ~ 1 | study_id, data = t,
+  family = zi.poisson(), zi_fixed = ~Hypo70
+)
+mod %>% tbl_regression(intercept = T, exponentiate = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo70", "Rate", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Rates") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Rate, colour = Hypo70,
+  group = Hypo70
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Rates total_score") +
+  xlab("Timepoint") +
+  theme_bw() +
+  theme(legend.title = element_blank())
+```
+
 # Hypoglycemia defined as < 60 mg/dL at any point
 
 ## Demographics
@@ -261,7 +421,7 @@ IA0005, IA0006, IA0017, IA0042, and IA0079 had catecholamines measured at multip
 #| warning: false
 df %>%
   select(
-    Hypo60, age_visit:cftr_mutation_2, hypoglycemia_symptoms_yesno,
+    Hypo60, age_visit:ethnicity, bmi, bmi_perc, CFTR,
     all_of(paste0("Glucose_", timepoints)),
     all_of(paste0("Insulin_", timepoints)),
     all_of(paste0("Epinephrine_", limited_timepoints)),
@@ -408,6 +568,156 @@ ggplot(means, aes(
   geom_line() +
   scale_x_continuous(breaks = limited_timepoints) +
   ylab("LS Mean Norepinephrine") +
+  xlab("Timepoint") +
+  theme_bw() +
+  theme(legend.title = element_blank())
+```
+
+## Hypoglycemia symptoms
+
+### `adren_score`
+
+`adren_score` was modeled using a generalized linear mixed effect model assuming a Poisson distribution for the outcome and a log link function. We also considered a negative binomial model, but the Poisson model was better by AIC. AICs for the Poisson and a zero-inflated Poisson were similar, so the Poisson was chosen for ease of interpretation. The following models were also determined based on AIC.
+
+```{r}
+#| warning: false
+# Fit
+# Poisson model better than NB by AIC and BIC
+mod <- glmer(adren_score ~ Timepoint * Hypo60 + (1 | study_id),
+  data = lmm_df,
+  family = "poisson"
+)
+mod %>% tbl_regression(intercept = T, exponentiate = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo60", "Rate", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Rates") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Rate, colour = Hypo60,
+  group = Hypo60
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Rates adren_score") +
+  xlab("Timepoint") +
+  theme_bw() +
+  theme(legend.title = element_blank())
+```
+
+### `neuro_score`
+
+`neuro_score` was modeled using a zero-inflated Poisson model with random intercept for participant and an intercept as the only fixed effect in the zero part of the model.
+
+```{r}
+#| warning: false
+# Fit
+# Poisson model no different from NB by AIC
+t <- lmm_df %>% filter(Timepoint %in% limited_timepoints)
+mod <- mixed_model(neuro_score ~ Timepoint * Hypo60,
+  random = ~ 1 | study_id, data = t,
+  family = zi.poisson(), zi_fixed = ~1
+)
+mod %>% tbl_regression(intercept = T, exponentiate = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo60", "Rate", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Rates") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Rate, colour = Hypo60,
+  group = Hypo60
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Rates neuro_score") +
+  xlab("Timepoint") +
+  theme_bw() +
+  theme(legend.title = element_blank())
+```
+
+### `num_symptoms`
+
+`num_symptoms` was modeled using a Poisson model with random intercept for participant.
+
+```{r}
+#| warning: false
+# Fit
+# Poisson better than NB by AIC
+mod <- glmer(num_symptoms ~ Timepoint * Hypo60 + (1 | study_id),
+  data = lmm_df,
+  family = "poisson"
+)
+mod %>% tbl_regression(intercept = T, exponentiate = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo60", "Rate", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Rates") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Rate, colour = Hypo60,
+  group = Hypo60
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Rates num_symptoms") +
+  xlab("Timepoint") +
+  theme_bw() +
+  theme(legend.title = element_blank())
+```
+
+### `total_score`
+
+`total_score` was modeled using a zero-inflated Poisson model with random intercept for participant and an intercept and hypoglycemia group as the fixed effects in the zero part of the model.
+
+```{r}
+#| warning: false
+# Fit
+mod <- mixed_model(total_score ~ Timepoint * Hypo60,
+  random = ~ 1 | study_id, data = t,
+  family = zi.poisson(), zi_fixed = ~Hypo60
+)
+mod %>% tbl_regression(intercept = T, exponentiate = T)
+means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"), type = "response"))
+colnames(means) <- c(
+  "Timepoint", "Hypo60", "Rate", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+)
+means %>%
+  gt(caption = "LS Rates") %>%
+  fmt_number(decimals = 2)
+# Plot
+ggplot(means, aes(
+  x = as.numeric(as.character(Timepoint)), y = Rate, colour = Hypo60,
+  group = Hypo60
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+    width = 3
+  ) +
+  geom_line() +
+  scale_x_continuous(breaks = limited_timepoints) +
+  ylab("LS Rates total_score") +
   xlab("Timepoint") +
   theme_bw() +
   theme(legend.title = element_blank())
