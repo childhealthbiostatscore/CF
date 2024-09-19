@@ -256,7 +256,7 @@ agreement <- function(bug, data = df) {
   cat("\n")
   print(plot(euler(d == "Negative"),
     quantities = list(cex = 3),
-    fills = list(fill = c("#FFC107", "#1E88E5"))
+    fills = list(fill = c("#FFC107","#1E88E5","#004D40"))
   ))
   cat("\n")
   cat("\n")
@@ -264,7 +264,7 @@ agreement <- function(bug, data = df) {
   cat("\n")
   print(plot(euler(d == "Positive"),
     quantities = list(cex = 3),
-    fills = list(fill = c("#FFC107", "#1E88E5"))
+    fills = list(fill = c("#FFC107", "#1E88E5","#004D40"))
   ))
   cat("\n")
 }
