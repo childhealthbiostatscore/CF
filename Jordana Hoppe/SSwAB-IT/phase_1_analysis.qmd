@@ -15,8 +15,6 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /home/timvigers/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -203,7 +201,7 @@ db_feasibility %>%
 
 # Agreement
 
-For these agreement analyses, we reported accuracy metrics that include all samples. Accuracy is the proportion of samples where the two tests agreed (positive/positive and negative/negative). Cohen's kappa accounts for agreement between the two tests by chance, and is interpreted analogously to correlation where -1 indicates perfect disagreement and 1 indicates perfect agreement [@mchughInterraterReliabilityKappa2012;@ranganathanCommonPitfallsStatistical2017]. A Cohen's kappa of NaN or NA indicates a lack of variability between the two tests.
+For these agreement analyses, we reported accuracy metrics that include all samples. Accuracy is the proportion of samples where the two tests agreed (positive/positive and negative/negative). Cohen's kappa accounts for agreement between the two tests by chance, and is interpreted analogously to correlation where -1 indicates perfect disagreement and 1 indicates perfect agreement. A Cohen's kappa of NaN or NA indicates a lack of variability between the two tests.
 
 | Cohen's Kappa | Interpretation         |
 |---------------|------------------------|
@@ -239,8 +237,8 @@ agreement <- function(bug, data = df) {
   cat("####", "2x2 Table (With CIs)")
   cat("\n")
   d %>%
-    tbl_cross(percent = "cell") %>%
-    add_ci() %>%
+    tbl_summary(by = COS, percent = "cell") %>%
+    add_ci(method = list(all_categorical() ~ "wald")) %>%
     print()
   cat("\n")
   cat("Overall accuracy (both negative/negative and positive/positive) was ",
@@ -256,12 +254,18 @@ agreement <- function(bug, data = df) {
   cat("\n")
   cat("#### Euler diagram of negative results")
   cat("\n")
-  print(plot(euler(d == "Negative"), quantities = list(cex = 3)))
+  print(plot(euler(d == "Negative"),
+    quantities = list(cex = 3),
+    fills = list(fill = c("#FFC107", "#1E88E5"))
+  ))
   cat("\n")
   cat("\n")
   cat("#### Euler diagram of positive results")
   cat("\n")
-  print(plot(euler(d == "Positive"), quantities = list(cex = 3)))
+  print(plot(euler(d == "Positive"),
+    quantities = list(cex = 3),
+    fills = list(fill = c("#FFC107", "#1E88E5"))
+  ))
   cat("\n")
 }
 agreement_test <- function(bug, group = "group", data = df) {
@@ -291,7 +295,9 @@ agreement_test <- function(bug, group = "group", data = df) {
 ```
 
 ```{r results='asis'}
+#| message: false
 invisible(lapply(names(bug_list), function(b) {
+  print(b)
   cat("\n")
   cat("##", as.character(bug_list[b]))
   cat("\n")
@@ -311,6 +317,7 @@ invisible(lapply(names(bug_list), function(b) {
 ## Age group
 
 ```{r results='asis'}
+#| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
   cat("###", as.character(bug_list[b]))
@@ -325,6 +332,7 @@ invisible(lapply(names(bug_list), function(b) {
 ## Sex
 
 ```{r results='asis'}
+#| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
   cat("###", as.character(bug_list[b]))
@@ -339,6 +347,7 @@ invisible(lapply(names(bug_list), function(b) {
 ## Azithromycin
 
 ```{r results='asis'}
+#| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
   cat("###", as.character(bug_list[b]))
@@ -353,6 +362,7 @@ invisible(lapply(names(bug_list), function(b) {
 ## Inhaled Tobramycin
 
 ```{r results='asis'}
+#| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
   cat("###", as.character(bug_list[b]))
@@ -367,6 +377,7 @@ invisible(lapply(names(bug_list), function(b) {
 ## Inhaled Aztreonam
 
 ```{r results='asis'}
+#| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
   cat("###", as.character(bug_list[b]))
@@ -381,6 +392,7 @@ invisible(lapply(names(bug_list), function(b) {
 ## Inhaled Colisitin
 
 ```{r results='asis'}
+#| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
   cat("###", as.character(bug_list[b]))
@@ -395,6 +407,7 @@ invisible(lapply(names(bug_list), function(b) {
 ## Inhaled Vancomycin
 
 ```{r results='asis'}
+#| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
   cat("###", as.character(bug_list[b]))
@@ -409,6 +422,7 @@ invisible(lapply(names(bug_list), function(b) {
 ## Other inhaled antibiotics
 
 ```{r results='asis'}
+#| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
   cat("###", as.character(bug_list[b]))
@@ -423,6 +437,7 @@ invisible(lapply(names(bug_list), function(b) {
 ## Chronic oral antibiotic
 
 ```{r results='asis'}
+#| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
   cat("###", as.character(bug_list[b]))
@@ -437,6 +452,7 @@ invisible(lapply(names(bug_list), function(b) {
 ## CFTR modulator status
 
 ```{r results='asis'}
+#| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
   cat("###", as.character(bug_list[b]))
@@ -447,5 +463,3 @@ invisible(lapply(names(bug_list), function(b) {
   cat("\n")
 }))
 ```
-
-# References
