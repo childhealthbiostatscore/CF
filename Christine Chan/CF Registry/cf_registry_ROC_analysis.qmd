@@ -218,11 +218,32 @@ roc_df %>%
 
 # HbA1c by diagnosis
 
+## Boxplot
+
 ```{r}
 ggplot(roc_df, aes(x = `OGTT 2-hour`, y = hgba1c)) +
   geom_boxplot() +
   ylab("HbA1c") +
   theme_classic(base_size = 20)
+```
+
+## Dotplot
+
+```{r}
+ggplot(roc_df, aes(x = `OGTT 2-hour`, y = hgba1c)) +
+  geom_jitter(alpha = 0.25) +
+  ylab("HbA1c") +
+  theme_classic(base_size = 20)
+```
+
+## Violin plot
+
+```{r}
+ggplot(roc_df, aes(x = `OGTT 2-hour`, y = hgba1c)) +
+  geom_violin(aes(fill = `OGTT 2-hour`)) +
+  ylab("HbA1c") +
+  theme_classic(base_size = 20) +
+  theme(legend.position = "none")
 ```
 
 # ROC analysis
