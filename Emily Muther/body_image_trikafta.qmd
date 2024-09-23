@@ -17,7 +17,7 @@ editor: source
 
 # Data Cleaning Steps
 
-1. Participants who answered "I don't know" or "no" on the variable `TakingTrikafta` were excluded from these analyses.
+1. Participants who answered "I don't know" or "no" on the variable `TakingTrikafta` were NOT excluded from these analyses.
 
 ```{r warning=FALSE}
 #| include: false
@@ -45,8 +45,8 @@ df <- read.spss("./Emily Muther/General/BodyImage_Trikafta/Data/TrikaftaBodyImag
   to.data.frame = T
 )
 # Filter
-df <- df %>%
-  filter(TakingTrikafta == "yes")
+# df <- df %>%
+#   filter(TakingTrikafta == "yes")
 # Trim white space
 df <- df %>%
   mutate(across(where(is.character), trimws))
