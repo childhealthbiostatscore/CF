@@ -26,6 +26,7 @@ library(Hmisc)
 library(tidyverse)
 library(lubridate)
 library(arsenal)
+library(rspiro)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring",
   "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring",
@@ -77,10 +78,20 @@ demo <- data %>%
   group_by(sid) %>%
   filter(row_number() == 1) %>%
   select(
-    sid, Diagnosis, age_at_consent, height, weight,
+    sid, Diagnosis, age_at_consent, height, weight, pre_fev,
     nih_sex.factor:nih_ethnicity.factor, mutation1.factor, mutation2.factor,
     cftr_mod.factor, cftr_mod_type.factor, mucolytic.factor:antih.factor
   )
+# Calculate FEV1% - rspiro not accepting NA values for gender, which is really
+# annoying
+fev1 <- demo %>%
+  select(age_at_consent, height, nih_sex.factor, pre_fev) %>%
+  filter(nih_sex.factor %in% c("Male", "Female"))
+fev1$pre_fev_pp <- pctpred_GLIgl(fev1$age_at_consent, fev1$height / 100,
+  factor(fev1$nih_sex.factor, levels = c("Male", "Female")),
+  FEV1 = fev1$pre_fev
+)
+demo = left_join(demo,fev1[,c("sid","pre_fev_pp")])
 # Set table options for the document
 mycontrols <-
   tableby.control(numeric.stats = c("Nmiss2", "meansd", "medianq1q3", "range"))
