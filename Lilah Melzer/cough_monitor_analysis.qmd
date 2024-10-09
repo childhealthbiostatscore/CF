@@ -15,7 +15,7 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
+bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
 csl: /Users/timvigers/GitHub/styles/american-medical-association.csl
 editor: source
 ---
@@ -25,6 +25,7 @@ editor: source
 library(Hmisc)
 library(tidyverse)
 library(lubridate)
+library(arsenal)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring",
   "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring",
@@ -58,25 +59,47 @@ agg_counts$sid <- sub("FN", "", agg_counts$sid)
 agg_counts <- agg_counts %>%
   pivot_longer(cols = -one_of("sid"), names_to = "Date", values_to = "Coughs") %>%
   filter(!is.na(Coughs)) %>%
-  mutate(Date = mdy(Date),
-    Coughs = as.numeric(Coughs))%>%
+  mutate(
+    Date = mdy(Date),
+    Coughs = as.numeric(Coughs)
+  ) %>%
   group_by(sid) %>%
   mutate(
     Night = row_number()
   ) %>%
   ungroup()
+# Demographics data
+data$Diagnosis <- factor(sub(".*arm_*", "", data$redcap_event_name),
+  levels = 1:2,
+  labels = c("CF", "Non-CF")
+)
+demo <- data %>%
+  group_by(sid) %>%
+  filter(row_number() == 1) %>%
+  select(
+    sid, Diagnosis, age_at_consent, height, weight,
+    nih_sex.factor:nih_ethnicity.factor, mutation1.factor, mutation2.factor,
+    cftr_mod.factor, cftr_mod_type.factor, mucolytic.factor:antih.factor
+  )
+# Set table options for the document
+mycontrols <-
+  tableby.control(numeric.stats = c("Nmiss2", "meansd", "medianq1q3", "range"))
 ```
 
 # Demographics
 
-```{r}
+```{r results='asis'}
 #| label: tbl-mean-demo
 #| tbl-cap: Participant characteristics
+f <- as.formula(paste0("Diagnosis ~", paste0(colnames(demo), collapse = "+")))
+f <- update(f, . ~ . - Diagnosis - sid)
+t1 <- tableby(f, data = demo, control = mycontrols)
+summary(t1, pfootnote = T)
 ```
 
 # Coughs per night
 
-```{r}
+```{r results='asis'}
 #| label: tbl-mean-coughs
 #| tbl-cap: Mean coughs per night
 ```
@@ -84,7 +107,7 @@ agg_counts <- agg_counts %>%
 # Coughs over time (aggregated)
 
 ```{r}
-#| label: fig-coughs-by-night
+#| label: fig-coughs-by-date
 #| fig-cap: Coughs by date
 ggplot(agg_counts, aes(x = Date, y = Coughs, group = sid, color = sid)) +
   geom_point() +
@@ -100,5 +123,3 @@ ggplot(agg_counts, aes(x = Night, y = Coughs, group = sid, color = sid)) +
   geom_line(alpha = 0.1) +
   theme(legend.position = "None")
 ```
-
-# 
