@@ -26,8 +26,8 @@ library(readxl)
 library(gtsummary)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Test",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Edith Zemanick/Sweat Test",
-  "Linux" = "/home/tim/OneDrive/Vigers/CF/Edith Zemanick/Sweat Test"
+  "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Edith Zemanick/Sweat Test",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Edith Zemanick/Sweat Test"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -145,51 +145,98 @@ df$Genotype2Function <-
     genotype_function$genotype
   )]
 df$TotalGenotypeFunction <- rowSums(
-  df[, c("Genotype1Function", "Genotype2Function")],
-  na.rm = T
+  df[, c("Genotype1Function", "Genotype2Function")]
 )
 df$TotalGenotypeFunction[df$TotalGenotypeFunction == 0] <- NA
 # Numeric variables
 df[, c("Na", "K", "Cl")] <- lapply(df[, c("Na", "K", "Cl")], as.numeric)
 # As data frame
 df <- as.data.frame(df)
+# Limit to complete data
+df <- df %>%
+  select(
+    PatientID, Diagnosis, Sex, Age.at.Test.in.Years, Na:Cl,
+    Genotypes1, Genotype1Function, Genotypes2, Genotype2Function,
+    TotalGenotypeFunction
+  )
+# Set non-CF to 100% CFTR function (200 because 100 for each allele)
+df$TotalGenotypeFunction[df$Diagnosis == "Non-CF"] <- 200
 # Write for checking
 write.csv(df, "./Data_Cleaned/analysis_dataset.csv", row.names = F, na = "")
-```
-
-# Excluding those with no genotype function estimate
-
-```{r}
-#| message: false
-df %>%
-  filter(!is.na(TotalGenotypeFunction)) %>%
-  select(
-    Diagnosis, Genotypes1, Genotypes2, Genotype1Function, Genotype2Function,
-    TotalGenotypeFunction, Na, K, Cl
-  ) %>%
-  droplevels(.) %>%
-  tbl_summary(by = Diagnosis)
 ```
 
 ```{r}
 #| message: false
 #| warning: false
 df %>%
-  filter(!is.na(TotalGenotypeFunction)) %>%
+  filter(Diagnosis == "CF") %>%
+  ggplot(
+    aes(x = Na, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
+  ) +
+  geom_point() +
+  theme()
+df %>%
+  filter(Diagnosis == "CF") %>%
   ggplot(
     aes(x = Cl, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
   ) +
   geom_point() +
-  geom_smooth(method = "lm", se = F) +
-  theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())
+  theme()
+df %>%
+  filter(Diagnosis == "CF") %>%
+  ggplot(
+    aes(x = Na / Cl, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
+  ) +
+  geom_point() +
+  theme()
 
 df %>%
-  filter(!is.na(TotalGenotypeFunction)) %>%
+  filter(Diagnosis == "CF") %>%
   ggplot(
-    aes(x = Cl, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
+    aes(
+      x = Na, y = TotalGenotypeFunction, color = Age.at.Test.in.Years,
+      group = Diagnosis
+    )
   ) +
   geom_point() +
-  geom_smooth(method = "lm", se = F) +
-  ylim(c(0, 20)) +
-  theme(axis.ticks.x = element_blank(), axis.text.x = element_blank())
+  theme()
+df %>%
+  filter(Diagnosis == "CF") %>%
+  ggplot(
+    aes(
+      x = Cl, y = TotalGenotypeFunction, color = Age.at.Test.in.Years,
+      group = Diagnosis
+    )
+  ) +
+  geom_point() +
+  theme()
+df %>%
+  filter(Diagnosis == "CF") %>%
+  ggplot(
+    aes(
+      x = Na / Cl, y = TotalGenotypeFunction, color = Age.at.Test.in.Years,
+      group = Diagnosis
+    )
+  ) +
+  geom_point() +
+  theme()
 ```
+
+```{r}
+df %>%
+  filter(Diagnosis == "CF") %>%
+  mutate(
+    `Age group` = cut(Age.at.Test.in.Years, c(-Inf, 18, Inf), right = F),
+    `Cl < 60` = Cl < 60
+  ) %>%
+  select(Na, Cl, TotalGenotypeFunction, `Cl < 60`, `Age group`) %>%
+  tbl_summary(by = `Age group`, missing_text = "Missing")
+write.csv(df, file = "~/sweat_analysis_data.csv", na = "", row.names = F)
+```
+
+Add CRMS change in sweat and change in ratio
+
+Add CF carrier genotypes to this report
+
+Plot just the CF genotype function
+  - Are the chloride values matching up with the CFTR function as we'd expect?
