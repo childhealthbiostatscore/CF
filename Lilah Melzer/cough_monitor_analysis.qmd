@@ -1,0 +1,104 @@
+---
+title: "Home Nighttime Cough Monitoring"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+    theme:
+      light: flatly
+      dark: darkly
+bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /Users/timvigers/GitHub/styles/american-medical-association.csl
+editor: source
+---
+
+```{r setup}
+#| include: false
+library(Hmisc)
+library(tidyverse)
+library(lubridate)
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring",
+  "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring"
+)
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/GitHub",
+  "Windows" = "C:/Users/timvigers/GitHub",
+  "Linux" = "/home/timvigers/GitHub"
+)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r data cleaning}
+#| message: false
+# Import REDCap data
+source(paste0(github_dir, "/CF/Lilah Melzer/cough_monitor_import.r"))
+# Import counts
+agg_counts <- read.csv(
+  "./Data_Raw/Cough_w_TotalCounts_0824 - Cough_agg_w_count_0828.csv",
+  na.strings = c("", "NMD"), header = F
+)
+# Format aggregated count data
+agg_counts <- data.frame(t(agg_counts))
+colnames(agg_counts) <- agg_counts[1, ]
+agg_counts$`Date/Device` <- NULL
+agg_counts <- agg_counts[-1, ]
+colnames(agg_counts)[1] <- "sid"
+agg_counts$sid <- sub("FN", "", agg_counts$sid)
+# Wide to long, fix dates, count number of nights
+agg_counts <- agg_counts %>%
+  pivot_longer(cols = -one_of("sid"), names_to = "Date", values_to = "Coughs") %>%
+  filter(!is.na(Coughs)) %>%
+  mutate(Date = mdy(Date),
+    Coughs = as.numeric(Coughs))%>%
+  group_by(sid) %>%
+  mutate(
+    Night = row_number()
+  ) %>%
+  ungroup()
+```
+
+# Demographics
+
+```{r}
+#| label: tbl-mean-demo
+#| tbl-cap: Participant characteristics
+```
+
+# Coughs per night
+
+```{r}
+#| label: tbl-mean-coughs
+#| tbl-cap: Mean coughs per night
+```
+
+# Coughs over time (aggregated)
+
+```{r}
+#| label: fig-coughs-by-night
+#| fig-cap: Coughs by date
+ggplot(agg_counts, aes(x = Date, y = Coughs, group = sid, color = sid)) +
+  geom_point() +
+  geom_line(alpha = 0.1) +
+  theme(legend.position = "None")
+```
+
+```{r}
+#| label: fig-coughs-by-night
+#| fig-cap: Coughs by nights from start
+ggplot(agg_counts, aes(x = Night, y = Coughs, group = sid, color = sid)) +
+  geom_point() +
+  geom_line(alpha = 0.1) +
+  theme(legend.position = "None")
+```
+
+# 
