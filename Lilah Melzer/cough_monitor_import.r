@@ -3,9 +3,8 @@ home_dir <- switch(Sys.info()["sysname"],
   "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring"
 )
-setwd(home_dir)
 # Read Data
-data <- read.csv("./Data_Raw/CoughMonitor230382_DATA_2024-10-09_1237.csv", na.strings = "")
+data <- read.csv(paste0(home_dir, "/Data_Raw/CoughMonitor230382_DATA_2024-10-09_1237.csv"), na.strings = "")
 # Setting Labels
 label(data$sid) <- "Subject ID"
 label(data$redcap_event_name) <- "Event Name"
@@ -2694,3 +2693,10 @@ levels(data$cfqr_a_es_48_v2.factor) <- c("Siempre", "A menudo", "A veces", "Nunc
 levels(data$cfqr_a_es_49_v2.factor) <- c("Siempre", "A menudo", "A veces", "Nunca")
 levels(data$cfqr_a_es_50_v2.factor) <- c("Siempre", "A menudo", "A veces", "Nunca")
 levels(data$spanish_cfqr_adolescents_and_adults_visit_2_complete.factor) <- c("Incomplete", "Unverified", "Complete")
+# Copy labels to factors
+factors <- colnames(data)[grep("\\.factor", colnames(data))]
+factor_labels <- label(data[, sub("\\.factor", "", factors)])
+names(factor_labels) <- paste0(names(factor_labels), ".factor")
+label(data[, factors]) <- as.list(factor_labels)
+# Clean up
+rm(factors, factor_labels, home_dir)

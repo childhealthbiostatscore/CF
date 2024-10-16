@@ -15,8 +15,6 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
-csl: /Users/timvigers/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -27,6 +25,8 @@ library(tidyverse)
 library(lubridate)
 library(arsenal)
 library(rspiro)
+library(lmerTest)
+library(performance)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring",
   "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring",
@@ -34,7 +34,7 @@ home_dir <- switch(Sys.info()["sysname"],
 )
 github_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/GitHub",
-  "Windows" = "C:/Users/timvigers/GitHub",
+  "Windows" = "C:/Users/timvigers/Documents/GitHub",
   "Linux" = "/home/timvigers/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
@@ -42,8 +42,13 @@ knitr::opts_knit$set(root.dir = home_dir)
 
 ```{r data cleaning}
 #| message: false
+#| warning: false
 # Import REDCap data
 source(paste0(github_dir, "/CF/Lilah Melzer/cough_monitor_import.r"))
+# Import use data
+use <- read.csv("./Data_Clean/Cough study vacation days consent date.csv",
+  na.strings = ""
+)
 # Import counts
 agg_counts <- read.csv(
   "./Data_Raw/Cough_w_TotalCounts_0824 - Cough_agg_w_count_0828.csv",
@@ -56,18 +61,24 @@ agg_counts$`Date/Device` <- NULL
 agg_counts <- agg_counts[-1, ]
 colnames(agg_counts)[1] <- "sid"
 agg_counts$sid <- sub("FN", "", agg_counts$sid)
-# Wide to long, fix dates, count number of nights
+# Wide to long, fix dates
 agg_counts <- agg_counts %>%
-  pivot_longer(cols = -one_of("sid"), names_to = "Date", values_to = "Coughs") %>%
-  filter(!is.na(Coughs)) %>%
+  pivot_longer(
+    cols = -one_of("sid"), names_to = "Date", values_to = "Coughs"
+  ) %>%
   mutate(
     Date = mdy(Date),
     Coughs = as.numeric(Coughs)
-  ) %>%
+  )
+# Add start date
+agg_counts$sid <- as.numeric(agg_counts$sid)
+agg_counts$Start <-
+  mdy(use$Start.date[match(agg_counts$sid, use$Participant.number)])
+# Count number of nights
+agg_counts <- agg_counts %>%
+  filter(Date >= Start) %>%
   group_by(sid) %>%
-  mutate(
-    Night = row_number()
-  ) %>%
+  mutate(Night = row_number()) %>%
   ungroup()
 # Demographics data
 data$Diagnosis <- factor(sub(".*arm_*", "", data$redcap_event_name),
@@ -91,10 +102,33 @@ fev1$pre_fev_pp <- pctpred_GLIgl(fev1$age_at_consent, fev1$height / 100,
   factor(fev1$nih_sex.factor, levels = c("Male", "Female")),
   FEV1 = fev1$pre_fev
 )
-demo = left_join(demo,fev1[,c("sid","pre_fev_pp")])
+demo <- left_join(demo, fev1[, c("sid", "pre_fev_pp")])
+label(demo$pre_fev_pp) <- "Pre-bronchodilator FEV1 % Predicted"
+# CF genotype
+demo$Genotype <-
+  factor(rowSums(demo[, c("mutation1.factor", "mutation2.factor")] == "F508del"),
+    levels = c(2, 1, 0),
+    labels = c("F508del homozygous", "F508del heterozygous", "No F508del")
+  )
+demo[, grep("mutation", colnames(demo))] <- NULL
+# Add group to counts
+agg_counts$Diagnosis <-
+  demo$Diagnosis[match(agg_counts$sid, as.numeric(as.character(demo$sid)))]
+# Per night
+per_night <- agg_counts %>%
+  group_by(sid) %>%
+  summarise(
+    median_coughs = median(Coughs, na.rm = T),
+    nights_data = sum(!is.na(Coughs))
+  )
+demo$sid <- as.numeric(demo$sid)
+demo <- left_join(demo, per_night)
+label(demo$median_coughs) <- "Median Coughs per Night"
+label(demo$nights_data) <- "Nights With Cough Data"
 # Set table options for the document
 mycontrols <-
-  tableby.control(numeric.stats = c("Nmiss2", "meansd", "medianq1q3", "range"))
+  tableby.control(numeric.stats = c("Nmiss", "medianq1q3", "range"),
+                  numeric.test = "kwt")
 ```
 
 # Demographics
@@ -103,34 +137,49 @@ mycontrols <-
 #| label: tbl-mean-demo
 #| tbl-cap: Participant characteristics
 f <- as.formula(paste0("Diagnosis ~", paste0(colnames(demo), collapse = "+")))
-f <- update(f, . ~ . - Diagnosis - sid)
+f <- update(f, . ~ . - Diagnosis - sid - median_coughs + kwt(median_coughs))
 t1 <- tableby(f, data = demo, control = mycontrols)
 summary(t1, pfootnote = T)
 ```
 
-# Coughs per night
+# Distribution of coughs
 
-```{r results='asis'}
-#| label: tbl-mean-coughs
-#| tbl-cap: Mean coughs per night
+```{r}
+#| label: fig-coughs-dist
+#| fig-cap: Histogram of Coughs Across All Nights
+#| warning: false
+ggplot(agg_counts, aes(x = Coughs)) +
+  geom_histogram(binwidth = 1)
 ```
+
+The distribution of coughs per night is extremely skewed, so coughs per night, etc. are reported as medians rather than means.
 
 # Coughs over time (aggregated)
 
-```{r}
-#| label: fig-coughs-by-date
-#| fig-cap: Coughs by date
-ggplot(agg_counts, aes(x = Date, y = Coughs, group = sid, color = sid)) +
-  geom_point() +
-  geom_line(alpha = 0.1) +
-  theme(legend.position = "None")
-```
+## Plot
 
 ```{r}
 #| label: fig-coughs-by-night
 #| fig-cap: Coughs by nights from start
-ggplot(agg_counts, aes(x = Night, y = Coughs, group = sid, color = sid)) +
-  geom_point() +
+#| warning: false
+ggplot(agg_counts, aes(
+  x = Night, y = Coughs, group = factor(sid), color = Diagnosis
+)) +
+  geom_point(alpha = 0.1) +
   geom_line(alpha = 0.1) +
-  theme(legend.position = "None")
+  geom_smooth(aes(group = Diagnosis))
+```
+
+## Model
+
+```{r}
+mod <- glmer(Coughs ~ Night * Diagnosis + (1 | sid),
+  data = agg_counts, family = "poisson"
+)
+gtsummary::tbl_regression(mod, exponentiate = T)
+
+mod <- glmer(Coughs ~ Diagnosis + (1 | sid),
+  data = agg_counts, family = "poisson"
+)
+gtsummary::tbl_regression(mod, exponentiate = T)
 ```
