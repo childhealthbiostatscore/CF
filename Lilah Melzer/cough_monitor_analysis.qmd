@@ -127,8 +127,10 @@ label(demo$median_coughs) <- "Median Coughs per Night"
 label(demo$nights_data) <- "Nights With Cough Data"
 # Set table options for the document
 mycontrols <-
-  tableby.control(numeric.stats = c("Nmiss", "medianq1q3", "range"),
-                  numeric.test = "kwt")
+  tableby.control(
+    numeric.stats = c("Nmiss", "medianq1q3", "range"),
+    numeric.test = "kwt"
+  )
 ```
 
 # Demographics
@@ -173,12 +175,7 @@ ggplot(agg_counts, aes(
 ## Model
 
 ```{r}
-mod <- glmer(Coughs ~ Night * Diagnosis + (1 | sid),
-  data = agg_counts, family = "poisson"
-)
-gtsummary::tbl_regression(mod, exponentiate = T)
-
-mod <- glmer(Coughs ~ Diagnosis + (1 | sid),
+mod <- glmer(Coughs ~ Night + Diagnosis + (Night | sid),
   data = agg_counts, family = "poisson"
 )
 gtsummary::tbl_regression(mod, exponentiate = T)
