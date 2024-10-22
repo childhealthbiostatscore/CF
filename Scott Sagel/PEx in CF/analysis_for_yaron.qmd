@@ -15,8 +15,6 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /home/tim/Documents/Miscellaneous/zotero.bib
-csl: /home/tim/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -28,7 +26,18 @@ library(lubridate)
 library(gtsummary)
 library(ggpubr)
 library(rspiro)
-knitr::opts_knit$set(root.dir = "/home/tim/OneDrive/Vigers/CF/Scott Sagel/PEx in CF")
+library(patchwork)
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Scott Sagel/PEx in CF",
+  "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Scott Sagel/PEx in CF",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Scott Sagel/PEx in CF"
+)
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/GitHub",
+  "Windows" = "C:/Users/timvigers/GitHub",
+  "Linux" = "/home/timvigers/GitHub"
+)
+knitr::opts_knit$set(root.dir = home_dir)
 # Colors for plots
 yellow <- "#f8b80a"
 red <- "#e30022"
@@ -151,6 +160,69 @@ df$Insurance <- apply(
     }
   }
 )
+df$Insurance <- factor(df$Insurance,
+  levels = c(
+    "Medicaid", "Medicaid/None", "Medicaid/Other", "Medicare", "Medicare/Other",
+    "None", "Other", "Private insurance", "Private insurance/Medicaid",
+    "Private insurance/Other",
+    "Private insurance/Tricare/other military health plan",
+    "Tricare/other military health plan"
+  ),
+  labels = c(
+    "Medicaid", "Medicaid", "Medicaid", "Medicare", "Medicare", "None/Other",
+    "None/Other", "Private insurance", "Private insurance", "Private insurance",
+    "Tricare/other military health plan", "Tricare/other military health plan"
+  )
+)
+df$admit_cx_source <- factor(df$admit_cx_source,
+  levels = 1:4,
+  labels = c(
+    "Bronchoscopy", "Expectorated sputum", "Induced sputum", "Throat swab"
+  )
+)
+# Combine species
+df$any_fungi <- apply(df, 1, function(r) {
+  r <- as.numeric(r[paste0("fungi___", 1:5)])
+  any(r == 1)
+})
+df$any_fungi <- factor(df$any_fungi, levels = c(F, T), labels = c("No", "Yes"))
+df$any_ntm <- apply(df, 1, function(r) {
+  r <- as.numeric(r[paste0("ntm___", 1:3)])
+  any(r == 1)
+})
+df$any_ntm <- factor(df$any_ntm, levels = c(F, T), labels = c("No", "Yes"))
+df$any_virus <- apply(df, 1, function(r) {
+  r <- as.numeric(r[paste0("viruses___", 1:5)])
+  any(r == 1)
+})
+df$any_virus <- factor(df$any_virus, levels = c(F, T), labels = c("No", "Yes"))
+df$any_bact <- apply(df, 1, function(r) {
+  r <- as.numeric(r[paste0("admit_cx_results___", 1:9)])
+  any(r == 1)
+})
+df$any_bact <- factor(df$any_bact, levels = c(F, T), labels = c("No", "Yes"))
+
+df$no_bact <- apply(df, 1, function(r) {
+  r <- as.numeric(r[paste0("admit_cx_results___", 1:8)])
+  all(r == 0)
+})
+df$no_bact <- factor(df$no_bact, levels = c(F, T), labels = c("No", "Yes"))
+# Change in FEV1 from admission to discharge
+df$ppfev1_change <- df$ppfev1_discharge - df$ppfev1_admit
+# Format fungi, NTM, etc. columns
+df <- df %>%
+  mutate(
+    across(
+      c(
+        fungi___1:fungi___5, ntm___1:ntm___3, viruses___1:viruses___5,
+        admit_cx_results___1:admit_cx_results___9
+      ),
+      ~ factor(as.numeric(.x),
+        levels = 0:1,
+        labels = c("Not detected", "Detected")
+      )
+    )
+  )
 # Labels
 labels <- list(
   "Age group at admission" = "age_group",
@@ -164,6 +236,7 @@ labels <- list(
   "Scedosporium apiospermum" = "fungi___3",
   "Candidia (any species)" = "fungi___4",
   "Other fungus" = "fungi___5",
+  "Any fungi?" = "any_fungi",
   "NTM testing performed?" = "ntm_test",
   "Fungal testing performed?" = "fungal_test",
   "Viral testing performed?" = "viral_test",
@@ -173,9 +246,11 @@ labels <- list(
   "Rhinovirus/enterovirus" = "viruses___3",
   "SARS CoV-2" = "viruses___4",
   "Other virus" = "viruses___5",
+  "Any virus?" = "any_virus",
   "M. abscessus species" = "ntm___1",
   "M. avium complex species" = "ntm___2",
   "Other NTM species" = "ntm___3",
+  "Any NTM?" = "any_ntm",
   "A. xylosoxidans" = "admit_cx_results___1",
   "B. cepacia complex" = "admit_cx_results___2",
   "H. influenzae" = "admit_cx_results___3",
@@ -185,16 +260,18 @@ labels <- list(
   "P. aeruginosa mucoid" = "admit_cx_results___7",
   "S. maltophilia" = "admit_cx_results___8",
   "Other bacteria" = "admit_cx_results___9",
+  "Any bacteria?" = "any_bact",
+  "No CF bacteria" = "no_bact",
   "On CFTR Modulator?" = "cftr_mod",
   "CFTR Modulator Type" = "cftr_mod_spec",
-  "Cultures Tested" = "redcap_data_access_group",
+  "Site" = "redcap_data_access_group",
   "Length of Admission" = "days_admit",
   "Systemic Steroids" = "steroids_system",
   "Oral Steroids" = "steroids_oral",
   "IV Steroids" = "steroids_iv",
-  "Baseline FEV1pp (2022)" = "ppfev1_baseline",
-  "Admission FEV1pp (2022)" = "ppfev1_admit",
-  "Discharge FEV1pp (2022)" = "ppfev1_discharge",
+  "Baseline FEV1pp" = "ppfev1_baseline",
+  "Admission FEV1pp" = "ppfev1_admit",
+  "Discharge FEV1pp" = "ppfev1_discharge",
   "Change in mean FEV1pp from admit to discharge" = "ppfev1_change"
 )
 labels <- as.list(setNames(names(labels), labels))
@@ -205,23 +282,43 @@ df <- df %>%
     redcap_data_access_group, year, sex, age_group, age_at_admit, race,
     ethnicity, Genotype, Insurance, cftr_mod, cftr_mod_spec,
     Trikafta, azithro, inhaled_abx, steroids_system, admit_cx_source,
-    ppfev1_baseline, ppfev1_admit, ppfev1_discharge, days_admit,
-    fungal_test, fungi___1:fungi___5,
-    ntm_test, ntm___1:ntm___3,
-    viral_test, viruses___1:viruses___5,
-    admit_cx_results___1:admit_cx_results___9,
+    ppfev1_baseline, ppfev1_admit, ppfev1_discharge, ppfev1_change,
+    days_admit, fungal_test, fungi___1:fungi___5, any_fungi,
+    ntm_test, ntm___1:ntm___3, any_ntm,
+    viral_test, viruses___1:viruses___5, any_virus,
+    admit_cx_results___1:admit_cx_results___9, any_bact, no_bact,
     contains("steroids")
   ) %>%
   filter(!is.na(year))
-# Write for Scott and Yaron to check
-write.csv(df,file = "./Data_Clean/analysis_dataset.csv",row.names = F,na = "")
 ```
 
 # Demographics
 
 ```{r}
 #| label: tbl-table-1
-#| tbl-cap: Participant characteristics at admission
+#| tbl-cap: Participant characteristics overall
+df %>%
+  group_by(sid) %>%
+  filter(row_number() == 1) %>%
+  ungroup() %>%
+  select(redcap_data_access_group, sex, race, ethnicity, Genotype) %>%
+  tbl_summary(missing_text = "(Missing)", label = labels)
+```
+
+```{r}
+#| label: tbl-table-1-year
+#| tbl-cap: Participant characteristics by year
+df %>%
+  group_by(sid, year) %>%
+  filter(row_number() == 1) %>%
+  ungroup() %>%
+  select(year, redcap_data_access_group, sex, race, ethnicity, Genotype) %>%
+  tbl_summary(by = year, missing_text = "(Missing)", label = labels)
+```
+
+```{r}
+#| label: tbl-table-1-indep
+#| tbl-cap: Participant characteristics at admission by year
 df %>%
   select(redcap_data_access_group:days_admit) %>%
   tbl_summary(
@@ -229,7 +326,10 @@ df %>%
     statistic =
       list(
         all_continuous() ~ "{median} [{p25}, {p75}]",
-        c(age_at_admit, ppfev1_baseline, ppfev1_admit, ppfev1_discharge) ~
+        c(
+          age_at_admit, ppfev1_baseline, ppfev1_admit, ppfev1_discharge,
+          ppfev1_change
+        ) ~
           "{mean} ({sd})"
       )
   ) %>%
@@ -270,7 +370,7 @@ The tables below are limited to patients who had fungal testing performed.
 #| tbl-cap: Fungi
 df %>%
   filter(fungal_test == "Yes") %>%
-  select(year, redcap_data_access_group, fungi___1:fungi___5) %>%
+  select(year, redcap_data_access_group, fungi___1:fungi___5, any_fungi) %>%
   tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
   add_overall() %>%
   add_p() %>%
@@ -283,7 +383,7 @@ df %>%
 #| message: false
 df %>%
   filter(fungal_test == "Yes") %>%
-  select(year, redcap_data_access_group, fungi___1:fungi___5) %>%
+  select(year, redcap_data_access_group, fungi___1:fungi___5, any_fungi) %>%
   tbl_strata(
     strata = redcap_data_access_group,
     .tbl_fun =
@@ -301,7 +401,7 @@ df %>%
 #| message: false
 df %>%
   filter(fungal_test == "Yes") %>%
-  select(year, cftr_mod, fungi___1:fungi___5) %>%
+  select(year, cftr_mod, fungi___1:fungi___5, any_fungi) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
@@ -319,7 +419,7 @@ df %>%
 #| message: false
 df %>%
   filter(fungal_test == "Yes") %>%
-  select(year, cftr_mod_spec, fungi___1:fungi___5) %>%
+  select(year, cftr_mod_spec, fungi___1:fungi___5, any_fungi) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
@@ -340,7 +440,7 @@ df %>%
 #| message: false
 df %>%
   filter(fungal_test == "Yes") %>%
-  select(year, Trikafta, fungi___1:fungi___5) %>%
+  select(year, Trikafta, fungi___1:fungi___5, any_fungi) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
@@ -361,7 +461,7 @@ The tables below are limited to patients who had NTM testing performed.
 #| tbl-cap: NTM
 df %>%
   filter(ntm_test == "Yes") %>%
-  select(year, redcap_data_access_group, ntm___1:ntm___3) %>%
+  select(year, redcap_data_access_group, ntm___1:ntm___3, any_ntm) %>%
   tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
   add_overall() %>%
   add_p() %>%
@@ -374,7 +474,7 @@ df %>%
 #| message: false
 df %>%
   filter(ntm_test == "Yes") %>%
-  select(year, redcap_data_access_group, ntm___1:ntm___3) %>%
+  select(year, redcap_data_access_group, ntm___1:ntm___3, any_ntm) %>%
   tbl_strata(
     strata = redcap_data_access_group,
     .tbl_fun =
@@ -392,7 +492,7 @@ df %>%
 #| message: false
 df %>%
   filter(ntm_test == "Yes") %>%
-  select(year, cftr_mod, ntm___1:ntm___3) %>%
+  select(year, cftr_mod, ntm___1:ntm___3, any_ntm) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
@@ -413,7 +513,7 @@ df %>%
 #| message: false
 df %>%
   filter(ntm_test == "Yes") %>%
-  select(year, cftr_mod_spec, ntm___1:ntm___3) %>%
+  select(year, cftr_mod_spec, ntm___1:ntm___3, any_ntm) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
@@ -434,7 +534,7 @@ df %>%
 #| message: false
 df %>%
   filter(ntm_test == "Yes") %>%
-  select(year, Trikafta, ntm___1:ntm___3) %>%
+  select(year, Trikafta, ntm___1:ntm___3, any_ntm) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
@@ -455,7 +555,7 @@ The tables below are limited to patients who had viral testing performed.
 #| tbl-cap: Viruses
 df %>%
   filter(viral_test == "Yes") %>%
-  select(year, redcap_data_access_group, viruses___1:viruses___5) %>%
+  select(year, redcap_data_access_group, viruses___1:viruses___5, any_virus) %>%
   tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
   add_overall() %>%
   add_p() %>%
@@ -468,7 +568,7 @@ df %>%
 #| message: false
 df %>%
   filter(viral_test == "Yes") %>%
-  select(year, cftr_mod, viruses___1:viruses___5) %>%
+  select(year, cftr_mod, viruses___1:viruses___5, any_virus) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
@@ -486,7 +586,7 @@ df %>%
 #| message: false
 df %>%
   filter(viral_test == "Yes") %>%
-  select(year, cftr_mod_spec, viruses___1:viruses___5) %>%
+  select(year, cftr_mod_spec, viruses___1:viruses___5, any_virus) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
@@ -507,7 +607,7 @@ df %>%
 #| message: false
 df %>%
   filter(viral_test == "Yes") %>%
-  select(year, Trikafta, viruses___1:viruses___5) %>%
+  select(year, Trikafta, viruses___1:viruses___5, any_virus) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
@@ -527,7 +627,7 @@ df %>%
 df %>%
   select(
     year, redcap_data_access_group,
-    admit_cx_results___1:admit_cx_results___9
+    admit_cx_results___1:admit_cx_results___9, any_bact, no_bact
   ) %>%
   tbl_summary(by = year, missing_text = "Missing", label = labels) %>%
   add_overall() %>%
@@ -541,7 +641,8 @@ df %>%
 #| message: false
 df %>%
   select(
-    year, redcap_data_access_group, admit_cx_results___1:admit_cx_results___9
+    year, redcap_data_access_group, admit_cx_results___1:admit_cx_results___9,
+    any_bact, no_bact
   ) %>%
   tbl_strata(
     strata = redcap_data_access_group,
@@ -559,7 +660,9 @@ df %>%
 #| tbl-cap: Bacteria by modulator status
 #| message: false
 df %>%
-  select(year, cftr_mod, admit_cx_results___1:admit_cx_results___9) %>%
+  select(
+    year, cftr_mod, admit_cx_results___1:admit_cx_results___9, any_bact, no_bact
+  ) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
@@ -579,7 +682,10 @@ df %>%
 #| tbl-cap: Bacteria by specfic modulator status
 #| message: false
 df %>%
-  select(year, cftr_mod_spec, admit_cx_results___1:admit_cx_results___9) %>%
+  select(
+    year, cftr_mod_spec, admit_cx_results___1:admit_cx_results___9, any_bact,
+    no_bact
+  ) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
@@ -599,7 +705,9 @@ df %>%
 #| tbl-cap: Bacteria by Trikafta status
 #| message: false
 df %>%
-  select(year, Trikafta, admit_cx_results___1:admit_cx_results___9) %>%
+  select(
+    year, Trikafta, admit_cx_results___1:admit_cx_results___9, any_bact, no_bact
+  ) %>%
   tbl_strata(
     strata = year,
     .tbl_fun =
@@ -786,7 +894,7 @@ df %>%
 ```{r}
 #| label: fig-num-hosps
 #| fig-cap: Number of hospitalizations
-df %>%
+fig1 <- df %>%
   group_by(year) %>%
   summarise(n = n()) %>%
   ggplot(aes(x = factor(year), y = n, fill = factor(year))) +
@@ -796,12 +904,13 @@ df %>%
   theme_bw() +
   theme(legend.position = "none", axis.title.x = element_blank()) +
   scale_fill_manual(values = c(purple, yellow))
+fig1
 ```
 
 ```{r}
 #| label: fig-perc-hosp-2-plus
 #| fig-cap: Percent hospitalized 2 or more times in both years
-df %>%
+fig2 <- df %>%
   group_by(sid, year) %>%
   summarise(n = n(), .groups = "drop") %>%
   group_by(year) %>%
@@ -821,11 +930,17 @@ df %>%
     xmin = 1, xmax = 2, y_position = 50, map_signif_level = T,
     annotation = "<0.001"
   ) +
-  xlab("Site") +
   ylab("Percent With >= 2 Hospitalizations") +
   theme_bw() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none", axis.title.x = element_blank()) +
   scale_fill_manual(values = c(purple, yellow))
+fig2
+```
+
+```{r}
+#| label: fig-panel
+#| fig-cap: Hospitalizations
+fig1 + fig2
 ```
 
 ```{r}
@@ -1061,13 +1176,12 @@ race_df %>%
 
 # FEV1 response (from admission to discharge) on ETI vs not on ETI
 
-Hospitalizations within a person were considered independent in the table below.
+Hospitalizations within a person were considered independent in the tables below.
 
 ```{r}
 #| label: tbl-fev1-change-eti
 #| tbl-cap: Change in FEV1pp by ETI status
 df %>%
-  mutate(ppfev1_change = ppfev1_discharge - ppfev1_admit) %>%
   filter(year == 2022) %>%
   select(ppfev1_change, Trikafta) %>%
   tbl_summary(
