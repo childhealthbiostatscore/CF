@@ -313,7 +313,9 @@ df %>%
   filter(row_number() == 1) %>%
   ungroup() %>%
   select(year, redcap_data_access_group, sex, race, ethnicity, Genotype) %>%
-  tbl_summary(by = year, missing_text = "(Missing)", label = labels)
+  tbl_summary(by = year, missing_text = "(Missing)", label = labels) %>%
+  add_p() %>%
+  separate_p_footnotes()
 ```
 
 ```{r}
