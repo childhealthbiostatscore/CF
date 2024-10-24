@@ -4,7 +4,7 @@ home_dir <- switch(Sys.info()["sysname"],
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring"
 )
 # Read Data
-data <- read.csv(paste0(home_dir, "/Data_Raw/CoughMonitor230382_DATA_2024-10-09_1237.csv"), na.strings = "")
+data <- read.csv(paste0(home_dir, "/Data_Raw/CoughMonitor230382_DATA_2024-10-23_1317.csv"), na.strings = "")
 # Setting Labels
 label(data$sid) <- "Subject ID"
 label(data$redcap_event_name) <- "Event Name"

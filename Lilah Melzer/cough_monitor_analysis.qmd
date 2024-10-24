@@ -25,6 +25,7 @@ library(tidyverse)
 library(lubridate)
 library(arsenal)
 library(rspiro)
+library(childsds)
 library(lmerTest)
 library(performance)
 home_dir <- switch(Sys.info()["sysname"],
@@ -46,9 +47,12 @@ knitr::opts_knit$set(root.dir = home_dir)
 # Import REDCap data
 source(paste0(github_dir, "/CF/Lilah Melzer/cough_monitor_import.r"))
 # Import use data
-use <- read.csv("./Data_Clean/Cough study vacation days consent date.csv",
-  na.strings = ""
-)
+start_end <- read.csv("./Data_Clean/Start and end dates.csv", na.strings = "")
+start_end$Start <- mdy(start_end$Start)
+start_end$End <- mdy(start_end$End)
+vacations <- read.csv("./Data_Clean/Vacation days.csv", na.strings = "")
+vacations$Vacation.Start <- mdy(vacations$Vacation.Start)
+vacations$Vacation.End <- mdy(vacations$Vacation.End)
 # Import counts
 agg_counts <- read.csv(
   "./Data_Raw/Cough_w_TotalCounts_0824 - Cough_agg_w_count_0828.csv",
@@ -70,13 +74,31 @@ agg_counts <- agg_counts %>%
     Date = mdy(Date),
     Coughs = as.numeric(Coughs)
   )
-# Add start date
+# Add start and end dates, filter
 agg_counts$sid <- as.numeric(agg_counts$sid)
-agg_counts$Start <-
-  mdy(use$Start.date[match(agg_counts$sid, use$Participant.number)])
+agg_counts <- left_join(agg_counts, start_end)
+agg_counts <- agg_counts %>%
+  filter(Date >= Start & Date <= End)
+# Vacations
+agg_counts$Vacation <- apply(agg_counts, 1, function(r) {
+  id <- as.numeric(r["sid"])
+  d <- r["Date"]
+  any(d >= vacations$Vacation.Start[vacations$sid == id] &
+    d <= vacations$Vacation.End[vacations$sid == id])
+})
+agg_counts <- agg_counts %>%
+  filter(!Vacation) %>%
+  arrange(sid, Date)
+# Sick
+sick <- data %>%
+  select(sid, pulm_ex_v2.factor) %>%
+  mutate(
+    antib_dt = mdy(antib_dt), 
+    px_start = antib_dt - 7,
+    px_end = antib_dt + 28
+  )
 # Count number of nights
 agg_counts <- agg_counts %>%
-  filter(Date >= Start) %>%
   group_by(sid) %>%
   mutate(Night = row_number()) %>%
   ungroup()
@@ -96,14 +118,27 @@ demo <- data %>%
 # Calculate FEV1% - rspiro not accepting NA values for gender, which is really
 # annoying
 fev1 <- demo %>%
-  select(age_at_consent, height, nih_sex.factor, pre_fev) %>%
+  select(age_at_consent, height, weight, nih_sex.factor, pre_fev) %>%
   filter(nih_sex.factor %in% c("Male", "Female"))
 fev1$pre_fev_pp <- pctpred_GLIgl(fev1$age_at_consent, fev1$height / 100,
   factor(fev1$nih_sex.factor, levels = c("Male", "Female")),
   FEV1 = fev1$pre_fev
 )
-demo <- left_join(demo, fev1[, c("sid", "pre_fev_pp")])
+fev1$height_perc <- sds(as.numeric(fev1$height),
+  age = fev1$age_at_consent, sex = fev1$nih_sex.factor,
+  male = "Male", female = "Female", item = "height2_20", ref = cdc.ref,
+  type = "perc"
+) * 100
+fev1$weight_perc <- sds(as.numeric(fev1$weight),
+  age = fev1$age_at_consent, sex = fev1$nih_sex.factor,
+  male = "Male", female = "Female", item = "weight2_20", ref = cdc.ref,
+  type = "perc"
+) * 100
+demo <-
+  left_join(demo, fev1[, c("sid", "height_perc", "weight_perc", "pre_fev_pp")])
 label(demo$pre_fev_pp) <- "Pre-bronchodilator FEV1 % Predicted"
+label(demo$height_perc) <- "Height %ile"
+label(demo$weight_perc) <- "Weight %ile"
 # CF genotype
 demo$Genotype <-
   factor(rowSums(demo[, c("mutation1.factor", "mutation2.factor")] == "F508del"),
@@ -125,6 +160,12 @@ demo$sid <- as.numeric(demo$sid)
 demo <- left_join(demo, per_night)
 label(demo$median_coughs) <- "Median Coughs per Night"
 label(demo$nights_data) <- "Nights With Cough Data"
+# Order columns
+demo <- demo %>%
+  select(sid, height_perc, weight_perc, pre_fev_pp, everything()) %>%
+  select(-height, -weight, -pre_fev)
+# Exclude vacation days
+
 # Set table options for the document
 mycontrols <-
   tableby.control(
