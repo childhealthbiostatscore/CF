@@ -24,6 +24,7 @@ editor: source
 ```{r setup}
 #| include: false
 # Libraries
+library(Hmisc)
 library(tidyverse)
 library(gt)
 library(gtsummary)
@@ -34,8 +35,8 @@ library(ggeffects)
 # Paths
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/tim/CF"
+  "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -78,49 +79,796 @@ encounter %>%
 
 # Segmented models
 
-The following models are adjusted for age group and insurance status. We fit a Gaussian mixed model for continuous outcomes with random intercept for each subject.
+```{r}
+# Create change in slope variable
+encounter$slope_change_days <- (encounter$Days > 0) * encounter$Days
+label(encounter$slope_change_days) <- "Change in Slope"
+encounter$Years <- encounter$Days / 365.25
+encounter$slope_change_years <- (encounter$Years > 0) * encounter$Years
+label(encounter$slope_change_years) <- "Change in Slope"
+```
 
-```{r results='asis'}
-#| message: false
-invisible(lapply(continuous_outcomes[1:3], function(o) {
-  # Formula
-  f <-
-    as.formula(paste0(
-      o,
-      "~ bs(Days, knots = 0, degree = 1) * Race + age_group + Insurance + (1 | eDWID)"
-    ))
-  m <- lmer(f, data = encounter)
-  # Print table
-  cat("\n")
-  cat("\n")
-  cat("##", o)
-  cat("\n")
-  cat("\n")
-  cat("### Model results")
-  cat("\n")
-  cat("\n")
-  m %>%
-    tbl_regression() %>%
-    print()
-  cat("\n")
-  cat("\n")
-  # Plot
-  cat("\n")
-  cat("\n")
-  cat("## Model predictions")
-  cat("\n")
-  cat("\n")
-  pred <- predict_response(m, terms = c("Days[-1095,0,730]", "Race"))
-  pred %>% gt() %>% print()
-  cat("\n")
-  cat("\n")
-  cat("### Plot")
-  cat("\n")
-  cat("\n")
-  pred %>%
-    plot() %>%
-    print()
-  cat("\n")
-  cat("\n")
-}))
+The following models are adjusted for age group and insurance status. We fit a Gaussian mixed model for continuous outcomes with random intercept for each subject (random slope did not improve the model AIC).
+
+## FEV1 % predicted
+
+### Full cohort
+
+#### GLI 2022 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  gli_fev1_ppred_rn ~ Years * Race +
+    slope_change_years * Race + age_group + Insurance + (1 | eDWID),
+  data = encounter
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = gli_fev1_ppred_rn, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+#### GLI 2012 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  GLI_FEV1_pct_predicted ~ Years * Race +
+    slope_change_years * Race + age_group + Insurance + (1 | eDWID),
+  data = encounter
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = GLI_FEV1_pct_predicted, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+### Age < 18 at ETI initiation
+
+The following models were not adjusted for age group.
+
+#### GLI 2022 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  gli_fev1_ppred_rn ~ Years * Race + slope_change_years * Race +
+    Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = gli_fev1_ppred_rn, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+#### GLI 2012 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  GLI_FEV1_pct_predicted ~ Years * Race +
+    slope_change_years * Race + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = GLI_FEV1_pct_predicted, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+### Age >= 18 at ETI initiation
+
+The following models were not adjusted for age group.
+
+#### GLI 2022 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  gli_fev1_ppred_rn ~ Years * Race +
+    slope_change_years * Race + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[18, Inf)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = gli_fev1_ppred_rn, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+#### GLI 2012 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  GLI_FEV1_pct_predicted ~ Years * Race +
+    slope_change_years * Race + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[18, Inf)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = GLI_FEV1_pct_predicted, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+## FVC % predicted
+
+### Full cohort
+
+#### GLI 2022 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  gli_fvc_ppred_rn ~ Years * Race +
+    slope_change_years * Race + age_group + Insurance + (1 | eDWID),
+  data = encounter
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = gli_fvc_ppred_rn, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+#### GLI 2012 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  GLI_FVC_pct_predicted ~ Years * Race +
+    slope_change_years * Race + age_group + Insurance + (1 | eDWID),
+  data = encounter
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = GLI_FVC_pct_predicted, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+### Age < 18 at ETI initiation
+
+The following models were not adjusted for age group.
+
+#### GLI 2022 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  gli_fvc_ppred_rn ~ Years * Race + slope_change_years * Race +
+    Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = gli_fvc_ppred_rn, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+#### GLI 2012 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  GLI_FVC_pct_predicted ~ Years * Race +
+    slope_change_years * Race + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = GLI_FVC_pct_predicted, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+### Age >= 18 at ETI initiation
+
+The following models were not adjusted for age group.
+
+#### GLI 2022 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  gli_fvc_ppred_rn ~ Years * Race +
+    slope_change_years * Race + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[18, Inf)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = gli_fvc_ppred_rn, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+#### GLI 2012 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  GLI_FVC_pct_predicted ~ Years * Race +
+    slope_change_years * Race + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[18, Inf)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = GLI_FVC_pct_predicted, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+## FEV1/FVC % predicted
+
+### Full cohort
+
+#### GLI 2022 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  gli_fev1fvc_ppred_rn ~ Years * Race +
+    slope_change_years * Race + age_group + Insurance + (1 | eDWID),
+  data = encounter
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = gli_fev1fvc_ppred_rn, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+#### GLI 2012 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  GLI_FEV1FVC_pct_predicted ~ Years * Race +
+    slope_change_years * Race + age_group + Insurance + (1 | eDWID),
+  data = encounter
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = GLI_FEV1FVC_pct_predicted, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+### Age < 18 at ETI initiation
+
+The following models were not adjusted for age group.
+
+#### GLI 2022 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  gli_fev1fvc_ppred_rn ~ Years * Race + slope_change_years * Race +
+    Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = gli_fev1fvc_ppred_rn, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+#### GLI 2012 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  GLI_FEV1FVC_pct_predicted ~ Years * Race +
+    slope_change_years * Race + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = GLI_FEV1FVC_pct_predicted, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+### Age >= 18 at ETI initiation
+
+The following models were not adjusted for age group.
+
+#### GLI 2022 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  gli_fev1fvc_ppred_rn ~ Years * Race +
+    slope_change_years * Race + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[18, Inf)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = gli_fev1fvc_ppred_rn, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+#### GLI 2012 equations
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  GLI_FEV1FVC_pct_predicted ~ Years * Race +
+    slope_change_years * Race + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[18, Inf)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = GLI_FEV1FVC_pct_predicted, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+## BMI %ile 
+
+### Full cohort
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  bmipercentile ~ Years * Race +
+    slope_change_years * Race + age_group + Insurance + (1 | eDWID),
+  data = encounter
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = bmipercentile, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+### Age < 18 at ETI initiation
+
+The following models were not adjusted for age group.
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  bmipercentile ~ Years * Race + slope_change_years * Race +
+    Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = bmipercentile, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+### Age >= 18 at ETI initiation
+
+The following models were not adjusted for age group.
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  bmipercentile ~ Years * Race +
+    slope_change_years * Race + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[18, Inf)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = bmipercentile, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+## Height %ile 
+
+### Full cohort
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  heightpercentile ~ Years * Race +
+    slope_change_years * Race + age_group + Insurance + (1 | eDWID),
+  data = encounter
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = heightpercentile, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+### Age < 18 at ETI initiation
+
+The following models were not adjusted for age group.
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  heightpercentile ~ Years * Race + slope_change_years * Race +
+    Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = heightpercentile, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+### Age >= 18 at ETI initiation
+
+The following models were not adjusted for age group.
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  heightpercentile ~ Years * Race +
+    slope_change_years * Race + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[18, Inf)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = heightpercentile, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+## Weight %ile 
+
+### Full cohort
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  weightpercentile ~ Years * Race +
+    slope_change_years * Race + age_group + Insurance + (1 | eDWID),
+  data = encounter
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = weightpercentile, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+### Age < 18 at ETI initiation
+
+The following models were not adjusted for age group.
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  weightpercentile ~ Years * Race + slope_change_years * Race +
+    Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = weightpercentile, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
+```
+
+### Age >= 18 at ETI initiation
+
+The following models were not adjusted for age group.
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  weightpercentile ~ Years * Race +
+    slope_change_years * Race + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[18, Inf)", ]
+)
+# Model plot
+mod_df <- change_mod@frame
+mod_df$ind_pred <- predict(change_mod)
+mod_df$pop_pred <- predict(change_mod, re.form = NA)
+ggplot(mod_df, aes(x = Years)) +
+  geom_point(aes(y = weightpercentile, group = eDWID),
+    alpha = 0.01, show.legend = F, shape = "."
+  ) +
+  geom_line(aes(y = ind_pred, group = eDWID),
+    alpha = 0.01, show.legend = F
+  ) +
+  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  xlab("Years from ETI Start") +
+  theme_classic()
+# Model summary
+change_mod %>% gtsummary::tbl_regression()
 ```

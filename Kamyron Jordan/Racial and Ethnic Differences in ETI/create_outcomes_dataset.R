@@ -122,6 +122,11 @@ encounter$Modulator_trikafta_first_date <-
 encounter$encounterdate <- mdy(encounter$encounterdate)
 encounter$Days <- as.numeric(encounter$encounterdate -
   encounter$Modulator_trikafta_first_date)
+encounter$age_eti_start <-
+  round(encounter$encounterage - (encounter$Days / 365.25), 2)
+encounter$age_eti_group <- cut(encounter$age_eti_start,
+  breaks = c(-Inf, 18, Inf), right = FALSE
+)
 # Hospitalization or home IVs
 hospitalizations$CareEpi_StartDt <- mdy(hospitalizations$CareEpi_StartDt)
 hospitalizations$CareEpi_EndDt <- mdy(hospitalizations$CareEpi_EndDt)
