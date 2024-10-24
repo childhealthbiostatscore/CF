@@ -103,10 +103,15 @@ change_mod <- lmer(
     slope_change_years * Race + age_group + Insurance + (1 | eDWID),
   data = encounter
 )
+# EMMs
+emm = emmeans(change_mod,spec = ~Years+Race)
+
 # Model plot
 mod_df <- change_mod@frame
 mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
+pop_dat = mod_df %>% select(Years:Insurance)
+pop_dat$pred <- predict(change_mod, re.form = NA,newdata = pop_dat)
+pop_dat = pop_dat%>% distinct()
 ggplot(mod_df, aes(x = Years)) +
   geom_point(aes(y = gli_fev1_ppred_rn, group = eDWID),
     alpha = 0.01, show.legend = F, shape = "."
@@ -114,7 +119,7 @@ ggplot(mod_df, aes(x = Years)) +
   geom_line(aes(y = ind_pred, group = eDWID),
     alpha = 0.01, show.legend = F
   ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+  geom_line(data = pop_dat,aes(y = pred, group = Race, colour = Race)) +
   xlab("Years from ETI Start") +
   theme_classic()
 # Model summary
