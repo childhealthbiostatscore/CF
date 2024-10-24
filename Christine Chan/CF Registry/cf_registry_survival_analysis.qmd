@@ -8,7 +8,7 @@ format:
     fig-width: 10
     fig-height: 10
     toc: true
-    toc-depth: 5
+    toc-depth: 10
     toc-float: true
     code-fold: true
     self-contained: true
@@ -38,13 +38,13 @@ library(ggstats)
 library(forestmodel)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry",
-  "Linux" = "/home/tim/OneDrive/Vigers/CF/Christine Chan/CF Registry"
+  "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry"
 )
 github_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/GitHub",
-  "Windows" = "C:/Users/Tim/GitHub",
-  "Linux" = "/home/tim/GitHub"
+  "Windows" = "C:/Users/timvigers/GitHub",
+  "Linux" = "/home/timvigers/GitHub"
 )
 source(paste0(github_dir, "/shared-resources/Visualization/forest_plots.R"))
 knitr::opts_knit$set(root.dir = home_dir)
@@ -470,7 +470,7 @@ cox_res <- coxph(f, data = annual, cluster = eDWID)
 # Forest plot and coefficients table
 cox_res %>%
   tbl_regression()
-ggcoef_model(cox_res, show_p_values = F, signif_stars = F, colour = F)
+ggcoef_table(cox_res, show_p_values = F, add_reference_rows = T, signif_stars = F, colour = F)
 # Diagnostics
 test.ph <- data.frame(cox.zph(cox_res)$table)
 test.ph <- test.ph[rownames(test.ph) != "GLOBAL", ]
@@ -497,8 +497,8 @@ vx770_cox_res <- coxph(f_vx770,
 )
 vx770_cox_res %>%
   tbl_regression()
-ggcoef_model(vx770_cox_res,
-  show_p_values = F, signif_stars = F, colour = F
+ggcoef_table(vx770_cox_res,
+  show_p_values = F, add_reference_rows = T, signif_stars = F, colour = F
 )
 ```
 
@@ -521,8 +521,8 @@ vx809comb_cox_res <- coxph(f_vx809comb,
 )
 vx809comb_cox_res %>%
   tbl_regression()
-ggcoef_model(vx809comb_cox_res,
-  show_p_values = F, signif_stars = F, colour = F
+ggcoef_table(vx809comb_cox_res,
+  show_p_values = F, add_reference_rows = T, signif_stars = F, colour = F
 )
 ```
 
@@ -597,6 +597,7 @@ invisible(lapply(time_varying, function(v) {
   cox_res_split <- coxph(new_f, data = annual_split, cluster = eDWID)
   # Use the regular interaction term to get means for each time period
   cat("\n")
+  cat("\n")
   cat("####", v)
   cat("\n")
   cat("\n")
@@ -608,31 +609,10 @@ invisible(lapply(time_varying, function(v) {
   emm <- emmeans(cox_res_split, new_f_emm, nuisance = xvars[-which(xvars == v)])
   emm <- data.frame(emm)
   # Plot base model (without time varying)
-  ggcoef_model(cox_res_split,
-    show_p_values = F, add_reference_rows = F, signif_stars = F, colour = F,
-    include = xvars[-which(xvars == v)]
+  ggcoef_table(cox_res_split,
+    show_p_values = F, add_reference_rows = T, signif_stars = F, colour = F
   ) %>%
     print()
-  cat("\n")
-  cat("\n")
-  # Print EMMs
-  print(kable(emm, digits = 3))
-  cat("\n")
-  cat("\n")
-  # Plot marginal means
-  tvfp <- time_varying_forest_plot(emm,
-    x = "emmean", var = v,
-    var_label = labels[v]
-  ) +
-    theme(text = element_text(size = 20))
-  print(tvfp)
-  ggsave(
-    paste0(
-      "./Dissemination/Figures/", v,
-      "_time_varying_forest_plot.png"
-    ),
-    plot = tvfp, width = 12, height = 9, units = "in"
-  )
   cat("\n")
   cat("\n")
 }))
