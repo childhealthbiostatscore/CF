@@ -64,22 +64,19 @@ chco$Diagnosis <- factor(
 chco <- chco %>% filter(Demographics.Available == "TRUE")
 # Limit to the columns that we need for analysis
 chco <- chco %>% select(
-  PatientID, Diagnosis, Sex, Genotypes1, Genotypes2,
-  Age.at.Test.in.Years, Method, Site, Na, K, Cl, Na_Left, Na_Right, K_Left,
+  PatientID, Site, Diagnosis, Sex, Genotypes1, Genotypes2,
+  Age.at.Test.in.Years, Method, Na, K, Cl, Na_Left, Na_Right, K_Left,
   K_Right, Cl_Left, Cl_Right
 )
-# Get each person's first test
-chco <- chco %>%
-  group_by(PatientID) %>%
-  slice_min(Age.at.Test.in.Years, na_rm = T)
 # Import NJH data
-njh <- read_excel("./Data_Raw/SweatVariability2025_CFgenotypes.xlsx")
+njh <- read_excel("./Data_Raw/SweatVariability2025_CFgenotypes 2024-08-21.xlsx")
 # Filter and select similar to CHCO
 njh <- njh %>%
   filter(`Demographics Available`) %>%
+  mutate(Site = "NJH") %>%
   select(
-    `Patient ID`, Diagnosis, Sex, `Genotype 1`, `Genotype 2`,
-    `Age at test (in years)`, `Test Method`, `Site of test`, `Sweat sodium`,
+    `Patient ID`, `Site of test`, Diagnosis, Sex, `Genotype 1`, `Genotype 2`,
+    `Age at test (in years)`, `Test Method`, `Sweat sodium`,
     `Sweat potassium`, `Sweat chloride`, `Sweat sodium left arm`,
     `Sweat sodium right arm`, `Sweat potassium left arm`,
     `Sweat potassium right arm`, `Sweat chloride left arm`,
@@ -96,6 +93,34 @@ diagnoses <- read.csv("./Data_Cleaned/SweatVariability2025_CFgenotypes.csv",
 # Merge NJH and diagnoses
 diagnoses <- diagnoses %>% select(Patient.ID, Diagnosis...DataScout)
 colnames(diagnoses) <- c("PatientID", "Diagnosis")
+# Less detailed diagnoses
+diagnoses$Diagnosis <- factor(diagnoses$Diagnosis,
+  levels = c(
+    "Abnormal sweat choride test without diagnosis of cystic fibrosis",
+    "Abnormal sweat test",
+    "Alpha-1-antitrypsin deficiency",
+    "Alpha-1-antitrypsin deficiency carrier",
+    "Alpha-1-antitrypsin deficiency, Positive cystic fibrosis sweat test without diagnosis of cystic fibrosis",
+    "CF", "CF carrier, Alpha-1-antitrypsin deficiency",
+    "CF, alpha 1-antitrypsin deficiency",
+    "CF, alpha 1-antitrypsin deficiency carrier",
+    "CF, Alpha-1-antitrypsin deficiency",
+    "Cystic fibrosis carrier",
+    "Cystic fibrosis carrier, Alpha-1-antitrypsin deficiency",
+    "Cystic fibrosis carrier, Alpha-1-antitrypsin deficiency carrier",
+    "Cystic fibrosis screening",
+    "Cystic fibrosis transmembrane conductance regulator (CFTR)-related disorder",
+    "Positive cystic fibrosis sweat test without diagnosis of cystic fibrosis",
+    "Primary ciliary dyskinesia",
+    "Primary Ciliary dyskinesia, Cystic Fibrosis carrier"
+  ),
+  labels = c(
+    "Non-CF", "Non-CF", "Non-CF", "CF Carrier", "Non-CF", "Cystic Fibrosis",
+    "CF Carrier", "Cystic Fibrosis", "Cystic Fibrosis", "Cystic Fibrosis",
+    "CF Carrier", "CF Carrier", "CF Carrier", "Non-CF", "CFTR-RD or CRMS",
+    "Non-CF", "Non-CF", "CF Carrier"
+  )
+)
 njh <- full_join(njh, diagnoses)
 # Import CHEC data
 chec <- read.csv("./Data_Raw/CHEC sweat sodium and chloride.csv")
@@ -109,7 +134,7 @@ chec[, c(
 )] <- NA
 chec <- chec %>%
   select(
-    subject, Diagnosis, sex, Genotypes1, Genotypes2, age, Method, site,
+    subject, site, Diagnosis, sex, Genotypes1, Genotypes2, age, Method,
     swsavg, K, swcavg, Na_Left, Na_Right, K_Left, K_Right, Cl_Left, Cl_Right
   )
 colnames(chec) <- colnames(chco)
@@ -152,71 +177,45 @@ df$TotalGenotypeFunction[df$TotalGenotypeFunction == 0] <- NA
 df[, c("Na", "K", "Cl")] <- lapply(df[, c("Na", "K", "Cl")], as.numeric)
 # As data frame
 df <- as.data.frame(df)
-# Limit to complete data
+# Get rid of unnecessary columns
 df <- df %>%
   select(
-    PatientID, Diagnosis, Sex, Age.at.Test.in.Years, Na:Cl,
+    PatientID, Site, Diagnosis, Sex, Age.at.Test.in.Years, Na:Cl,
     Genotypes1, Genotype1Function, Genotypes2, Genotype2Function,
     TotalGenotypeFunction
   )
+# For each ID, get the row with the most data (or first test)
+df$Missing <- rowSums(is.na(df))
+df <- df %>%
+  group_by(PatientID) %>%
+  slice_min(Missing) %>%
+  slice_min(row_number()) %>%
+  filter(!is.na(Diagnosis)) %>%
+  ungroup()
 # Set non-CF to 100% CFTR function (200 because 100 for each allele)
 df$TotalGenotypeFunction[df$Diagnosis == "Non-CF"] <- 200
 # Write for checking
-write.csv(df, "./Data_Cleaned/analysis_dataset.csv", row.names = F, na = "")
+write.csv(df, "./Data_Cleaned/final_analysis_dataset.csv", row.names = F, na = "")
 ```
 
 ```{r}
 #| message: false
 #| warning: false
 df %>%
-  filter(Diagnosis == "CF") %>%
   ggplot(
     aes(x = Na, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
   ) +
   geom_point() +
   theme()
 df %>%
-  filter(Diagnosis == "CF") %>%
   ggplot(
     aes(x = Cl, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
   ) +
   geom_point() +
   theme()
 df %>%
-  filter(Diagnosis == "CF") %>%
   ggplot(
     aes(x = Na / Cl, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
-  ) +
-  geom_point() +
-  theme()
-
-df %>%
-  filter(Diagnosis == "CF") %>%
-  ggplot(
-    aes(
-      x = Na, y = TotalGenotypeFunction, color = Age.at.Test.in.Years,
-      group = Diagnosis
-    )
-  ) +
-  geom_point() +
-  theme()
-df %>%
-  filter(Diagnosis == "CF") %>%
-  ggplot(
-    aes(
-      x = Cl, y = TotalGenotypeFunction, color = Age.at.Test.in.Years,
-      group = Diagnosis
-    )
-  ) +
-  geom_point() +
-  theme()
-df %>%
-  filter(Diagnosis == "CF") %>%
-  ggplot(
-    aes(
-      x = Na / Cl, y = TotalGenotypeFunction, color = Age.at.Test.in.Years,
-      group = Diagnosis
-    )
   ) +
   geom_point() +
   theme()
@@ -230,13 +229,6 @@ df %>%
     `Cl < 60` = Cl < 60
   ) %>%
   select(Na, Cl, TotalGenotypeFunction, `Cl < 60`, `Age group`) %>%
-  tbl_summary(by = `Age group`, missing_text = "Missing")
-write.csv(df, file = "~/sweat_analysis_data.csv", na = "", row.names = F)
+  tbl_summary(by = `Age group`, missing_text = "Missing") %>%
+  add_p()
 ```
-
-Add CRMS change in sweat and change in ratio
-
-Add CF carrier genotypes to this report
-
-Plot just the CF genotype function
-  - Are the chloride values matching up with the CFTR function as we'd expect?

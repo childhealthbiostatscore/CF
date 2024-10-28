@@ -20,6 +20,11 @@ editor: source
 ```{r setup}
 #| include: false
 library(tidyverse)
+library(arsenal)
+library(survival)
+library(ggsurvfit)
+library(ggstats)
+library(gtsummary)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
   "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry",
@@ -85,35 +90,41 @@ annual <- left_join(
 )
 # CFRD by OGTT two hour
 annual$cfrd_ogtt <- factor(annual$A_twohour_bloodglucose >= 200,
-  levels = c(F, T), labels = c("No", "Yes")
+  levels = c(F, T), labels = c("CFRD-", "CFRD+")
 )
 # CFRD by registry definition
 annual$cfrd_registry <- factor(annual$cfrd_status_annual,
-  levels = c(1:5), labels = c("No", "No", "Yes", "No", "No")
+  levels = c(1:5), labels = c("CFRD-", "CFRD-", "CFRD+", "CFRD-", "CFRD-")
 )
-# Assume that missing data for CFRD means "No" (some of these will get filled in
+# Assume that missing data for CFRD means "CFRD-" (some of these will get filled in
 # later)
-annual$cfrd_registry[is.na(annual$cfrd_registry)] <- "No"
-annual$cfrd_ogtt[is.na(annual$cfrd_ogtt)] <- "No"
+annual$cfrd_registry[is.na(annual$cfrd_registry)] <- "CFRD-"
+annual$cfrd_ogtt[is.na(annual$cfrd_ogtt)] <- "CFRD-"
+# Modulators
+annual$A_Vx770 <- factor(annual$A_Vx770, levels = 0:1, labels = c("No", "Yes"))
+annual$A_VX809comb <- factor(annual$A_VX809comb,
+  levels = 0:1, labels = c("No", "Yes")
+)
 # Select columns
 annual <- annual %>%
   select(
     eDWID, ReviewYear, Race, Hispanicrace, Gender, F508, MutClass,
-    Age_YrEnd, A_bmipercentile, A_hgba1c, cfrd_registry, cfrd_status_annual,
-    cfrd_ogtt, A_twohour_bloodglucose
+    A_Vx770, A_VX809comb, Age_YrEnd, A_bmipercentile, A_hgba1c,
+    cfrd_registry, cfrd_status_annual, cfrd_ogtt, A_twohour_bloodglucose
   ) %>%
   group_by(eDWID) %>%
   mutate(
-    cfrd_registry_age = first(na.omit(Age_YrEnd[cfrd_registry == "Yes"])),
-    cfrd_ogtt_age = first(na.omit(Age_YrEnd[cfrd_ogtt == "Yes"]))
+    Age_YrEnd = round(Age_YrEnd, 2),
+    cfrd_registry_age = first(na.omit(Age_YrEnd[cfrd_registry == "CFRD+"])),
+    cfrd_ogtt_age = first(na.omit(Age_YrEnd[cfrd_ogtt == "CFRD+"]))
   )
 # Fill in CFRD diagnoses
 annual$cfrd_registry_age[is.na(annual$cfrd_registry_age)] <- Inf
 annual$cfrd_ogtt_age[is.na(annual$cfrd_ogtt_age)] <- Inf
-annual$cfrd_registry[annual$Age_YrEnd < annual$cfrd_registry_age] <- "No"
-annual$cfrd_registry[annual$Age_YrEnd >= annual$cfrd_registry_age] <- "Yes"
-annual$cfrd_ogtt[annual$Age_YrEnd < annual$cfrd_ogtt_age] <- "No"
-annual$cfrd_ogtt[annual$Age_YrEnd >= annual$cfrd_ogtt_age] <- "Yes"
+annual$cfrd_registry[annual$Age_YrEnd < annual$cfrd_registry_age] <- "CFRD-"
+annual$cfrd_registry[annual$Age_YrEnd >= annual$cfrd_registry_age] <- "CFRD+"
+annual$cfrd_ogtt[annual$Age_YrEnd < annual$cfrd_ogtt_age] <- "CFRD-"
+annual$cfrd_ogtt[annual$Age_YrEnd >= annual$cfrd_ogtt_age] <- "CFRD+"
 # Split into one dataset for registry and one for OGTT
 registry <- annual %>%
   filter(Age_YrEnd <= cfrd_registry_age) %>%
@@ -121,671 +132,117 @@ registry <- annual %>%
 ogtt <- annual %>%
   filter(Age_YrEnd <= cfrd_ogtt_age) %>%
   select(eDWID:A_hgba1c, cfrd_ogtt, cfrd_ogtt_age)
+# Create start times
+registry$Age_YrStart <- registry$Age_YrEnd - 1
+ogtt$Age_YrStart <- ogtt$Age_YrEnd - 1
 ```
 
+# By registry CFRD status
+
+## Participant demographics
+
+Categorical variables are from either the first year with CFRD or the most recent year for those without CFRD.
+
+```{r results='asis'}
+v1 <- registry %>%
+  group_by(eDWID) %>%
+  slice_max(ReviewYear)
+t1 <- tableby(cfrd_registry ~ Race + Hispanicrace + Gender + F508 + MutClass +
+  Age_YrEnd + A_bmipercentile + A_hgba1c, data = v1)
+summary(t1, pfootnote = T)
+```
+
+## Kaplan-Meier plots
+
 ```{r}
-# Plotting function
-roc_plot <- function(roc_obj) {
-  c <- coords(roc_obj, "best")
-  plot_df <- coords(roc_obj)
-  point_df <- plot_df[plot_df$threshold == as.numeric(c[1]), ]
-  c <- round(as.numeric(c), 2)
-  point_label <- paste0(
-    "Threshold: ", c[1], "\n",
-    "Specificity: ", c[2], "\n",
-    "Sensitivity: ", c[3]
+# Plot
+survfit2(Surv(Age_YrStart, Age_YrEnd, as.numeric(cfrd_registry)) ~ 1,
+  data = registry
+) %>%
+  ggsurvfit() +
+  labs(
+    x = "Age",
+    y = "Overall CFRD- probability"
+  ) +
+  add_confidence_interval() +
+  add_risktable()
+# Median "survival" time
+survfit2(Surv(Age_YrStart, Age_YrEnd, as.numeric(cfrd_registry)) ~ 1,
+  data = registry
+) %>%
+  tbl_survfit(
+    probs = 0.5,
+    label_header = "**Median time to CFRD+ (95% CI)**"
   )
-  p <- ggplot(plot_df, aes(x = specificity, y = sensitivity)) +
-    scale_x_reverse() +
-    geom_line() +
-    geom_point(data = point_df) +
-    geom_label_repel(
-      data = point_df, aes(label = point_label), nudge_x = 0.25,
-      segment.color = "grey50", size = 5
-    ) +
-    xlab("Specificity") +
-    ylab("Sensitivity") +
-    theme_bw(base_size = 20)
-  return(p)
-}
 ```
 
-# Data cleaning
-
-1. People who reported American Indian or Alaska Native, Asian, and Native Hawaiian or Other Pacific Islander for race were considered as "Other race" due to relatively small sample sizes for these groups.
-
-2. Years prior to 2010 and those under age 10 at the end of a given year were excluded from the analysis.
-
-3. HbA1cs < 3.5% or > 15% were excluded from the analysis, as these values were assumed to be entered incorrectly.
-
-# Participant Characteristics
-
-## By two hour OGTT value
+## Cox PH model
 
 ```{r}
-roc_df %>%
-  select(
-    reviewyear, hgba1c, Age_YrEnd, `Age Group`, `OGTT 2-hour`, Race,
-    Hispanicrace, Gender, F508, MutClass
-  ) %>%
-  tbl_summary(
-    by = `OGTT 2-hour`, missing_text = "Missing",
-    type = list(reviewyear ~ "categorical"),
-    label = list(
-      hgba1c = "HbA1c", Hispanicrace = "Hispanic", MutClass = "Mutation Class",
-      reviewyear = "Year", Age_YrEnd = "Age at Year End"
-    )
-  ) %>%
-  add_overall() %>%
-  add_p(
-    test = list(reviewyear = "fisher.test"),
-    test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
-  ) %>%
-  separate_p_footnotes() %>%
-  as_gt()
+cph <- coxph(
+  Surv(Age_YrStart, Age_YrEnd, as.numeric(cfrd_registry)) ~
+    A_hgba1c + Gender + F508 + A_Vx770 + A_VX809comb,
+  data = registry, cluster = eDWID
+)
+cph %>% tbl_regression(exponentiate = T)
+plot(cox.zph(cph), resid = F)
+cox.zph(cph)
+ggcoef_table(cph,
+  show_p_values = F, add_reference_rows = T, signif_stars = F, colour = F
+)
 ```
 
-## By age
+# By CFRD status based on 2 hour OGTT >= 200
 
-```{r}
-roc_df %>%
-  select(
-    reviewyear, hgba1c, Age_YrEnd, `Age Group`, `OGTT 2-hour`, Race,
-    Hispanicrace, Gender, F508, MutClass
-  ) %>%
-  tbl_summary(
-    by = `Age Group`, missing_text = "Missing",
-    type = list(reviewyear ~ "categorical"),
-    label = list(
-      hgba1c = "HbA1c", Hispanicrace = "Hispanic", MutClass = "Mutation Class",
-      reviewyear = "Year", Age_YrEnd = "Age at Year End"
-    )
-  ) %>%
-  add_overall() %>%
-  add_p(
-    test = list(reviewyear = "fisher.test"),
-    test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
-  ) %>%
-  separate_p_footnotes() %>%
-  as_gt()
+## Participant demographics
+
+Categorical variables are from either the first year with CFRD or the most recent year for those without CFRD.
+
+```{r results='asis'}
+v1 <- ogtt %>%
+  group_by(eDWID) %>%
+  slice_max(ReviewYear)
+t1 <- tableby(cfrd_ogtt ~ Race + Hispanicrace + Gender + F508 + MutClass +
+  Age_YrEnd + A_bmipercentile + A_hgba1c, data = v1)
+summary(t1, pfootnote = T)
 ```
 
-# HbA1c by diagnosis
-
-## Boxplot
+## Kaplan-Meier plots
 
 ```{r}
-ggplot(roc_df, aes(x = `OGTT 2-hour`, y = hgba1c)) +
-  geom_boxplot() +
-  geom_hline(yintercept = 5.3, linetype = "dashed") +
-  geom_hline(yintercept = 5.5, linetype = "dashed") +
-  geom_hline(yintercept = 5.7, linetype = "dashed") +
-  ylab("HbA1c") +
-  theme_classic(base_size = 20)
+# Plot
+survfit2(Surv(Age_YrStart, Age_YrEnd, as.numeric(cfrd_ogtt)) ~ 1,
+  data = ogtt
+) %>%
+  ggsurvfit() +
+  labs(
+    x = "Age",
+    y = "Overall CFRD- probability"
+  ) +
+  add_confidence_interval() +
+  add_risktable()
+# Median "survival" time
+survfit2(Surv(Age_YrStart, Age_YrEnd, as.numeric(cfrd_ogtt)) ~ 1,
+  data = ogtt
+) %>%
+  tbl_survfit(
+    probs = 0.5,
+    label_header = "**Median time to CFRD+ (95% CI)**"
+  )
 ```
 
-## Dotplot
+## Cox PH model
 
 ```{r}
-ggplot(roc_df, aes(x = `OGTT 2-hour`, y = hgba1c)) +
-  geom_jitter(alpha = 0.05) +
-  geom_hline(yintercept = 5.3, linetype = "dashed") +
-  geom_hline(yintercept = 5.5, linetype = "dashed") +
-  geom_hline(yintercept = 5.7, linetype = "dashed") +
-  ylab("HbA1c") +
-  theme_classic(base_size = 20)
-```
-
-## Violin plot
-
-```{r}
-ggplot(roc_df, aes(x = `OGTT 2-hour`, y = hgba1c)) +
-  geom_violin(aes(fill = `OGTT 2-hour`)) +
-  geom_hline(yintercept = 5.3, linetype = "dashed") +
-  geom_hline(yintercept = 5.5, linetype = "dashed") +
-  geom_hline(yintercept = 5.7, linetype = "dashed") +
-  ylab("HbA1c") +
-  theme_classic(base_size = 20) +
-  theme(legend.position = "none")
-```
-
-# ROC analysis
-
-For each ROC curve, we performed 2000 bootstrap replicates. Here the median best threshold (based on Youden index), sensitivity, and specificity are presented along with the bootstrapped 95% confidence intervals. Column names are printed in terms of percentiles, so `threshold.2.5.` indicates the lower limit of the confidence interval, `threshold.50.` indicates the median best threshold, and `threshold.97.5.` indicates the upper limit of the confidence interval. All non-bootstrapped thresholds are also reported.
-
-## NGT vs. AGT and AGT vs. CFRD
-
-For the following analyses, we considered those with a two hour glucose value >= 140 and < 200 as a distinct group (AGT) and use receiver operating characteristic curves to find cutoffs that predict: 
-
-1. NGT vs. AGT
-
-2. AGT vs. CFRD
-
-```{r}
-ngt_agt <- roc_df %>% filter(`OGTT 2-hour` != ">=200")
-ngt_agt$ogtt <- droplevels(ngt_agt$`OGTT 2-hour`)
-agt_cfrd <- roc_df %>% filter(`OGTT 2-hour` != "<140")
-agt_cfrd$ogtt <- droplevels(agt_cfrd$`OGTT 2-hour`)
-```
-
-### Full cohort
-
-#### NGT vs. AGT
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = ngt_agt)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-#### AGT vs. CFRD
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = agt_cfrd)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-### Peds vs. Adults
-
-#### Peds
-
-```{r}
-peds_ngt_agt <- ngt_agt %>% filter(Age_YrEnd < 18)
-peds_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd < 18)
-```
-
-##### NGT vs. AGT
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = peds_ngt_agt)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### AGT vs. CFRD
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = peds_agt_cfrd)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-#### Adults
-
-```{r}
-adult_ngt_agt <- ngt_agt %>% filter(Age_YrEnd >= 18)
-adult_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd >= 18)
-```
-
-##### NGT vs. AGT
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = adult_ngt_agt)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### AGT vs. CFRD
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = adult_agt_cfrd)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-### By race
-
-#### White
-
-```{r}
-white_ngt_agt <- ngt_agt %>% filter(Race == "White")
-white_agt_cfrd <- agt_cfrd %>% filter(Race == "White")
-```
-
-##### NGT vs. AGT
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = white_ngt_agt)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### AGT vs. CFRD
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = white_agt_cfrd)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-#### Black or African American
-
-```{r}
-black_ngt_agt <- ngt_agt %>% filter(Race == "Black or African American")
-black_agt_cfrd <- agt_cfrd %>% filter(Race == "Black or African American")
-```
-
-##### NGT vs. AGT
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = black_ngt_agt)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### AGT vs. CFRD
-
-Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = black_agt_cfrd)
-roc_plot(r)
-gt(data.frame(coords(r, "best"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-#### More than one race
-
-```{r}
-more_ngt_agt <- ngt_agt %>% filter(Race == "More than one race")
-more_agt_cfrd <- agt_cfrd %>% filter(Race == "More than one race")
-```
-
-##### NGT vs. AGT
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = more_ngt_agt)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### AGT vs. CFRD
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = more_agt_cfrd)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-#### Other race
-
-```{r}
-other_ngt_agt <- ngt_agt %>% filter(Race == "Other race")
-other_agt_cfrd <- agt_cfrd %>% filter(Race == "Other race")
-```
-
-##### NGT vs. AGT
-
-Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = other_ngt_agt)
-roc_plot(r)
-gt(data.frame(coords(r, "best"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### AGT vs. CFRD
-
-Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = other_agt_cfrd)
-roc_plot(r)
-gt(data.frame(coords(r, "best"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-### By ethnicity
-
-#### Hispanic
-
-```{r}
-hispanic_ngt_agt <- ngt_agt %>% filter(Hispanicrace == "Yes")
-hispanic_agt_cfrd <- agt_cfrd %>% filter(Hispanicrace == "No")
-```
-
-##### NGT vs. AGT
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = hispanic_ngt_agt)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### AGT vs. CFRD
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = hispanic_agt_cfrd)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-#### Non-Hispanic
-
-```{r}
-non_hispanic_ngt_agt <-
-  ngt_agt %>% filter(Race == "Black or African American")
-non_hispanic_agt_cfrd <-
-  agt_cfrd %>% filter(Race == "Black or African American")
-```
-
-##### NGT vs. AGT
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = non_hispanic_ngt_agt)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### AGT vs. CFRD
-
-Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
-
-```{r}
-#| message: false
-r <- roc(ogtt ~ hgba1c, data = non_hispanic_agt_cfrd)
-roc_plot(r)
-gt(data.frame(coords(r, "best"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-## Two hour OGTT >= 140 or >= 200
-
-For the following analyses, we examined HbA1c cutoffs that best predict a two hour OGTT value either >= 140 or >= 200
-
-```{r}
-roc_df$agt <- as.numeric(roc_df$twohour_bloodglucose >= 140)
-roc_df$cfrd <- as.numeric(roc_df$twohour_bloodglucose >= 200)
-```
-
-### Full cohort
-
-#### $\geq$ 140
-
-```{r}
-#| message: false
-r <- roc(agt ~ hgba1c, data = roc_df)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-#### $\geq$ 200
-
-```{r}
-#| message: false
-r <- roc(cfrd ~ hgba1c, data = roc_df)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-### Peds vs. Adults
-
-#### Peds
-
-```{r}
-peds_roc <- roc_df %>% filter(Age_YrEnd < 18)
-```
-
-##### $\geq$ 140
-
-```{r}
-#| message: false
-r <- roc(agt ~ hgba1c, data = peds_roc)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### $\geq$ 200
-
-```{r}
-#| message: false
-r <- roc(cfrd ~ hgba1c, data = peds_roc)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-#### Adults
-
-```{r}
-adult_roc <- roc_df %>% filter(Age_YrEnd >= 18)
-```
-
-##### $\geq$ 140
-
-```{r}
-#| message: false
-r <- roc(agt ~ hgba1c, data = adult_roc)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### $\geq$ 200
-
-```{r}
-#| message: false
-r <- roc(cfrd ~ hgba1c, data = adult_roc)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-### By race
-
-#### White
-
-```{r}
-white_roc <- roc_df %>% filter(Race == "White")
-```
-
-##### $\geq$ 140
-
-```{r}
-#| message: false
-r <- roc(agt ~ hgba1c, data = white_roc)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### $\geq$ 200
-
-```{r}
-#| message: false
-r <- roc(cfrd ~ hgba1c, data = white_roc)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-#### Black or African American
-
-```{r}
-black_roc <- roc_df %>% filter(Race == "Black or African American")
-```
-
-##### $\geq$ 140
-
-```{r}
-#| message: false
-r <- roc(agt ~ hgba1c, data = black_roc)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### $\geq$ 200
-
-Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
-
-```{r}
-#| message: false
-r <- roc(cfrd ~ hgba1c, data = black_roc)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-#### More than one race
-
-```{r}
-more_roc <- roc_df %>% filter(Race == "More than one race")
-```
-
-##### $\geq$ 140
-
-```{r}
-#| message: false
-r <- roc(agt ~ hgba1c, data = more_roc)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### $\geq$ 200
-
-```{r}
-#| message: false
-r <- roc(cfrd ~ hgba1c, data = more_roc)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-#### Other race
-
-```{r}
-other_roc <- roc_df %>% filter(Race == "Other race")
-```
-
-##### $\geq$ 140
-
-Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
-
-```{r}
-#| message: false
-r <- roc(agt ~ hgba1c, data = other_roc)
-roc_plot(r)
-gt(data.frame(coords(r, "best"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### $\geq$ 200
-
-```{r}
-#| message: false
-r <- roc(cfrd ~ hgba1c, data = other_roc)
-roc_plot(r)
-gt(data.frame(coords(r, "best"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(ci.coords(r, "best"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-### By ethnicity
-
-#### Hispanic
-
-```{r}
-hispanic_roc <- roc_df %>% filter(Hispanicrace == "Yes")
-```
-
-##### $\geq$ 140
-
-```{r}
-#| message: false
-r <- roc(agt ~ hgba1c, data = hispanic_roc)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### $\geq$ 200
-
-```{r}
-#| message: false
-r <- roc(cfrd ~ hgba1c, hispanic_roc)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-#### Non-Hispanic
-
-```{r}
-non_hispanic_roc <- roc_df %>% filter(Hispanicrace == "No")
-```
-
-##### $\geq$ 140
-
-```{r}
-#| message: false
-r <- roc(agt ~ hgba1c, data = non_hispanic_roc)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
-```
-
-##### $\geq$ 200
-
-```{r}
-#| message: false
-r <- roc(cfrd ~ hgba1c, data = non_hispanic_roc)
-roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+cph <- coxph(
+  Surv(Age_YrStart, Age_YrEnd, as.numeric(cfrd_ogtt)) ~
+    A_hgba1c + Gender + F508 + A_Vx770 + A_VX809comb,
+  data = ogtt, cluster = eDWID
+)
+cph %>% tbl_regression(exponentiate = T)
+plot(cox.zph(cph), resid = F)
+cox.zph(cph)
+ggcoef_table(cph,
+  show_p_values = F, add_reference_rows = T, signif_stars = F, colour = F
+)
 ```
