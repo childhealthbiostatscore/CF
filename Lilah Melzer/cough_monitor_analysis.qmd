@@ -21,44 +21,50 @@ editor: source
 ```{r setup}
 #| include: false
 library(Hmisc)
+library(redcapAPI)
 library(tidyverse)
-library(lubridate)
-library(arsenal)
 library(rspiro)
 library(childsds)
+library(arsenal)
 library(lmerTest)
 library(performance)
-home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring",
-  "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring"
-)
-github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/GitHub",
-  "Windows" = "C:/Users/timvigers/Documents/GitHub",
-  "Linux" = "/home/timvigers/GitHub"
-)
-knitr::opts_knit$set(root.dir = home_dir)
 ```
 
-```{r data cleaning}
+```{r data import}
+#| include: false
 # Import from REDCap
-unlockREDCap(c(rcon = ""),
+unlockREDCap(c(rcon = "Cough Monitor 23-0382"),
   keyring = "API_KEYs",
   envir = 1,
   url = "https://redcap.ucdenver.edu/api/"
 )
-exportBulkRecords(list(db = rcon), envir = 1)
+df <- exportRecordsTyped(rcon)
+```
+
+```{r data cleaning}
+#| message: false
+#| warning: false
 # Import use data
-start_end <- read.csv("./Data_Clean/Start and end dates.csv", na.strings = "")
+start_end <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Clean/Start and end dates.csv",
+  na.strings = ""
+)
 start_end$Start <- mdy(start_end$Start)
 start_end$End <- mdy(start_end$End)
-vacations <- read.csv("./Data_Clean/Vacation days.csv", na.strings = "")
+vacations <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Clean/Vacation days.csv",
+  na.strings = ""
+)
 vacations$Vacation.Start <- mdy(vacations$Vacation.Start)
 vacations$Vacation.End <- mdy(vacations$Vacation.End)
+# Make a grid of everyone's possible dates
+dates <- start_end %>%
+  rowwise() %>%
+  transmute(sid,
+    Date = list(seq(Start, End - 1, by = "day"))
+  ) %>%
+  unnest(Date)
 # Import counts
 agg_counts <- read.csv(
-  "./Data_Raw/Cough_w_TotalCounts_0824 - Cough_agg_w_count_0828.csv",
+  "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Raw/Cough_w_TotalCounts_0824 - Cough_agg_w_count_0828.csv",
   na.strings = c("", "NMD"), header = F
 )
 # Format aggregated count data
@@ -77,11 +83,9 @@ agg_counts <- agg_counts %>%
     Date = mdy(Date),
     Coughs = as.numeric(Coughs)
   )
-# Add start and end dates, filter
+# Merge with all possible dates
 agg_counts$sid <- as.numeric(agg_counts$sid)
-agg_counts <- left_join(agg_counts, start_end)
-agg_counts <- agg_counts %>%
-  filter(Date >= Start & Date <= End)
+agg_counts <- left_join(dates, agg_counts)
 # Vacations
 agg_counts$Vacation <- apply(agg_counts, 1, function(r) {
   id <- as.numeric(r["sid"])
@@ -90,50 +94,71 @@ agg_counts$Vacation <- apply(agg_counts, 1, function(r) {
     d <= vacations$Vacation.End[vacations$sid == id])
 })
 agg_counts <- agg_counts %>%
-  filter(!Vacation) %>%
+  filter(!Vacation | is.na(Vacation)) %>%
   arrange(sid, Date)
+agg_counts$Vacation <- NULL
 # Sick
-sick <- data %>%
-  select(sid, pulm_ex_v2.factor) %>%
-  mutate(
-    antib_dt = mdy(antib_dt), 
-    px_start = antib_dt - 7,
-    px_end = antib_dt + 28
-  )
+sick <- df %>%
+  select(sid, pulm_ex_v2, pulm_ex_spec_v2) %>%
+  filter(pulm_ex_v2 == "Yes")
+sick$pulm_ex_abx_start <- mdy(c("4/17/24", "5/8/24"))
+sick$pulm_ex_start <- sick$pulm_ex_abx_start - 7
+sick$pulm_ex_end <- sick$pulm_ex_abx_start + 28
+# Make a grid of everyone's sick days and merge
+sick <- sick %>%
+  select(sid, pulm_ex_start, pulm_ex_end) %>%
+  rowwise() %>%
+  transmute(sid,
+    Date = list(seq(pulm_ex_start, pulm_ex_end, by = "day"))
+  ) %>%
+  unnest(Date) %>%
+  mutate(Sick = T)
+sick$sid <- as.numeric(sick$sid)
+agg_counts <- left_join(agg_counts, sick)
+# Format sick column
+agg_counts$Sick[is.na(agg_counts$Sick)] <- F
+agg_counts$Sick <- factor(agg_counts$Sick,
+  levels = c(F, T),
+  labels = c("No", "Yes")
+)
 # Count number of nights
 agg_counts <- agg_counts %>%
   group_by(sid) %>%
   mutate(Night = row_number()) %>%
   ungroup()
 # Demographics data
-data$Diagnosis <- factor(sub(".*arm_*", "", data$redcap_event_name),
-  levels = 1:2,
-  labels = c("CF", "Non-CF")
+df$Diagnosis <- factor(df$redcap_event_name,
+  levels = c(
+    "Visits (Arm 1: CF)", "Interim (Arm 1: CF)", "Visits (Arm 2: Control)",
+    "Interim (Arm 2: Control)"
+  ),
+  labels = c("CF", "CF", "Non-CF", "Non-CF")
 )
-demo <- data %>%
+df$Diagnosis <- relevel(df$Diagnosis, ref = "Non-CF")
+demo <- df %>%
   group_by(sid) %>%
   filter(row_number() == 1) %>%
   select(
     sid, Diagnosis, age_at_consent, height, weight, pre_fev,
-    nih_sex.factor:nih_ethnicity.factor, mutation1.factor, mutation2.factor,
-    cftr_mod.factor, cftr_mod_type.factor, mucolytic.factor:antih.factor
+    nih_sex:nih_ethnicity, mutation1, mutation2,
+    cftr_mod, cftr_mod_type, mucolytic:antih
   )
 # Calculate FEV1% - rspiro not accepting NA values for gender, which is really
 # annoying
 fev1 <- demo %>%
-  select(age_at_consent, height, weight, nih_sex.factor, pre_fev) %>%
-  filter(nih_sex.factor %in% c("Male", "Female"))
+  select(sid, age_at_consent, height, weight, nih_sex, pre_fev) %>%
+  filter(nih_sex %in% c("Male", "Female"))
 fev1$pre_fev_pp <- pctpred_GLIgl(fev1$age_at_consent, fev1$height / 100,
-  factor(fev1$nih_sex.factor, levels = c("Male", "Female")),
+  factor(fev1$nih_sex, levels = c("Male", "Female")),
   FEV1 = fev1$pre_fev
 )
 fev1$height_perc <- sds(as.numeric(fev1$height),
-  age = fev1$age_at_consent, sex = fev1$nih_sex.factor,
+  age = fev1$age_at_consent, sex = fev1$nih_sex,
   male = "Male", female = "Female", item = "height2_20", ref = cdc.ref,
   type = "perc"
 ) * 100
 fev1$weight_perc <- sds(as.numeric(fev1$weight),
-  age = fev1$age_at_consent, sex = fev1$nih_sex.factor,
+  age = fev1$age_at_consent, sex = fev1$nih_sex,
   male = "Male", female = "Female", item = "weight2_20", ref = cdc.ref,
   type = "perc"
 ) * 100
@@ -144,7 +169,7 @@ label(demo$height_perc) <- "Height %ile"
 label(demo$weight_perc) <- "Weight %ile"
 # CF genotype
 demo$Genotype <-
-  factor(rowSums(demo[, c("mutation1.factor", "mutation2.factor")] == "F508del"),
+  factor(rowSums(demo[, c("mutation1", "mutation2")] == "F508del"),
     levels = c(2, 1, 0),
     labels = c("F508del homozygous", "F508del heterozygous", "No F508del")
   )
@@ -152,6 +177,8 @@ demo[, grep("mutation", colnames(demo))] <- NULL
 # Add group to counts
 agg_counts$Diagnosis <-
   demo$Diagnosis[match(agg_counts$sid, as.numeric(as.character(demo$sid)))]
+# Save
+write.csv(agg_counts, file = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Clean/cleaned_aggregated_counts.csv", na = "", row.names = F)
 # Per night
 per_night <- agg_counts %>%
   group_by(sid) %>%
@@ -167,12 +194,11 @@ label(demo$nights_data) <- "Nights With Cough Data"
 demo <- demo %>%
   select(sid, height_perc, weight_perc, pre_fev_pp, everything()) %>%
   select(-height, -weight, -pre_fev)
-# Exclude vacation days
-
 # Set table options for the document
 mycontrols <-
   tableby.control(
-    numeric.stats = c("Nmiss", "medianq1q3", "range"),
+    numeric.stats = c("N", "Nmiss", "medianq1q3", "range"),
+    cat.stats = c("N", "Nmiss", "countpct"),
     numeric.test = "kwt"
   )
 ```
@@ -183,9 +209,29 @@ mycontrols <-
 #| label: tbl-mean-demo
 #| tbl-cap: Participant characteristics
 f <- as.formula(paste0("Diagnosis ~", paste0(colnames(demo), collapse = "+")))
-f <- update(f, . ~ . - Diagnosis - sid - median_coughs + kwt(median_coughs))
+f <- update(f, . ~ . - Diagnosis - sid)
 t1 <- tableby(f, data = demo, control = mycontrols)
 summary(t1, pfootnote = T)
+```
+
+# Data for ATS abstract
+
+```{r results='asis'}
+per_person <- agg_counts %>%
+  group_by(sid, Diagnosis) %>%
+  summarise(
+    `Nights` = n(),
+    `Nights With Data` = sum(!is.na(Coughs)),
+    `Prop. Nights With Data` = sum(!is.na(Coughs)) / n(),
+    `Median Coughs per Night` = median(Coughs, na.rm = T),
+    .groups = "drop"
+  )
+t2 <- tableby(
+  Diagnosis ~ `Nights` + `Nights With Data` + `Prop. Nights With Data` +
+    `Median Coughs per Night`,
+  data = per_person, control = mycontrols
+)
+summary(t2, pfootnote = T)
 ```
 
 # Distribution of coughs
@@ -223,4 +269,15 @@ mod <- glmer(Coughs ~ Night + Diagnosis + (Night | sid),
   data = agg_counts, family = "poisson"
 )
 gtsummary::tbl_regression(mod, exponentiate = T)
+# check_model(mod, re_formula = NA, residual_type = "normal")
+```
+
+### By sick status
+
+```{r}
+mod <- glmer(Coughs ~ Night + Diagnosis + Sick + (Night | sid),
+  data = agg_counts, family = "poisson"
+)
+gtsummary::tbl_regression(mod, exponentiate = T)
+# check_model(mod, re_formula = NA, residual_type = "normal")
 ```
