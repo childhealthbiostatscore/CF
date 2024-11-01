@@ -127,7 +127,7 @@ chec <- read.csv("./Data_Raw/CHEC sweat sodium and chloride.csv")
 # Filter and select as above (need to add some empty columns and split genotype)
 chec$Genotypes1 <- trimws(sapply(strsplit(chec$gntyp_pair, "/"), "[[", 1))
 chec$Genotypes2 <- trimws(sapply(strsplit(chec$gntyp_pair, "/"), "[[", 2))
-chec$Diagnosis <- "CF"
+chec$Diagnosis <- "Cystic Fibrosis"
 chec[, c(
   "Method", "K", "Na_Left", "Na_Right", "K_Left", "K_Right", "Cl_Left",
   "Cl_Right"
@@ -195,7 +195,9 @@ df <- df %>%
 # Set non-CF to 100% CFTR function (200 because 100 for each allele)
 df$TotalGenotypeFunction[df$Diagnosis == "Non-CF"] <- 200
 # Write for checking
-write.csv(df, "./Data_Cleaned/final_analysis_dataset.csv", row.names = F, na = "")
+write.csv(df, "./Data_Cleaned/final_analysis_dataset.csv",
+  row.names = F, na = ""
+)
 ```
 
 ```{r}
@@ -223,7 +225,7 @@ df %>%
 
 ```{r}
 df %>%
-  filter(Diagnosis == "CF") %>%
+  filter(Diagnosis == "Cystic Fibrosis") %>%
   mutate(
     `Age group` = cut(Age.at.Test.in.Years, c(-Inf, 18, Inf), right = F),
     `Cl < 60` = Cl < 60
