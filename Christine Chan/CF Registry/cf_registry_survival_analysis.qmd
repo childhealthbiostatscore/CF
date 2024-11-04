@@ -41,7 +41,7 @@ home_dir <- switch(Sys.info()["sysname"],
 )
 github_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/GitHub",
-  "Windows" = "C:/Users/timvigers/GitHub",
+  "Windows" = "C:/Users/timvigers/Documents/GitHub",
   "Linux" = "/home/timvigers/GitHub"
 )
 source(paste0(github_dir, "/shared-resources/Visualization/forest_plots.R"))
@@ -349,9 +349,16 @@ annual %>%
       ~ .x %>%
         tbl_summary(
           by = CFRD, missing_text = "Missing",
-          type = list(A_corticosteroids1 ~ "categorical")
+          type = list(A_corticosteroids1 ~ "categorical"),
+          statistic = list(c(
+            "Age_YrEnd", "bmi_perc", "A_FEV1_pct_predicted",
+            "A_FVC_pct_predicted"
+          ) ~ "{mean} ({sd})")
         ) %>%
-        add_p() %>%
+        add_p(test = list(c(
+          "Age_YrEnd", "bmi_perc", "A_FEV1_pct_predicted",
+          "A_FVC_pct_predicted"
+        ) ~ "t.test")) %>%
         add_overall() %>%
         separate_p_footnotes()
   )
@@ -371,7 +378,15 @@ screening <- annual %>%
     `Screened Either` = mean(!is.na(A_twohour_bloodglucose) |
       !is.na(A_ogttfast_bloodglucose) | !is.na(A_hgba1c)),
     .groups = "drop"
-  ) %>%
+  )
+kable(
+  screening %>%
+    select(ReviewYear, age_group, `Screened OGTT`) %>%
+    mutate(`Screened OGTT` = round(`Screened OGTT` * 100, 2)) %>%
+    pivot_wider(names_from = age_group, values_from = `Screened OGTT`),
+  caption = "% Screened by OGTT"
+)
+screening <- screening %>%
   pivot_longer(`Screened HbA1c`:`Screened Either`)
 screening_plot <- ggplot(screening, aes(
   x = ReviewYear, y = value,
@@ -456,6 +471,8 @@ Based on CFFPR annualized data. These data are interval censored because we know
 ```{r}
 # Origin for survival analyses
 og <- ymd("2003-01-01")
+# Need to use a dataframe not a tibble
+annual <- as.data.frame(annual)
 # Formula for base model
 xvars <- c(
   "age_group", "Gender", "Race", "Hispanicrace", "bmi_perc_cat", "MutClass",
@@ -467,8 +484,11 @@ f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
 cox_res <- coxph(f, data = annual, cluster = eDWID)
 # Forest plot and coefficients table
 cox_res %>%
-  tbl_regression()
-ggcoef_table(cox_res, show_p_values = F, add_reference_rows = T, signif_stars = F, colour = F)
+  tbl_regression(exponentiate = T)
+ggcoef_table(cox_res,
+  show_p_values = F, add_reference_rows = T, exponentiate = T,
+  signif_stars = F, colour = F
+)
 # Diagnostics
 test.ph <- data.frame(cox.zph(cox_res)$table)
 test.ph <- test.ph[rownames(test.ph) != "GLOBAL", ]
@@ -494,9 +514,10 @@ vx770_cox_res <- coxph(f_vx770,
   cluster = eDWID
 )
 vx770_cox_res %>%
-  tbl_regression()
+  tbl_regression(exponentiate = T)
 ggcoef_table(vx770_cox_res,
-  show_p_values = F, add_reference_rows = T, signif_stars = F, colour = F
+  show_p_values = F, add_reference_rows = T, exponentiate = T,
+  signif_stars = F, colour = F
 )
 ```
 
@@ -518,9 +539,10 @@ vx809comb_cox_res <- coxph(f_vx809comb,
   cluster = eDWID
 )
 vx809comb_cox_res %>%
-  tbl_regression()
+  tbl_regression(exponentiate = T)
 ggcoef_table(vx809comb_cox_res,
-  show_p_values = F, add_reference_rows = T, signif_stars = F, colour = F
+  show_p_values = F, add_reference_rows = T, exponentiate = T,
+  signif_stars = F, colour = F
 )
 ```
 
@@ -600,7 +622,7 @@ invisible(lapply(time_varying, function(v) {
   cat("\n")
   cat("\n")
   cox_res_split %>%
-    tbl_regression() %>%
+    tbl_regression(exponentiate = T) %>%
     print()
   cat("\n")
   cat("\n")
@@ -608,7 +630,8 @@ invisible(lapply(time_varying, function(v) {
   emm <- data.frame(emm)
   # Plot base model (without time varying)
   ggcoef_table(cox_res_split,
-    show_p_values = F, add_reference_rows = T, signif_stars = F, colour = F
+    show_p_values = F, add_reference_rows = T, exponentiate = T,
+    signif_stars = F, colour = F
   ) %>%
     print()
   cat("\n")
