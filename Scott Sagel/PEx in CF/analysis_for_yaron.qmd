@@ -34,7 +34,7 @@ home_dir <- switch(Sys.info()["sysname"],
 )
 github_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/GitHub",
-  "Windows" = "C:/Users/timvigers/GitHub",
+  "Windows" = "C:/Users/timvigers/Documents/GitHub",
   "Linux" = "/home/timvigers/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
@@ -120,6 +120,13 @@ df$race <- factor(df$race,
     "White", "Black or African-American", "Other", "Asian", "Other",
     "Other", "Other", "Unknown/not reported"
   )
+)
+df$race_wnw <- factor(df$race,
+  levels = c(
+    "White", "Black or African-American", "Other", "Asian",
+    "Unknown/not reported"
+  ),
+  labels = c("White", "Non-White", "Non-White", "Non-White", "Non-White")
 )
 df$ethnicity <- factor(df$ethnicity,
   levels = 1:3,
@@ -227,8 +234,9 @@ df <- df %>%
 labels <- list(
   "Age group at admission" = "age_group",
   "Age at admission" = "age_at_admit", "Sex" = "sex",
-  "Race" = "race", "Ethnicity" = "ethnicity",
-  "Azithromycin" = "azithro", "Inhaled antibiotics" = "inhaled_abx",
+  "Race" = "race", "Race (White vs. Non-White)" = "race_wnw",
+  "Ethnicity" = "ethnicity", "Azithromycin" = "azithro",
+  "Inhaled antibiotics" = "inhaled_abx",
   "Systemic steroids" = "steroids_system",
   "Source of respiratory culture at admit" = "admit_cx_source",
   "Aspergillus fumigatus" = "fungi___1",
@@ -280,7 +288,7 @@ df <- df %>%
   select(
     sid,
     redcap_data_access_group, year, sex, age_group, age_at_admit, race,
-    ethnicity, Genotype, Insurance, cftr_mod, cftr_mod_spec,
+    race_wnw, ethnicity, Genotype, Insurance, cftr_mod, cftr_mod_spec,
     Trikafta, azithro, inhaled_abx, steroids_system, admit_cx_source,
     ppfev1_baseline, ppfev1_admit, ppfev1_discharge, ppfev1_change,
     days_admit, fungal_test, fungi___1:fungi___5, any_fungi,
@@ -301,7 +309,7 @@ df %>%
   group_by(sid) %>%
   filter(row_number() == 1) %>%
   ungroup() %>%
-  select(redcap_data_access_group, sex, race, ethnicity, Genotype) %>%
+  select(redcap_data_access_group, sex, race, race_wnw, ethnicity, Genotype) %>%
   tbl_summary(missing_text = "(Missing)", label = labels)
 ```
 
@@ -312,7 +320,9 @@ df %>%
   group_by(sid, year) %>%
   filter(row_number() == 1) %>%
   ungroup() %>%
-  select(year, redcap_data_access_group, sex, race, ethnicity, Genotype) %>%
+  select(
+    year, redcap_data_access_group, sex, race, race_wnw, ethnicity, Genotype
+  ) %>%
   tbl_summary(by = year, missing_text = "(Missing)", label = labels) %>%
   add_p() %>%
   separate_p_footnotes()
@@ -329,8 +339,7 @@ df %>%
       list(
         all_continuous() ~ "{median} [{p25}, {p75}]",
         c(
-          age_at_admit, ppfev1_baseline, ppfev1_admit, ppfev1_discharge,
-          ppfev1_change
+          age_at_admit, ppfev1_baseline, ppfev1_admit, ppfev1_discharge
         ) ~
           "{mean} ({sd})"
       )
