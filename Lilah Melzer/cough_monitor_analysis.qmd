@@ -45,26 +45,31 @@ df <- exportRecordsTyped(rcon)
 #| message: false
 #| warning: false
 # Import use data
-start_end <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Clean/Start and end dates.csv",
+start_end <- read.csv("C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Clean/Start and end dates.csv",
   na.strings = ""
 )
 start_end$Start <- mdy(start_end$Start)
 start_end$End <- mdy(start_end$End)
-vacations <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Clean/Vacation days.csv",
+vacations <- read.csv("C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Clean/Vacation days.csv",
   na.strings = ""
 )
 vacations$Vacation.Start <- mdy(vacations$Vacation.Start)
 vacations$Vacation.End <- mdy(vacations$Vacation.End)
+# Those with end date after the last data pull will just end on the date of the
+# pull
+pull_date <- mdy("8/28/24")
+start_end$End[is.na(start_end$End)] <- pull_date
+start_end$End[start_end$End > pull_date] <- pull_date
 # Make a grid of everyone's possible dates
 dates <- start_end %>%
   rowwise() %>%
   transmute(sid,
-    Date = list(seq(Start, End - 1, by = "day"))
+    Date = list(seq(Start, End, by = "day"))
   ) %>%
   unnest(Date)
 # Import counts
 agg_counts <- read.csv(
-  "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Raw/Cough_w_TotalCounts_0824 - Cough_agg_w_count_0828.csv",
+  "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Raw/Cough_w_TotalCounts_0824 - Cough_agg_w_count_0828.csv",
   na.strings = c("", "NMD"), header = F
 )
 # Format aggregated count data
@@ -178,7 +183,7 @@ demo[, grep("mutation", colnames(demo))] <- NULL
 agg_counts$Diagnosis <-
   demo$Diagnosis[match(agg_counts$sid, as.numeric(as.character(demo$sid)))]
 # Save
-write.csv(agg_counts, file = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Clean/cleaned_aggregated_counts.csv", na = "", row.names = F)
+write.csv(agg_counts, file = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Clean/cleaned_aggregated_counts.csv", na = "", row.names = F)
 # Per night
 per_night <- agg_counts %>%
   group_by(sid) %>%
