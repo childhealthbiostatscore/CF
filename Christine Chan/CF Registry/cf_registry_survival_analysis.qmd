@@ -34,18 +34,7 @@ library(eulerr)
 library(broom)
 library(emmeans)
 library(ggstats)
-home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
-  "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry"
-)
-github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/GitHub",
-  "Windows" = "C:/Users/timvigers/Documents/GitHub",
-  "Linux" = "/home/timvigers/GitHub"
-)
-source(paste0(github_dir, "/shared-resources/Visualization/forest_plots.R"))
-knitr::opts_knit$set(root.dir = home_dir)
+knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry")
 ```
 
 # Data cleaning
@@ -494,6 +483,14 @@ test.ph <- data.frame(cox.zph(cox_res)$table)
 test.ph <- test.ph[rownames(test.ph) != "GLOBAL", ]
 # Find which variables technically violate PH assumption
 time_varying <- rownames(test.ph)[test.ph$p < 0.05]
+# Just split data by time period so we're only fitting 3 models
+# "[2003,2009)", "[2009,2014)", "[2014,2019)"
+annual$time_period <- cut(annual$ReviewYear,
+  breaks = c(-Inf, 2009, 2014, Inf), right = F
+)
+era1 <- coxph(f, data = annual[as.numeric(annual$time_period) == 1, ], cluster = eDWID)
+era2 <- coxph(f, data = annual[as.numeric(annual$time_period) == 2, ], cluster = eDWID)
+era3 <- coxph(f, data = annual[as.numeric(annual$time_period) == 3, ], cluster = eDWID)
 ```
 
 ### Vx770
