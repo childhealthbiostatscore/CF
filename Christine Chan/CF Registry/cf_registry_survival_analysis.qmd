@@ -462,13 +462,15 @@ Based on CFFPR annualized data. These data are interval censored because we know
 og <- ymd("2003-01-01")
 # Need to use a dataframe not a tibble
 annual <- as.data.frame(annual)
+annual$tstart <- as.numeric(annual$tstart) - as.numeric(og)
+annual$tstop <- as.numeric(annual$tstop) - as.numeric(og)
 # Formula for base model
 xvars <- c(
   "age_group", "Gender", "Race", "Hispanicrace", "bmi_perc_cat", "MutClass",
   "A_IsOnEnzymes", "tube_feeding", "liver_disease", "ppFEV1_cat",
   "NumPulmExacerbation", "A_corticosteroids1"
 )
-y <- "Surv(time = as.numeric(tstart), time2 = as.numeric(tstop), event = as.numeric(CFRD) == 2)"
+y <- "Surv(time = tstart, time2 = tstop, event = as.numeric(CFRD) == 2)"
 f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
 cox_res <- coxph(f, data = annual, cluster = eDWID)
 # Forest plot and coefficients table
@@ -488,9 +490,24 @@ time_varying <- rownames(test.ph)[test.ph$p < 0.05]
 annual$time_period <- cut(annual$ReviewYear,
   breaks = c(-Inf, 2009, 2014, Inf), right = F
 )
-era1 <- coxph(f, data = annual[as.numeric(annual$time_period) == 1, ], cluster = eDWID)
-era2 <- coxph(f, data = annual[as.numeric(annual$time_period) == 2, ], cluster = eDWID)
-era3 <- coxph(f, data = annual[as.numeric(annual$time_period) == 3, ], cluster = eDWID)
+era1 <- coxph(f,
+  data = annual[as.numeric(annual$time_period) == 1, ],
+  cluster = eDWID
+)
+era2 <- coxph(f,
+  data = annual[as.numeric(annual$time_period) == 2, ],
+  cluster = eDWID
+)
+era3 <- coxph(f,
+  data = annual[as.numeric(annual$time_period) == 3, ],
+  cluster = eDWID
+)
+# # KM plot
+# fit <- survfit(Surv(time = tstart, time2 = tstop, event = as.numeric(CFRD) == 2) ~ age_group,
+#   data = annual[as.numeric(annual$time_period) == 1, ]
+# )
+# # Visualize with survminer
+# ggsurvplot(fit, data = annual[as.numeric(annual$time_period) == 1, ], risk.table = TRUE)
 ```
 
 ### Vx770
@@ -577,61 +594,47 @@ invisible(lapply(c(xvars, "A_Vx770", "A_VX809comb"), function(v) {
 
 ### Time varying coefficients
 
+#### 2003 - 2008
+
 ```{r}
-annual$tstart <- as.numeric(annual$tstart)
-annual$tstop <- as.numeric(annual$tstop)
-annual_split <- survSplit(
-  Surv(as.numeric(tstart), as.numeric(tstop), as.numeric(CFRD) == 2,
-    origin = as.numeric(og)
-  ) ~ .,
-  data = annual,
-  cut = c(
-    as.numeric(ymd("2008-12-31")) - as.numeric(og),
-    as.numeric(ymd("2013-12-31")) - as.numeric(og)
-  ),
-  episode = "tgroup"
+t1 <- era1 %>% tbl_regression(exponentiate = T)
+t1
+ggcoef_model(era1,
+  show_p_values = F, add_reference_rows = T, exponentiate = T,
+  signif_stars = F, colour = F
 )
-annual_split$tgroup <- factor(annual_split$tgroup,
-  levels = 1:3, labels = c("[2003,2009)", "[2009,2014)", "[2014,2019)")
-)
-y <- "Surv(tstart, tstop, event)"
 ```
 
-In the plots below, time-varying coefficients are excluded from the first forest plot, to show the average effect of the predictors. In the second forest plot, the estimated marginal means (EMMs) for the time-varying coefficients are shown. The EMMs are averaged over the levels of all the other variables in the model. In other words, the EMM represents the baseline hazard (not hazard ratio) at the average level of all the other variables in the model. For example, the log hazard for an average participant age [30, Inf) in the time period [2003,2009) is 1.887 and the log hazard for a similar participant in [2014,2019) is 1.401. 
+#### 2009 - 2013
 
-```{r results='asis'}
-invisible(lapply(time_varying, function(v) {
-  # Formulas
-  new_f <- as.formula(paste0(
-    y, "~", paste0(xvars[-which(xvars == v)], collapse = "+"),
-    paste0("+", v, "*strata(tgroup)")
-  ))
-  new_f_emm <- as.formula(paste0(
-    "~", paste0(v, "|tgroup")
-  ))
-  # This could be done more efficiently but it seems to work
-  # Fit one stratified model and one with a regular interaction term
-  cox_res_split <- coxph(new_f, data = annual_split, cluster = eDWID)
-  # Use the regular interaction term to get means for each time period
-  cat("\n")
-  cat("\n")
-  cat("####", v)
-  cat("\n")
-  cat("\n")
-  cox_res_split %>%
-    tbl_regression(exponentiate = T) %>%
-    print()
-  cat("\n")
-  cat("\n")
-  emm <- emmeans(cox_res_split, new_f_emm, nuisance = xvars[-which(xvars == v)])
-  emm <- data.frame(emm)
-  # Plot base model (without time varying)
-  ggcoef_table(cox_res_split,
-    show_p_values = F, add_reference_rows = T, exponentiate = T,
-    signif_stars = F, colour = F
-  ) %>%
-    print()
-  cat("\n")
-  cat("\n")
-}))
+```{r}
+t2 <- era2 %>% tbl_regression(exponentiate = T)
+t2
+ggcoef_model(era2,
+  show_p_values = F, add_reference_rows = T, exponentiate = T,
+  signif_stars = F, colour = F
+)
+```
+
+#### 2014 - 2018
+
+```{r}
+t3 <- era3 %>% tbl_regression(exponentiate = T)
+t3
+ggcoef_model(era3,
+  show_p_values = F, add_reference_rows = T, exponentiate = T,
+  signif_stars = F, colour = F
+)
+```
+
+#### Combined results
+
+```{r}
+tbl_merge(
+  tbls = list("2003 - 2008" = t1, "2009 - 2013" = t2, "2014 - 2018" = t3)
+)
+ggcoef_compare(
+  list("2003 - 2008" = era1, "2009 - 2013" = era2, "2014 - 2018" = era3),
+  add_reference_rows = T, exponentiate = T, type = "faceted", colour = F
+)
 ```
