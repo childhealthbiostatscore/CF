@@ -527,8 +527,9 @@ vx770_cox_res <- coxph(f_vx770,
   data = annual[annual$ReviewYear >= 2011, ],
   cluster = eDWID
 )
-vx770_cox_res %>%
+t1 <- vx770_cox_res %>%
   tbl_regression(exponentiate = T)
+t1
 ggcoef_table(vx770_cox_res,
   show_p_values = F, add_reference_rows = T, exponentiate = T,
   signif_stars = F, colour = F
@@ -552,11 +553,29 @@ vx809comb_cox_res <- coxph(f_vx809comb,
   data = annual[annual$ReviewYear >= 2015, ],
   cluster = eDWID
 )
-vx809comb_cox_res %>%
+t2 <- vx809comb_cox_res %>%
   tbl_regression(exponentiate = T)
+t2
 ggcoef_table(vx809comb_cox_res,
   show_p_values = F, add_reference_rows = T, exponentiate = T,
   signif_stars = F, colour = F
+)
+```
+
+### Combined results
+
+```{r}
+tbl_merge(
+  tbls = list(t1, t2),
+  tab_spanner = c("VX770", "VX809comb")
+)
+comb_plot = ggcoef_compare(
+  list("VX770" = vx770_cox_res, "VX809comb" = vx809comb_cox_res),
+  add_reference_rows = T, exponentiate = T, type = "faceted", colour = F
+)
+comb_plot
+ggsave("./Dissemination/Figures/vx_combined_forest.png",
+  plot = comb_plot, width = 12, height = 9, units = "in"
 )
 ```
 
@@ -634,8 +653,12 @@ tbl_merge(
   tbls = list(t1, t2, t3),
   tab_spanner = c("2003 - 2008", "2009 - 2013", "2014 - 2018")
 )
-ggcoef_compare(
+comb_plot = ggcoef_compare(
   list("2003 - 2008" = era1, "2009 - 2013" = era2, "2014 - 2018" = era3),
   add_reference_rows = T, exponentiate = T, type = "faceted", colour = F
+)
+comb_plot
+ggsave("./Dissemination/Figures/time_combined_forest.png",
+  plot = comb_plot, width = 12, height = 9, units = "in"
 )
 ```
