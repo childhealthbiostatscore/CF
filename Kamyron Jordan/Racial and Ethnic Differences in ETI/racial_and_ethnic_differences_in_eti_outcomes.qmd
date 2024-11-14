@@ -45,6 +45,8 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```{r data import}
 # source("/home/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_outcomes_dataset.R")
 load("./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/outcomes_dataset.RData")
+# Change age group reference level
+encounter$age_group <- relevel(encounter$age_group, ref = "[18,30)")
 ```
 
 # Data cleaning
@@ -78,6 +80,161 @@ encounter %>%
   tbl_summary(by = Race, missing_text = "Missing")
 ```
 
+# Outcome distributions
+
+## FEV1 % predicted
+
+### GLI 2022 equations
+
+```{r}
+ggplot(encounter, aes(x = gli_fev1_ppred_rn, fill = Race, color = Race)) +
+  geom_density() +
+  facet_wrap(~Race)
+ggplot(encounter, aes(x = gli_fev1_ppred_rn, fill = Race)) +
+  geom_density(alpha = 0.2)
+```
+
+### GLI 2012 equations
+
+```{r}
+ggplot(encounter, aes(x = GLI_FEV1_pct_predicted, fill = Race, color = Race)) +
+  geom_density() +
+  facet_wrap(~Race)
+ggplot(encounter, aes(x = GLI_FEV1_pct_predicted, fill = Race)) +
+  geom_density(alpha = 0.2)
+```
+
+## FVC % predicted
+
+### GLI 2022 equations
+
+```{r}
+ggplot(encounter, aes(x = gli_fvc_ppred_rn, fill = Race, color = Race)) +
+  geom_density() +
+  facet_wrap(~Race)
+ggplot(encounter, aes(x = gli_fvc_ppred_rn, fill = Race)) +
+  geom_density(alpha = 0.2)
+```
+
+### GLI 2012 equations
+
+```{r}
+ggplot(encounter, aes(x = GLI_FVC_pct_predicted, fill = Race, color = Race)) +
+  geom_density() +
+  facet_wrap(~Race)
+ggplot(encounter, aes(x = GLI_FVC_pct_predicted, fill = Race)) +
+  geom_density(alpha = 0.2)
+```
+
+## FEV1/FVC % predicted
+
+### GLI 2022 equations
+
+```{r}
+ggplot(encounter, aes(
+  x = gli_fev1fvc_ppred_rn, fill = Race,
+  color = Race
+)) +
+  geom_density() +
+  facet_wrap(~Race)
+ggplot(encounter, aes(x = gli_fev1fvc_ppred_rn, fill = Race)) +
+  geom_density(alpha = 0.2)
+```
+
+### GLI 2012 equations
+
+```{r}
+ggplot(encounter, aes(x = GLI_FEV1FVC_pct_predicted, fill = Race, color = Race)) +
+  geom_density() +
+  facet_wrap(~Race)
+ggplot(encounter, aes(x = GLI_FEV1FVC_pct_predicted, fill = Race)) +
+  geom_density(alpha = 0.2)
+```
+
+## BMI %ile (age < 20 at ETI start)
+
+```{r}
+encounter %>%
+  filter(age_eti_start < 20) %>%
+  ggplot(aes(x = bmipercentile, fill = Race, color = Race)) +
+  geom_density() +
+  facet_wrap(~Race)
+encounter %>%
+  filter(age_eti_start < 20) %>%
+  ggplot(aes(x = bmipercentile, fill = Race)) +
+  geom_density(alpha = 0.2)
+```
+
+## BMI raw value (age >= 20 at ETI start)
+
+```{r}
+encounter %>%
+  filter(age_eti_start >= 20) %>%
+  ggplot(aes(x = bmivalue, fill = Race, color = Race)) +
+  geom_density() +
+  facet_wrap(~Race)
+encounter %>%
+  filter(age_eti_start >= 20) %>%
+  ggplot(aes(x = bmivalue, fill = Race)) +
+  geom_density(alpha = 0.2)
+```
+
+## Height %ile (age < 20 at ETI start)
+
+```{r}
+encounter %>%
+  filter(age_eti_start < 20) %>%
+  ggplot(aes(x = heightpercentile, fill = Race, color = Race)) +
+  geom_density() +
+  facet_wrap(~Race)
+encounter %>%
+  filter(age_eti_start < 20) %>%
+  ggplot(aes(x = heightpercentile, fill = Race)) +
+  geom_density(alpha = 0.2)
+```
+
+## Height raw value (age >= 20 at ETI start)
+
+```{r}
+encounter %>%
+  filter(age_eti_start >= 20) %>%
+  ggplot(aes(x = height, fill = Race, color = Race)) +
+  geom_density() +
+  facet_wrap(~Race)
+encounter %>%
+  filter(age_eti_start >= 20) %>%
+  ggplot(aes(x = height, fill = Race)) +
+  geom_density(alpha = 0.2)
+```
+
+## Weight %ile (age < 20 at ETI start)
+
+```{r}
+encounter %>%
+  filter(age_eti_start < 20) %>%
+  ggplot(aes(x = weightpercentile, fill = Race, color = Race)) +
+  geom_density() +
+  facet_wrap(~Race)
+encounter %>%
+  filter(age_eti_start < 20) %>%
+  ggplot(aes(x = weightpercentile, fill = Race)) +
+  geom_density(alpha = 0.2)
+```
+
+## Weight raw value (age >= 20 at ETI start)
+
+```{r}
+encounter %>%
+  filter(age_eti_start >= 20) %>%
+  ggplot(aes(x = weight, fill = Race, color = Race)) +
+  geom_density() +
+  facet_wrap(~Race)
+encounter %>%
+  filter(age_eti_start >= 20) %>%
+  ggplot(aes(x = weight, fill = Race)) +
+  geom_density(alpha = 0.2)
+```
+
 # Segmented models
 
 ```{r}
@@ -104,55 +261,31 @@ change_mod <- lmer(
     slope_change_years * Race + age_group + Insurance + (1 | eDWID),
   data = encounter
 )
-cm <- chngptm(
-  formula.1 = gli_fev1_ppred_rn ~ age_group + Insurance + (1 | eDWID),
-  formula.2 = ~Years, family = "gaussian", data = encounter,
-  type = "segmented", est.method = "grid", var.type = "none"
-)
-
-t <- data.frame(encounter)
-levels(t$Race) <- c("White", "Black", "Hispanic", "Other")
-o <- lme(gli_fev1_ppred_rn ~ Years + Race + age_group + Insurance,
-  random = ~ 1 | eDWID, data = t, na.action = na.omit
-)
-os <- segmented(o, ~Years,
-  data = t,
-  fixed.parms = c(G0 = 0),
-  random = list(eDWID = pdDiag(~ 1 + Years + U))
-)
-
-emt <- emtrends(change_mod, ~ Years + slope_change_years | Race, "Years",
-  at = list(Years = c(-3, 2))
-)
-# EMMs
-emm1 <- emmeans(change_mod,
-  spec = ~ Years | Race,
-  at = list(Years = c(-3, -2, -1, 0)),
-  pbkrtest.limit = Inf
-)
-emm2 <- emmeans(change_mod,
-  spec = ~ Years + slope_change_years | Race,
-  at = list(Years = c(0, 1, 2), slope_change_years = c(0, 1, 2)),
-  pbkrtest.limit = Inf
-)
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-pop_dat <- mod_df %>% select(Years:Insurance)
-pop_dat$pred <- predict(change_mod, re.form = NA, newdata = pop_dat)
-pop_dat <- pop_dat %>% distinct()
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = gli_fev1_ppred_rn, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(data = pop_dat, aes(y = pred, group = Race, colour = Race)) +
+pop_dat <- data.frame(expand.grid(
+  Years = -3:2, Race = unique(encounter$Race), age_group = "[18,30)",
+  Insurance = "Private"
+))
+pop_dat$slope_change_years <- (pop_dat$Years > 0) * pop_dat$Years
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("gli_fev1_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 #### GLI 2012 equations
@@ -165,21 +298,25 @@ change_mod <- lmer(
   data = encounter
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = GLI_FEV1_pct_predicted, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("GLI_FEV1_pct_predicted") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(GLI_FEV1_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 ### Age < 18 at ETI initiation
@@ -196,21 +333,25 @@ change_mod <- lmer(
   data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = gli_fev1_ppred_rn, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("gli_fev1_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 #### GLI 2012 equations
@@ -223,21 +364,25 @@ change_mod <- lmer(
   data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = GLI_FEV1_pct_predicted, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("GLI_FEV1_pct_predicted") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(GLI_FEV1_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 ### Age >= 18 at ETI initiation
@@ -254,21 +399,25 @@ change_mod <- lmer(
   data = encounter[encounter$age_eti_group == "[18, Inf)", ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = gli_fev1_ppred_rn, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("gli_fev1_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 #### GLI 2012 equations
@@ -281,21 +430,25 @@ change_mod <- lmer(
   data = encounter[encounter$age_eti_group == "[18, Inf)", ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = GLI_FEV1_pct_predicted, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("GLI_FEV1_pct_predicted") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(GLI_FEV1_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 ## FVC % predicted
@@ -312,21 +465,25 @@ change_mod <- lmer(
   data = encounter
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = gli_fvc_ppred_rn, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("gli_fvc_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fvc_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 #### GLI 2012 equations
@@ -339,21 +496,25 @@ change_mod <- lmer(
   data = encounter
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = GLI_FVC_pct_predicted, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("GLI_FVC_pct_predicted") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(GLI_FVC_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 ### Age < 18 at ETI initiation
@@ -370,21 +531,25 @@ change_mod <- lmer(
   data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = gli_fvc_ppred_rn, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("gli_fvc_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fvc_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 #### GLI 2012 equations
@@ -397,21 +562,25 @@ change_mod <- lmer(
   data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = GLI_FVC_pct_predicted, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("GLI_FVC_pct_predicted") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(GLI_FVC_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 ### Age >= 18 at ETI initiation
@@ -428,21 +597,25 @@ change_mod <- lmer(
   data = encounter[encounter$age_eti_group == "[18, Inf)", ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = gli_fvc_ppred_rn, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("gli_fvc_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fvc_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 #### GLI 2012 equations
@@ -455,21 +628,25 @@ change_mod <- lmer(
   data = encounter[encounter$age_eti_group == "[18, Inf)", ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = GLI_FVC_pct_predicted, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("GLI_FVC_pct_predicted") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(GLI_FVC_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 ## FEV1/FVC % predicted
@@ -486,21 +663,25 @@ change_mod <- lmer(
   data = encounter
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = gli_fev1fvc_ppred_rn, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("gli_fev1fvc_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fev1fvc_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 #### GLI 2012 equations
@@ -513,21 +694,25 @@ change_mod <- lmer(
   data = encounter
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = GLI_FEV1FVC_pct_predicted, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("GLI_FEV1FVC_pct_predicted") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(GLI_FEV1FVC_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 ### Age < 18 at ETI initiation
@@ -544,21 +729,25 @@ change_mod <- lmer(
   data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = gli_fev1fvc_ppred_rn, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("gli_fev1fvc_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fev1fvc_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 #### GLI 2012 equations
@@ -571,21 +760,25 @@ change_mod <- lmer(
   data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = GLI_FEV1FVC_pct_predicted, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("GLI_FEV1FVC_pct_predicted") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(GLI_FEV1FVC_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 ### Age >= 18 at ETI initiation
@@ -602,21 +795,25 @@ change_mod <- lmer(
   data = encounter[encounter$age_eti_group == "[18, Inf)", ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = gli_fev1fvc_ppred_rn, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("gli_fev1fvc_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fev1fvc_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
 #### GLI 2012 equations
@@ -629,280 +826,212 @@ change_mod <- lmer(
   data = encounter[encounter$age_eti_group == "[18, Inf)", ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = GLI_FEV1FVC_pct_predicted, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("GLI_FEV1FVC_pct_predicted") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(GLI_FEV1FVC_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
-## BMI %ile 
+## BMI
 
-### Full cohort
+### BMI %ile (age < 20 at ETI start)
 
 ```{r}
 # Fit mixed model with change point
 change_mod <- lmer(
   bmipercentile ~ Years * Race +
     slope_change_years * Race + age_group + Insurance + (1 | eDWID),
-  data = encounter
+  data = encounter[encounter$age_eti_start < 20, ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = bmipercentile, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("bmipercentile") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(bmipercentile = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
-### Age < 18 at ETI initiation
-
-The following models were not adjusted for age group.
+### BMI raw value (age >= 20 at ETI start)
 
 ```{r}
-# Fit mixed model with change point
 change_mod <- lmer(
-  bmipercentile ~ Years * Race + slope_change_years * Race +
-    Insurance + (1 | eDWID),
-  data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
+  bmivalue ~ Years * Race +
+    slope_change_years * Race + age_group + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_start >= 20, ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = bmipercentile, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("bmivalue") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(bmivalue = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
-### Age >= 18 at ETI initiation
+## Height
 
-The following models were not adjusted for age group.
-
-```{r}
-# Fit mixed model with change point
-change_mod <- lmer(
-  bmipercentile ~ Years * Race +
-    slope_change_years * Race + Insurance + (1 | eDWID),
-  data = encounter[encounter$age_eti_group == "[18, Inf)", ]
-)
-# Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = bmipercentile, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
-  xlab("Years from ETI Start") +
-  theme_classic()
-# Model summary
-change_mod %>% gtsummary::tbl_regression()
-```
-
-## Height %ile 
-
-### Full cohort
+### Height %ile (age < 20 at ETI start)
 
 ```{r}
 # Fit mixed model with change point
 change_mod <- lmer(
   heightpercentile ~ Years * Race +
     slope_change_years * Race + age_group + Insurance + (1 | eDWID),
-  data = encounter
+  data = encounter[encounter$age_eti_start < 20, ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = heightpercentile, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("heightpercentile") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(heightpercentile = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
-### Age < 18 at ETI initiation
-
-The following models were not adjusted for age group.
+### Height raw value (age >= 20 at ETI start)
 
 ```{r}
-# Fit mixed model with change point
 change_mod <- lmer(
-  heightpercentile ~ Years * Race + slope_change_years * Race +
-    Insurance + (1 | eDWID),
-  data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
+  height ~ Years * Race +
+    slope_change_years * Race + age_group + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_start >= 20, ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = heightpercentile, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("height") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(height = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
-### Age >= 18 at ETI initiation
+## Weight
 
-The following models were not adjusted for age group.
-
-```{r}
-# Fit mixed model with change point
-change_mod <- lmer(
-  heightpercentile ~ Years * Race +
-    slope_change_years * Race + Insurance + (1 | eDWID),
-  data = encounter[encounter$age_eti_group == "[18, Inf)", ]
-)
-# Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = heightpercentile, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
-  xlab("Years from ETI Start") +
-  theme_classic()
-# Model summary
-change_mod %>% gtsummary::tbl_regression()
-```
-
-## Weight %ile 
-
-### Full cohort
+### Weight %ile (age < 20 at ETI start)
 
 ```{r}
 # Fit mixed model with change point
 change_mod <- lmer(
   weightpercentile ~ Years * Race +
     slope_change_years * Race + age_group + Insurance + (1 | eDWID),
-  data = encounter
+  data = encounter[encounter$age_eti_start < 20, ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = weightpercentile, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("weightpercentile") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(weightpercentile = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
 
-### Age < 18 at ETI initiation
-
-The following models were not adjusted for age group.
+### Weight raw value (age >= 20 at ETI start)
 
 ```{r}
-# Fit mixed model with change point
 change_mod <- lmer(
-  weightpercentile ~ Years * Race + slope_change_years * Race +
-    Insurance + (1 | eDWID),
-  data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
+  weight ~ Years * Race +
+    slope_change_years * Race + age_group + Insurance + (1 | eDWID),
+  data = encounter[encounter$age_eti_start >= 20, ]
 )
 # Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = weightpercentile, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
   xlab("Years from ETI Start") +
+  ylab("weight") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression()
-```
-
-### Age >= 18 at ETI initiation
-
-The following models were not adjusted for age group.
-
-```{r}
-# Fit mixed model with change point
-change_mod <- lmer(
-  weightpercentile ~ Years * Race +
-    slope_change_years * Race + Insurance + (1 | eDWID),
-  data = encounter[encounter$age_eti_group == "[18, Inf)", ]
-)
-# Model plot
-mod_df <- change_mod@frame
-mod_df$ind_pred <- predict(change_mod)
-mod_df$pop_pred <- predict(change_mod, re.form = NA)
-ggplot(mod_df, aes(x = Years)) +
-  geom_point(aes(y = weightpercentile, group = eDWID),
-    alpha = 0.01, show.legend = F, shape = "."
-  ) +
-  geom_line(aes(y = ind_pred, group = eDWID),
-    alpha = 0.01, show.legend = F
-  ) +
-  geom_line(aes(y = pop_pred, group = Race, colour = Race)) +
-  xlab("Years from ETI Start") +
-  theme_classic()
-# Model summary
-change_mod %>% gtsummary::tbl_regression()
+change_mod %>% gtsummary::tbl_regression(intercept = T)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(weight = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 2)
 ```
