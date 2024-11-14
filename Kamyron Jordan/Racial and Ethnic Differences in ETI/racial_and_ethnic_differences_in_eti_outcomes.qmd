@@ -32,6 +32,7 @@ library(ggflowchart)
 library(lmerTest)
 library(splines)
 library(ggeffects)
+library(emmeans)
 # Paths
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
@@ -103,15 +104,43 @@ change_mod <- lmer(
     slope_change_years * Race + age_group + Insurance + (1 | eDWID),
   data = encounter
 )
-# EMMs
-emm = emmeans(change_mod,spec = ~Years+Race)
+cm <- chngptm(
+  formula.1 = gli_fev1_ppred_rn ~ age_group + Insurance + (1 | eDWID),
+  formula.2 = ~Years, family = "gaussian", data = encounter,
+  type = "segmented", est.method = "grid", var.type = "none"
+)
 
+t <- data.frame(encounter)
+levels(t$Race) <- c("White", "Black", "Hispanic", "Other")
+o <- lme(gli_fev1_ppred_rn ~ Years + Race + age_group + Insurance,
+  random = ~ 1 | eDWID, data = t, na.action = na.omit
+)
+os <- segmented(o, ~Years,
+  data = t,
+  fixed.parms = c(G0 = 0),
+  random = list(eDWID = pdDiag(~ 1 + Years + U))
+)
+
+emt <- emtrends(change_mod, ~ Years + slope_change_years | Race, "Years",
+  at = list(Years = c(-3, 2))
+)
+# EMMs
+emm1 <- emmeans(change_mod,
+  spec = ~ Years | Race,
+  at = list(Years = c(-3, -2, -1, 0)),
+  pbkrtest.limit = Inf
+)
+emm2 <- emmeans(change_mod,
+  spec = ~ Years + slope_change_years | Race,
+  at = list(Years = c(0, 1, 2), slope_change_years = c(0, 1, 2)),
+  pbkrtest.limit = Inf
+)
 # Model plot
 mod_df <- change_mod@frame
 mod_df$ind_pred <- predict(change_mod)
-pop_dat = mod_df %>% select(Years:Insurance)
-pop_dat$pred <- predict(change_mod, re.form = NA,newdata = pop_dat)
-pop_dat = pop_dat%>% distinct()
+pop_dat <- mod_df %>% select(Years:Insurance)
+pop_dat$pred <- predict(change_mod, re.form = NA, newdata = pop_dat)
+pop_dat <- pop_dat %>% distinct()
 ggplot(mod_df, aes(x = Years)) +
   geom_point(aes(y = gli_fev1_ppred_rn, group = eDWID),
     alpha = 0.01, show.legend = F, shape = "."
@@ -119,7 +148,7 @@ ggplot(mod_df, aes(x = Years)) +
   geom_line(aes(y = ind_pred, group = eDWID),
     alpha = 0.01, show.legend = F
   ) +
-  geom_line(data = pop_dat,aes(y = pred, group = Race, colour = Race)) +
+  geom_line(data = pop_dat, aes(y = pred, group = Race, colour = Race)) +
   xlab("Years from ETI Start") +
   theme_classic()
 # Model summary
