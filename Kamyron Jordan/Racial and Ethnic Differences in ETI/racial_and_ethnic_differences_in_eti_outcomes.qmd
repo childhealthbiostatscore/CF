@@ -30,8 +30,6 @@ library(gt)
 library(gtsummary)
 library(ggflowchart)
 library(lmerTest)
-library(splines)
-library(ggeffects)
 library(emmeans)
 # Paths
 home_dir <- switch(Sys.info()["sysname"],

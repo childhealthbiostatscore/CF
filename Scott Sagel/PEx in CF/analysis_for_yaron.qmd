@@ -911,7 +911,7 @@ fig1 <- df %>%
   ggplot(aes(x = factor(year), y = n, fill = factor(year))) +
   geom_bar(position = "dodge", stat = "identity") +
   geom_label(aes(label = n), nudge_y = -20, fill = "white") +
-  ylab("Num. of Hospitalizations") +
+  ylab("Number of Hospitalizations") +
   theme_bw() +
   theme(legend.position = "none", axis.title.x = element_blank()) +
   scale_fill_manual(values = c(purple, yellow))
@@ -941,7 +941,7 @@ fig2 <- df %>%
     xmin = 1, xmax = 2, y_position = 50, map_signif_level = T,
     annotation = "<0.001"
   ) +
-  ylab("Percent With >= 2 Hospitalizations") +
+  ylab("Percent with >= 2 Hospitalizations in a Single Year") +
   theme_bw() +
   theme(legend.position = "none", axis.title.x = element_blank()) +
   scale_fill_manual(values = c(purple, yellow))
@@ -951,7 +951,7 @@ fig2
 ```{r}
 #| label: fig-panel
 #| fig-cap: Hospitalizations
-fig1 + fig2
+fig1 + fig2 + plot_annotation(tag_levels = c("a", "b"))
 ```
 
 ```{r}
