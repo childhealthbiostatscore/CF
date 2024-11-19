@@ -35,7 +35,7 @@ home_dir <- switch(Sys.info()["sysname"],
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/GitHub",
+  "Darwin" = "/Users/timvigers/Documents/GitHub",
   "Windows" = "C:/Users/Tim/GitHub",
   "Linux" = "/home/timvigers/GitHub"
 )
@@ -92,6 +92,7 @@ data$home_cx_no_growth.factor <- factor(data$home_cx_no_growth.factor,
 # Additional labels for tables
 labels["race"] <- "Race"
 labels["age"] <- "Age at Clinic Visit"
+labels <- as.list(labels)
 # Genotype format
 data$Genotype <- paste0(
   data$mutation1.factor == "F508del", "/", data$mutation2.factor == "F508del"
@@ -237,11 +238,56 @@ agreement <- function(result_pattern, df = data) {
   cat("#### Euler diagram")
   cat("\n")
   d %>%
-    mutate(across(everything(), ~ as.numeric(. == "Present" | . == "No Growth"))) %>%
+    mutate(across(
+      everything(),
+      ~ as.numeric(. == "Present" | . == "No Growth")
+    )) %>%
     drop_na(.) %>%
-    euler(.) %>%
+    venn(.) %>%
     plot(., quantities = T) %>%
     print(.)
+  cat("\n")
+  cat("\n")
+  cat("#### Bar plot")
+  cat("\n")
+  cat("\n")
+  # Format data
+  bar_plot_df <- d %>%
+    rowwise() %>%
+    mutate(
+      "Immediate vs. Delayed" = case_when(
+        Immediate == "Present" & Delayed == "Present" ~ "Both Present",
+        Immediate == "Absent" & Delayed == "Absent" ~ "Both Absent",
+        .default = "Disagreed"
+      ),
+      "Immediate vs. Home" = case_when(
+        Immediate == "Present" & Home == "Present" ~ "Both Present",
+        Immediate == "Absent" & Home == "Absent" ~ "Both Absent",
+        .default = "Disagreed"
+      ),
+      "Delayed vs. Home" = case_when(
+        Delayed == "Present" & Home == "Present" ~ "Both Present",
+        Delayed == "Absent" & Home == "Absent" ~ "Both Absent",
+        .default = "Disagreed"
+      ),
+    ) %>%
+    select(-c(Immediate:Home)) %>%
+    pivot_longer(cols = `Immediate vs. Delayed`:`Delayed vs. Home`) %>%
+    group_by(name) %>%
+    count(value) %>%
+    mutate(pct = (n / sum(n)) * 100)
+  # Plot
+  p = ggplot(bar_plot_df, aes(x = name, fill = value, y = n)) +
+    geom_bar(stat = "identity") +
+    geom_text(aes(label = paste0(sprintf("%1.1f", pct), "%")),
+      position = position_stack(vjust = 0.5)
+    ) +
+    ylab("Samples (N)") +
+    theme_classic() +
+    theme(legend.title = element_blank(), axis.title.x = element_blank())
+  cat("\n")
+  cat("\n")
+  show(p)
   cat("\n")
   cat("\n")
   cat("### Pairwise agreement")

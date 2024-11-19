@@ -86,6 +86,11 @@ db_demographics$Race <- apply(db_demographics, 1, function(r) {
     return(NA)
   }
 })
+db_demographics$Race <- factor(db_demographics$Race,
+  levels = c(
+    "White", "Other", "Multiple Races", "American Indian or Alaskan Native"
+  )
+)
 db_demographics$Ethnicity <- apply(db_demographics, 1, function(r) {
   w <- which(r[grep("ethnicity", names(r))] == "Checked")
   if (length(w) == 1) {
@@ -96,6 +101,11 @@ db_demographics$Ethnicity <- apply(db_demographics, 1, function(r) {
     return(NA)
   }
 })
+db_demographics$Ethnicity <- factor(db_demographics$Ethnicity,
+  levels = c("Non-Hispanic", "Hispanic", "Unknown/Not Reported")
+)
+# Drop empty levels
+db_demographics <- droplevels(db_demographics)
 # Add groups to other dataframes
 db_medications <- left_join(db_medications,
   db_demographics %>% select(record_id, group),
@@ -256,7 +266,7 @@ agreement <- function(bug, data = df) {
   cat("\n")
   print(plot(euler(d == "Negative"),
     quantities = list(cex = 3),
-    fills = list(fill = c("#FFC107","#1E88E5","#004D40"))
+    fills = list(fill = c("#FFC107", "#1E88E5", "#004D40"))
   ))
   cat("\n")
   cat("\n")
@@ -264,7 +274,7 @@ agreement <- function(bug, data = df) {
   cat("\n")
   print(plot(euler(d == "Positive"),
     quantities = list(cex = 3),
-    fills = list(fill = c("#FFC107", "#1E88E5","#004D40"))
+    fills = list(fill = c("#FFC107", "#1E88E5", "#004D40"))
   ))
   cat("\n")
 }
