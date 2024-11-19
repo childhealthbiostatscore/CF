@@ -43,10 +43,10 @@ exclude <- c("01-030_W", "01-038_W", "02-0038", "02-0039", "04-001")
 df <- full_join(db_cos_collection_results, db_sos_collection_results)
 # Add dates to demographics
 db_demographics <- left_join(db_demographics,
-  df %>% select(record_id, cos_result_date),
+  db_clinic_obtained_values %>% select(record_id, cos_collection_date),
   by = join_by(record_id)
 )
-db_demographics$age_at_cos <- as.numeric(difftime(db_demographics$cos_result_date,
+db_demographics$age_at_cos <- as.numeric(difftime(db_demographics$cos_collection_date,
   db_demographics$dob,
   units = "days"
 )) / 365.25
@@ -167,7 +167,7 @@ Participants 01-030_W, 01-038_W, 02-0038, 02-0039, and 04-001 were excluded from
 db_demographics %>%
   select(group, age_at_cos, age_group, sex, Race, Ethnicity) %>%
   tbl_summary(
-    by = group,
+    by = group, missing_text = "Missing",
     statistic = all_continuous() ~ c("{median} ({min}, {max})"),
     label = list(
       "sex" = "Sex", "age_at_cos" = "Age at COS", "age_group" = "Age Group"
@@ -188,7 +188,7 @@ db_medications %>%
     -inhaled_colisitin_status, -inhaled_vancomycin_status,
     -other_inhaled_status, -please_specify_mucolytic
   ) %>%
-  tbl_summary(by = group) %>%
+  tbl_summary(by = group, missing_text = "Missing") %>%
   add_overall() %>%
   add_p() %>%
   separate_p_footnotes() %>%
@@ -292,7 +292,7 @@ agreement_test <- function(bug, group = "group", data = df) {
   cat("\n")
   d %>%
     select(agree, detailed_agree, Group) %>%
-    tbl_summary(by = Group, label = list(
+    tbl_summary(by = Group, missing_text = "Missing", label = list(
       agree ~ "Agree (Both Positive/Positive and Negative/Negative)",
       detailed_agree ~ "Detailed Agreement"
     )) %>%
