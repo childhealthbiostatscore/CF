@@ -20,7 +20,8 @@ setwd(home_dir)
 # Insulin
 #-------------------------------------------------------------------------------
 # Import all files and combine
-files <- list.files("./Christine Chan/EnVision CF/Data_Raw/EnVision insulin re-runs",
+files <- list.files(
+  "./Christine Chan/EnVision CF/Data_Raw/EnVision insulin re-runs",
   full.names = T
 )
 dfs <- lapply(files, read.csv, na.strings = c("", -999.99))
@@ -33,7 +34,9 @@ insulin <- insulin %>%
     Date = Collection.Date
   )
 # Add re-runs
-new_insulin <- read.csv("./Christine Chan/EnVision CF/Data_Raw/20240718 190422 IOWA results.csv")
+new_insulin <- read.csv(
+  "./Christine Chan/EnVision CF/Data_Raw/20240718 190422 IOWA results.csv"
+)
 new_insulin <- new_insulin %>%
   select(Patient.Name, Collection.Date, Test, Reported.As) %>%
   rename(
@@ -62,7 +65,8 @@ colnames(catecholamines) <- c(
 #-------------------------------------------------------------------------------
 # Glucose
 #-------------------------------------------------------------------------------
-redcap <- read.csv("./Christine Chan/EnVision CF/Data_Raw/EnvisionCF_DATA_2024-07-19_1236.csv",
+redcap <- read.csv(
+  "./Christine Chan/EnVision CF/Data_Raw/EnvisionCF_DATA_2024-07-19_1236.csv",
   na.strings = ""
 )
 timepoints <- c(0, 10, 30, 60, 90, 120, 150, 180)
@@ -165,17 +169,23 @@ insulin <- insulin %>% distinct()
 # For duplicates with different insulin values, take the first (per Katie)
 insulin <- insulin %>%
   group_by(study_id, Date, Timepoint) %>%
-  summarise(Insulin = first(na.omit(Insulin)))
+  summarise(Insulin = first(na.omit(Insulin)), .groups = "drop")
 # Convert to numeric
+insulin$Insulin[insulin$Insulin %in%
+  c(
+    "<1, hemolyzed", "<1, slightly hemolyzed", "1 Hemolyzed",
+    "1 Slightly hemolyzed", "2 Slightly hemolyzed", "No Sample Received"
+  )] <- NA
 insulin$Insulin <- as.numeric(insulin$Insulin)
 #-------------------------------------------------------------------------------
 # Hypoglycemia symptom surveys
 #-------------------------------------------------------------------------------
 hypo_surveys <- c(
-  "adren_score_baseline", "adren_score_120", "adren_score_150", "adren_score_180",
-  "neuro_score_baseline", "neuro_score_120", "neuro_score_150", "neuro_score_180",
-  "total_score_baseline", "total_score_120", "total_score_150", "total_score_180",
-  "num_symptoms_base", "num_symptoms_120", "num_symptoms_150", "num_symptoms_180"
+  "adren_score_baseline", "adren_score_120", "adren_score_150",
+  "adren_score_180", "neuro_score_baseline", "neuro_score_120",
+  "neuro_score_150", "neuro_score_180", "total_score_baseline",
+  "total_score_120", "total_score_150", "total_score_180", "num_symptoms_base",
+  "num_symptoms_120", "num_symptoms_150", "num_symptoms_180"
 )
 hypo_symptoms <- redcap %>%
   select(study_id, date_visit, all_of(hypo_surveys)) %>%
@@ -183,7 +193,8 @@ hypo_symptoms <- redcap %>%
     Date = date_visit, adren_score_0 = adren_score_baseline,
     neuro_score_0 = neuro_score_baseline, total_score_0 = total_score_baseline,
     num_symptoms_0 = num_symptoms_base
-  )
+  ) %>%
+  filter(!is.na(Date))
 hypo_symptoms$Date <- ymd(hypo_symptoms$Date)
 #-------------------------------------------------------------------------------
 # CGM data
@@ -214,7 +225,10 @@ cgm$redcap_event_name <- sapply(
   stri_split_fixed(str = cgm$subject_id, pattern = "_", n = 2),
   "[", 2
 )
-cgm <- left_join(cgm, redcap %>% select(study_id, redcap_event_name, date_visit) %>% distinct() %>% drop_na(),
+cgm <- left_join(cgm,
+  redcap %>%
+    select(study_id, redcap_event_name, date_visit) %>%
+    distinct() %>% drop_na(),
   by = join_by(study_id, redcap_event_name)
 )
 cgm <- cgm %>% rename(Date = date_visit)
@@ -236,6 +250,38 @@ cgm$Date[cgm$study_id == "IA0096" &
 cgm$subject_id <- NULL
 cgm$date_cgm_placement <- NULL
 #-------------------------------------------------------------------------------
+# hOGTT data
+#-------------------------------------------------------------------------------
+files <- list.files("./Christine Chan/EnVision CF/Data_Clean/hOGTTs",
+  full.names = T
+)
+ogtts <- lapply(files, function(f) {
+  # Import
+  d <- read.csv(f,
+    na.strings = c("", "not detectable", "not detecable", "no serum")
+  )
+  # Get run date
+  date <- sub("./Christine Chan/EnVision CF/Data_Clean/hOGTTs/summary_", "", f)
+  date <- sub("\\.csv", "", date)
+  d$iowa_run_date <- mdy(date)
+  # Format
+  d$study_id <- gsub(" ", "", d$study_id)
+  d$Timepoint <- as.numeric(sub(" min", "", d$Timepoint))
+  return(d)
+})
+ogtts <- do.call(rbind, ogtts)
+# Get rid of insulin values because those were re-run at CHCO
+ogtts$Insulin <- NULL
+# Wide version for merging later
+ogtts <- ogtts %>%
+  pivot_wider(names_from = Timepoint, values_from = c(C.Peptide:GIP)) %>%
+  arrange(study_id, iowa_run_date) %>%
+  filter(is.na(Status))
+ogtts <- ogtts %>%
+  group_by(study_id) %>%
+  mutate(ogtt_num = row_number()) %>%
+  ungroup()
+#-------------------------------------------------------------------------------
 # Combine everything in a wide format
 #-------------------------------------------------------------------------------
 # Merge
@@ -247,6 +293,15 @@ final_df <- final_df %>% pivot_wider(
 final_df <- full_join(final_df, cgm)
 final_df <- full_join(final_df, visits)
 final_df <- full_join(final_df, hypo_symptoms)
+# Add OGTT data
+final_df <- final_df %>%
+  arrange(study_id, Date) %>%
+  group_by(study_id) %>%
+  mutate(ogtt_num = row_number()) %>%
+  ungroup() %>%
+  select(study_id, Date, ogtt_num, everything())
+final_df <- full_join(final_df, ogtts)
+final_df <- final_df %>% arrange(study_id, Date)
 # Add HbA1c, etc.
 a1c <- redcap %>%
   select(study_id, date_visit, a1c_result) %>%
@@ -277,9 +332,12 @@ final_df$Diagnosis[final_df[, glucose[1]] < 100 &
   (rowSums(final_df[, glucose[6:8]] < 140, na.rm = T) ==
     rowSums(!is.na(final_df[, glucose[6:8]])))] <- "NGT"
 final_df$Diagnosis[final_df[, glucose[1]] >= 100] <- "IFG"
-final_df$Diagnosis[rowSums(final_df[, glucose[2:5]] >= 200, na.rm = T) > 0] <- "INDET"
-final_df$Diagnosis[rowSums(final_df[, glucose[6:8]] >= 140, na.rm = T) > 0] <- "IGF"
-final_df$Diagnosis[final_df$Glucose_0 >= 126 | final_df$Glucose_120 >= 200] <- "CFRD"
+final_df$Diagnosis[rowSums(final_df[, glucose[2:5]] >= 200, na.rm = T) > 0] <-
+  "INDET"
+final_df$Diagnosis[rowSums(final_df[, glucose[6:8]] >= 140, na.rm = T) > 0] <-
+  "IGF"
+final_df$Diagnosis[final_df$Glucose_0 >= 126 | final_df$Glucose_120 >= 200] <-
+  "CFRD"
 final_df$Diagnosis <- factor(final_df$Diagnosis,
   levels = c("NGT", "IFG", "INDET", "IGF", "CFRD")
 )
@@ -395,7 +453,9 @@ final_df$Hypo60 <- factor(final_df$Hypo60,
 final_df$CFTR <- paste0(final_df$cftr_mutation_1, final_df$cftr_mutation_2)
 final_df$CFTR <- factor(final_df$CFTR,
   levels = c("11", "12", "22", "NANA"),
-  labels = c("F508del homozygous", "F508del heterozygous", "Other/Other", "Unknown")
+  labels = c(
+    "F508del homozygous", "F508del heterozygous", "Other/Other", "Unknown"
+  )
 )
 final_df$cftr_mutation_1 <- NULL
 final_df$cftr_mutation_2 <- NULL
