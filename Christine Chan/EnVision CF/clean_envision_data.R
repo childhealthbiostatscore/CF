@@ -290,7 +290,6 @@ final_df <- full_join(final_df, catecholamines)
 final_df <- final_df %>% pivot_wider(
   names_from = Timepoint, values_from = c(Glucose:Epinephrine)
 )
-final_df <- full_join(final_df, cgm)
 final_df <- full_join(final_df, visits)
 final_df <- full_join(final_df, hypo_symptoms)
 # Add OGTT data
@@ -302,6 +301,8 @@ final_df <- final_df %>%
   select(study_id, Date, ogtt_num, everything())
 final_df <- full_join(final_df, ogtts)
 final_df <- final_df %>% arrange(study_id, Date)
+# Add CGM
+final_df <- full_join(final_df, cgm)
 # Add HbA1c, etc.
 a1c <- redcap %>%
   select(study_id, date_visit, a1c_result) %>%
@@ -344,7 +345,7 @@ final_df$Diagnosis <- factor(final_df$Diagnosis,
 # iAUCs
 final_df$iAUC30gluc <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[glucose[1:3]]) - as.numeric(r[glucose[1]])
-  if (is.na(last(y))) {
+  if (is.na(first(y)) | is.na(last(y))) {
     return(NA)
   } else {
     x <- c(0, 10, 30)[!is.na(y)]
@@ -355,7 +356,7 @@ final_df$iAUC30gluc <- apply(final_df, 1, function(r) {
 })
 final_df$iAUC60gluc <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[glucose[1:4]]) - as.numeric(r[glucose[1]])
-  if (is.na(last(y))) {
+  if (is.na(first(y)) | is.na(last(y))) {
     return(NA)
   } else {
     x <- c(0, 10, 30, 60)[!is.na(y)]
@@ -366,7 +367,7 @@ final_df$iAUC60gluc <- apply(final_df, 1, function(r) {
 })
 final_df$iAUC120gluc <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[glucose[1:6]]) - as.numeric(r[glucose[1]])
-  if (is.na(last(y))) {
+  if (is.na(first(y)) | is.na(last(y))) {
     return(NA)
   } else {
     x <- c(0, 10, 30, 60, 90, 120)[!is.na(y)]
@@ -377,7 +378,7 @@ final_df$iAUC120gluc <- apply(final_df, 1, function(r) {
 })
 final_df$iAUC180gluc <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[glucose]) - as.numeric(r[glucose[1]])
-  if (is.na(last(y))) {
+  if (is.na(first(y)) | is.na(last(y))) {
     return(NA)
   } else {
     x <- c(0, 10, 30, 60, 90, 120, 150, 180)[!is.na(y)]
@@ -388,7 +389,7 @@ final_df$iAUC180gluc <- apply(final_df, 1, function(r) {
 })
 final_df$iAUC30ins <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[insulin[1:3]]) - as.numeric(r[insulin[1]])
-  if (is.na(last(y))) {
+  if (is.na(first(y)) | is.na(last(y))) {
     return(NA)
   } else {
     x <- c(0, 10, 30)[!is.na(y)]
@@ -399,7 +400,7 @@ final_df$iAUC30ins <- apply(final_df, 1, function(r) {
 })
 final_df$iAUC60ins <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[insulin[1:4]]) - as.numeric(r[insulin[1]])
-  if (is.na(last(y))) {
+  if (is.na(first(y)) | is.na(last(y))) {
     return(NA)
   } else {
     x <- c(0, 10, 30, 60)[!is.na(y)]
@@ -410,7 +411,7 @@ final_df$iAUC60ins <- apply(final_df, 1, function(r) {
 })
 final_df$iAUC120ins <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[insulin[1:6]]) - as.numeric(r[insulin[1]])
-  if (is.na(last(y))) {
+  if (is.na(first(y)) | is.na(last(y))) {
     return(NA)
   } else {
     x <- c(0, 10, 30, 60, 90, 120)[!is.na(y)]
@@ -421,7 +422,7 @@ final_df$iAUC120ins <- apply(final_df, 1, function(r) {
 })
 final_df$iAUC180ins <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[insulin]) - as.numeric(r[insulin[1]])
-  if (is.na(last(y))) {
+  if (is.na(first(y)) | is.na(last(y))) {
     return(NA)
   } else {
     x <- c(0, 10, 30, 60, 90, 120, 150, 180)[!is.na(y)]

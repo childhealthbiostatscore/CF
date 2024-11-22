@@ -1,0 +1,73 @@
+---
+title: "EnVision Data Summary"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+    theme:
+      light: flatly
+      dark: darkly
+bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Documents/GitHub/styles/american-medical-association.csl
+editor: source
+---
+
+```{r setup}
+#| include: false
+library(tidyverse)
+library(arsenal)
+knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF")
+```
+
+```{r data cleaning}
+# Import cleaned dataset
+df <- read.csv("./Data_Clean/analysis_dataset.csv", na.strings = "")
+# Set table options
+mycontrols <-
+  tableby.control(
+    numeric.stats = c("N", "Nmiss", "meansd", "medianq1q3", "range"),
+    cat.stats = c("N", "Nmiss", "countpct"),
+    digits = 1
+  )
+```
+
+```{r results='asis'}
+#| label: tbl-auc-numbers-overall
+#| tbl-cap: Glucose and Insulin iAUC
+tbl <- tableby(
+  Diagnosis ~ iAUC30gluc + iAUC60gluc + iAUC120gluc + iAUC180gluc + iAUC30ins +
+    iAUC60ins + iAUC120ins + iAUC180ins,
+  data = df, control = mycontrols
+)
+summary(tbl, pfootnote = T)
+```
+
+```{r results='asis'}
+#| label: fig-auc-hist
+#| fig-cap: Glucose and Insulin iAUC Histograms
+df %>%
+  select(
+    iAUC30gluc, iAUC60gluc, iAUC120gluc, iAUC180gluc, iAUC30ins, iAUC60ins,
+    iAUC120ins, iAUC180ins
+  ) %>%
+  pivot_longer(everything()) %>%
+  mutate(
+    measure = factor(sub("iAUC\\d{2,3}", "", name),
+      levels = c("gluc", "ins"), labels = c("Glucose", "Insulin")
+    ),
+    name = factor(sub("gluc|ins", "", name),
+      levels = c("iAUC30", "iAUC60", "iAUC120", "iAUC180")
+    )
+  ) %>%
+  ggplot(., aes(x = name, y = value)) +
+  geom_boxplot() +
+  facet_wrap(~measure)
+```
