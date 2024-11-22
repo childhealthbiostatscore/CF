@@ -24,12 +24,26 @@ editor: source
 #| include: false
 library(tidyverse)
 library(arsenal)
+library(skimr)
 knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF")
 ```
 
 ```{r data cleaning}
 # Import cleaned dataset
-df <- read.csv("./Data_Clean/analysis_dataset.csv", na.strings = "")
+df <- read.csv("./Data_Clean/envision_analysis_dataset.csv", na.strings = "")
+# Find those missing both iAUC120ins and iAUC120gluc, and both iAUC180ins and
+# iAUC180gluc
+df$miss_120 <- factor(is.na(df$iAUC120gluc) & is.na(df$iAUC120ins),
+  levels = c(F, T), labels = c("No", "Yes")
+)
+df$miss_180 <- factor(is.na(df$iAUC180gluc) & is.na(df$iAUC180ins),
+  levels = c(F, T), labels = c("No", "Yes")
+)
+# Labels
+mylabels <- list(
+  miss_120 = "Missing iAUC120gluc and iAUC120ins?",
+  miss_180 = "Missing iAUC180gluc and iAUC180ins?"
+)
 # Set table options
 mycontrols <-
   tableby.control(
@@ -39,20 +53,58 @@ mycontrols <-
   )
 ```
 
+# Demographics
+
 ```{r results='asis'}
-#| label: tbl-auc-numbers-overall
-#| tbl-cap: Glucose and Insulin iAUC
+#| label: tbl-demo
+#| tbl-cap: Demographics by Participant
 tbl <- tableby(
-  Diagnosis ~ iAUC30gluc + iAUC60gluc + iAUC120gluc + iAUC180gluc + iAUC30ins +
-    iAUC60ins + iAUC120ins + iAUC180ins,
-  data = df, control = mycontrols
+  ~ age_visit + height + weight + bmi + bmi_perc + origin_race + ethnicity +
+    sex + CFTR,
+  data = df %>% group_by(study_id) %>% slice_min(row_number()),
+  control = mycontrols
 )
 summary(tbl, pfootnote = T)
 ```
 
 ```{r results='asis'}
+#| label: tbl-demo-ogtt
+#| tbl-cap: Demographics Treating OGTTs as Independent
+tbl <- tableby(
+  ~ age_visit + height + weight + bmi + bmi_perc + origin_race + ethnicity +
+    sex + CFTR,
+  data = df, control = mycontrols
+)
+summary(tbl, pfootnote = T)
+```
+
+# iAUC
+
+```{r results='asis'}
+#| label: tbl-auc-numbers-overall
+#| tbl-cap: Glucose and Insulin iAUC
+tbl <- tableby(
+  ~ iAUC30gluc + iAUC60gluc + iAUC120gluc + iAUC180gluc + iAUC30ins +
+    iAUC60ins + iAUC120ins + iAUC180ins + miss_120 + miss_180,
+  data = df, control = mycontrols
+)
+summary(tbl, pfootnote = T, labelTranslations = mylabels)
+```
+
+```{r results='asis'}
+#| label: tbl-auc-numbers-diagnosis
+#| tbl-cap: Glucose and Insulin iAUC by Diagnosis
+tbl <- tableby(
+  Diagnosis ~ iAUC30gluc + iAUC60gluc + iAUC120gluc + iAUC180gluc + iAUC30ins +
+    iAUC60ins + iAUC120ins + iAUC180ins + miss_120 + miss_180,
+  data = df, control = mycontrols
+)
+summary(tbl, pfootnote = T, labelTranslations = mylabels)
+```
+
+```{r results='asis'}
 #| label: fig-auc-hist
-#| fig-cap: Glucose and Insulin iAUC Histograms
+#| fig-cap: Glucose and Insulin iAUC Boxplots
 df %>%
   select(
     iAUC30gluc, iAUC60gluc, iAUC120gluc, iAUC180gluc, iAUC30ins, iAUC60ins,
@@ -67,7 +119,16 @@ df %>%
       levels = c("iAUC30", "iAUC60", "iAUC120", "iAUC180")
     )
   ) %>%
+  filter(!is.na(value)) %>%
   ggplot(., aes(x = name, y = value)) +
   geom_boxplot() +
   facet_wrap(~measure)
+```
+
+# EDA
+
+```{r}
+#| label: fig-skimr
+#| fig-cap: Data Skim
+skim(df)
 ```
