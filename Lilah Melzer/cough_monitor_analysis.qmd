@@ -45,12 +45,12 @@ df <- exportRecordsTyped(rcon)
 #| message: false
 #| warning: false
 # Import use data
-start_end <- read.csv("C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Clean/Start and end dates.csv",
+start_end <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Data_Clean/Start and end dates.csv",
   na.strings = ""
 )
 start_end$Start <- mdy(start_end$Start)
 start_end$End <- mdy(start_end$End)
-vacations <- read.csv("C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Clean/Vacation days.csv",
+vacations <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Data_Clean/Vacation days.csv",
   na.strings = ""
 )
 vacations$Vacation.Start <- mdy(vacations$Vacation.Start)
@@ -69,7 +69,7 @@ dates <- start_end %>%
   unnest(Date)
 # Import counts
 agg_counts <- read.csv(
-  "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Raw/Cough_w_TotalCounts_0824 - Cough_agg_w_count_0828.csv",
+  "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Data_Raw/Cough_w_TotalCounts_0824 - Cough_agg_w_count_0828.csv",
   na.strings = c("", "NMD"), header = F
 )
 # Format aggregated count data
@@ -183,7 +183,7 @@ demo[, grep("mutation", colnames(demo))] <- NULL
 agg_counts$Diagnosis <-
   demo$Diagnosis[match(agg_counts$sid, as.numeric(as.character(demo$sid)))]
 # Save
-write.csv(agg_counts, file = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Lilah Melzer/Home Nighttime Cough Monitoring/Data_Clean/cleaned_aggregated_counts.csv", na = "", row.names = F)
+write.csv(agg_counts, file = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Data_Clean/cleaned_aggregated_counts.csv", na = "", row.names = F)
 # Per night
 per_night <- agg_counts %>%
   group_by(sid) %>%
