@@ -254,6 +254,11 @@ encounter <- left_join(encounter, prior_mods, by = join_by(eDWID))
 # On enzymes for pancreatic insufficiency
 encounter$isOnEnzymes <-
   factor(encounter$isOnEnzymes, levels = 0:1, labels = c("No", "Yes"))
+# Pseudomonas
+encounter$pseudomonasaeruginosa[is.na(encounter$pseudomonasaeruginosa)] <- 0
+encounter$pseudomonasaeruginosa <- factor(encounter$pseudomonasaeruginosa,
+  levels = 0:1, labels = c("No", "Yes")
+)
 ```
 
 The following models are adjusted for age group and insurance status. We fit a Gaussian mixed model for continuous outcomes with random intercept for each subject (random slope did not improve the model AIC).
@@ -268,14 +273,15 @@ The following models are adjusted for age group and insurance status. We fit a G
 # Fit mixed model with change point
 change_mod <- lmer(
   gli_fev1_ppred_rn ~ Years * Race + slope_change_years * Race + age_group +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
   data = encounter
 )
 # Model plot
 pop_dat <- data.frame(expand.grid(
   Years = -3:2, Race = unique(encounter$Race), age_group = "[18,30)",
   Insurance = "Private", prior_modulator = "Yes",
-  isOnEnzymes = "Yes"
+  isOnEnzymes = "Yes", pseudomonasaeruginosa = "No"
 ))
 pop_dat$slope_change_years <- (pop_dat$Years > 0) * pop_dat$Years
 pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
@@ -362,7 +368,8 @@ white_vs_other_post %>%
 # Fit mixed model with change point
 change_mod <- lmer(
   GLI_FEV1_pct_predicted ~ Years * Race + slope_change_years * Race +
-    age_group + Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    age_group + Insurance + prior_modulator + isOnEnzymes +
+    pseudomonasaeruginosa + (1 | eDWID),
   data = encounter
 )
 # Model plot
@@ -453,8 +460,8 @@ The following models were not adjusted for age group.
 ```{r}
 # Fit mixed model with change point
 change_mod <- lmer(
-  gli_fev1_ppred_rn ~ Years * Race + slope_change_years * Race +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+  gli_fev1_ppred_rn ~ Years * Race + slope_change_years * Race + Insurance +
+    prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID),
   data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
 )
 # Model plot
@@ -542,7 +549,8 @@ white_vs_other_post %>%
 # Fit mixed model with change point
 change_mod <- lmer(
   GLI_FEV1_pct_predicted ~ Years * Race + slope_change_years * Race +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
   data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
 )
 # Model plot
@@ -633,8 +641,8 @@ The following models were not adjusted for age group.
 ```{r}
 # Fit mixed model with change point
 change_mod <- lmer(
-  gli_fev1_ppred_rn ~ Years * Race + slope_change_years * Race +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+  gli_fev1_ppred_rn ~ Years * Race + slope_change_years * Race + Insurance +
+    prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID),
   data = encounter[encounter$age_eti_group == "[18, Inf)", ]
 )
 # Model plot
@@ -722,7 +730,8 @@ white_vs_other_post %>%
 # Fit mixed model with change point
 change_mod <- lmer(
   GLI_FEV1_pct_predicted ~ Years * Race + slope_change_years * Race +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
   data = encounter[encounter$age_eti_group == "[18, Inf)", ]
 )
 # Model plot
@@ -814,7 +823,8 @@ white_vs_other_post %>%
 # Fit mixed model with change point
 change_mod <- lmer(
   gli_fvc_ppred_rn ~ Years * Race + slope_change_years * Race + age_group +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
   data = encounter
 )
 # Model plot
@@ -902,7 +912,8 @@ white_vs_other_post %>%
 # Fit mixed model with change point
 change_mod <- lmer(
   GLI_FVC_pct_predicted ~ Years * Race + slope_change_years * Race +
-    age_group + Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    age_group + Insurance + prior_modulator + isOnEnzymes +
+    pseudomonasaeruginosa + (1 | eDWID),
   data = encounter
 )
 # Model plot
@@ -993,8 +1004,8 @@ The following models were not adjusted for age group.
 ```{r}
 # Fit mixed model with change point
 change_mod <- lmer(
-  gli_fvc_ppred_rn ~ Years * Race + slope_change_years * Race +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+  gli_fvc_ppred_rn ~ Years * Race + slope_change_years * Race + Insurance +
+    prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID),
   data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
 )
 # Model plot
@@ -1082,7 +1093,8 @@ white_vs_other_post %>%
 # Fit mixed model with change point
 change_mod <- lmer(
   GLI_FVC_pct_predicted ~ Years * Race + slope_change_years * Race +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
   data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
 )
 # Model plot
@@ -1173,8 +1185,8 @@ The following models were not adjusted for age group.
 ```{r}
 # Fit mixed model with change point
 change_mod <- lmer(
-  gli_fvc_ppred_rn ~ Years * Race + slope_change_years * Race +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+  gli_fvc_ppred_rn ~ Years * Race + slope_change_years * Race + Insurance +
+    prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID),
   data = encounter[encounter$age_eti_group == "[18, Inf)", ]
 )
 # Model plot
@@ -1262,7 +1274,8 @@ white_vs_other_post %>%
 # Fit mixed model with change point
 change_mod <- lmer(
   GLI_FVC_pct_predicted ~ Years * Race + slope_change_years * Race +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
   data = encounter[encounter$age_eti_group == "[18, Inf)", ]
 )
 # Model plot
@@ -1353,8 +1366,9 @@ white_vs_other_post %>%
 ```{r}
 # Fit mixed model with change point
 change_mod <- lmer(
-  gli_fev1fvc_ppred_rn ~ Years * Race + slope_change_years * Race +
-    age_group + Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+  gli_fev1fvc_ppred_rn ~ Years * Race + slope_change_years * Race + age_group +
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
   data = encounter
 )
 # Model plot
@@ -1442,7 +1456,8 @@ white_vs_other_post %>%
 # Fit mixed model with change point
 change_mod <- lmer(
   GLI_FEV1FVC_pct_predicted ~ Years * Race + slope_change_years * Race +
-    age_group + Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    age_group + Insurance + prior_modulator + isOnEnzymes +
+    pseudomonasaeruginosa + (1 | eDWID),
   data = encounter
 )
 # Model plot
@@ -1534,7 +1549,8 @@ The following models were not adjusted for age group.
 # Fit mixed model with change point
 change_mod <- lmer(
   gli_fev1fvc_ppred_rn ~ Years * Race + slope_change_years * Race +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
   data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
 )
 # Model plot
@@ -1622,7 +1638,8 @@ white_vs_other_post %>%
 # Fit mixed model with change point
 change_mod <- lmer(
   GLI_FEV1FVC_pct_predicted ~ Years * Race + slope_change_years * Race +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    Insurance + prior_modulator + isOnEnzymes +
+    pseudomonasaeruginosa + (1 | eDWID),
   data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
 )
 # Model plot
@@ -1713,8 +1730,8 @@ The following models were not adjusted for age group.
 ```{r}
 # Fit mixed model with change point
 change_mod <- lmer(
-  gli_fev1fvc_ppred_rn ~ Years * Race + slope_change_years * Race +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+  gli_fev1fvc_ppred_rn ~ Years * Race + slope_change_years * Race + Insurance +
+    prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID),
   data = encounter[encounter$age_eti_group == "[18, Inf)", ]
 )
 # Model plot
@@ -1802,7 +1819,8 @@ white_vs_other_post %>%
 # Fit mixed model with change point
 change_mod <- lmer(
   GLI_FEV1FVC_pct_predicted ~ Years * Race + slope_change_years * Race +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
   data = encounter[encounter$age_eti_group == "[18, Inf)", ]
 )
 # Model plot
@@ -1892,7 +1910,8 @@ white_vs_other_post %>%
 # Fit mixed model with change point
 change_mod <- lmer(
   bmipercentile ~ Years * Race + slope_change_years * Race + age_group +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
   data = encounter[encounter$age_eti_start < 20, ]
 )
 # Model plot
@@ -1979,7 +1998,8 @@ white_vs_other_post %>%
 ```{r}
 change_mod <- lmer(
   bmivalue ~ Years * Race + slope_change_years * Race + age_group +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
   data = encounter[encounter$age_eti_start >= 20, ]
 )
 # Model plot
@@ -2069,7 +2089,8 @@ white_vs_other_post %>%
 # Fit mixed model with change point
 change_mod <- lmer(
   heightpercentile ~ Years * Race + slope_change_years * Race + age_group +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
   data = encounter[encounter$age_eti_start < 20, ]
 )
 # Model plot
@@ -2155,8 +2176,8 @@ white_vs_other_post %>%
 
 ```{r}
 change_mod <- lmer(
-  height ~ Years * Race + slope_change_years * Race + age_group +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+  height ~ Years * Race + slope_change_years * Race + age_group + Insurance +
+    prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID),
   data = encounter[encounter$age_eti_start >= 20, ]
 )
 # Model plot
@@ -2246,7 +2267,8 @@ white_vs_other_post %>%
 # Fit mixed model with change point
 change_mod <- lmer(
   weightpercentile ~ Years * Race + slope_change_years * Race + age_group +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
   data = encounter[encounter$age_eti_start < 20, ]
 )
 # Model plot
@@ -2332,8 +2354,8 @@ white_vs_other_post %>%
 
 ```{r}
 change_mod <- lmer(
-  weight ~ Years * Race + slope_change_years * Race + age_group +
-    Insurance + prior_modulator + isOnEnzymes + (1 | eDWID),
+  weight ~ Years * Race + slope_change_years * Race + age_group + Insurance +
+    prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID),
   data = encounter[encounter$age_eti_start >= 20, ]
 )
 # Model plot
