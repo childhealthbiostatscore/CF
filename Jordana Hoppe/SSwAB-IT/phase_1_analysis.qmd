@@ -6,7 +6,7 @@ date-format: long
 format:
   html:
     toc: true
-    toc-depth: 5
+    toc-depth: 10
     toc-float: true
     code-fold: true
     self-contained: true
@@ -41,23 +41,29 @@ exportBulkRecords(list(db = rcon), envir = 1)
 exclude <- c("01-030_W", "01-038_W", "02-0038", "02-0039", "04-001")
 # Combine collection results
 df <- full_join(db_cos_collection_results, db_sos_collection_results)
+df <- full_join(df,
+  db_selfobtained_sample[, c("record_id", "who_collected_the_sos")],
+  by = join_by(record_id)
+)
 # Add dates to demographics
 db_demographics <- left_join(db_demographics,
   db_clinic_obtained_values %>% select(record_id, cos_collection_date),
   by = join_by(record_id)
 )
-db_demographics$age_at_cos <- as.numeric(difftime(db_demographics$cos_collection_date,
-  db_demographics$dob,
-  units = "days"
-)) / 365.25
+db_demographics$age_at_cos <-
+  as.numeric(difftime(db_demographics$cos_collection_date,
+    db_demographics$dob,
+    units = "days"
+  )) / 365.25
+# 1-5, 6-11, 12-17 and 18+ years
 db_demographics$age_group <- cut(db_demographics$age_at_cos,
-  c(-Inf, 10, 18, 30, Inf),
+  c(-Inf, 6, 12, 18, Inf),
   right = F
 )
 # Format
 df <- df %>%
   select(
-    record_id,
+    record_id, who_collected_cos, who_collected_the_sos,
     staphylococcus_aureus_cos:other_result_cos,
     staphylococcus_aureus_sos:other_result_sos
   ) %>%
@@ -153,6 +159,8 @@ df <- left_join(df, db_demographics %>% select(record_id, group, age_group),
 df <- left_join(df, db_medications, by = join_by(record_id, group))
 # Feasibility
 db_feasibility <- db_feasibility %>% filter(!record_id %in% exclude)
+# Drop unused levels
+df$who_collected_cos <- droplevels(df$who_collected_cos)
 ```
 
 # Data cleaning
@@ -174,7 +182,10 @@ db_demographics %>%
     )
   ) %>%
   add_overall() %>%
-  add_p(test = list(c("Race", "Ethnicity") ~ "fisher.test")) %>%
+  add_p(
+    test = list(c("Race", "Ethnicity") ~ "fisher.test"),
+    test.args = age_group ~ list(workspace = 2e9)
+  ) %>%
   separate_p_footnotes() %>%
   as_gt()
 ```
@@ -238,18 +249,23 @@ agreement <- function(bug, data = df) {
   )
   # Print
   cat("\n")
+  cat("\n")
   cat("####", "2x2 Table")
+  cat("\n")
   cat("\n")
   d %>%
     tbl_cross(percent = "cell") %>%
     print()
   cat("\n")
+  cat("\n")
   cat("####", "2x2 Table (With CIs)")
+  cat("\n")
   cat("\n")
   d %>%
     tbl_summary(by = COS, percent = "cell") %>%
     add_ci(method = list(all_categorical() ~ "wald")) %>%
     print()
+  cat("\n")
   cat("\n")
   cat("Overall accuracy (both negative/negative and positive/positive) was ",
     scales::percent(c$overall["Accuracy"], accuracy = 0.1), " (95% CI: ",
@@ -264,6 +280,7 @@ agreement <- function(bug, data = df) {
   cat("\n")
   cat("#### Euler diagram of negative results")
   cat("\n")
+  cat("\n")
   print(plot(euler(d == "Negative"),
     quantities = list(cex = 3),
     fills = list(fill = c("#FFC107", "#1E88E5", "#004D40"))
@@ -272,10 +289,12 @@ agreement <- function(bug, data = df) {
   cat("\n")
   cat("#### Euler diagram of positive results")
   cat("\n")
+  cat("\n")
   print(plot(euler(d == "Positive"),
     quantities = list(cex = 3),
     fills = list(fill = c("#FFC107", "#1E88E5", "#004D40"))
   ))
+  cat("\n")
   cat("\n")
 }
 agreement_test <- function(bug, group = "group", data = df) {
@@ -290,6 +309,7 @@ agreement_test <- function(bug, group = "group", data = df) {
   d$detailed_agree <- paste0("COS ", d$COS, "/", "SOS ", d$SOS)
   # Print
   cat("\n")
+  cat("\n")
   d %>%
     select(agree, detailed_agree, Group) %>%
     tbl_summary(by = Group, missing_text = "Missing", label = list(
@@ -297,9 +317,10 @@ agreement_test <- function(bug, group = "group", data = df) {
       detailed_agree ~ "Detailed Agreement"
     )) %>%
     add_overall() %>%
-    add_p(test.args = all_tests("fisher.test") ~ list(workspace = 2e6)) %>%
+    add_p(test.args = all_tests("fisher.test") ~ list(workspace = 2e9)) %>%
     separate_p_footnotes() %>%
     print()
+  cat("\n")
   cat("\n")
 }
 ```
@@ -309,15 +330,21 @@ agreement_test <- function(bug, group = "group", data = df) {
 invisible(lapply(names(bug_list), function(b) {
   print(b)
   cat("\n")
+  cat("\n")
   cat("##", as.character(bug_list[b]))
+  cat("\n")
   cat("\n")
   cat("###", "Overall agreement")
   cat("\n")
+  cat("\n")
   agreement(b)
+  cat("\n")
   cat("\n")
   cat("###", "Agreement by group")
   cat("\n")
+  cat("\n")
   agreement_test(b)
+  cat("\n")
   cat("\n")
 }))
 ```
@@ -330,11 +357,15 @@ invisible(lapply(names(bug_list), function(b) {
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
+  cat("\n")
   cat("###", as.character(bug_list[b]))
+  cat("\n")
   cat("\n")
   cat("####", "Agreement by age group")
   cat("\n")
+  cat("\n")
   agreement_test(b, group = "age_group")
+  cat("\n")
   cat("\n")
 }))
 ```
@@ -345,11 +376,15 @@ invisible(lapply(names(bug_list), function(b) {
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
+  cat("\n")
   cat("###", as.character(bug_list[b]))
+  cat("\n")
   cat("\n")
   cat("####", "Agreement by gender assigned at birth")
   cat("\n")
+  cat("\n")
   agreement_test(b, group = "age_group")
+  cat("\n")
   cat("\n")
 }))
 ```
@@ -360,11 +395,15 @@ invisible(lapply(names(bug_list), function(b) {
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
+  cat("\n")
   cat("###", as.character(bug_list[b]))
+  cat("\n")
   cat("\n")
   cat("####", "Agreement by Azithromycin status")
   cat("\n")
+  cat("\n")
   agreement_test(b, group = "azithromycin")
+  cat("\n")
   cat("\n")
 }))
 ```
@@ -375,11 +414,15 @@ invisible(lapply(names(bug_list), function(b) {
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
+  cat("\n")
   cat("###", as.character(bug_list[b]))
+  cat("\n")
   cat("\n")
   cat("####", "Agreement by inhaled Tobramycin status")
   cat("\n")
+  cat("\n")
   agreement_test(b, group = "inhaled_tobramycin")
+  cat("\n")
   cat("\n")
 }))
 ```
@@ -390,11 +433,15 @@ invisible(lapply(names(bug_list), function(b) {
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
+  cat("\n")
   cat("###", as.character(bug_list[b]))
+  cat("\n")
   cat("\n")
   cat("####", "Agreement by inhaled Aztreonam status")
   cat("\n")
+  cat("\n")
   agreement_test(b, group = "inhaled_aztreonam")
+  cat("\n")
   cat("\n")
 }))
 ```
@@ -405,11 +452,15 @@ invisible(lapply(names(bug_list), function(b) {
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
+  cat("\n")
   cat("###", as.character(bug_list[b]))
+  cat("\n")
   cat("\n")
   cat("####", "Agreement by inhaled Colisitin status")
   cat("\n")
+  cat("\n")
   agreement_test(b, group = "inhaled_colisitin")
+  cat("\n")
   cat("\n")
 }))
 ```
@@ -420,11 +471,15 @@ invisible(lapply(names(bug_list), function(b) {
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
+  cat("\n")
   cat("###", as.character(bug_list[b]))
+  cat("\n")
   cat("\n")
   cat("####", "Agreement by inhaled Vancomycin status")
   cat("\n")
+  cat("\n")
   agreement_test(b, group = "inhaled_vancomycin")
+  cat("\n")
   cat("\n")
 }))
 ```
@@ -435,11 +490,15 @@ invisible(lapply(names(bug_list), function(b) {
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
+  cat("\n")
   cat("###", as.character(bug_list[b]))
+  cat("\n")
   cat("\n")
   cat("####", "Agreement by other inhaled antibiotics status")
   cat("\n")
+  cat("\n")
   agreement_test(b, group = "other_inhaled_antibiotics")
+  cat("\n")
   cat("\n")
 }))
 ```
@@ -450,11 +509,15 @@ invisible(lapply(names(bug_list), function(b) {
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
+  cat("\n")
   cat("###", as.character(bug_list[b]))
+  cat("\n")
   cat("\n")
   cat("####", "Agreement by chronic oral antibiotic status")
   cat("\n")
+  cat("\n")
   agreement_test(b, group = "chronic_oral_antibiotic")
+  cat("\n")
   cat("\n")
 }))
 ```
@@ -465,11 +528,53 @@ invisible(lapply(names(bug_list), function(b) {
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
   cat("\n")
+  cat("\n")
   cat("###", as.character(bug_list[b]))
+  cat("\n")
   cat("\n")
   cat("####", "Agreement by CFTR modulator status")
   cat("\n")
+  cat("\n")
   agreement_test(b, group = "cftr_modulator")
+  cat("\n")
+  cat("\n")
+}))
+```
+
+## Who collected the COS
+
+```{r results='asis'}
+#| message: false
+invisible(lapply(names(bug_list), function(b) {
+  cat("\n")
+  cat("\n")
+  cat("###", as.character(bug_list[b]))
+  cat("\n")
+  cat("\n")
+  cat("####", "Agreement by who collected the COS")
+  cat("\n")
+  cat("\n")
+  agreement_test(b, group = "who_collected_cos")
+  cat("\n")
+  cat("\n")
+}))
+```
+
+## Who collected the SOS
+
+```{r results='asis'}
+#| message: false
+invisible(lapply(names(bug_list), function(b) {
+  cat("\n")
+  cat("\n")
+  cat("###", as.character(bug_list[b]))
+  cat("\n")
+  cat("\n")
+  cat("####", "Agreement by who collected the SOS")
+  cat("\n")
+  cat("\n")
+  agreement_test(b, group = "who_collected_the_sos")
+  cat("\n")
   cat("\n")
 }))
 ```
