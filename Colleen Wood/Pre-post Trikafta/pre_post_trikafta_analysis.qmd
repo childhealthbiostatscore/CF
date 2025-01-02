@@ -16,7 +16,7 @@ format:
       light: flatly
       dark: darkly
 bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
-csl: /Users/timvigers/GitHub/styles/american-medical-association.csl
+csl: /Users/timvigers/Dropbox/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -31,28 +31,24 @@ library(knitr)
 library(rspiro)
 library(lmerTest)
 library(car)
-home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Colleen Wood"
-)
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
-knitr::opts_knit$set(root.dir = home_dir)
+knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood")
 ```
 
 ```{r data cleaning}
 #| include: false
-load("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/analysis_dataset.rdata")
-load("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/hba1c_dataset.rdata")
+load("./Prepost Trikafta/Data_Cleaned/analysis_dataset.rdata")
+load("./Prepost Trikafta/Data_Cleaned/hba1c_dataset.rdata")
 # Ethnicity
-chco_demo <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Raw/Data From CHCO/Registry/Copy of Earliest Trikafta Dates in Registry_updated 2.2.21 cc modified_cfrdyn.csv")
+chco_demo <- read.csv("./Prepost Trikafta/Data_Raw/Data From CHCO/Registry/Copy of Earliest Trikafta Dates in Registry_updated 2.2.21 cc modified_cfrdyn.csv")
 chco_demo$Hispanic <- NA
 chco_demo$Hispanic[chco_demo$Hispanic.Latinx] <- "Yes"
 chco_demo$Hispanic[!chco_demo$Hispanic.Latinx] <- "No"
 chco_demo <- chco_demo[, c("CFF.ID", "Hispanic")]
-montana_demo <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/montana_demo.csv")
+montana_demo <- read.csv("./Prepost Trikafta/Data_Cleaned/montana_demo.csv")
 montana_demo$Hispanic <- montana_demo$Is.Patient.of.Hispanic.Origin
 montana_demo <- montana_demo[, c("CFF.ID", "Hispanic")]
-uw_demo <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Colleen Wood/Prepost Trikafta/Data_Cleaned/uw_demo.csv")
+uw_demo <- read.csv("./Prepost Trikafta/Data_Cleaned/uw_demo.csv")
 uw_demo$Hispanic <- uw_demo$Is.Patient.of.Hispanic.Origin
 uw_demo <- uw_demo[, c("CFF.ID", "Hispanic")]
 eth <- do.call(rbind, list(chco_demo, montana_demo, uw_demo))
