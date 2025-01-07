@@ -17,8 +17,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /home/tim/Documents/Miscellaneous/zotero.bib
-csl: /home/tim/GitHub/styles/american-medical-association.csl
+bibliography: /Users/timvigers/Library/CloudStorage/Dropbox/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Library/CloudStorage/Dropbox/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -98,6 +98,10 @@ df <- df %>%
     ID, HbA1c, Age, Gender, Race, Ethnicity, `Pancreatic insufficient`,
     contains("GCT"), contains("OGTT ")
   )
+# Per Christine, we can exclude C046's 140 value and keep them in the NGT
+# category because they had multiple normal OGTTs after this one and the 140 is
+# likely a transcription error
+df$`OGTT 0 min`[df$ID == "C046"] <- NA
 # Get diagnosis
 df$Diagnosis <- "NGT"
 df$Diagnosis[df$`OGTT 0 min` >= 100] <- "IFG"
@@ -113,9 +117,26 @@ df$Dysglycemia <- factor(df$Diagnosis,
   levels = c("NGT", "IFG", "INDET", "IGT", "CFRD"),
   labels = c("NGT", "AGT", "AGT", "AGT", "AGT")
 )
+df$Diabetes <- factor(df$Diagnosis,
+  levels = c("NGT", "IFG", "INDET", "IGT", "CFRD"),
+  labels = c("NGT", "Pre-CFRD", "Pre-CFRD", "Pre-CFRD", "CFRD")
+)
 df$CFRD <- factor(df$`OGTT 120 min` >= 200,
   levels = c(F, T),
   labels = c("No", "Yes")
+)
+# Has OGTT vs. does not
+df$`Got OGTT and GCT?` <- apply(
+  df[, c("OGTT 120 min", "GCT 60 min plasma")], 1, function(r) {
+    !any(is.na(r))
+  }
+)
+df$`Got OGTT and GCT?` <- factor(df$`Got OGTT and GCT?`,
+  levels = c(T, F),
+  labels = c(
+    "Have GCT 1 Hour Plasma or OGTT 2 Hour",
+    "Missing GCT 1 Hour Plasma or OGTT 2 Hour"
+  )
 )
 # Write for Christine to check
 write.csv(df,
@@ -128,22 +149,27 @@ write.csv(df,
 
 ```{r}
 #| label: table1a
-#| tbl-cap: Participant characteristics (including those missing OGTT data)
+#| tbl-cap: Participant characteristics by OGTT status
 #| message: false
 df %>%
-  select(-ID, -Dysglycemia) %>%
-  tbl_summary(missing_text = "(Missing)")
-# Now remove those without OGTT
-df <- df %>% filter(!is.na(Diagnosis))
+  select(-ID) %>%
+  tbl_summary(by = `Got OGTT and GCT?`, missing_text = "(Missing)") %>%
+  add_overall() %>%
+  add_p() %>%
+  separate_p_footnotes()
+# Limit to 189 after this
+df <- df %>%
+  filter(`Got OGTT and GCT?` == "Have GCT 1 Hour Plasma or OGTT 2 Hour") %>%
+  select(-`Got OGTT and GCT?`)
 ```
 
 ```{r}
 #| label: table1b
-#| tbl-cap: Participant characteristics by diagnosis
+#| tbl-cap: Participant characteristics by CFRD status
 #| message: false
 df %>%
-  select(-ID, -Dysglycemia) %>%
-  tbl_summary(by = Diagnosis, missing_text = "(Missing)") %>%
+  select(-ID) %>%
+  tbl_summary(by = Diabetes, missing_text = "(Missing)") %>%
   add_overall() %>%
   add_p() %>%
   separate_p_footnotes()
@@ -167,9 +193,10 @@ df %>%
 #| label: fig-boxplot
 #| fig-cap: Boxplot of OGTT glucose values by diabetes status
 #| warning: false
-plot_df <- df %>% pivot_longer(contains("OGTT"),
-  names_to = "OGTT Timepoint", values_to = "Glucose"
-)
+plot_df <- df %>%
+  pivot_longer(contains("OGTT"),
+    names_to = "OGTT Timepoint", values_to = "Glucose"
+  )
 plot_df$`OGTT Timepoint` <- factor(plot_df$`OGTT Timepoint`,
   levels = c("OGTT 0 min", "OGTT 60 min", "OGTT 120 min")
 )
@@ -179,42 +206,14 @@ box_p <- ggplot(
 ) +
   geom_boxplot() +
   scale_y_continuous(breaks = c(100, 140, 200, 300)) +
-  facet_wrap(~Diagnosis) +
-  theme_bw() +
-  theme(legend.position = "none")
+  facet_wrap(~Diabetes) +
+  theme_bw(base_size = 20) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_blank()
+  )
 box_p
-```
-
-```{r}
-#| label: fig-dot
-#| fig-cap: Dot plot of OGTT glucose values by diabetes status
-#| warning: false
-dot_p <- ggplot(
-  plot_df,
-  aes(x = `OGTT Timepoint`, y = Glucose, color = `OGTT Timepoint`)
-) +
-  geom_jitter() +
-  scale_y_continuous(breaks = c(100, 140, 200, 300)) +
-  facet_wrap(~Diagnosis) +
-  theme_bw() +
-  theme(legend.position = "none")
-dot_p
-```
-
-```{r}
-#| label: fig-violin
-#| fig-cap: Violin plot of OGTT glucose values by diabetes status
-#| warning: false
-violin_p <- ggplot(
-  plot_df,
-  aes(x = `OGTT Timepoint`, y = Glucose, fill = `OGTT Timepoint`)
-) +
-  geom_violin() +
-  scale_y_continuous(breaks = c(100, 140, 200, 300)) +
-  facet_wrap(~Diagnosis) +
-  theme_bw() +
-  theme(legend.position = "none")
-violin_p
 ```
 
 # ROC analyses
