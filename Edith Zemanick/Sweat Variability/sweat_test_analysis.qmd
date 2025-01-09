@@ -1,0 +1,121 @@
+---
+title: "Sweat electrolytes and CFTR activity in the era of CFTR modulators"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 10
+    toc-float: true
+    number-sections: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+    theme:
+      light: flatly
+      dark: darkly
+editor: source
+---
+
+```{r setup}
+#| include: false
+library(Hmisc)
+library(tidyverse)
+library(readxl)
+library(gtsummary)
+knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability")
+```
+
+```{r data cleaning}
+#| message: false
+# Import data
+# source("/Users/timvigers/Library/CloudStorage/Dropbox/GitHub/CF/Edith Zemanick/Sweat Variability/data_import.r")
+load("./Data_Cleaned/chco_data.RData")
+# Exclude people without demographics
+chco <- chco %>% filter(demog_avail == "True")
+# Fix diagnoses/exclusion data for CHCO (based on Angela's review)
+diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with CF or Non-CF.xlsx")
+exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) |
+  diagnoses$Code == "Exclude"]
+exclude <- exclude[!is.na(exclude)]
+chco <- chco[!(chco$patient_id %in% exclude), ]
+chco$Diagnosis <- diagnoses$Diagnosis[match(chco$patient_id, diagnoses$PatientID)]
+diagnosis_check <- chco %>% select(patient_id, Diagnosis, diagnosis)
+# Import NJH data, remove those without demographics
+njh <- read_excel("./Data_Raw/SweatVariability2025_CFgenotypes 2024-08-21.xlsx")
+# Filter and select similar to CHCO
+njh <- njh %>% filter(`Demographics Available`)
+# Import detailed diagnoses from Katie
+diagnoses <- read.csv("./Data_Cleaned/SweatVariability2025_CFgenotypes.csv",
+  na.strings = c("", ".")
+)
+# Merge NJH and diagnoses
+diagnoses <- diagnoses %>% select(Patient.ID, Diagnosis...DataScout)
+colnames(diagnoses) <- c("PatientID", "Diagnosis")
+# Less detailed diagnoses
+diagnoses$Diagnosis <- factor(diagnoses$Diagnosis,
+  levels = c(
+    "Abnormal sweat choride test without diagnosis of cystic fibrosis",
+    "Abnormal sweat test",
+    "Alpha-1-antitrypsin deficiency",
+    "Alpha-1-antitrypsin deficiency carrier",
+    "Alpha-1-antitrypsin deficiency, Positive cystic fibrosis sweat test without diagnosis of cystic fibrosis",
+    "CF", "CF carrier, Alpha-1-antitrypsin deficiency",
+    "CF, alpha 1-antitrypsin deficiency",
+    "CF, alpha 1-antitrypsin deficiency carrier",
+    "CF, Alpha-1-antitrypsin deficiency",
+    "Cystic fibrosis carrier",
+    "Cystic fibrosis carrier, Alpha-1-antitrypsin deficiency",
+    "Cystic fibrosis carrier, Alpha-1-antitrypsin deficiency carrier",
+    "Cystic fibrosis screening",
+    "Cystic fibrosis transmembrane conductance regulator (CFTR)-related disorder",
+    "Positive cystic fibrosis sweat test without diagnosis of cystic fibrosis",
+    "Primary ciliary dyskinesia",
+    "Primary Ciliary dyskinesia, Cystic Fibrosis carrier"
+  ),
+  labels = c(
+    "Non-CF", "Non-CF", "Non-CF", "CF Carrier", "Non-CF", "Cystic Fibrosis",
+    "CF Carrier", "Cystic Fibrosis", "Cystic Fibrosis", "Cystic Fibrosis",
+    "CF Carrier", "CF Carrier", "CF Carrier", "Non-CF", "CFTR-RD or CRMS",
+    "Non-CF", "Non-CF", "CF Carrier"
+  )
+)
+# Patient ids may not match so keep CHCO and NJH separate and check names after
+```
+
+```{r}
+#| message: false
+#| warning: false
+df %>%
+  ggplot(
+    aes(x = Na, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
+  ) +
+  geom_point() +
+  theme()
+df %>%
+  ggplot(
+    aes(x = Cl, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
+  ) +
+  geom_point() +
+  theme()
+df %>%
+  ggplot(
+    aes(x = Na / Cl, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
+  ) +
+  geom_point() +
+  theme()
+```
+
+```{r}
+df %>%
+  filter(Diagnosis == "Cystic Fibrosis") %>%
+  mutate(
+    `Age group` = cut(Age.at.Test.in.Years, c(-Inf, 18, Inf), right = F),
+    `Cl < 60` = Cl < 60
+  ) %>%
+  select(Na, Cl, TotalGenotypeFunction, `Cl < 60`, `Age group`) %>%
+  tbl_summary(by = `Age group`, missing_text = "Missing") %>%
+  add_p()
+```
