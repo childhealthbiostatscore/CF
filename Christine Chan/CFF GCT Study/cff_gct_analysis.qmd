@@ -27,21 +27,13 @@ editor: source
 library(readxl)
 library(dplyr)
 library(tidyr)
+library(lubridate)
 library(ggplot2)
+library(ggpmisc)
 library(pROC)
 library(gtsummary)
 library(gt)
-home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/tim/OneDrive/Vigers/CF"
-)
-github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/GitHub",
-  "Windows" = "C:/Users/Tim/GitHub",
-  "Linux" = "/home/tim/GitHub"
-)
-knitr::opts_knit$set(root.dir = home_dir)
+knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF")
 ```
 
 ```{r data cleaning}
@@ -96,8 +88,18 @@ df <- df %>%
   ) %>%
   select(
     ID, HbA1c, Age, Gender, Race, Ethnicity, `Pancreatic insufficient`,
-    contains("GCT"), contains("OGTT ")
+    contains("GCT"), contains("OGTT "), "OGTT.Date.Time",
+    "Study.visit.PFTs.Date."
   )
+# Remove C044
+df <- df %>% filter(ID != "C044")
+# Time from OGTT to GCT
+df$OGTT.Date.Time <- mdy_hm(df$OGTT.Date.Time)
+df$Study.visit.PFTs.Date. <- mdy_hm(df$Study.visit.PFTs.Date.)
+df$`Days From OGTT to GCT` <-
+  as.numeric(as.Date(df$OGTT.Date.Time) - as.Date(df$Study.visit.PFTs.Date.))
+df$OGTT.Date.Time <- NULL
+df$Study.visit.PFTs.Date. <- NULL
 # Per Christine, we can exclude C046's 140 value and keep them in the NGT
 # category because they had multiple normal OGTTs after this one and the 140 is
 # likely a transcription error
@@ -153,7 +155,7 @@ write.csv(df,
 #| message: false
 df %>%
   select(-ID) %>%
-  tbl_summary(by = `Got OGTT and GCT?`, missing_text = "(Missing)") %>%
+  tbl_summary(by = `Got OGTT and GCT?`, missing_text = "Missing") %>%
   add_overall() %>%
   add_p() %>%
   separate_p_footnotes()
@@ -169,7 +171,7 @@ df <- df %>%
 #| message: false
 df %>%
   select(-ID) %>%
-  tbl_summary(by = Diabetes, missing_text = "(Missing)") %>%
+  tbl_summary(by = Diabetes, missing_text = "Missing") %>%
   add_overall() %>%
   add_p() %>%
   separate_p_footnotes()
@@ -181,7 +183,7 @@ df %>%
 #| message: false
 df %>%
   select(-ID) %>%
-  tbl_summary(by = Dysglycemia) %>%
+  tbl_summary(by = Dysglycemia, missing_text = "Missing") %>%
   add_overall() %>%
   add_p() %>%
   separate_p_footnotes()
@@ -194,7 +196,7 @@ df %>%
 #| fig-cap: Boxplot of OGTT glucose values by diabetes status
 #| warning: false
 plot_df <- df %>%
-  pivot_longer(contains("OGTT"),
+  pivot_longer(c(`OGTT 0 min`, `OGTT 60 min`, `OGTT 120 min`),
     names_to = "OGTT Timepoint", values_to = "Glucose"
   )
 plot_df$`OGTT Timepoint` <- factor(plot_df$`OGTT Timepoint`,
@@ -214,6 +216,24 @@ box_p <- ggplot(
     axis.title.x = element_blank()
   )
 box_p
+ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
+  box_p,
+  device = "png"
+)
+# OGTT 1 hour and GCT 1 hour regression
+scatter_p <- ggplot(df, aes(x = `GCT 60 min plasma`, y = `OGTT 60 min`)) +
+  geom_point() +
+  stat_poly_line() +
+  stat_poly_eq(use_label(c("eq", "R2")),
+    size = 5,
+    label.y = "bottom", label.x = "right"
+  ) +
+  theme_bw(base_size = 20)
+scatter_p
+ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/scatterplot.png",
+  scatter_p,
+  device = "png"
+)
 ```
 
 # ROC analyses
