@@ -28,6 +28,7 @@ library(childsds)
 library(arsenal)
 library(lmerTest)
 library(performance)
+library(GLMMadaptive)
 ```
 
 ```{r data import}
@@ -55,9 +56,9 @@ vacations <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUnivers
 )
 vacations$Vacation.Start <- mdy(vacations$Vacation.Start)
 vacations$Vacation.End <- mdy(vacations$Vacation.End)
-# Those with end date after the last data pull will just end on the date of the
-# pull
-pull_date <- mdy("11/25/24")
+# Last date should be either the end date in REDCap or the last day with data
+# I
+pull_date <- mdy("11/05/24")
 start_end$End[is.na(start_end$End)] <- pull_date
 start_end$End[start_end$End > pull_date] <- pull_date
 # Make a grid of everyone's possible dates
@@ -69,14 +70,14 @@ dates <- start_end %>%
   unnest(Date)
 # Import counts
 agg_counts <- read.csv(
-  "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Data_Raw/Cough_w_TotalCounts_1105 - Cough_agg_w_count_nov25.csv",
+  "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Data_Raw/Cough_w_TotalCounts_1105_NMDcorrected - Cough_agg_w_count_122324.csv",
   na.strings = c("", "NMD"), header = F
 )
 # Format aggregated count data
 agg_counts <- data.frame(t(agg_counts))
 colnames(agg_counts) <- agg_counts[1, ]
 agg_counts$`Date/Device` <- NULL
-agg_counts$`#nights-monitoring` = NULL
+agg_counts$`#nights-monitoring` <- NULL
 agg_counts <- agg_counts[-1, ]
 colnames(agg_counts)[1] <- "sid"
 agg_counts$sid <- sub("FN", "", agg_counts$sid)
@@ -183,19 +184,6 @@ demo[, grep("mutation", colnames(demo))] <- NULL
 # Add group to counts
 agg_counts$Diagnosis <-
   demo$Diagnosis[match(agg_counts$sid, as.numeric(as.character(demo$sid)))]
-# Save
-write.csv(agg_counts, file = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Data_Clean/cleaned_aggregated_counts.csv", na = "", row.names = F)
-# Per night
-per_night <- agg_counts %>%
-  group_by(sid) %>%
-  summarise(
-    median_coughs = median(Coughs, na.rm = T),
-    nights_data = sum(!is.na(Coughs))
-  )
-demo$sid <- as.numeric(demo$sid)
-demo <- left_join(demo, per_night)
-label(demo$median_coughs) <- "Median Coughs per Night"
-label(demo$nights_data) <- "Nights With Cough Data"
 # Order columns
 demo <- demo %>%
   select(sid, height_perc, weight_perc, pre_fev_pp, everything()) %>%
@@ -207,6 +195,13 @@ mycontrols <-
     cat.stats = c("N", "Nmiss", "countpct"),
     numeric.test = "kwt"
   )
+# Exclude participant 3 per Lilah
+agg_counts <- agg_counts %>% filter(sid != 3)
+# Save
+write.csv(agg_counts,
+  file = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Data_Clean/cleaned_aggregated_counts.csv",
+  na = "", row.names = F
+)
 ```
 
 # Demographics
@@ -220,7 +215,7 @@ t1 <- tableby(f, data = demo, control = mycontrols)
 summary(t1, pfootnote = T)
 ```
 
-# Data for ATS abstract
+# Summary data
 
 ```{r results='asis'}
 per_person <- agg_counts %>%
@@ -232,6 +227,8 @@ per_person <- agg_counts %>%
     `Median Coughs per Night` = median(Coughs, na.rm = T),
     .groups = "drop"
   )
+# Exclude the people with 0 nights of data
+per_person <- per_person %>% filter(`Nights With Data` != 0)
 t2 <- tableby(
   Diagnosis ~ `Nights` + `Nights With Data` + `Prop. Nights With Data` +
     `Median Coughs per Night`,
@@ -260,7 +257,7 @@ The distribution of coughs per night is extremely skewed, so coughs per night, e
 #| label: fig-coughs-by-night
 #| fig-cap: Coughs by nights from start
 #| warning: false
-ggplot(agg_counts, aes(
+ggplot(agg_counts[!is.na(agg_counts$Coughs), ], aes(
   x = Night, y = Coughs, group = factor(sid), color = Diagnosis
 )) +
   geom_point(alpha = 0.1) +
@@ -268,22 +265,33 @@ ggplot(agg_counts, aes(
   geom_smooth(aes(group = Diagnosis))
 ```
 
-## Model
+## Zero-inflated models
 
 ```{r}
-mod <- glmer(Coughs ~ Night + Diagnosis + (Night | sid),
-  data = agg_counts, family = "poisson"
+zip1 <- mixed_model(Coughs ~ Night + Diagnosis,
+  random = ~ 1 | sid, data = agg_counts,
+  family = zi.poisson(), zi_fixed = ~1,
+  zi_random = ~ 1 | sid
 )
-gtsummary::tbl_regression(mod, exponentiate = T)
-# check_model(mod, re_formula = NA, residual_type = "normal")
+zip2 <- update(zip1, zi_fixed = ~ Night + Diagnosis)
+
+anova(zip1, zip2)
+
+zinb1 <- update(zip2, family = zi.negative.binomial())
+
+anova(zip2, zinb1)
+
+summary(zinb1)
+# check_model(zinb1, re_formula = NA, residual_type = "normal")
 ```
 
 ### By sick status
 
 ```{r}
-mod <- glmer(Coughs ~ Night + Diagnosis + Sick + (Night | sid),
-  data = agg_counts, family = "poisson"
+zinb2 <- update(zinb1,
+  fixed = Coughs ~ Night + Diagnosis + Sick,
+  zi_fixed = ~ Night + Diagnosis + Sick
 )
-gtsummary::tbl_regression(mod, exponentiate = T)
-# check_model(mod, re_formula = NA, residual_type = "normal")
+summary(zinb2)
+# check_model(zinb2, re_formula = NA, residual_type = "normal")
 ```
