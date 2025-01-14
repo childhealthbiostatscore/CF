@@ -29,6 +29,7 @@ library(arsenal)
 library(lmerTest)
 library(performance)
 library(GLMMadaptive)
+library(gt)
 ```
 
 ```{r data import}
@@ -285,8 +286,22 @@ zinb3 <- update(zinb1, zi_random = ~ Night | sid)
 
 zinb <- zinb2
 
-summary(zinb)
+s <- summary(zinb)
+
+s$coef_table_zi %>%
+  data.frame() %>%
+  rownames_to_column() %>%
+  gt(caption = "Zero-part coefficients") %>%
+  fmt_number(decimals = 3)
+
+s$coef_table %>%
+  data.frame() %>%
+  rownames_to_column() %>%
+  gt(caption = "Count coefficients") %>%
+  fmt_number(decimals = 3)
 ```
+
+For now, the results above are still on the log scale, so a negative value in the estimate column indicates a lower odds ratio or incidence rate ratio. The zero-part coefficients indicate that the odds of having a night with 0 coughs were significantly lower in the CF group (log(OR) = `r round(s$coef_table_zi["DiagnosisCF",1],3)`, OR = `r round(exp(s$coef_table_zi["DiagnosisCF",1]),3)`, p = `r format.pval(s$coef_table_zi["DiagnosisCF",4],eps = 0.001,digits = 3)`). In other words, people with CF were more likely to cough than those without CF. However, the count coefficients table indicates that given a night with more than 0 coughs, people with CF coughed at a higher rate than those without CF, but this difference was not statistically significant (log(OR) = `r round(s$coef_table["DiagnosisCF",1],3)`, OR = `r round(exp(s$coef_table["DiagnosisCF",1]),3)`, p = `r format.pval(s$coef_table["DiagnosisCF",4],eps = 0.001,digits = 3)`).
 
 ### By sick status
 
@@ -297,5 +312,20 @@ zinb_sick <- update(zinb,
   fixed = Coughs ~ Night + Diagnosis + Sick,
   zi_fixed = ~ Night + Diagnosis + Sick
 )
-summary(zinb_sick)
+
+s <- summary(zinb_sick)
+
+s$coef_table_zi %>%
+  data.frame() %>%
+  rownames_to_column() %>%
+  gt(caption = "Zero-part coefficients") %>%
+  fmt_number(decimals = 3)
+
+s$coef_table %>%
+  data.frame() %>%
+  rownames_to_column() %>%
+  gt(caption = "Count coefficients") %>%
+  fmt_number(decimals = 3)
 ```
+
+The interpretation of these results is generally the same as above. The zero-part coefficients indicate that people with CF are still more likely to cough than people without CF (log(OR) = `r round(s$coef_table_zi["DiagnosisCF",1],3)`, OR = `r round(exp(s$coef_table_zi["DiagnosisCF",1]),3)`, p = `r format.pval(s$coef_table_zi["DiagnosisCF",4],eps = 0.001,digits = 3)`), even after adjusting for sickness. Sickness increased the odds of coughing, but the difference was not significant (log(OR) = `r round(s$coef_table_zi["SickYes",1],3)`, OR = `r round(exp(s$coef_table_zi["SickYes",1]),3)`, p = `r format.pval(s$coef_table_zi["SickYes",4],eps = 0.001,digits = 3)`). However, given a night with coughs, sickness increased the rate of cough significantly (log(OR) =  `r round(s$coef_table["SickYes",1],3)`, OR = `r round(exp(s$coef_table["SickYes",1]),3)`, p = `r format.pval(s$coef_table["SickYes",4],eps = 0.001,digits = 3)`).
