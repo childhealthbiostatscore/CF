@@ -196,8 +196,6 @@ mycontrols <-
     cat.stats = c("N", "Nmiss", "countpct"),
     numeric.test = "kwt"
   )
-# Exclude participant 3 per Lilah
-agg_counts <- agg_counts %>% filter(sid != 3)
 # Save
 write.csv(agg_counts,
   file = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Data_Clean/cleaned_aggregated_counts.csv",
@@ -254,6 +252,8 @@ The distribution of coughs per night is extremely skewed, so coughs per night, e
 
 ## Plot
 
+### All participants
+
 ```{r}
 #| label: fig-coughs-by-night
 #| fig-cap: Coughs by nights from start
@@ -263,12 +263,45 @@ ggplot(agg_counts[!is.na(agg_counts$Coughs), ], aes(
 )) +
   geom_point(alpha = 0.1) +
   geom_line(alpha = 0.1) +
-  geom_smooth(aes(group = Diagnosis))
+  geom_smooth(aes(group = Diagnosis)) +
+  theme_bw()
+```
+
+### Participant 2
+
+```{r}
+#| label: fig-coughs-by-night-2
+#| fig-cap: Coughs by nights from start
+#| warning: false
+ggplot(agg_counts[agg_counts$sid == 2 & !is.na(agg_counts$Coughs), ], aes(
+  x = Night, y = Coughs, group = factor(sid), color = Sick
+)) +
+  geom_point() +
+  geom_line() +
+  theme_bw()
+```
+
+### Participant 3
+
+```{r}
+#| label: fig-coughs-by-night-3
+#| fig-cap: Coughs by nights from start
+#| warning: false
+ggplot(agg_counts[agg_counts$sid == 3 & agg_counts$Night %in% c(1:7, 96:102), ], aes(
+  x = Night, y = Coughs, group = factor(sid), color = Sick
+)) +
+  geom_point() +
+  geom_line() +
+  theme_bw()
 ```
 
 ## Zero-inflated models
 
-We compared several models using BIC. First, we compared a zero-inflated Poisson (ZIP) model with no fixed effects in the zero part of the model to one with time and diagnosis included as fixed effects in the zero part (both parts of the model included a random intercept for participant). The model with the same fixed effects in both parts was better (10088.29 vs. 10071.32). Next, we compared this model to the same model structure but with a negative binomial distribution (ZINB) rather than Poisson to account for overdispersion in the non-zero part of the model. The ZINB was significantly better than the ZIP model (10071.32 vs. 6810.49). Next, we compared the ZINB model with random intercept in both parts of the model to one with an additional random slope in the zero part, one with random slope in the count part, and one with random slope in both parts. The ZINB model with random slope in the non-zero part of the model but only a random intercept in the zero part was better than the simple ZINB model (6810.49 vs. 6753.76). Interestingly, it was also better than the model with a random slope in both parts (6732.82 vs. 6801.86).
+We compared several models using BIC. First, we compared a zero-inflated Poisson (ZIP) model with no fixed effects in the zero part of the model to one with time and diagnosis included as fixed effects in the zero part (both parts of the model included a random intercept for participant). The model with the same fixed effects in both parts was better (10088.29 vs. 10071.32). 
+
+Next, we compared this model to the same model structure but with a negative binomial distribution (ZINB) rather than Poisson to account for overdispersion in the non-zero part of the model. The ZINB was significantly better than the ZIP model (10071.32 vs. 6810.49). 
+
+Finally, we compared the ZINB model with random intercept in both parts of the model to one with an additional random slope in the zero part, one with random slope in the count part, and one with random slope in both parts. The ZINB model with random slope in the non-zero part of the model but only a random intercept in the zero part was better than the simple ZINB model (6810.49 vs. 6753.76). Interestingly, it was also better than the model with a random slope in both parts (6732.82 vs. 6801.86).
 
 ```{r}
 zip1 <- mixed_model(Coughs ~ Night + Diagnosis,
@@ -328,4 +361,4 @@ s$coef_table %>%
   fmt_number(decimals = 3)
 ```
 
-The interpretation of these results is generally the same as above. The zero-part coefficients indicate that people with CF are still more likely to cough than people without CF (log(OR) = `r round(s$coef_table_zi["DiagnosisCF",1],3)`, OR = `r round(exp(s$coef_table_zi["DiagnosisCF",1]),3)`, p = `r format.pval(s$coef_table_zi["DiagnosisCF",4],eps = 0.001,digits = 3)`), even after adjusting for sickness. Sickness increased the odds of coughing, but the difference was not significant (log(OR) = `r round(s$coef_table_zi["SickYes",1],3)`, OR = `r round(exp(s$coef_table_zi["SickYes",1]),3)`, p = `r format.pval(s$coef_table_zi["SickYes",4],eps = 0.001,digits = 3)`). However, given a night with coughs, sickness increased the rate of cough significantly (log(OR) =  `r round(s$coef_table["SickYes",1],3)`, OR = `r round(exp(s$coef_table["SickYes",1]),3)`, p = `r format.pval(s$coef_table["SickYes",4],eps = 0.001,digits = 3)`).
+The interpretation of these results is generally the same as above. The zero-part coefficients indicate that people with CF are still more likely to cough than people without CF (log(OR) = `r round(s$coef_table_zi["DiagnosisCF",1],3)`, OR = `r round(exp(s$coef_table_zi["DiagnosisCF",1]),3)`, p = `r format.pval(s$coef_table_zi["DiagnosisCF",4],eps = 0.001,digits = 3)`), even after adjusting for sickness. Sickness increased the odds of coughing, but the difference was not statistically significant (log(OR) = `r round(s$coef_table_zi["SickYes",1],3)`, OR = `r round(exp(s$coef_table_zi["SickYes",1]),3)`, p = `r format.pval(s$coef_table_zi["SickYes",4],eps = 0.001,digits = 3)`). However, given a night with coughs, sickness increased the rate of cough significantly (log(OR) =  `r round(s$coef_table["SickYes",1],3)`, OR = `r round(exp(s$coef_table["SickYes",1]),3)`, p = `r format.pval(s$coef_table["SickYes",4],eps = 0.001,digits = 3)`).
