@@ -267,31 +267,35 @@ ggplot(agg_counts[!is.na(agg_counts$Coughs), ], aes(
 
 ## Zero-inflated models
 
+We compared several models using BIC. First, we compared a zero-inflated Poisson (ZIP) model with no fixed effects in the zero part of the model to one with time and diagnosis included as fixed effects in the zero part (both parts of the model included a random intercept for participant). The model with the same fixed effects in both parts was better (10088.29 vs. 10071.32). Next, we compared this model to the same model structure but with a negative binomial distribution (ZINB) rather than Poisson to account for overdispersion in the non-zero part of the model. The ZINB was significantly better than the ZIP model (10071.32 vs. 6810.49). Next, we compared the ZINB model with random intercept in both parts of the model to one with an additional random slope in the zero part, one with random slope in the count part, and one with random slope in both parts. The ZINB model with random slope in the non-zero part of the model but only a random intercept in the zero part was better than the simple ZINB model (6810.49 vs. 6753.76). Interestingly, it was also better than the model with a random slope in both parts (6732.82 vs. 6801.86).
+
 ```{r}
 zip1 <- mixed_model(Coughs ~ Night + Diagnosis,
-  random = ~ 1 | sid, data = agg_counts,
-  family = zi.poisson(), zi_fixed = ~1,
-  zi_random = ~ 1 | sid
+  data = agg_counts,
+  random = ~ 1 | sid, zi_random = ~ 1 | sid,
+  family = zi.poisson(), zi_fixed = ~1
 )
 zip2 <- update(zip1, zi_fixed = ~ Night + Diagnosis)
 
-anova(zip1, zip2)
-
 zinb1 <- update(zip2, family = zi.negative.binomial())
 
-anova(zip2, zinb1)
+zinb2 <- update(zinb1, random = ~ Night | sid)
 
-summary(zinb1)
-# check_model(zinb1, re_formula = NA, residual_type = "normal")
+zinb3 <- update(zinb1, zi_random = ~ Night | sid)
+
+zinb <- zinb2
+
+summary(zinb)
 ```
 
 ### By sick status
 
+To examine the effect of sickness on cough rate, we kept the same random effect structure as above, but added a fixed effect for sick status in both parts of the model.
+
 ```{r}
-zinb2 <- update(zinb1,
+zinb_sick <- update(zinb,
   fixed = Coughs ~ Night + Diagnosis + Sick,
   zi_fixed = ~ Night + Diagnosis + Sick
 )
-summary(zinb2)
-# check_model(zinb2, re_formula = NA, residual_type = "normal")
+summary(zinb_sick)
 ```
