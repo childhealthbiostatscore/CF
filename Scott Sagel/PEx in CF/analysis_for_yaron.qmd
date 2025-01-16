@@ -27,17 +27,7 @@ library(gtsummary)
 library(ggpubr)
 library(rspiro)
 library(patchwork)
-home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Scott Sagel/PEx in CF",
-  "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Scott Sagel/PEx in CF",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Scott Sagel/PEx in CF"
-)
-github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/GitHub",
-  "Windows" = "C:/Users/timvigers/Documents/GitHub",
-  "Linux" = "/home/timvigers/GitHub"
-)
-knitr::opts_knit$set(root.dir = home_dir)
+knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Scott Sagel/PEx in CF")
 # Colors for plots
 yellow <- "#f8b80a"
 red <- "#e30022"
@@ -905,7 +895,7 @@ df %>%
 ```{r}
 #| label: fig-num-hosps
 #| fig-cap: Number of hospitalizations
-fig1 <- df %>%
+p1 <- df %>%
   group_by(year) %>%
   summarise(n = n()) %>%
   ggplot(aes(x = factor(year), y = n, fill = factor(year))) +
@@ -915,13 +905,13 @@ fig1 <- df %>%
   theme_bw() +
   theme(legend.position = "none", axis.title.x = element_blank()) +
   scale_fill_manual(values = c(purple, yellow))
-fig1
+p1
 ```
 
 ```{r}
 #| label: fig-perc-hosp-2-plus
 #| fig-cap: Percent hospitalized 2 or more times in both years
-fig2 <- df %>%
+p2 <- df %>%
   group_by(sid, year) %>%
   summarise(n = n(), .groups = "drop") %>%
   group_by(year) %>%
@@ -945,13 +935,17 @@ fig2 <- df %>%
   theme_bw() +
   theme(legend.position = "none", axis.title.x = element_blank()) +
   scale_fill_manual(values = c(purple, yellow))
-fig2
+p2
 ```
 
 ```{r}
 #| label: fig-panel
 #| fig-cap: Hospitalizations
-fig1 + fig2 + plot_annotation(tag_levels = c("a", "b"))
+fig1 <- p1 + p2 + plot_annotation(tag_levels = c("a", "b"))
+fig1
+ggsave("./Dissemination/Figures/Figure 1.tiff", fig1,
+  width = 7, height = 5, units = "in"
+)
 ```
 
 ```{r}
@@ -979,7 +973,7 @@ df %>%
 #| label: fig-fev1-year
 #| fig-cap: FEV1 % predicted by year
 #| warning: false
-df %>%
+fig2 <- df %>%
   group_by(year, sid) %>%
   rename(
     Admission = ppfev1_admit, Discharge = ppfev1_discharge,
@@ -1006,6 +1000,10 @@ df %>%
     axis.title.x = element_blank()
   ) +
   scale_fill_manual(values = c(purple, yellow))
+fig2
+ggsave("./Dissemination/Figures/Figure 2.tiff", fig2,
+  width = 7, height = 5, units = "in"
+)
 ```
 
 FEV1 percent predicted was calculated using the GLI global (2022) equations with the `rspiro` R package.
@@ -1013,7 +1011,7 @@ FEV1 percent predicted was calculated using the GLI global (2022) equations with
 ```{r}
 #| label: fig-return-90-100
 #| fig-cap: Proportions who returned to >= 90% and >= 100% at discharge
-df %>%
+figE1 <- df %>%
   mutate(
     returned_90 = ppfev1_discharge >= ppfev1_baseline * 0.9,
     returned_100 = ppfev1_discharge >= ppfev1_baseline
@@ -1060,6 +1058,10 @@ df %>%
     name = element_blank(), values = c(purple, yellow),
     labels = c("Returned to 100%", "Returned to 90%")
   )
+figE1
+ggsave("./Dissemination/Figures/Figure E1.tiff", figE1,
+  width = 7, height = 5, units = "in"
+)
 ```
 
 The above plot represents the proportion of admissions where the patient returned to close to baseline lung function, and was not aggregated by patient. In other words, multiple admissions for the same patient were considered independent in this case.

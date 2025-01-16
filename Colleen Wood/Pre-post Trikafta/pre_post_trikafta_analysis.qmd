@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Dropbox/GitHub/styles/american-medical-association.csl
+bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Documents/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -99,10 +99,10 @@ hba1c_df <- mod@frame
 hba1c_df$pop_pred <- predict(mod, re.form = NA)
 hba1c_df$pred <- predict(mod)
 # Plot
-ggplot(hba1c_df, aes(x = Time)) +
+fig2=ggplot(hba1c_df, aes(x = Time)) +
   geom_point(
     aes(y = HbA1c, colour = factor(`CFF ID`), group = factor(`CFF ID`)),
-    alpha = 0.1
+    alpha = 0.3
   ) +
   geom_line(
     aes(y = pred, colour = factor(`CFF ID`), group = factor(`CFF ID`)),
@@ -112,6 +112,10 @@ ggplot(hba1c_df, aes(x = Time)) +
   theme_bw() +
   theme(legend.position = "none") +
   xlab("Days from ETI Start")
+fig2
+ggsave("./Prepost Trikafta/Dissemination/Figures/Figure 2.tiff", fig2,
+  width = 7, height = 5, units = "in"
+)
 # Print table
 kable(summary(mod)$coefficients)
 linearHypothesis(mod, "Time + Change = 0")
@@ -322,13 +326,17 @@ df %>%
       separate_p_footnotes()
   )
 # Plot
-ggplot(df, aes(x = `Pre or Post`, y = HbA1c, group = `CFF ID`)) +
+fig1 = ggplot(df, aes(x = `Pre or Post`, y = HbA1c, group = `CFF ID`)) +
   geom_point(alpha = 0.2) +
   geom_line(alpha = 0.2) +
   geom_hline(yintercept = 6.5, linetype = "dashed") +
   theme_classic() +
   theme(axis.title.x = element_blank()) +
   facet_wrap(~`Baseline HbA1c`)
+fig1
+ggsave("./Prepost Trikafta/Dissemination/Figures/Figure 1.tiff", fig1,
+  width = 7, height = 5, units = "in"
+)
 ```
 
 ### By BMI percentile pre-modulator
@@ -917,7 +925,7 @@ df$`HbA1c group` <- cut(df$`Change in HbA1c`,
   labels = c("HbA1c decreased", "HbA1 no change", "HbA1c increased")
 )
 ggplot(df, aes(x = `Pre or Post`, y = ppFEV1gl, group = `CFF ID`)) +
-  geom_point(alpha = 0.2) +
+  geom_point(alpha = 0.5) +
   geom_line(alpha = 0.2) +
   theme_classic() +
   theme(axis.title.x = element_blank()) +

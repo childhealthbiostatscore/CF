@@ -267,98 +267,37 @@ ggplot(agg_counts[!is.na(agg_counts$Coughs), ], aes(
   theme_bw()
 ```
 
-### Participant 2
+### By participant
 
-```{r}
+```{r results='asis'}
 #| label: fig-coughs-by-night-2
 #| fig-cap: Coughs by nights from start
 #| warning: false
-ggplot(agg_counts[agg_counts$sid == 2 & !is.na(agg_counts$Coughs), ], aes(
-  x = Night, y = Coughs, group = factor(sid), color = Sick
-)) +
-  geom_point() +
-  geom_line() +
-  theme_bw()
+invisible(lapply(unique(agg_counts$sid), function(s) {
+  if (s == 3) {
+    d <- agg_counts[agg_counts$sid == s & agg_counts$Night %in% c(1:7, 96:102), ]
+  } else {
+    d <- agg_counts[agg_counts$sid == s & !is.na(agg_counts$Coughs), ]
+  }
+
+  diag <- d$Diagnosis[1]
+  p <- ggplot(d, aes(
+    x = Night, y = Coughs, group = factor(sid), color = Sick
+  )) +
+    geom_point() +
+    geom_line() +
+    theme_bw() +
+    ylim(0, 50) +
+    xlim(0, 147) +
+    scale_color_manual(values = c("#377EB8", "#E41A1C")) +
+    ggtitle(paste0("Participant ", s, " (", diag, ")"))
+  if (s == 38) {
+    p <- p + ylim(0, 270)
+  }
+  cat("\n")
+  cat("\n")
+  print(p)
+  cat("\n")
+  cat("\n")
+}))
 ```
-
-### Participant 3
-
-```{r}
-#| label: fig-coughs-by-night-3
-#| fig-cap: Coughs by nights from start
-#| warning: false
-ggplot(agg_counts[agg_counts$sid == 3 & agg_counts$Night %in% c(1:7, 96:102), ], aes(
-  x = Night, y = Coughs, group = factor(sid), color = Sick
-)) +
-  geom_point() +
-  geom_line() +
-  theme_bw()
-```
-
-## Zero-inflated models
-
-We compared several models using BIC. First, we compared a zero-inflated Poisson (ZIP) model with no fixed effects in the zero part of the model to one with time and diagnosis included as fixed effects in the zero part (both parts of the model included a random intercept for participant). The model with the same fixed effects in both parts was better (10088.29 vs. 10071.32). 
-
-Next, we compared this model to the same model structure but with a negative binomial distribution (ZINB) rather than Poisson to account for overdispersion in the non-zero part of the model. The ZINB was significantly better than the ZIP model (10071.32 vs. 6810.49). 
-
-Finally, we compared the ZINB model with random intercept in both parts of the model to one with an additional random slope in the zero part, one with random slope in the count part, and one with random slope in both parts. The ZINB model with random slope in the non-zero part of the model but only a random intercept in the zero part was better than the simple ZINB model (6810.49 vs. 6753.76). Interestingly, it was also better than the model with a random slope in both parts (6732.82 vs. 6801.86).
-
-```{r}
-zip1 <- mixed_model(Coughs ~ Night + Diagnosis,
-  data = agg_counts,
-  random = ~ 1 | sid, zi_random = ~ 1 | sid,
-  family = zi.poisson(), zi_fixed = ~1
-)
-zip2 <- update(zip1, zi_fixed = ~ Night + Diagnosis)
-
-zinb1 <- update(zip2, family = zi.negative.binomial())
-
-zinb2 <- update(zinb1, random = ~ Night | sid)
-
-zinb3 <- update(zinb1, zi_random = ~ Night | sid)
-
-zinb <- zinb2
-
-s <- summary(zinb)
-
-s$coef_table_zi %>%
-  data.frame() %>%
-  rownames_to_column() %>%
-  gt(caption = "Zero-part coefficients") %>%
-  fmt_number(decimals = 3)
-
-s$coef_table %>%
-  data.frame() %>%
-  rownames_to_column() %>%
-  gt(caption = "Count coefficients") %>%
-  fmt_number(decimals = 3)
-```
-
-For now, the results above are still on the log scale, so a negative value in the estimate column indicates a lower odds ratio or incidence rate ratio. The zero-part coefficients indicate that the odds of having a night with 0 coughs were significantly lower in the CF group (log(OR) = `r round(s$coef_table_zi["DiagnosisCF",1],3)`, OR = `r round(exp(s$coef_table_zi["DiagnosisCF",1]),3)`, p = `r format.pval(s$coef_table_zi["DiagnosisCF",4],eps = 0.001,digits = 3)`). In other words, people with CF were more likely to cough than those without CF. However, the count coefficients table indicates that given a night with more than 0 coughs, people with CF coughed at a higher rate than those without CF, but this difference was not statistically significant (log(OR) = `r round(s$coef_table["DiagnosisCF",1],3)`, OR = `r round(exp(s$coef_table["DiagnosisCF",1]),3)`, p = `r format.pval(s$coef_table["DiagnosisCF",4],eps = 0.001,digits = 3)`).
-
-### By sick status
-
-To examine the effect of sickness on cough rate, we kept the same random effect structure as above, but added a fixed effect for sick status in both parts of the model.
-
-```{r}
-zinb_sick <- update(zinb,
-  fixed = Coughs ~ Night + Diagnosis + Sick,
-  zi_fixed = ~ Night + Diagnosis + Sick
-)
-
-s <- summary(zinb_sick)
-
-s$coef_table_zi %>%
-  data.frame() %>%
-  rownames_to_column() %>%
-  gt(caption = "Zero-part coefficients") %>%
-  fmt_number(decimals = 3)
-
-s$coef_table %>%
-  data.frame() %>%
-  rownames_to_column() %>%
-  gt(caption = "Count coefficients") %>%
-  fmt_number(decimals = 3)
-```
-
-The interpretation of these results is generally the same as above. The zero-part coefficients indicate that people with CF are still more likely to cough than people without CF (log(OR) = `r round(s$coef_table_zi["DiagnosisCF",1],3)`, OR = `r round(exp(s$coef_table_zi["DiagnosisCF",1]),3)`, p = `r format.pval(s$coef_table_zi["DiagnosisCF",4],eps = 0.001,digits = 3)`), even after adjusting for sickness. Sickness increased the odds of coughing, but the difference was not statistically significant (log(OR) = `r round(s$coef_table_zi["SickYes",1],3)`, OR = `r round(exp(s$coef_table_zi["SickYes",1]),3)`, p = `r format.pval(s$coef_table_zi["SickYes",4],eps = 0.001,digits = 3)`). However, given a night with coughs, sickness increased the rate of cough significantly (log(OR) =  `r round(s$coef_table["SickYes",1],3)`, OR = `r round(exp(s$coef_table["SickYes",1]),3)`, p = `r format.pval(s$coef_table["SickYes",4],eps = 0.001,digits = 3)`).
