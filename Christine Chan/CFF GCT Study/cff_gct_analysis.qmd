@@ -88,9 +88,11 @@ df <- df %>%
     "Age" = Age.at.enrollment..years.,
     "Pancreatic insufficient" = Pancreatic.exocrine.insufficient,
     "Weight (kg)" = Body.weight..kg., "Height (cm)" = Height..cm.,
-    "Highest FEV1" = Highest.FEV1..last.12.months..FEV1..L.,
-    "Second Highest FEV1" =
-      Second.Highest.FEV1..12.months...FEV1..2nd.highest.in.L..,
+    "Highest FEV1pp" = Highest.FEV1..last.12.months....FEV1.highest....,
+    "Second Highest FEV1pp" =
+      Second.Highest.FEV1..12.months....FEV1.2nd.highest....,
+    "Average of Highest FEV1pp" =
+      Average.of.the.two.highest.FEV1.s...Average.FEV1.......,
     "Type 2 diabetes in the family - Father" =
       Type.2.diabetes.in.the.family...Father,
     "Type 2 diabetes in the family - Mother" =
@@ -104,75 +106,12 @@ df <- df %>%
     ID, HbA1c, Age, `Weight (kg)`, `Height (cm)`, BMI,
     Gender, Race, Ethnicity, `Pancreatic insufficient`,
     `Type 2 diabetes in the family - Father`:`Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)`,
-    `Highest FEV1`, `Second Highest FEV1`,
+    `Highest FEV1pp`, `Second Highest FEV1pp`, `Average of Highest FEV1pp`,
     contains("GCT"), contains("OGTT "), "OGTT.Date.Time",
     "Study.visit.PFTs.Date."
   )
 # Remove C044
 df <- df %>% filter(ID != "C044")
-# Calculate FEV1 pp and height, weight, and BMI percentiles
-lung_function <- df %>%
-  select(
-    ID, Age, Gender, Race, `Height (cm)`, `Highest FEV1`,
-    `Second Highest FEV1`
-  ) %>%
-  filter(!is.na(Gender))
-lung_function$`Average of Highest FEV1s` <-
-  rowMeans(lung_function[, c("Highest FEV1", "Second Highest FEV1")], na.rm = T)
-lung_function$Gender <- factor(lung_function$Gender,
-  levels = c("Male", "Female"),
-  labels = c("male", "female")
-)
-lung_function$Race <- factor(lung_function$Race,
-  levels = c(
-    "White", "Black/African American",
-    "Asian Non-Indian", "Asian Indian", "American Indian/Alaska Native",
-    "Native Hawaiian/Other Pacific Islander"
-  ),
-  labels = c(
-    "Caucasian", "African-American", "NE Asian", "SE Asian", "Other/mixed",
-    "Other/mixed"
-  )
-)
-lung_function$`Highest FEV1pp (2012)` <- pctpred_GLI(
-  age = lung_function$Age, height = lung_function$`Height (cm)` / 100,
-  gender = lung_function$Gender, ethnicity = lung_function$Race,
-  FEV1 = lung_function$`Highest FEV1`
-)
-lung_function$`Second Highest FEV1pp (2012)` <- pctpred_GLI(
-  age = lung_function$Age, height = lung_function$`Height (cm)` / 100,
-  gender = lung_function$Gender, ethnicity = lung_function$Race,
-  FEV1 = lung_function$`Second Highest FEV1`
-)
-lung_function$`Average of Highest FEV1pp (2012)` <- pctpred_GLI(
-  age = lung_function$Age, height = lung_function$`Height (cm)` / 100,
-  gender = lung_function$Gender, ethnicity = lung_function$Race,
-  FEV1 = lung_function$`Average of Highest FEV1s`
-)
-
-
-
-
-
-lung_function$`Highest FEV1pp (2022)` <- pctpred_GLIgl(
-  age = lung_function$Age, height = lung_function$`Height (cm)` / 100,
-  gender = lung_function$Gender, FEV1 = lung_function$`Highest FEV1`
-)
-lung_function$`Second Highest FEV1pp (2022)` <- pctpred_GLIgl(
-  age = lung_function$Age, height = lung_function$`Height (cm)` / 100,
-  gender = lung_function$Gender, FEV1 = lung_function$`Second Highest FEV1`
-)
-lung_function$`Average of Highest FEV1pp (2012)` <- pctpred_GLIgl(
-  age = lung_function$Age, height = lung_function$`Height (cm)` / 100,
-  gender = lung_function$Gender,
-  FEV1 = lung_function$`Average of Highest FEV1s`
-)
-
-df <- left_join(
-  df,
-  lung_function %>%
-    select(ID, `Highest FEV1pp (2012)`:`Second Highest FEV1pp (2022)`)
-)
 # Height, weight, BMI percentiles
 df$`Height %ile` <- sds(df$`Height (cm)`,
   age = ifelse(df$Age > 20, 20, df$Age),
@@ -192,7 +131,6 @@ df$`BMI %ile` <- sds(df$BMI,
   male = "Male", female = "Female",
   sex = as.character(df$Gender)
 )
-df <- df %>% select(-`Highest FEV1`, -`Second Highest FEV1`)
 # Time from OGTT to GCT
 df$OGTT.Date.Time <- mdy_hm(df$OGTT.Date.Time)
 df$Study.visit.PFTs.Date. <- mdy_hm(df$Study.visit.PFTs.Date.)
