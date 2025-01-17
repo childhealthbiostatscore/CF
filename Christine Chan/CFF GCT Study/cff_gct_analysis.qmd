@@ -17,8 +17,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Library/CloudStorage/Dropbox/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Library/CloudStorage/Dropbox/GitHub/styles/american-medical-association.csl
+bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Documents/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -33,6 +33,8 @@ library(ggpmisc)
 library(pROC)
 library(gtsummary)
 library(gt)
+library(rspiro)
+library(childsds)
 knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF")
 ```
 
@@ -84,15 +86,113 @@ df <- df %>%
     "GCT 60 min capillary" = X1.hour.Capillary.Glucose.Value,
     "HbA1c" = Hemoglobin.A1c..,
     "Age" = Age.at.enrollment..years.,
-    "Pancreatic insufficient" = Pancreatic.exocrine.insufficient
+    "Pancreatic insufficient" = Pancreatic.exocrine.insufficient,
+    "Weight (kg)" = Body.weight..kg., "Height (cm)" = Height..cm.,
+    "Highest FEV1" = Highest.FEV1..last.12.months..FEV1..L.,
+    "Second Highest FEV1" =
+      Second.Highest.FEV1..12.months...FEV1..2nd.highest.in.L..,
+    "Type 2 diabetes in the family - Father" =
+      Type.2.diabetes.in.the.family...Father,
+    "Type 2 diabetes in the family - Mother" =
+      Type.2.diabetes.in.the.family...Mother,
+    "Brothers (number with diabetes)" = Brothers..number.with.diabetes.,
+    "Sisters (number with diabetes)" = Sisters..number.with.diabetes.,
+    "Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)" =
+      Number.of.other.relatives.with.diabetes..aunts..uncles..cousins..grandparents.
   ) %>%
   select(
-    ID, HbA1c, Age, Gender, Race, Ethnicity, `Pancreatic insufficient`,
+    ID, HbA1c, Age, `Weight (kg)`, `Height (cm)`, BMI,
+    Gender, Race, Ethnicity, `Pancreatic insufficient`,
+    `Type 2 diabetes in the family - Father`:`Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)`,
+    `Highest FEV1`, `Second Highest FEV1`,
     contains("GCT"), contains("OGTT "), "OGTT.Date.Time",
     "Study.visit.PFTs.Date."
   )
 # Remove C044
 df <- df %>% filter(ID != "C044")
+# Calculate FEV1 pp and height, weight, and BMI percentiles
+lung_function <- df %>%
+  select(
+    ID, Age, Gender, Race, `Height (cm)`, `Highest FEV1`,
+    `Second Highest FEV1`
+  ) %>%
+  filter(!is.na(Gender))
+lung_function$`Average of Highest FEV1s` <-
+  rowMeans(lung_function[, c("Highest FEV1", "Second Highest FEV1")], na.rm = T)
+lung_function$Gender <- factor(lung_function$Gender,
+  levels = c("Male", "Female"),
+  labels = c("male", "female")
+)
+lung_function$Race <- factor(lung_function$Race,
+  levels = c(
+    "White", "Black/African American",
+    "Asian Non-Indian", "Asian Indian", "American Indian/Alaska Native",
+    "Native Hawaiian/Other Pacific Islander"
+  ),
+  labels = c(
+    "Caucasian", "African-American", "NE Asian", "SE Asian", "Other/mixed",
+    "Other/mixed"
+  )
+)
+lung_function$`Highest FEV1pp (2012)` <- pctpred_GLI(
+  age = lung_function$Age, height = lung_function$`Height (cm)` / 100,
+  gender = lung_function$Gender, ethnicity = lung_function$Race,
+  FEV1 = lung_function$`Highest FEV1`
+)
+lung_function$`Second Highest FEV1pp (2012)` <- pctpred_GLI(
+  age = lung_function$Age, height = lung_function$`Height (cm)` / 100,
+  gender = lung_function$Gender, ethnicity = lung_function$Race,
+  FEV1 = lung_function$`Second Highest FEV1`
+)
+lung_function$`Average of Highest FEV1pp (2012)` <- pctpred_GLI(
+  age = lung_function$Age, height = lung_function$`Height (cm)` / 100,
+  gender = lung_function$Gender, ethnicity = lung_function$Race,
+  FEV1 = lung_function$`Average of Highest FEV1s`
+)
+
+
+
+
+
+lung_function$`Highest FEV1pp (2022)` <- pctpred_GLIgl(
+  age = lung_function$Age, height = lung_function$`Height (cm)` / 100,
+  gender = lung_function$Gender, FEV1 = lung_function$`Highest FEV1`
+)
+lung_function$`Second Highest FEV1pp (2022)` <- pctpred_GLIgl(
+  age = lung_function$Age, height = lung_function$`Height (cm)` / 100,
+  gender = lung_function$Gender, FEV1 = lung_function$`Second Highest FEV1`
+)
+lung_function$`Average of Highest FEV1pp (2012)` <- pctpred_GLIgl(
+  age = lung_function$Age, height = lung_function$`Height (cm)` / 100,
+  gender = lung_function$Gender,
+  FEV1 = lung_function$`Average of Highest FEV1s`
+)
+
+df <- left_join(
+  df,
+  lung_function %>%
+    select(ID, `Highest FEV1pp (2012)`:`Second Highest FEV1pp (2022)`)
+)
+# Height, weight, BMI percentiles
+df$`Height %ile` <- sds(df$`Height (cm)`,
+  age = ifelse(df$Age > 20, 20, df$Age),
+  item = "height2_20", ref = cdc.ref, type = "perc",
+  male = "Male", female = "Female",
+  sex = as.character(df$Gender)
+)
+df$`Weight %ile` <- sds(df$`Weight (kg)`,
+  age = ifelse(df$Age > 20, 20, df$Age),
+  item = "weight2_20", ref = cdc.ref, type = "perc",
+  male = "Male", female = "Female",
+  sex = as.character(df$Gender)
+)
+df$`BMI %ile` <- sds(df$BMI,
+  age = ifelse(df$Age > 20, 20, df$Age),
+  item = "bmi", ref = cdc.ref, type = "perc",
+  male = "Male", female = "Female",
+  sex = as.character(df$Gender)
+)
+df <- df %>% select(-`Highest FEV1`, -`Second Highest FEV1`)
 # Time from OGTT to GCT
 df$OGTT.Date.Time <- mdy_hm(df$OGTT.Date.Time)
 df$Study.visit.PFTs.Date. <- mdy_hm(df$Study.visit.PFTs.Date.)
@@ -155,7 +255,12 @@ write.csv(df,
 #| message: false
 df %>%
   select(-ID) %>%
-  tbl_summary(by = `Got OGTT and GCT?`, missing_text = "Missing") %>%
+  tbl_summary(
+    by = `Got OGTT and GCT?`, missing_text = "Missing",
+    type =
+      "Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)" ~
+        "continuous2"
+  ) %>%
   add_overall() %>%
   add_p() %>%
   separate_p_footnotes()
@@ -171,7 +276,12 @@ df <- df %>%
 #| message: false
 df %>%
   select(-ID) %>%
-  tbl_summary(by = Diabetes, missing_text = "Missing") %>%
+  tbl_summary(
+    by = Diabetes, missing_text = "Missing",
+    type =
+      "Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)" ~
+        "continuous2"
+  ) %>%
   add_overall() %>%
   add_p() %>%
   separate_p_footnotes()
@@ -183,7 +293,12 @@ df %>%
 #| message: false
 df %>%
   select(-ID) %>%
-  tbl_summary(by = Dysglycemia, missing_text = "Missing") %>%
+  tbl_summary(
+    by = Dysglycemia, missing_text = "Missing",
+    type =
+      "Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)" ~
+        "continuous2"
+  ) %>%
   add_overall() %>%
   add_p() %>%
   separate_p_footnotes()
