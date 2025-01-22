@@ -31,22 +31,29 @@ knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-
 ```{r data cleaning}
 #| message: false
 # Import data
-# source("/Users/timvigers/Library/CloudStorage/Dropbox/GitHub/CF/Edith Zemanick/Sweat Variability/data_import.r")
-load("./Data_Cleaned/chco_data.RData")
+chco <- read.csv("./Data_Raw/SweatVariability2025_DATA_LABELS_2025-01-21_1211.csv",
+  na.strings = ""
+)
+# Format dates
+chco$Birth.Date <- as.Date(chco$Birth.Date, "%Y-%m-%d")
+chco$Sweat.test.date <- as.Date(chco$Sweat.test.date, "%Y-%m-%d")
 # Exclude people without demographics
-chco <- chco %>% filter(demog_avail == "True")
+chco <- chco %>% filter(Demographics.Available == "True")
 # Fix diagnoses/exclusion data for CHCO (based on Angela's review)
 diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with CF or Non-CF.xlsx")
 exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) |
   diagnoses$Code == "Exclude"]
 exclude <- exclude[!is.na(exclude)]
-chco <- chco[!(chco$patient_id %in% exclude), ]
-chco$Diagnosis <- diagnoses$Diagnosis[match(chco$patient_id, diagnoses$PatientID)]
-diagnosis_check <- chco %>% select(patient_id, Diagnosis, diagnosis)
+chco <- chco[!(chco$Patient.ID %in% exclude), ]
+chco$New.Diagnosis <- diagnoses$Diagnosis[match(chco$Patient.ID, diagnoses$PatientID)]
+diagnosis_check <- chco %>% select(Patient.ID, Diagnosis, New.Diagnosis)
 # Import NJH data, remove those without demographics
-njh <- read_excel("./Data_Raw/SweatVariability2025_CFgenotypes 2024-08-21.xlsx")
+njh <- read_excel("./Data_Raw/SweatVariability2025_CFgenotypes 2024-08-21.xlsx", .name_repair = "universal")
 # Filter and select similar to CHCO
-njh <- njh %>% filter(`Demographics Available`)
+njh <- njh %>% filter(Demographics.Available)
+# Convert dates
+njh$Birth.Date <- as.Date(njh$Birth.Date, origin = "1899-12-30")
+njh$Sweat.test.date <- as.Date(njh$Sweat.test.date, origin = "1899-12-30")
 # Import detailed diagnoses from Katie
 diagnoses <- read.csv("./Data_Cleaned/SweatVariability2025_CFgenotypes.csv",
   na.strings = c("", ".")
@@ -83,6 +90,27 @@ diagnoses$Diagnosis <- factor(diagnoses$Diagnosis,
   )
 )
 # Patient ids may not match so keep CHCO and NJH separate and check names after
+njh$New.Diagnosis <- diagnoses$Diagnosis[match(njh$Patient.ID, diagnoses$PatientID)]
+diagnosis_check_njh <- njh %>% select(Patient.ID, Diagnosis, New.Diagnosis)
+# Remove unnecessary columns and combine
+chco <- chco %>%
+  mutate(Dataset = "CHCO") %>%
+  select(
+    Dataset, Record.ID, Patient.ID, Patient.Name, Birth.Date, Diagnosis,
+    New.Diagnosis, Genotype.1, Genotype.2, Sweat.test.date,
+    Age.at.test..in.years., Site.of.test:Sweat.chloride.right.arm
+  )
+njh <- njh %>%
+  mutate(Dataset = "NJH") %>%
+  select(
+    Dataset, Record.ID, Patient.ID, Patient.Name, Birth.Date, Diagnosis,
+    New.Diagnosis, Genotype.1, Genotype.2, Sweat.test.date,
+    Age.at.test..in.years., Site.of.test:Sweat.chloride.right.arm
+  )
+df <- rbind(chco, njh)
+df <- df %>% arrange(Patient.ID, Sweat.test.date, Dataset)
+# Save
+write.csv(df, file = "./Data_Cleaned/combined_data.csv", row.names = F, na = "")
 ```
 
 ```{r}
