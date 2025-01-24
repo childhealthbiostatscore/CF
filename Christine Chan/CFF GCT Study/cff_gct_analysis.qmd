@@ -31,10 +31,11 @@ library(lubridate)
 library(ggplot2)
 library(ggpmisc)
 library(pROC)
-library(gtsummary)
-library(gt)
 library(rspiro)
 library(childsds)
+library(arsenal)
+library(gt)
+library(reporttools)
 knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF")
 ```
 
@@ -93,12 +94,14 @@ df <- df %>%
       Second.Highest.FEV1..12.months....FEV1.2nd.highest....,
     "Average of Highest FEV1pp" =
       Average.of.the.two.highest.FEV1.s...Average.FEV1.......,
+  ) %>%
+  mutate(
     "Type 2 diabetes in the family - Father" =
-      Type.2.diabetes.in.the.family...Father,
+      factor(Type.2.diabetes.in.the.family...Father),
     "Type 2 diabetes in the family - Mother" =
-      Type.2.diabetes.in.the.family...Mother,
-    "Brothers (number with diabetes)" = Brothers..number.with.diabetes.,
-    "Sisters (number with diabetes)" = Sisters..number.with.diabetes.,
+      factor(Type.2.diabetes.in.the.family...Mother),
+    "Brothers (number with diabetes)" = factor(Brothers..number.with.diabetes.),
+    "Sisters (number with diabetes)" = factor(Sisters..number.with.diabetes.),
     "Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)" =
       Number.of.other.relatives.with.diabetes..aunts..uncles..cousins..grandparents.
   ) %>%
@@ -178,6 +181,14 @@ df$`Got OGTT and GCT?` <- factor(df$`Got OGTT and GCT?`,
     "Missing GCT 1 Hour Plasma or OGTT 2 Hour"
   )
 )
+# Drop levels
+df$Race <- droplevels(df$Race)
+# Set table options
+mycontrols <-
+  tableby.control(
+    numeric.stats = c("N", "Nmiss2", "meansd", "range"),
+    cat.stats = c("N", "Nmiss2", "countpct")
+  )
 # Write for Christine to check
 write.csv(df,
   file = "./Christine Chan/CFF GCT Study/Data_Clean/gct_analysis_data.csv",
@@ -187,59 +198,85 @@ write.csv(df,
 
 # Demographics
 
-```{r}
+## By OGTT status
+
+```{r results='asis'}
 #| label: table1a
 #| tbl-cap: Participant characteristics by OGTT status
 #| message: false
-df %>%
-  select(-ID) %>%
-  tbl_summary(
-    by = `Got OGTT and GCT?`, missing_text = "Missing",
-    type =
-      "Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)" ~
-        "continuous2"
-  ) %>%
-  add_overall() %>%
-  add_p() %>%
-  separate_p_footnotes()
+# Basic table formula
+f <- ~ HbA1c + kwt(Age, "N", "Nmiss2", "medianq1q3", "range") +
+  kwt(`Weight (kg)`, "N", "Nmiss2", "medianq1q3", "range") + `Height (cm)` +
+  kwt(BMI, "N", "Nmiss2", "medianq1q3", "range") + Gender + fe(Race) +
+  fe(Ethnicity) + fe(`Pancreatic insufficient`) +
+  fe(`Type 2 diabetes in the family - Father`) +
+  fe(`Type 2 diabetes in the family - Mother`) +
+  fe(`Brothers (number with diabetes)`) + fe(`Sisters (number with diabetes)`) +
+  kwt(
+    `Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)`,
+    "N", "Nmiss2", "medianq1q3", "range"
+  ) +
+  `Highest FEV1pp` + `Second Highest FEV1pp` + `Average of Highest FEV1pp` +
+  kwt(`GCT 0 min plasma`, "N", "Nmiss2", "medianq1q3", "range") +
+  kwt(`GCT 0 min capillary`, "N", "Nmiss2", "medianq1q3", "range") +
+  kwt(`GCT 60 min plasma`, "N", "Nmiss2", "medianq1q3", "range") +
+  kwt(`GCT 60 min capillary`, "N", "Nmiss2", "medianq1q3", "range") +
+  kwt(`OGTT 0 min`, "N", "Nmiss2", "medianq1q3", "range") +
+  kwt(`OGTT 60 min`, "N", "Nmiss2", "medianq1q3", "range") +
+  kwt(`OGTT 120 min`, "N", "Nmiss2", "medianq1q3", "range") +
+  kwt(`Height %ile`, "N", "Nmiss2", "medianq1q3", "range") +
+  kwt(`Weight %ile`, "N", "Nmiss2", "medianq1q3", "range") +
+  kwt(`BMI %ile`, "N", "Nmiss2", "medianq1q3", "range") +
+  kwt(`Days From OGTT to GCT`, "N", "Nmiss2", "medianq1q3", "range") +
+  fe(Diagnosis) + fe(Dysglycemia) + fe(Diabetes) + fe(CFRD)
+t1a <- tableby(update(f, `Got OGTT and GCT?` ~ . - `Got OGTT and GCT?`),
+  data = df, control = mycontrols
+)
+summary(t1a, pfootnote = T, digits = 2)
 # Limit to 189 after this
 df <- df %>%
   filter(`Got OGTT and GCT?` == "Have GCT 1 Hour Plasma or OGTT 2 Hour") %>%
   select(-`Got OGTT and GCT?`)
 ```
 
-```{r}
+## By CFRD status
+
+```{r results='asis'}
 #| label: table1b
 #| tbl-cap: Participant characteristics by CFRD status
 #| message: false
-df %>%
-  select(-ID) %>%
-  tbl_summary(
-    by = Diabetes, missing_text = "Missing",
-    type =
-      "Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)" ~
-        "continuous2"
-  ) %>%
-  add_overall() %>%
-  add_p() %>%
-  separate_p_footnotes()
+t1b <- tableby(update(f, Diabetes ~ . - Diabetes),
+  data = df, control = mycontrols
+)
+summary(t1b, pfootnote = T, digits = 2)
 ```
 
+### Pairwise comparisons
+
 ```{r}
+pairwise.t.test(df$`Average of Highest FEV1pp`, df$Diabetes)
+pairwise.fisher.test(df$`Pancreatic insufficient`, df$Diabetes,
+  p.adjust.method = "holm"
+)
+pairwise.t.test(df$HbA1c, df$Diabetes)
+pairwise.wilcox.test(df$`GCT 60 min plasma`, df$Diabetes)
+pairwise.wilcox.test(df$`GCT 60 min capillary`, df$Diabetes)
+pairwise.wilcox.test(df$`OGTT 0 min`, df$Diabetes)
+pairwise.wilcox.test(df$`OGTT 60 min`, df$Diabetes)
+pairwise.wilcox.test(df$`OGTT 120 min`, df$Diabetes)
+pairwise.wilcox.test(df$`Days From OGTT to GCT`, df$Diabetes)
+```
+
+## By dysglycemia status
+
+```{r results='asis'}
 #| label: table1c
 #| tbl-cap: Participant characteristics by dysglycemia
 #| message: false
-df %>%
-  select(-ID) %>%
-  tbl_summary(
-    by = Dysglycemia, missing_text = "Missing",
-    type =
-      "Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)" ~
-        "continuous2"
-  ) %>%
-  add_overall() %>%
-  add_p() %>%
-  separate_p_footnotes()
+t1c <- tableby(update(f, Dysglycemia ~ . - Dysglycemia),
+  data = df, control = mycontrols
+)
+summary(t1c, pfootnote = T, digits = 2)
 ```
 
 # OGTT Figures
@@ -325,7 +362,7 @@ gt(roc_table, rownames_to_stub = T) %>% fmt_number(decimals = 3)
 invisible(lapply(
   list(gctpl_roc, gctcap_roc, ogtt1_roc, rpg_roc, rcg_roc, a1c_roc),
   function(roc) {
-    print(plot(roc, print.auc = T, print.thres = T))
+    print(plot(roc, print.auc = T, print.thres = T, legacy.axes = T))
   }
 ))
 ```
@@ -447,7 +484,7 @@ gt(roc_table, rownames_to_stub = T) %>% fmt_number(decimals = 3)
 invisible(lapply(
   list(gctpl_roc, gctcap_roc, ogtt1_roc, rpg_roc, rcg_roc, a1c_roc),
   function(roc) {
-    print(plot(roc, print.auc = T, print.thres = T))
+    print(plot(roc, print.auc = T, print.thres = T, legacy.axes = T))
   }
 ))
 ```
