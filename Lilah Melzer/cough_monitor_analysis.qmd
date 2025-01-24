@@ -22,14 +22,14 @@ editor: source
 #| include: false
 library(Hmisc)
 library(redcapAPI)
-library(tidyverse)
 library(rspiro)
 library(childsds)
 library(arsenal)
 library(lmerTest)
 library(performance)
 library(GLMMadaptive)
-library(gt)
+library(tidyverse)
+library(ggstats)
 ```
 
 ```{r data import}
@@ -58,7 +58,6 @@ vacations <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUnivers
 vacations$Vacation.Start <- mdy(vacations$Vacation.Start)
 vacations$Vacation.End <- mdy(vacations$Vacation.End)
 # Last date should be either the end date in REDCap or the last day with data
-# I
 pull_date <- mdy("11/05/24")
 start_end$End[is.na(start_end$End)] <- pull_date
 start_end$End[start_end$End > pull_date] <- pull_date
@@ -274,12 +273,7 @@ ggplot(agg_counts[!is.na(agg_counts$Coughs), ], aes(
 #| fig-cap: Coughs by nights from start
 #| warning: false
 invisible(lapply(unique(agg_counts$sid), function(s) {
-  if (s == 3) {
-    d <- agg_counts[agg_counts$sid == s & agg_counts$Night %in% c(1:7, 96:102), ]
-  } else {
-    d <- agg_counts[agg_counts$sid == s & !is.na(agg_counts$Coughs), ]
-  }
-
+  d <- agg_counts[agg_counts$sid == s, ]
   diag <- d$Diagnosis[1]
   p <- ggplot(d, aes(
     x = Night, y = Coughs, group = factor(sid), color = Sick
@@ -288,7 +282,7 @@ invisible(lapply(unique(agg_counts$sid), function(s) {
     geom_line() +
     theme_bw() +
     ylim(0, 50) +
-    xlim(0, 147) +
+    xlim(0, 150) +
     scale_color_manual(values = c("#377EB8", "#E41A1C")) +
     ggtitle(paste0("Participant ", s, " (", diag, ")"))
   if (s == 38) {
@@ -300,4 +294,13 @@ invisible(lapply(unique(agg_counts$sid), function(s) {
   cat("\n")
   cat("\n")
 }))
+```
+
+# CFQ-R
+
+```{r}
+# CFQ-R Caregivers 6-13
+cfqr_6_13 <- df %>%
+  filter(redcap_repeat_instrument == "CFQ-R Caregivers 6-13") %>%
+  select(sid, Diagnosis, cfqr_caregivers_613_timestamp:cfqr_caregivers_613_complete)
 ```
