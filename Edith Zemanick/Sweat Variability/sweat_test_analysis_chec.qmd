@@ -11,481 +11,297 @@ format:
     code-fold: true
     self-contained: true
     fig-cap-location: top
+    fig-width: 9
+    fig-height: 7
     page-layout: full
     theme:
       light: flatly
       dark: darkly
-bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /home/timvigers/GitHub/styles/american-medical-association.csl
+bibliography: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Personal/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Personal/GitHub/styles/american-medical-association.csl
 editor: source
+execute:
+  warning: false
 ---
 
 ```{r setup}
 #| include: false
+library(Hmisc)
 library(tidyverse)
 library(readxl)
-library(ggpmisc)
-library(gtsummary)
-home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Test",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Edith Zemanick/Sweat Test",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Edith Zemanick/Sweat Test"
-)
-github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/GitHub",
-  "Windows" = "C:/Users/Tim/GitHub",
-  "Linux" = "/home/timvigers/GitHub"
-)
-source(paste0(github_dir, "/CF/genotype_class_severity.R"))
-knitr::opts_knit$set(root.dir = home_dir)
+library(arsenal)
+library(ggpubr)
+library(performance)
+knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability")
 ```
-
-# CHCO data
-
-```{r}
-# Edith's data
-# Import exclusion data from Excel
-diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with CF or Non-CF.xlsx")
-exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) | diagnoses$Code == "Exclude"]
-exclude <- exclude[!is.na(exclude)]
-# Import data
-df <- read.csv("./Data_Raw/Copy of Sweat Tests_AllFor202558_revised01Feb2021.csv",
-  na.strings = ""
-)
-# Remove exclusions from Angela
-df <- df[!(df$PatientID %in% exclude), ]
-# Diagnosis per Angela
-df$Diagnosis <- factor(diagnoses$Diagnosis[match(df$PatientID, diagnoses$PatientID)],
-  levels = c("CFTR-related disorder", "CRMS", "Cystic Fibrosis", "Non-CF"),
-  labels = c("CFTR-RD or CRMS", "CFTR-RD or CRMS", "Cystic Fibrosis", "Non-CF")
-)
-# Add modulator info
-cftr <- read.csv("./Data_Raw/Copy of Report CFTR Modulators.csv")
-df$Modulator <- apply(df, 1, function(r) {
-  mod <- cftr[cftr$Patient.ID == as.numeric(r["PatientID"]), ]
-  if (any(duplicated(mod$Age.at.Start..years.))) {
-    mod <- mod[-which(duplicated(mod$Age.at.Start..years.)), ]
-  }
-  mod <- mod[order(mod$Age.at.Start..years.), ]
-  age <- as.numeric(r["Age.at.Test.in.Years"])
-  as.character(cut(age, c(-Inf, mod$Age.at.Start..years., Inf),
-    labels = c("None", mod$Modulator), right = F
-  ))
-})
-# Numeric variables
-num_vars <- c("Amount", "Na", "K", "Cl")
-num_vars <- c(paste0(num_vars, "_Left"), paste0(num_vars, "_Right"))
-df[, num_vars] <- suppressWarnings(lapply(df[, num_vars], as.numeric))
-# Filter per Maxie's code
-exclude2 <- c(22, 23, 24, 29, 31, 474, 483, 484, 485, 505, 510, 785, 791, 792, 793)
-no_dem <- unique(df$PatientID[df$Demographics.Available != "TRUE" | is.na(df$Demographics.Available) | df$Sex == ""])
-df <- df %>%
-  mutate(Age.at.Test.in.Days = Age.at.Test.in.Weeks * 7) %>%
-  filter(
-    Age.at.Test.in.Years < 50 & Age.at.Test.in.Days >= 2,
-    !(Diagnosis == "Non-CF" & PatientID %in% exclude2),
-    Modulator == "None"
-  ) %>%
-  distinct(.) %>%
-  filter(Sex != "", Demographics.Available == "TRUE")
-# Genotype info
-## By severity
-df$geno1 <- cf_genotype_class_severity(df$Genotypes1)
-df$geno2 <- cf_genotype_class_severity(df$Genotypes2)
-df$geno1[df$Diagnosis == "Non-CF"] <- "Not CF"
-df$geno2[df$Diagnosis == "Non-CF"] <- "Not CF"
-df$geno_risk <- paste(df$geno1, df$geno2, sep = "/")
-df$geno_risk <- factor(df$geno_risk)
-## By function
-df$geno1_class <- cf_genotype_class_severity(df$Genotypes1, out = "class")
-df$geno1_class[grep("508", df$Genotypes1)] <- "F508del"
-df$geno1_class <- replace(df$geno1_class, df$geno1_class %in% c("I", "II", "III"), "MF")
-df$geno1_class <- replace(df$geno1_class, df$geno1_class %in% c("IV", "V"), "RF")
-df$geno2_class <- cf_genotype_class_severity(df$Genotypes2, out = "class")
-df$geno2_class[grep("508", df$Genotypes2)] <- "F508del"
-df$geno2_class <- replace(df$geno2_class, df$geno2_class %in% c("I", "II", "III"), "MF")
-df$geno2_class <- replace(df$geno2_class, df$geno2_class %in% c("IV", "V"), "RF")
-df$geno_class <- factor(paste0(
-  pmin(df$geno1_class, df$geno2_class), "/",
-  pmax(df$geno1_class, df$geno2_class)
-))
-levels(df$geno_class) <- c(
-  "MF/MF", "MF/MF", "MF/RF", "MF/Unknown", "MF/MF",
-  "MF/RF", "MF/Unknown", "Both RF or Unknown", "Both RF or Unknown"
-)
-# Which arm?
-df$Arm <- apply(df[, c("Cl", "Cl_Left", "Cl_Right", "Na", "Na_Left", "Na_Right", "K", "K_Left", "K_Right")], 1, function(r) {
-  k <- sum(!is.na(r))
-  if (k == 6) {
-    return("Both")
-  } else if (k == 3) {
-    return("Arm Not Noted")
-  } else {
-    return(NA)
-  }
-})
-# Merge left and right values
-df$Amount <- apply(df[, c("Amount", "Amount_Left", "Amount_Right")], 1, function(r) {
-  amt <- suppressWarnings(as.numeric(as.character(r)))
-  mean(amt, na.rm = T)
-})
-df$Cl <- apply(df[, c("Cl", "Cl_Left", "Cl_Right")], 1, function(r) {
-  cl <- suppressWarnings(as.numeric(as.character(r)))
-  mean(cl, na.rm = T)
-})
-df$Na <- apply(df[, c("Na", "Na_Left", "Na_Right")], 1, function(r) {
-  na <- suppressWarnings(as.numeric(as.character(r)))
-  mean(na, na.rm = T)
-})
-df$K <- apply(df[, c("K", "K_Left", "K_Right")], 1, function(r) {
-  k <- suppressWarnings(as.numeric(as.character(r)))
-  mean(k, na.rm = T)
-})
-# Sodium to chloride ratio
-df$`Na/Cl Ratio` <- df$Na / df$Cl
-high_ratio <- unique(which(df$`Na/Cl Ratio` > 2))
-high_cl <- unique(which(df$Cl > 160))
-high_na <- unique(which(df$Na > 160))
-df <- df[-unique(c(high_ratio, high_cl, high_na)), ]
-# Sweat chloride group
-df$`Sweat Chloride Group` <- cut(df$Cl, c(-Inf, 30, 60, Inf),
-  right = F,
-  labels = c("< 30", "30-59", ">60")
-)
-# Sort
-df <- df %>% arrange(PatientID, Age.at.Test.in.Weeks)
-# First measure for everyone, remove those with no sweat chloride
-df <- df %>%
-  filter(!is.na(Cl)) %>%
-  group_by(PatientID) %>%
-  filter(row_number() == 1) %>%
-  ungroup()
-# Order groups
-df$Diagnosis <- factor(df$Diagnosis,
-  levels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "Non-CF")
-)
-```
-
-## By sweat chloride group
-
-```{r}
-#| warning: false
-ggplot(df, aes(x = Na)) +
-  geom_histogram(aes(y = ..density.., fill = `Sweat Chloride Group`)) +
-  geom_density(aes(group = `Sweat Chloride Group`)) +
-  theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(df, aes(x = Cl)) +
-  geom_histogram(aes(y = ..density.., fill = `Sweat Chloride Group`)) +
-  geom_density(aes(group = `Sweat Chloride Group`)) +
-  theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(df, aes(x = Na, y = Cl, colour = `Sweat Chloride Group`)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw()
-ggplot(df, aes(x = Na, y = Cl)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw() +
-  facet_wrap(~`Sweat Chloride Group`, scales = "free", ncol = 2)
-df %>%
-  select(Na, Cl, `Sweat Chloride Group`) %>%
-  tbl_summary(by = `Sweat Chloride Group`)
-```
-
-## By classification
-
-```{r}
-#| warning: false
-ggplot(df, aes(x = Na)) +
-  geom_histogram(aes(y = ..density.., fill = Diagnosis)) +
-  geom_density(aes(group = Diagnosis)) +
-  theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(df, aes(x = Cl)) +
-  geom_histogram(aes(y = ..density.., fill = Diagnosis)) +
-  geom_density(aes(group = Diagnosis)) +
-  theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(df, aes(x = Na, y = Cl, colour = Diagnosis)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw()
-ggplot(df, aes(x = Na, y = Cl)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw() +
-  facet_wrap(~Diagnosis, scales = "free", ncol = 2)
-df %>%
-  select(Na, Cl, Diagnosis) %>%
-  tbl_summary(by = Diagnosis)
-```
-
-## By genotype severity
-
-```{r}
-#| warning: false
-ggplot(df, aes(x = Na)) +
-  geom_histogram(aes(y = ..density.., fill = geno_class)) +
-  geom_density(aes(group = geno_class)) +
-  theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(df, aes(x = Cl)) +
-  geom_histogram(aes(y = ..density.., fill = geno_class)) +
-  geom_density(aes(group = geno_class)) +
-  theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(df, aes(x = Na, y = Cl, colour = geno_class)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw()
-ggplot(df, aes(x = Na, y = Cl)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw() +
-  facet_wrap(~geno_class, scales = "free", ncol = 2)
-df %>%
-  select(Na, Cl, geno_class) %>%
-  tbl_summary(by = geno_class)
-```
-
-# CHEC data
 
 ```{r data cleaning}
 # Import CHEC data
-chec <- read.csv("./Data_Raw/CHEC sweat sodium and chloride.csv")
-# Chloride groups
-chec$swc_group <- cut(chec$swcavg, c(-Inf, 30, 60, Inf),
-  right = F,
-  labels = c("< 30", "30-59", ">60")
+chec <- read.csv("./Data_Raw/CHEC sweat sodium and chloride.csv",
+  na.strings = c("", "NA")
 )
-chec$swc_group_pm <- cut(chec$swhcavgpm, c(-Inf, 30, 60, Inf),
-  right = F,
-  labels = c("< 30", "30-59", ">60")
+# Calculate ratios
+chec$pre_ratio <- chec$swhsavgpm / chec$swhcavgpm
+chec$post_ratio <- chec$swsavg / chec$swcavg
+# Long dataset for easier plotting and paired analysis
+chec_long <- chec %>%
+  rename(
+    pre_cl = swhcavgpm, pre_na = swhsavgpm, post_cl = swcavg, post_na = swsavg
+  ) %>%
+  pivot_longer(c(pre_cl, pre_na, post_cl, post_na, pre_ratio, post_ratio),
+    names_to = c("pre_post", ".value"),
+    names_pattern = "(.*)_(.*)",
+    values_to = "count"
+  )
+chec_long$pre_post <- factor(chec_long$pre_post, levels = c("pre", "post"))
+# Set table options
+mycontrols <-
+  tableby.control(
+    numeric.stats = c("N", "Nmiss2", "meansd", "range"),
+    cat.stats = c("N", "Nmiss2", "countpct")
+  )
+# Labels
+label(chec_long$cl) <- "Sweat Cl"
+label(chec_long$na) <- "Sweat Na"
+label(chec_long$ratio) <- "Sweat Na:Cl"
+```
+
+# Tables
+
+## Table 1: Participant demographics by CFTR modulator
+
+```{r results='asis'}
+f <- modqual~sex + age + agecat_txt + race_txt + genotype_group
+t1 <- tableby(f, data = chec, control = mycontrols)
+summary(t1, pfootnote = T)
+```
+
+- I think that we currently don't have ethnicity data.
+
+## Table 2: Change in sweat electrolytes
+
+```{r results='asis'}
+pt1 <- paired(
+  pre_post ~
+    signed.rank(cl, "N", "Nmiss2", "medianq1q3", "range") +
+    signed.rank(na, "N", "Nmiss2", "medianq1q3", "range") +
+    signed.rank(ratio, "N", "Nmiss2", "medianq1q3", "range"),
+  data = chec_long, id = subject,
+  control = paired.control(signed.rank.exact = F)
 )
+summary(pt1, pfootnote = T)
 ```
 
-# Pre-modulator
+## Table 3: Change in sweat electrolytes by modulator
 
-## By sweat chloride group
-
-```{r}
-#| warning: false
-ggplot(chec, aes(x = swhsavgpm)) +
-  geom_histogram(aes(y = ..density.., fill = swc_group_pm)) +
-  geom_density(aes(group = swc_group_pm)) +
-  theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(chec, aes(x = swhcavgpm)) +
-  geom_histogram(aes(y = ..density.., fill = swc_group_pm)) +
-  geom_density(aes(group = swc_group_pm)) +
-  theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm, colour = swc_group_pm)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw()
-ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw() +
-  facet_wrap(~swc_group_pm, scales = "free", ncol = 2)
-chec %>%
-  select(swhsavgpm, swhcavgpm, swc_group_pm) %>%
-  tbl_summary(by = swc_group_pm)
+```{r results='asis'}
+pt2 <- paired(
+  pre_post ~
+    signed.rank(cl, "N", "Nmiss2", "medianq1q3", "range") +
+    signed.rank(na, "N", "Nmiss2", "medianq1q3", "range") +
+    signed.rank(ratio, "N", "Nmiss2", "medianq1q3", "range"),
+  data = chec_long, id = subject, strata = modqual,
+  control = paired.control(signed.rank.exact = F)
+)
+summary(pt2, pfootnote = T)
 ```
 
-## By CHEC genotype group
+# Histograms and density plots
+
+## Sweat chloride (overall)
+
+### Histogram
 
 ```{r}
-#| warning: false
-ggplot(chec, aes(x = swhsavgpm)) +
-  geom_histogram(aes(y = ..density.., fill = genotype_group)) +
-  geom_density(aes(group = genotype_group)) +
+ggplot(chec_long, aes(x = cl, fill = pre_post)) +
+  geom_histogram(alpha = 0.5) +
   theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(chec, aes(x = swhcavgpm)) +
-  geom_histogram(aes(y = ..density.., fill = genotype_group)) +
-  geom_density(aes(group = genotype_group)) +
-  theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm, colour = genotype_group)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw()
-ggplot(chec, aes(x = swhsavgpm, y = swhcavgpm)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw() +
-  facet_wrap(~genotype_group, scales = "free", ncol = 2)
-chec %>%
-  select(swhsavgpm, swhcavgpm, genotype_group) %>%
-  tbl_summary(by = genotype_group)
+  scale_fill_manual(values = c("#EFB036", "#3B6790"))
 ```
 
-# Post-modulator
-
-## By sweat chloride group
+### Density
 
 ```{r}
-#| warning: false
-ggplot(chec, aes(x = swhsavgpm)) +
-  geom_histogram(aes(y = ..density.., fill = swc_group)) +
-  geom_density(aes(group = swc_group)) +
+ggplot(chec_long, aes(x = cl, fill = pre_post)) +
+  geom_density(alpha = 0.5) +
   theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(chec, aes(x = swhcavgpm)) +
-  geom_histogram(aes(y = ..density.., fill = swc_group)) +
-  geom_density(aes(group = swc_group)) +
-  theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(chec, aes(x = swsavg, y = swcavg, colour = swc_group)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw()
-ggplot(chec, aes(x = swsavg, y = swcavg)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw() +
-  facet_wrap(~swc_group, scales = "free", ncol = 2)
-chec %>%
-  select(swsavg, swcavg, swc_group) %>%
-  tbl_summary(by = swc_group)
+  scale_fill_manual(values = c("#EFB036", "#3B6790"))
 ```
 
-## By CHEC genotype group
+## Sweat sodium (overall)
+
+### Histogram
 
 ```{r}
-#| warning: false
-ggplot(chec, aes(x = swhsavgpm)) +
-  geom_histogram(aes(y = ..density.., fill = genotype_group)) +
-  geom_density(aes(group = genotype_group)) +
+ggplot(chec_long, aes(x = na, fill = pre_post)) +
+  geom_histogram(alpha = 0.5) +
   theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(chec, aes(x = swhcavgpm)) +
-  geom_histogram(aes(y = ..density.., fill = genotype_group)) +
-  geom_density(aes(group = genotype_group)) +
-  theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(chec, aes(x = swsavg, y = swcavg, colour = genotype_group)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw()
-ggplot(chec, aes(x = swsavg, y = swcavg)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw() +
-  facet_wrap(~genotype_group, scales = "free", ncol = 2)
-chec %>%
-  select(swsavg, swcavg, genotype_group) %>%
-  tbl_summary(by = genotype_group)
+  scale_fill_manual(values = c("#EFB036", "#3B6790"))
 ```
 
-## By modulator type
+### Density
 
 ```{r}
-#| warning: false
-ggplot(chec, aes(x = swhsavgpm)) +
-  geom_histogram(aes(y = ..density.., fill = modqual)) +
-  geom_density(aes(group = modqual)) +
+ggplot(chec_long, aes(x = na, fill = pre_post)) +
+  geom_density(alpha = 0.5) +
   theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(chec, aes(x = swhcavgpm)) +
-  geom_histogram(aes(y = ..density.., fill = modqual)) +
-  geom_density(aes(group = modqual)) +
+  scale_fill_manual(values = c("#EFB036", "#3B6790"))
+```
+
+## Sweat sodium:chloride ratio (overall)
+
+### Histogram
+
+```{r}
+ggplot(chec_long, aes(x = ratio, fill = pre_post)) +
+  geom_histogram(alpha = 0.5) +
   theme_bw() +
-  theme(
-    axis.title.y = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks.y = element_blank()
-  )
-ggplot(chec, aes(x = swsavg, y = swcavg, colour = modqual)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
-  theme_bw()
-ggplot(chec, aes(x = swsavg, y = swcavg)) +
-  geom_point(alpha = 0.2) +
-  stat_poly_line(se = F) +
-  stat_poly_eq(use_label(c("eq", "R2"))) +
+  scale_fill_manual(values = c("#EFB036", "#3B6790"))
+```
+
+### Density
+
+```{r}
+ggplot(chec_long, aes(x = ratio, fill = pre_post)) +
+  geom_density(alpha = 0.5) +
   theme_bw() +
-  facet_wrap(~modqual, scales = "free", ncol = 2)
-chec %>%
-  select(swsavg, swcavg, modqual) %>%
-  tbl_summary(by = modqual)
+  scale_fill_manual(values = c("#EFB036", "#3B6790"))
+```
+
+## Sweat chloride by modulator
+
+### Histogram
+
+```{r}
+ggplot(chec_long, aes(x = cl, fill = pre_post)) +
+  geom_histogram(alpha = 0.5) +
+  theme_bw() +
+  scale_fill_manual(values = c("#EFB036", "#3B6790")) +
+  facet_wrap(~modqual)
+```
+
+### Density
+
+```{r}
+ggplot(chec_long, aes(x = cl, fill = pre_post)) +
+  geom_density(alpha = 0.5) +
+  theme_bw() +
+  scale_fill_manual(values = c("#EFB036", "#3B6790")) +
+  facet_wrap(~modqual)
+```
+
+## Sweat sodium by modulator
+
+### Histogram
+
+```{r}
+ggplot(chec_long, aes(x = na, fill = pre_post)) +
+  geom_histogram(alpha = 0.5) +
+  theme_bw() +
+  scale_fill_manual(values = c("#EFB036", "#3B6790")) +
+  facet_wrap(~modqual)
+```
+
+### Density
+
+```{r}
+ggplot(chec_long, aes(x = na, fill = pre_post)) +
+  geom_density(alpha = 0.5) +
+  theme_bw() +
+  scale_fill_manual(values = c("#EFB036", "#3B6790")) +
+  facet_wrap(~modqual)
+```
+
+## Sweat sodium:chloride ratio by modulator
+
+### Histogram
+
+```{r}
+ggplot(chec_long, aes(x = ratio, fill = pre_post)) +
+  geom_histogram(alpha = 0.5) +
+  theme_bw() +
+  scale_fill_manual(values = c("#EFB036", "#3B6790")) +
+  facet_wrap(~modqual)
+```
+
+### Density
+
+```{r}
+ggplot(chec_long, aes(x = ratio, fill = pre_post)) +
+  geom_density(alpha = 0.5) +
+  theme_bw() +
+  scale_fill_manual(values = c("#EFB036", "#3B6790")) +
+  facet_wrap(~modqual)
+```
+
+# Boxplots
+
+```{r}
+ggplot(chec_long, aes(y = ratio, x = pre_post, fill = pre_post)) +
+  geom_boxplot() +
+  geom_signif(
+    comparison = list(c("pre", "post")), test = "wilcox.test",
+    test.args = list(paired = TRUE, exact = FALSE), y_position = 3.5,
+    map_signif_level = function(p) format.pval(p, digits = 3, eps = 0.001)
+  ) +
+  theme_bw() +
+  scale_fill_manual(values = c("#EFB036", "#3B6790")) +
+  facet_wrap(~modqual)
+```
+
+# Scatterplots and models
+
+To evaluate whether the relationship between pre-modulator sweat chloride and pre-modulator sodium:chloride ratio is logarithmic, we compared three models:
+
+1. A simple linear model with no transformations.
+2. A linear model with log-transformed sweat chloride as the outcome.
+3. A quadratic model.
+
+The model residuals do *not* appear to be improved by log transforming the outcome. Also, the quadratic model is better than the linear model by BIC, but this does not remain the case when the influential point (CFF ID 1650133) is removed. 
+
+```{r}
+pre_model_df <- chec %>%
+  select(cffid_first, swhcavgpm, pre_ratio) %>%
+  drop_na() %>%
+  unique()
+
+m1 <- lm(swhcavgpm ~ pre_ratio, data = pre_model_df)
+log_m <- lm(log(swhcavgpm) ~ pre_ratio, data = pre_model_df)
+m2 <- lm(swhcavgpm ~ pre_ratio + I(pre_ratio^2), data = pre_model_df)
+```
+
+## Linear model assumptions check
+
+```{r}
+check_model(m1)
+```
+
+## Log model assumptions check
+
+```{r}
+check_model(log_m)
+```
+
+## Quadratic model assumptions check
+
+```{r}
+check_model(m2)
+```
+
+## Model predicted values
+
+```{r}
+ggplot(pre_model_df, aes(y = swhcavgpm, x = pre_ratio)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F, aes(color = "Linear")) +
+  geom_smooth(
+    method = "lm", formula = y ~ x + I(x^2), se = F,
+    aes(color = "Quadratic")
+  ) +
+  geom_smooth(
+    method = "glm", formula = y ~ x, se = F, aes(color = "Log Linear"),
+    method.args = list(family = gaussian(link = "log"))
+  ) +
+  theme_bw() +
+  theme(legend.title = element_blank())
 ```
