@@ -36,7 +36,7 @@ home_dir <- switch(Sys.info()["sysname"],
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Documents/GitHub",
+  "Darwin" = "/Users/timvigers/GitHub",
   "Windows" = "C:/Users/Tim/GitHub",
   "Linux" = "/home/timvigers/GitHub"
 )
@@ -50,6 +50,8 @@ source(paste0(github_dir, "/CF/Jordana Hoppe/Home Collection/home_collection_sur
 # Exclude missing subjects
 data_exclude <- c("009-07", "009-17", "009-25", "009-37")
 survey_exclude <- c(15, 27, 30, 34, 47)
+data <- data %>% filter(!subject_id %in% data_exclude)
+survey_data <- survey_data %>% filter(!participant_id %in% survey_exclude)
 # Fix missing labels
 labels <- label(data)[which(label(data) != "")]
 labels[paste0(names(labels), ".factor")] <- as.character(labels)
@@ -135,7 +137,6 @@ It appears that the two participants who were previously marked as unknown race 
 #| label: tbl-2
 #| tbl-cap: Survey Results
 survey_data %>%
-  filter(!participant_id %in% survey_exclude) %>%
   select(q1.factor:q6b___4.factor) %>%
   tbl_summary(
     label = labels, missing_text = "Missing"
@@ -149,7 +150,6 @@ survey_data %>%
 #| label: tbl-3
 #| tbl-cap: Immediate Culture Results
 data %>%
-  filter(!subject_id %in% data_exclude) %>%
   select(clinic_cx_source.factor:clinic_burk_sp.factor) %>%
   tbl_summary(
     label = labels, missing_text = "Missing"
@@ -163,7 +163,6 @@ data %>%
 #| label: tbl-4
 #| tbl-cap: Delayed Culture Results
 data %>%
-  filter(!subject_id %in% data_exclude) %>%
   select(research_cx.factor:res_burk_sp.factor) %>%
   tbl_summary(
     label = labels, missing_text = "Missing"
@@ -177,7 +176,6 @@ data %>%
 #| label: tbl-5
 #| tbl-cap: Home Culture Results
 data %>%
-  filter(!subject_id %in% data_exclude) %>%
   select(home_cx.factor:home_burk_sp.factor) %>%
   tbl_summary(
     label = labels, missing_text = "Missing"
@@ -312,8 +310,7 @@ agreement <- function(result_pattern, df = data) {
       theme(legend.title = element_blank(), axis.title.x = element_blank())
     p <- bar_plot + venn + plot_annotation(tag_levels = c("a", "b"))
     ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/mssa_2.png",
-      plot = p,
-      width = 12, height = , units = "in"
+      plot = p, width = 12, height = , units = "in"
     )
   }
   cat("### Pairwise agreement")
@@ -512,10 +509,7 @@ yn <- c(
   "q1.factor", "q3.factor", "q4.factor", "goodsample.factor",
   "q6.factor", "q5.factor", "previous.factor"
 )
-# Subset and label
-t <- survey_data %>%
-  filter(!participant_id %in% survey_exclude) %>%
-  select(participant_id, q1.factor:q6b___4.factor)
+# Label
 labels <- as.character(label(survey_data)[sub("\\.factor", "", colnames(t))])
 names(labels) <- colnames(t)
 ```
