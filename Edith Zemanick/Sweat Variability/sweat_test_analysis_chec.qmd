@@ -31,6 +31,7 @@ library(tidyverse)
 library(readxl)
 library(arsenal)
 library(ggpubr)
+library(lmerTest)
 library(performance)
 knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability")
 ```
@@ -306,4 +307,11 @@ ggplot(pre_model_df, aes(y = swhcavgpm, x = pre_ratio)) +
   ) +
   theme_bw() +
   theme(legend.title = element_blank())
+```
+
+# Model-based approaches
+
+```{r}
+m <- glmer(pre_post ~ na + cl + (1 | subject), data = chec_long, family = "binomial")
+m2 <- lmer(cl ~ pre_post * na + (1 | subject), data = chec_long)
 ```
