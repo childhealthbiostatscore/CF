@@ -30,6 +30,8 @@ library(performance)
 library(GLMMadaptive)
 library(tidyverse)
 library(ggstats)
+library(corrplot)
+knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor")
 ```
 
 ```{r data import}
@@ -47,12 +49,12 @@ df <- exportRecordsTyped(rcon)
 #| message: false
 #| warning: false
 # Import use data
-start_end <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Data_Clean/Start and end dates.csv",
+start_end <- read.csv("./Data_Clean/Start and end dates.csv",
   na.strings = ""
 )
 start_end$Start <- mdy(start_end$Start)
 start_end$End <- mdy(start_end$End)
-vacations <- read.csv("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Data_Clean/Vacation days.csv",
+vacations <- read.csv("./Data_Clean/Vacation days.csv",
   na.strings = ""
 )
 vacations$Vacation.Start <- mdy(vacations$Vacation.Start)
@@ -70,7 +72,7 @@ dates <- start_end %>%
   unnest(Date)
 # Import counts
 agg_counts <- read.csv(
-  "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Data_Raw/Cough_w_TotalCounts_1105_NMDcorrected - Cough_agg_w_count_122324.csv",
+  "./Data_Raw/Cough_w_TotalCounts_1105_NMDcorrected - Cough_agg_w_count_122324.csv",
   na.strings = c("", "NMD"), header = F
 )
 # Format aggregated count data
@@ -146,18 +148,22 @@ demo <- df %>%
   group_by(sid) %>%
   filter(row_number() == 1) %>%
   select(
-    sid, Diagnosis, age_at_consent, height, weight, pre_fev,
+    sid, Diagnosis, age_at_consent, height, weight, pre_fev, post_fev,
     nih_sex:nih_ethnicity, mutation1, mutation2,
     cftr_mod, cftr_mod_type, mucolytic:antih
   )
 # Calculate FEV1% - rspiro not accepting NA values for gender, which is really
 # annoying
 fev1 <- demo %>%
-  select(sid, age_at_consent, height, weight, nih_sex, pre_fev) %>%
+  select(sid, age_at_consent, height, weight, nih_sex, pre_fev, post_fev) %>%
   filter(nih_sex %in% c("Male", "Female"))
 fev1$pre_fev_pp <- pctpred_GLIgl(fev1$age_at_consent, fev1$height / 100,
   factor(fev1$nih_sex, levels = c("Male", "Female")),
   FEV1 = fev1$pre_fev
+)
+fev1$post_fev_pp <- pctpred_GLIgl(fev1$age_at_consent, fev1$height / 100,
+  factor(fev1$nih_sex, levels = c("Male", "Female")),
+  FEV1 = fev1$post_fev
 )
 fev1$height_perc <- sds(as.numeric(fev1$height),
   age = fev1$age_at_consent, sex = fev1$nih_sex,
@@ -170,8 +176,12 @@ fev1$weight_perc <- sds(as.numeric(fev1$weight),
   type = "perc"
 ) * 100
 demo <-
-  left_join(demo, fev1[, c("sid", "height_perc", "weight_perc", "pre_fev_pp")])
+  left_join(
+    demo,
+    fev1[, c("sid", "height_perc", "weight_perc", "pre_fev_pp", "post_fev_pp")]
+  )
 label(demo$pre_fev_pp) <- "Pre-bronchodilator FEV1 % Predicted"
+label(demo$pre_fev_pp) <- "Post-bronchodilator FEV1 % Predicted"
 label(demo$height_perc) <- "Height %ile"
 label(demo$weight_perc) <- "Weight %ile"
 # CF genotype
@@ -184,9 +194,23 @@ demo[, grep("mutation", colnames(demo))] <- NULL
 # Add group to counts
 agg_counts$Diagnosis <-
   demo$Diagnosis[match(agg_counts$sid, as.numeric(as.character(demo$sid)))]
+# Import and merge sleep times from Lilah
+sleep <- read.csv("./Data_Clean/Total sleep times.csv", na.strings = "")
+sleep <- sleep %>%
+  select(
+    Participant.First.Name..or.any.uniq.identifier.,
+    Total.sleep.time..hours.
+  ) %>%
+  rename(
+    sid = Participant.First.Name..or.any.uniq.identifier.,
+    total_sleep = Total.sleep.time..hours.
+  )
+sleep$sid <- as.character(as.numeric(sub("FN", "", sleep$sid)))
+label(sleep$total_sleep) <- "Total sleep time (hours)"
+demo <- left_join(demo, sleep)
 # Order columns
 demo <- demo %>%
-  select(sid, height_perc, weight_perc, pre_fev_pp, everything()) %>%
+  select(sid, height_perc, weight_perc, pre_fev_pp, total_sleep, everything()) %>%
   select(-height, -weight, -pre_fev)
 # Set table options for the document
 mycontrols <-
@@ -197,7 +221,7 @@ mycontrols <-
   )
 # Save
 write.csv(agg_counts,
-  file = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Data_Clean/cleaned_aggregated_counts.csv",
+  file = "./Data_Clean/cleaned_aggregated_counts.csv",
   na = "", row.names = F
 )
 ```
@@ -296,6 +320,67 @@ invisible(lapply(unique(agg_counts$sid), function(s) {
 }))
 ```
 
+# Basic statistics excluding 0s
+
+## Aggregated by person
+
+The comparisons below exclude any nights with missing data OR 0 coughs, as well as periods of sickness. This table could potentially be a little bit confusing because the numbers presented are the median of multiple medians, but the data are still so skewed without 0s that this seemed the best way to aggregate the data.
+
+```{r results='asis'}
+#| warning: false
+no_0 <- agg_counts %>%
+  filter(Sick == "No", !is.na(Coughs)) %>%
+  group_by(sid, Diagnosis) %>%
+  mutate(`Prop. Non-0 Coughs` = mean(Coughs > 0, na.rm = T)) %>%
+  filter(Coughs > 0) %>%
+  summarise(
+    `Prop. Non-0 Coughs` = `Prop. Non-0 Coughs`[1],
+    `Median Coughs` = median(Coughs),
+    `Cough IQR` = IQR(Coughs),
+    .groups = "drop"
+  )
+no_0 <- left_join(
+  no_0,
+  fev1 %>%
+    mutate(sid = as.numeric(sid)) %>%
+    select(sid, pre_fev_pp, post_fev_pp),
+  by = join_by(sid)
+)
+no_0_t <- tableby(
+  Diagnosis ~
+    kwt(`Prop. Non-0 Coughs`, "medianq1q3", "range") +
+    kwt(`Median Coughs`, "medianq1q3", "range"),
+  data = no_0
+)
+summary(no_0_t, pfootnote = T)
+M <- cor.test(no_0$`Median Coughs`, no_0$pre_fev_pp, method = "spearman")
+corrplot(cor(no_0 %>% select(`Median Coughs`, pre_fev_pp),
+  method = "spearman", use = "pairwise.complete.obs"
+))
+ggplot(no_0, aes(x = `Median Coughs`, y = pre_fev_pp)) +
+  geom_point()
+```
+
+Spearman correlation between median coughs and pre-bronchodilator FEV1 was `r round(as.numeric(M$estimate),3)` (p = `r format.pval(M$p.value,eps = 0.001,digits = 3)`).
+
+## Not aggregated 
+
+```{r results='asis'}
+#| warning: false
+no_0 <- agg_counts %>% filter(Sick == "No", !is.na(Coughs), Coughs > 0)
+no_0 <- left_join(
+  no_0,
+  fev1 %>%
+    mutate(sid = as.numeric(sid)) %>%
+    select(sid, pre_fev_pp, post_fev_pp),
+  by = join_by(sid)
+)
+no_0_t <- tableby(Diagnosis ~ kwt(Coughs, "medianq1q3", "range"), data = no_0)
+summary(no_0_t, pfootnote = T)
+```
+
+Spearman correlation between median coughs and pre-bronchodilator FEV1 was `r round(as.numeric(M$estimate),3)` (p = `r format.pval(M$p.value,eps = 0.001,digits = 3)`).
+
 # CFQ-R
 
 ```{r}
@@ -325,21 +410,161 @@ invisible(lapply(unique(agg_counts$sid), function(s) {
 # if nmiss (digest35) = 0 then
 # digest = (mean (digest35)-1)/3*100;
 
-cfqr_6_13 <- df %>%
-  filter(redcap_repeat_instrument == "CFQ-R Caregivers 6-13") %>%
+# Caregivers of children ages 6-13
+# Rename columns so we can use the code from the CFF
+cfqr_parent_6_13_names <- list(
+  "cfq_r_p_1" = "phys1", "cfq_r_p_2" = "phys2", "cfq_r_p_3" = "phys3",
+  "cfq_r_p_4" = "phys4", "cfq_r_p_5" = "phys5", "cfq_r_p_6" = "emot6",
+  "cfq_r_p_7" = "emot7", "cfq_r_p_8" = "vital8", "cfq_r_p_9" = "vital9",
+  "cfq_r_p_10" = "vital10", "cfq_r_p_11" = "vital11", "cfq_r_p_12" = "vital12",
+  "cfq_r_p_13" = "school13", "cfq_r_p_14" = "phys14", "cfq_r_p_15" = "phys15",
+  "cfq_r_p_16" = "phys16", "cfq_r_p_17" = "eat17", "cfq_r_p_18" = "treat18",
+  "cfq_r_p_19" = "body19", "cfq_r_p_20" = "body20", "cfq_r_p_21" = "body21",
+  "cfq_r_p_22" = "health22", "cfq_r_p_23" = "emot23", "cfq_r_p_24" = "health24",
+  "cfq_r_p_25" = "emot25", "cfq_r_p_26" = "emot26", "cfq_r_p_27" = "school27",
+  "cfq_r_p_28" = "school28", "cfq_r_p_29" = "school29",
+  "cfq_r_p_30" = "treat30", "cfq_r_p_31" = "treat31", "cfq_r_p_32" = "health32",
+  "cfq_r_p_33" = "weight33", "cfq_r_p_34" = "resp34", "cfq_r_p_35" = "resp35",
+  "cfq_r_p_36" = "resp36", "cfq_r_p_37" = "resp37", "cfq_r_p_38" = "resp38",
+  "cfq_r_p_39" = "resp39", "cfq_r_p_40" = "resp40", "cfq_r_p_41" = "digest41",
+  "cfq_r_p_42" = "digest42", "cfq_r_p_43" = "digest43", "cfq_r_p_44" = "eat44"
+)
+cfqr_parent_6_13_names <-
+  setNames(names(cfqr_parent_6_13_names), cfqr_parent_6_13_names)
+# Some items need to be reverse scored
+cfqr_parent_6_13_reverse <- c(
+  "emot6", "vital10", "vital12", "phys15", "treat31", "health22", "health24",
+  "health32", "school28", "resp37"
+)
+# Do it!
+cfqr_parent_6_13 <- df %>%
   select(
-    sid, Diagnosis, cfqr_caregivers_613_timestamp:cfqr_caregivers_613_complete
+    sid, redcap_event_name:redcap_repeat_instance,
+    cfq_r_p_1:cfq_r_p_44
+  ) %>%
+  mutate(across(cfq_r_p_1:cfq_r_p_44, ~ as.numeric(.x))) %>%
+  rename(all_of(unlist(cfqr_parent_6_13_names))) %>%
+  mutate(across(all_of(cfqr_parent_6_13_reverse), ~ 5 - .x)) %>%
+  rowwise() %>%
+  mutate(
+    physical =
+      ifelse(
+        sum(is.na(c(phys1, phys2, phys3, phys4, phys5, phys14, phys15, phys16))) <= 4,
+        (mean(c(phys1, phys2, phys3, phys4, phys5, phys14, phys15, phys16)) - 1)
+        / 3 * 100, NA
+      ),
+    emotion =
+      ifelse(
+        sum(is.na(c(emot6, emot7, emot23, emot25, emot26))) <= 2,
+        (mean(c(emot6, emot7, emot23, emot25, emot26)) - 1)
+        / 3 * 100, NA
+      ),
+    vitality =
+      ifelse(
+        sum(is.na(c(vital8, vital9, vital10, vital11, vital12))) <= 2,
+        (mean(c(vital8, vital9, vital10, vital11, vital12)) - 1)
+        / 3 * 100, NA
+      ),
+    school =
+      ifelse(
+        sum(is.na(c(school13, school27, school28, school29))) <= 2,
+        (mean(c(school13, school27, school28, school29)) - 1)
+        / 3 * 100, NA
+      ),
+    eat =
+      ifelse(
+        sum(is.na(c(eat17, eat44))) == 0,
+        (mean(c(eat17, eat44)) - 1)
+        / 3 * 100, NA
+      ),
+    body =
+      ifelse(
+        sum(is.na(c(body19, body20, body21))) <= 1,
+        (mean(c(body19, body20, body21)) - 1)
+        / 3 * 100, NA
+      ),
+    treat =
+      ifelse(
+        sum(is.na(c(treat18, treat30, treat31))) <= 1,
+        (mean(c(treat18, treat30, treat31)) - 1)
+        / 3 * 100, NA
+      ),
+    health =
+      ifelse(
+        sum(is.na(c(health22, health24, health32))) <= 1,
+        (mean(c(health22, health24, health32)) - 1)
+        / 3 * 100, NA
+      ),
+    respirat =
+      ifelse(
+        sum(is.na(c(resp34, resp35, resp36, resp38, resp39, resp40))) <= 3,
+        (mean(c(resp34, resp35, resp36, resp38, resp39, resp40)) - 1)
+        / 3 * 100, NA
+      ),
+    digest =
+      ifelse(
+        sum(is.na(c(digest41, digest42, digest43))) <= 1,
+        (mean(c(digest41, digest42, digest43)) - 1)
+        / 3 * 100, NA
+      ),
+    weight =
+      ifelse(
+        sum(is.na(c(weight33))) == 0,
+        (mean(c(weight33)) - 1)
+        / 3 * 100, NA
+      )
   )
-
-cfqr_6_13$cfqr_physical <- apply(
-  data.matrix(cfqr_6_13[, paste0("cfq_r_p_", 1:5)]), 1, function(r) {
-    (mean(r) - 1) / 3 * 100
-  }
+check <- left_join(
+  df %>%
+    select(
+      sid, redcap_event_name:redcap_repeat_instance,
+      cfq_r_p_1:cfq_r_p_44
+    ),
+  cfqr_parent_6_13 %>%
+    select(sid, redcap_event_name:redcap_repeat_instance, physical:weight),
+  join_by(
+    sid, redcap_event_name, redcap_repeat_instrument,
+    redcap_repeat_instance
+  )
 )
-cfqr_6_13$cfqr_emotion <- apply(
-  data.matrix(cfqr_6_13[, paste0("cfq_r_p_", 6:13)]), 1, function(r) {
-    (mean(r) - 1) / 3 * 100
-  }
-)
+write.csv(check, file = "./Data_Clean/cfqr_parent_6_13_check.csv", na = "", row.names = F)
 
+cfqr_children_6_11 <- list(
+  "cfq_r_y_1" = "phys1", "cfq_r_y_2" = "phys2", "cfq_r_y_3" = "phys3",
+  "cfq_r_y_4" = "phys4", "cfq_r_y_5" = "phys5", "cfq_r_y_6" = "phys6",
+  "cfq_r_y_7" = "emot7", "cfq_r_y_8" = "emot8", "cfq_r_y_9" = "emot9",
+  "cfq_r_y_10" = "emot10", "cfq_r_y_11" = "emot11", "cfq_r_y_12" = "emot12",
+  "cfq_r_y_13" = "emot13", "cfq_r_y_14" = "emot14", "cfq_r_y_15" = "eat15",
+  "cfq_r_y_16" = "treat16", "cfq_r_y_17" = "eat17", "cfq_r_y_18" = "treat18",
+  "cfq_r_y_19" = "eat19", "cfq_r_y_20" = "social20", "cfq_r_y_21" = "social21",
+  "cfq_r_y_22" = "social22", "cfq_r_y_23" = "social23",
+  "cfq_r_y_24" = "social24", "cfq_r_y_25" = "social25",
+  "cfq_r_y_26" = "social26", "cfq_r_y_27" = "body27", "cfq_r_y_28" = "body28",
+  "cfq_r_y_29" = "body29", "cfq_r_y_30" = "treat30", "cfq_r_y_31" = "resp31",
+  "cfq_r_y_32" = "resp32", "cfq_r_y_33" = "resp33", "cfq_r_y_34" = "resp34",
+  "cfq_r_y_35" = "digest35 "
+)
+cfqr_children_6_11 <-
+  setNames(names(cfqr_children_6_11), cfqr_children_6_11)
+cfqr_teens_adults <- list(
+  "cfq_r_a_1" = "phys1", "cfq_r_a_2" = "phys2", "cfq_r_a_3" = "phys3",
+  "cfq_r_a_4" = "phys4", "cfq_r_a_5" = "phys5", "cfq_r_a_6" = "vital6",
+  "cfq_r_a_7" = "emot7", "cfq_r_a_8" = "emot8", "cfq_r_a_9" = "vital9",
+  "cfq_r_a_10" = "vital10", "cfq_r_a_11" = "vital11", "cfq_r_a_12" = "emot12",
+  "cfq_r_a_13" = "phys13", "cfq_r_a_14" = "eat14", "cfq_r_a_15" = "treat15",
+  "cfq_r_a_16" = "treat16", "cfq_r_a_17" = "treat17", "cfq_r_a_18" = "health18",
+  "cfq_r_a_19" = "phys19", "cfq_r_a_20" = "phys20", "cfq_r_a_21" = "eat21",
+  "cfq_r_a_22" = "social22", "cfq_r_a_23" = "social23", "cfq_r_a_24" = "body24",
+  "cfq_r_a_25" = "body25", "cfq_r_a_26" = "body26", "cfq_r_a_27" = "social27",
+  "cfq_r_a_28" = "social28", "cfq_r_a_29" = "social29",
+  "cfq_r_a_30" = "social30", "cfq_r_a_31" = "emot31", "cfq_r_a_32" = "health32",
+  "cfq_r_a_33" = "emot33", "cfq_r_a_34" = "health34", "cfq_r_a_35" = "role35",
+  "cfq_r_a_36" = "role36", "cfq_r_a_37" = "role37", "cfq_r_a_38" = "role38",
+  "cfq_r_a_39" = "weight39", "cfq_r_a_40" = "resp40", "cfq_r_a_41" = "resp41",
+  "cfq_r_a_42" = "resp42", "cfq_r_a_43" = "resp43", "cfq_r_a_44" = "resp44",
+  "cfq_r_a_45" = "resp45", "cfq_r_a_46" = "resp46", "cfq_r_a_47" = "digest47",
+  "cfq_r_a_48" = "digest48", "cfq_r_a_49" = "digest49", "cfq_r_a_50" = "eat50"
+)
+cfqr_teens_adults <-
+  setNames(names(cfqr_teens_adults), cfqr_teens_adults)
 ```
