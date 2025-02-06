@@ -1,0 +1,52 @@
+---
+title: "Quantifying Sweat Chloride in CF Carriers"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+    theme:
+      light: flatly
+      dark: darkly
+bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /Users/timvigers/GitHub/styles/american-medical-association.csl
+editor: source
+---
+
+```{r setup}
+#| include: false
+library(tidyverse)
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/GitHub",
+  "Windows" = "C:/Users/timvigers/GitHub",
+  "Linux" = "/home/timvigers/GitHub"
+)
+knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Angela Metcalf/Quantifying Sweat Chloride in CF Carriers")
+```
+
+```{r data cleaning}
+#| message: false
+df <- read.csv("./Data_Raw/Midpoint data.csv", na.strings = "")
+df <- df %>%
+  mutate(
+    `Right Arm Cl` = as.numeric(Sweat.chloride..right.arm),
+    `Left Arm Cl` = as.numeric(Sweat.chloride..left.arm),
+    `Right Arm Na` = as.numeric(Sweat.sodium..right.arm),
+    `Left Arm Na` = as.numeric(Sweat.sodium..left.arm)
+  )
+df$`Mean Cl` <- rowMeans(df[, c("Right Arm Cl", "Left Arm Cl")])
+df$`Mean Na` <- rowMeans(df[, c("Right Arm Na", "Left Arm Na")])
+```
+
+# Plots
+
+```{r}
+ggplot(df,aes(y=`Mean Cl`))+boxplot()
+```
