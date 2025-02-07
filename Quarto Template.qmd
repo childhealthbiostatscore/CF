@@ -16,7 +16,7 @@ format:
       light: flatly
       dark: darkly
 bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /Users/timvigers/GitHub/styles/american-medical-association.csl
+csl: /Users/timvigers/Documents/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -40,7 +40,7 @@ unlockREDCap(c(rcon = ""),
   envir = 1,
   url = "https://redcap.ucdenver.edu/api/"
 )
-exportBulkRecords(list(db = rcon), envir = 1)
+df <- exportRecordsTyped(rcon)
 ```
 
 # Table
