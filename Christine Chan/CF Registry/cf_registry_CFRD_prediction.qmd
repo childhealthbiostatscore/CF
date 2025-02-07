@@ -21,6 +21,7 @@ editor: source
 #| include: false
 library(tidyverse)
 library(arsenal)
+library(childsds)
 library(survival)
 library(ggsurvfit)
 library(ggstats)
@@ -95,12 +96,20 @@ annual$A_Vx770 <- factor(annual$A_Vx770, levels = 0:1, labels = c("No", "Yes"))
 annual$A_VX809comb <- factor(annual$A_VX809comb,
   levels = 0:1, labels = c("No", "Yes")
 )
+# Convert BMI to percentile (assume age > 20 is 20)
+annual$bmi_perc <- sds(annual$A_bmivalue,
+  age = ifelse(annual$Age_YrEnd > 20, 20, annual$Age_YrEnd),
+  sex = annual$Gender, item = "bmi", type = "perc", male = "M", female = "F",
+  ref = cdc.ref
+) * 100
 # Select columns
 annual <- annual %>%
   select(
     eDWID, ReviewYear, Race, Hispanicrace, Gender, F508, MutClass,
-    A_Vx770, A_VX809comb, Age_YrEnd, A_bmipercentile, A_hgba1c,
-    cfrd_registry, cfrd_status_annual, cfrd_ogtt, A_twohour_bloodglucose
+    A_Vx770, A_VX809comb, Age_YrEnd, A_bmivalue, A_bmipercentile, bmi_perc,
+    A_FEV1_pct_predicted, NumPulmExacerbation, A_IsOnEnzymes,
+    A_fast_bloodglucose, A_hgba1c, cfrd_registry, cfrd_status_annual, cfrd_ogtt,
+    A_twohour_bloodglucose
   ) %>%
   group_by(eDWID) %>%
   mutate(
@@ -125,6 +134,30 @@ ogtt <- annual %>%
 # Create start times
 registry$Age_YrStart <- registry$Age_YrEnd - 1
 ogtt$Age_YrStart <- ogtt$Age_YrEnd - 1
+# Format columns
+annual$MutClass <- factor(annual$MutClass,
+  levels = c("1-3", "4-5", "Oth", "N/A"),
+  labels = c("1-3", "4-5", "Oth", "Unknown")
+)
+annual$NumPulmExacerbation <- cut(annual$NumPulmExacerbation,
+  labels = c("0", "1", "2", ">=3"),
+  breaks = c(0, 1, 2, 3, Inf), right = F
+)
+# Labels
+labels <- list(
+  Age_YrStart = "Age at Year Start", Age_YrEnd = "Age at Year End",
+  Hispanicrace = "Hispanic", A_Vx770 = "Use of CFTR modulator Vx770",
+  A_VX809comb = "Use of CFTR modulator Vx809 combination",
+  A_FEV1_pct_predicted = "FEV1 percent predicted", MutClass = "Mutation class",
+  NumPulmExacerbation = "Admissions for PEx"
+)
+# Basic formula
+xvars <- c(
+  "Gender", "Race", "Hispanicrace", "MutClass", "A_IsOnEnzymes",
+  "A_FEV1_pct_predicted", "NumPulmExacerbation", "A_corticosteroids1"
+)
+f <- ~ A_hgba1c + A_fast_bloodglucose + Gender + Race + Hispanicrace + MutClass +
+  A_IsOnEnzymes + A_FEV1_pct_predicted + NumPulmExacerbation
 ```
 
 # By registry CFRD status
@@ -170,16 +203,19 @@ survfit2(Surv(Age_YrStart, Age_YrEnd, as.numeric(cfrd_registry)) ~ 1,
 
 ```{r}
 cph <- coxph(
-  Surv(Age_YrStart, Age_YrEnd, as.numeric(cfrd_registry)) ~
-    A_hgba1c + Gender + F508 + A_Vx770 + A_VX809comb,
+  update(f, Surv(time = Age_YrStart, time2 = Age_YrEnd, event = as.numeric(cfrd_registry)==2) ~ .),
   data = registry, cluster = eDWID
 )
 cph %>% tbl_regression(exponentiate = T)
 plot(cox.zph(cph), resid = F)
 cox.zph(cph)
 ggcoef_table(cph,
-  show_p_values = F, add_reference_rows = T, signif_stars = F, colour = F
+  exponentiate = T, show_p_values = F, add_reference_rows = T, signif_stars = F,
+  colour = F
 )
+
+d = model.frame(cph)
+d$pred <- predict(cph, type = "survival")
 ```
 
 # By CFRD status based on 2 hour OGTT >= 200
@@ -225,14 +261,14 @@ survfit2(Surv(Age_YrStart, Age_YrEnd, as.numeric(cfrd_ogtt)) ~ 1,
 
 ```{r}
 cph <- coxph(
-  Surv(Age_YrStart, Age_YrEnd, as.numeric(cfrd_ogtt)) ~
-    A_hgba1c + Gender + F508 + A_Vx770 + A_VX809comb,
+  update(f, Surv(time = Age_YrStart, time2 = Age_YrEnd, event = as.numeric(cfrd_ogtt)) ~ .),
   data = ogtt, cluster = eDWID
 )
 cph %>% tbl_regression(exponentiate = T)
 plot(cox.zph(cph), resid = F)
 cox.zph(cph)
 ggcoef_table(cph,
-  show_p_values = F, add_reference_rows = T, signif_stars = F, colour = F
+  exponentiate = T, show_p_values = F, add_reference_rows = T, signif_stars = F,
+  colour = F
 )
 ```
