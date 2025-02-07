@@ -213,6 +213,8 @@ agreement <- function(result_pattern, df = data) {
   d[d == "NA"] <- NA
   d[d == "Unchecked"] <- "Absent"
   d[d == "Checked"] <- "Present"
+  d[d == "No Growth"] <- "Absent"
+  d[d == "Some Growth"] <- "Present"
   fk <- kappam.fleiss(d)
   cat("\n")
   cat("### Agreement between all three methods")
@@ -315,6 +317,13 @@ agreement <- function(result_pattern, df = data) {
       plot = p, width = 12, height = , units = "in"
     )
   }
+  # Save no growth Venn diagram
+  if (result_pattern == "no_growth") {
+    ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/no_growth.png",
+      plot = venn,
+    )
+  }
+  cat("\n")
   cat("### Pairwise agreement")
   cat("\n")
   d <- data.frame(lapply(d, factor, levels = c("Absent", "Present")))
@@ -602,7 +611,8 @@ ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/check.png",
 df3 <- survey_data %>%
   select(all_of(levels3)) %>%
   rename(any_of(setNames(names(labels), labels)))
-p3 <- gglikert(as_tibble(df3), add_totals = F)
+p3 <- gglikert(as_tibble(df3), add_totals = F) +
+  scale_fill_manual(values = c("#5AB4AC", "#F5F5F5", "#D8B365"))
 p3
 ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/q2.png",
   plot = p3,
@@ -614,7 +624,8 @@ ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/q2.png",
 df5 <- survey_data %>%
   select(all_of(levels5)) %>%
   rename(any_of(setNames(names(labels), labels)))
-p5 <- gglikert(df5)
+p5 <- gglikert(df5) +
+  scale_fill_manual(values = c("#018571", "#80CDC1", "#F5F5F5", "#DFC27D", "#A6611A"))
 p5
 ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/difficulty.png",
   plot = p5,
