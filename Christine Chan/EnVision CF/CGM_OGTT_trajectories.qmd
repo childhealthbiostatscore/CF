@@ -1,0 +1,75 @@
+---
+title: "Title"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+    theme:
+      light: flatly
+      dark: darkly
+bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /Users/timvigers/Documents/GitHub/styles/american-medical-association.csl
+editor: source
+---
+
+```{r setup}
+#| include: false
+library(tidyverse)
+library(traj)
+knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF")
+```
+
+```{r data cleaning}
+# Import data
+df <- read.csv("./Data_Clean/envision_analysis_dataset.csv", na.strings = "")
+# Long data for plotting
+long_df <- df %>%
+  pivot_longer(Glucose_0:Insulin_180,
+    names_to = c("Measure", "Timepoint"),
+    names_pattern = "(.*)_(.*)", values_to = "Value"
+  ) %>%
+  select(study_id, Date, ogtt_num, Measure, Timepoint, Value) %>%
+  drop_na()
+long_df$Timepoint <- as.numeric(long_df$Timepoint)
+# Define timepoints
+timepoints <- c(0, 10, 30, 60, 90, 120, 150, 180)
+# Make a trajectory dataset for OGTT glucose, remove rows with < 3 values
+glucose <- df %>%
+  select(Glucose_0:Glucose_180) %>%
+  filter(rowSums(!is.na(.)) > 3)
+```
+
+# fsOGTT Spaghetti Plot
+
+```{r}
+ggplot(long_df, aes(
+  x = Timepoint, y = Value,
+  group = interaction(study_id, ogtt_num)
+)) +
+  geom_point(shape = ".", alpha = 0.1) +
+  geom_line(alpha = 0.1) +
+  scale_x_continuous(breaks = timepoints) +
+  facet_wrap(~Measure) +
+  theme_bw()
+```
+
+# Basis Trajectory Analysis
+
+```{r}
+set.seed(1017)
+step1 <- Step1Measures(glucose, measures = 1:19)
+summary(step1)
+step2 <- Step2Selection(trajMeasures = step1)
+summary(step2)
+print(step2)
+step3 <- Step3Clusters(trajSelection = step2, nclusters = 4)
+plot(step3, spline = T)
+```
