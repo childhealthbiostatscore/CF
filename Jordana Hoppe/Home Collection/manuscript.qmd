@@ -30,13 +30,14 @@ library(caret)
 library(ggstats)
 library(RColorBrewer)
 library(patchwork)
+library(ggpubr)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/GitHub",
+  "Darwin" = "/Users/timvigers/Documents/GitHub",
   "Windows" = "C:/Users/Tim/GitHub",
   "Linux" = "/home/timvigers/GitHub"
 )
@@ -223,6 +224,7 @@ agreement <- function(result_pattern, df = data) {
   f <- ftable(d)
   f %>%
     as.data.frame(.) %>%
+    arrange(desc(Freq)) %>%
     kable(.) %>%
     kable_styling(., "striped") %>%
     print(.)
@@ -284,7 +286,7 @@ agreement <- function(result_pattern, df = data) {
     scale_fill_manual(values = brewer.pal(3, "Accent")) +
     theme_classic() +
     theme(legend.title = element_blank(), axis.title.x = element_blank())
-  p <- bar_plot + venn + plot_annotation(tag_levels = c("a", "b"))
+  p <- ggarrange(venn, bar_plot, nrow = 1, labels = "auto") + bgcolor("White")
   cat("\n")
   cat("\n")
   show(p)
@@ -308,7 +310,7 @@ agreement <- function(result_pattern, df = data) {
       scale_fill_manual(values = brewer.pal(3, "Accent")) +
       theme_classic() +
       theme(legend.title = element_blank(), axis.title.x = element_blank())
-    p <- bar_plot + venn + plot_annotation(tag_levels = c("a", "b"))
+    p <- ggarrange(venn, bar_plot, nrow = 1, labels = "auto") + bgcolor("White")
     ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/mssa_2.png",
       plot = p, width = 12, height = , units = "in"
     )
@@ -510,14 +512,14 @@ yn <- c(
   "q6.factor", "q5.factor", "previous.factor"
 )
 # Label
-labels <- as.character(label(survey_data)[sub("\\.factor", "", colnames(t))])
-names(labels) <- colnames(t)
+labels <- as.character(label(survey_data)[sub("\\.factor", "", colnames(survey_data))])
+names(labels) <- colnames(survey_data)
 ```
 
 ## Plots
 
 ```{r}
-yn_df <- t %>%
+yn_df <- survey_data %>%
   select(all_of(yn)) %>%
   rename(any_of(setNames(names(labels), labels)))
 yn_df <- data.frame(lapply(yn_df, factor, levels = c("No", "Yes")),
@@ -533,7 +535,7 @@ ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/yn.png",
 ```
 
 ```{r}
-check_df <- t %>%
+check_df <- survey_data %>%
   select(all_of(checkboxes)) %>%
   rename(any_of(setNames(names(labels), labels)))
 colnames(check_df) <- c(
@@ -551,6 +553,21 @@ benefits_df <- check_df[, c(
   "Financial reasons - costs to travel to clinic can be a burden",
   "Health concerns with coming to clinic"
 )]
+benefits_df <- benefits_df %>%
+  pivot_longer(everything()) %>%
+  group_by(name) %>%
+  summarise(prop = mean(value == "Checked")) %>%
+  arrange(desc(prop))
+p_benefits <- ggplot(benefits_df, aes(y = reorder(name, prop), x = prop)) +
+  geom_bar(stat = "identity", fill = "#5AB4AC") +
+  geom_text(aes(label = scales::percent(prop, accuracy = 1)), position = position_stack(vjust = 0.5)) +
+  ggtitle("Benefits") +
+  scale_x_continuous(
+    breaks = c(0, 0.25, 0.5, 0.75, 1),
+    labels = scales::percent(c(0, 0.25, 0.5, 0.75, 1))
+  ) +
+  theme_bw() +
+  theme(axis.title.y = element_blank(), axis.title.x = element_blank())
 barriers_df <- check_df[, c(
   "Uncooperative child",
   "I did not think the sample I obtained was a good sample",
@@ -558,17 +575,21 @@ barriers_df <- check_df[, c(
   "I do not feel collection at home is reliable",
   "I do not feel comfortable with home collection"
 )]
-
-p_benefits <- gglikert(benefits_df, add_totals = F) +
-  ggtitle("Benefits") +
-  theme(
-    axis.text.x = element_blank(), axis.title.x = element_blank(),
-    legend.position = "none"
-  ) +
-  scale_fill_manual(values = c("Unchecked" = "#D8B365", "Checked" = "#5AB4AC"))
-p_barriers <- gglikert(barriers_df, reverse_likert = T, add_totals = F) +
+barriers_df <- barriers_df %>%
+  pivot_longer(everything()) %>%
+  group_by(name) %>%
+  summarise(prop = mean(value == "Checked")) %>%
+  arrange(desc(prop))
+p_barriers <- ggplot(barriers_df, aes(y = reorder(name, prop), x = prop)) +
+  geom_bar(stat = "identity", fill = "#D8B365") +
+  geom_text(aes(label = scales::percent(prop, accuracy = 1)), position = position_stack(vjust = 0.5)) +
   ggtitle("Barriers") +
-  scale_fill_manual(values = c("Unchecked" = "#5AB4AC", "Checked" = "#D8B365"))
+  scale_x_continuous(
+    breaks = c(0, 0.05, 0.1, 0.15),
+    labels = scales::percent(c(0, 0.05, 0.1, 0.15))
+  ) +
+  theme_bw() +
+  theme(axis.title.y = element_blank(), axis.title.x = element_blank())
 p <- p_benefits / p_barriers
 p
 ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/check.png",
@@ -578,10 +599,10 @@ ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/check.png",
 ```
 
 ```{r}
-df3 <- t %>%
+df3 <- survey_data %>%
   select(all_of(levels3)) %>%
   rename(any_of(setNames(names(labels), labels)))
-p3 <- gglikert(as_tibble(df3))
+p3 <- gglikert(as_tibble(df3), add_totals = F)
 p3
 ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/q2.png",
   plot = p3,
@@ -590,7 +611,7 @@ ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/q2.png",
 ```
 
 ```{r}
-df5 <- t %>%
+df5 <- survey_data %>%
   select(all_of(levels5)) %>%
   rename(any_of(setNames(names(labels), labels)))
 p5 <- gglikert(df5)
@@ -599,7 +620,7 @@ ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/difficulty.png",
   plot = p5,
   width = 9, height = 6, units = "in"
 )
-p <- p3 / p5 + plot_annotation(tag_levels = c("a", "b"))
+p <- p3 / p5 + plot_annotation(tag_level = "a")
 p
 ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/fig2.png",
   plot = p,
