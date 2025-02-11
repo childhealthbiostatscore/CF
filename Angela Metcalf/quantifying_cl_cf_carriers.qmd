@@ -22,7 +22,9 @@ editor: source
 
 ```{r setup}
 #| include: false
+library(redcapAPI)
 library(tidyverse)
+library(arsenal)
 github_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/GitHub",
   "Windows" = "C:/Users/timvigers/GitHub",
@@ -33,20 +35,33 @@ knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-
 
 ```{r data cleaning}
 #| message: false
-df <- read.csv("./Data_Raw/Midpoint data.csv", na.strings = "")
+# Import from REDCap
+unlockREDCap(c(rcon = "Sweat Electrolytes in CF Carriers 24-0691"),
+  keyring = "API_KEYs",
+  envir = 1,
+  url = "https://redcap.ucdenver.edu/api/"
+)
+df <- exportRecordsTyped(rcon)
+# Format
 df <- df %>%
   mutate(
-    `Right Arm Cl` = as.numeric(Sweat.chloride..right.arm),
-    `Left Arm Cl` = as.numeric(Sweat.chloride..left.arm),
-    `Right Arm Na` = as.numeric(Sweat.sodium..right.arm),
-    `Left Arm Na` = as.numeric(Sweat.sodium..left.arm)
+    `Cl Right` = as.numeric(cl_right), `Cl Left` = as.numeric(cl_left),
+    `Na Right` = as.numeric(na_right), `Na Left` = as.numeric(na_left)
   )
-df$`Mean Cl` <- rowMeans(df[, c("Right Arm Cl", "Left Arm Cl")])
-df$`Mean Na` <- rowMeans(df[, c("Right Arm Na", "Left Arm Na")])
+df$`Mean Cl` <- rowMeans(df[, c("Cl Right", "Cl Left")])
+df$`Mean Na` <- rowMeans(df[, c("Na Right", "Na Left")])
+```
+
+# Table 1
+
+```{r}
+t1 = tableby(carrier~`Mean Cl` +`Mean Na`,data = df )
+summary(t1)
 ```
 
 # Plots
 
 ```{r}
-ggplot(df,aes(y=`Mean Cl`))+boxplot()
+ggplot(df, aes(x = carrier, y = `Mean Cl`)) +
+  geom_boxplot()
 ```
