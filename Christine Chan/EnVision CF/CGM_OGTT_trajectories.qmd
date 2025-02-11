@@ -30,13 +30,18 @@ knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-
 ```{r data cleaning}
 # Import data
 df <- read.csv("./Data_Clean/envision_analysis_dataset.csv", na.strings = "")
+# CFRD by 2 hour OGTT
+df$CFRD <- factor(df$Glucose_120 >= 200,
+  levels = c(F, T),
+  labels = c("CFRD-", "CFRD+")
+)
 # Long data for plotting
 long_df <- df %>%
   pivot_longer(Glucose_0:Insulin_180,
     names_to = c("Measure", "Timepoint"),
     names_pattern = "(.*)_(.*)", values_to = "Value"
   ) %>%
-  select(study_id, Date, ogtt_num, Measure, Timepoint, Value) %>%
+  select(study_id, CFRD, Date, ogtt_num, Measure, Timepoint, Value) %>%
   drop_na()
 long_df$Timepoint <- as.numeric(long_df$Timepoint)
 # Define timepoints
