@@ -385,9 +385,13 @@ Spearman correlation between median coughs and pre-bronchodilator FEV1 was `r ro
 # CFQ-R
 
 ```{r}
+#| message: false
 # See SAS scoring instructions (from Quitter's CFQ-R website).docx for
 # instructions
-
+df <- df %>%
+  group_by(sid) %>%
+  fill(c(date_v1_cf, date_v1_hc)) %>%
+  ungroup()
 # Caregivers of children ages 6-13
 # Rename columns so we can use the code from the CFF
 cfqr_parent_6_13_names <- list(
@@ -417,7 +421,8 @@ cfqr_parent_6_13_reverse <- c(
 # Do all the calculations!
 cfqr_parent_6_13 <- df %>%
   select(
-    sid, cfqr_caregivers_613_timestamp, cfq_r_p_1:cfq_r_p_44
+    sid, date_v1_cf, date_v1_hc,
+    cfqr_caregivers_613_timestamp, cfq_r_p_1:cfq_r_p_44
   ) %>%
   mutate(
     Date = as.Date(cfqr_caregivers_613_timestamp),
@@ -494,7 +499,15 @@ cfqr_parent_6_13 <- df %>%
         / 3 * 100, NA
       )
   ) %>%
-  select(sid, Date, physical:weight)
+  mutate(
+    Date = coalesce(Date, date_v1_cf),
+    Date = coalesce(Date, date_v1_hc),
+    Survey = "CFQ-R Caregivers 6-13"
+  ) %>%
+  select(
+    sid, Survey, Date, physical:weight
+  ) %>%
+  filter(!if_all(physical:weight, ~ is.na(.)))
 # Children aged 6 to 11
 cfqr_children_6_11_names <- list(
   "cfq_r_y_1" = "phys1", "cfq_r_y_2" = "phys2", "cfq_r_y_3" = "phys3",
@@ -521,7 +534,8 @@ cfqr_children_6_11_reverse <- c(
 # Do all the calculations
 cfqr_children_6_11 <- df %>%
   select(
-    sid, cfqr_children_ages_611_timestamp, cfq_r_y_1:cfq_r_y_35
+    sid, date_v1_cf, date_v1_hc,
+    cfqr_children_ages_611_timestamp, cfq_r_y_1:cfq_r_y_35
   ) %>%
   mutate(
     Date = as.Date(cfqr_children_ages_611_timestamp),
@@ -580,7 +594,15 @@ cfqr_children_6_11 <- df %>%
         / 3 * 100, NA
       )
   ) %>%
-  select(sid, Date, physical:digest)
+  mutate(
+    Date = coalesce(Date, date_v1_cf),
+    Date = coalesce(Date, date_v1_hc),
+    Survey = "CFQ-R Children Ages 6-11"
+  ) %>%
+  select(
+    sid, Survey, Date, physical:digest
+  ) %>%
+  filter(!if_all(physical:digest, ~ is.na(.)))
 # Teen/Adult version
 cfqr_teens_adults_names <- list(
   "cfq_r_a_1" = "phys1", "cfq_r_a_2" = "phys2", "cfq_r_a_3" = "phys3",
@@ -611,7 +633,8 @@ cfqr_teens_adults_reverse <- c(
 # Do all the calculations
 cfqr_teens_adults <- df %>%
   select(
-    sid, cfqr_adolescents_and_adults_14_years_timestamp, cfq_r_a_1:cfq_r_a_50
+    sid, date_v1_cf, date_v1_hc,
+    cfqr_adolescents_and_adults_14_years_timestamp, cfq_r_a_1:cfq_r_a_50
   ) %>%
   mutate(
     Date = as.Date(cfqr_adolescents_and_adults_14_years_timestamp),
@@ -694,20 +717,18 @@ cfqr_teens_adults <- df %>%
         / 3 * 100, NA
       )
   ) %>%
-  select(sid, Date, physical:digest)
-# Write for checking
-write.csv(df %>%
+  mutate(
+    Date = coalesce(Date, date_v1_cf),
+    Date = coalesce(Date, date_v1_hc),
+    Survey = "CFQ-R Adolescents and Adults 14 Years"
+  ) %>%
   select(
-    sid, cfqr_caregivers_613_timestamp, cfq_r_p_1:cfq_r_p_44
-  ), file = "~/cfqr_parent_6_13.csv", na = "", row.names = F)
-write.csv(df %>%
-  select(
-    sid, cfqr_children_ages_611_timestamp, cfq_r_y_1:cfq_r_y_35
-  ), file = "~/cfqr_children_6_11.csv", na = "", row.names = F)
-write.csv(df %>%
-  select(
-    sid, cfqr_adolescents_and_adults_14_years_timestamp, cfq_r_a_1:cfq_r_a_50
-  ), file = "~/cfqr_teens_adults.csv", na = "", row.names = F)
+    sid, Survey, Date, physical:digest
+  ) %>%
+  filter(!if_all(physical:digest, ~ is.na(.)))
+# Combine
+surveys <- full_join(cfqr_parent_6_13, cfqr_children_6_11)
+surveys <- full_join(surveys, cfqr_teens_adults)
 # Add to counts for plotting
 cfqr_parent_6_13$sid <- as.numeric(cfqr_parent_6_13$sid)
 cfqr_children_6_11$sid <- as.numeric(cfqr_children_6_11$sid)
@@ -756,4 +777,9 @@ invisible(lapply(unique(agg_counts$sid), function(s) {
   cat("\n")
   cat("\n")
 }))
+```
+
+## Correlation between baseline surveys and coughs
+
+```{r}
 ```
