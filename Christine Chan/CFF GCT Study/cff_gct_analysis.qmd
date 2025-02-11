@@ -181,6 +181,8 @@ df$`Got OGTT and GCT?` <- factor(df$`Got OGTT and GCT?`,
     "Missing GCT 1 Hour Plasma or OGTT 2 Hour"
   )
 )
+# Fix C088 pancreatic insufficiency
+df$`Pancreatic insufficient`[df$ID == "C088"] <- "Yes"
 # Drop levels
 df$Race <- droplevels(df$Race)
 # Set table options
