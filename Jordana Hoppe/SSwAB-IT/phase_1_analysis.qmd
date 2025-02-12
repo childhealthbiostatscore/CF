@@ -161,6 +161,12 @@ df <- left_join(df, db_medications, by = join_by(record_id, group))
 db_feasibility <- db_feasibility %>% filter(!record_id %in% exclude)
 # Drop unused levels
 df$who_collected_cos <- droplevels(df$who_collected_cos)
+# Shorter group labels for cleaner tables
+levels(df$group) <- c("COS/SOS/IP", "COS/SOS/DP", "SOS/COS/IP", "SOS/COS/DP")
+levels(db_demographics$group) <-
+  c("COS/SOS/IP", "COS/SOS/DP", "SOS/COS/IP", "SOS/COS/DP")
+levels(db_medications$group) <-
+  c("COS/SOS/IP", "COS/SOS/DP", "SOS/COS/IP", "SOS/COS/DP")
 ```
 
 # Data cleaning
@@ -187,6 +193,7 @@ db_demographics %>%
     test.args = age_group ~ list(workspace = 2e9)
   ) %>%
   separate_p_footnotes() %>%
+  modify_footnote(everything() ~ NA) %>%
   as_gt()
 ```
 
@@ -203,6 +210,7 @@ db_medications %>%
   add_overall() %>%
   add_p() %>%
   separate_p_footnotes() %>%
+  modify_footnote(everything() ~ NA) %>%
   as_gt()
 ```
 
@@ -307,18 +315,26 @@ agreement_test <- function(bug, group = "group", data = df) {
   # Agreement and detailed agreement
   d$agree <- d$COS == d$SOS
   d$detailed_agree <- paste0("COS ", d$COS, "/", "SOS ", d$SOS)
+  d$detailed_agree <- factor(d$detailed_agree,
+    levels = c(
+      "COS Negative/SOS Negative", "COS Negative/SOS Positive",
+      "COS Positive/SOS Negative", "COS Positive/SOS Positive"
+    ),
+    labels = c("COS-/SOS-", "COS-/SOS+", "COS+/SOS-", "COS+/SOS+")
+  )
   # Print
   cat("\n")
   cat("\n")
   d %>%
     select(agree, detailed_agree, Group) %>%
     tbl_summary(by = Group, missing_text = "Missing", label = list(
-      agree ~ "Agree (Both Positive/Positive and Negative/Negative)",
+      agree ~ "Agree (+/+ and -/-)",
       detailed_agree ~ "Detailed Agreement"
     )) %>%
     add_overall() %>%
     add_p(test.args = all_tests("fisher.test") ~ list(workspace = 2e9)) %>%
     separate_p_footnotes() %>%
+    modify_footnote(everything() ~ NA) %>%
     print()
   cat("\n")
   cat("\n")
