@@ -26,6 +26,7 @@ library(gt)
 library(gtsummary)
 library(caret)
 library(eulerr)
+library(ggpubr)
 ```
 
 ```{r data cleaning}
@@ -593,4 +594,48 @@ invisible(lapply(names(bug_list), function(b) {
   cat("\n")
   cat("\n")
 }))
+```
+
+# Manuscript Figures
+
+```{r}
+# All pathogens
+d <- df[, c("overall_cos", "overall_sos")]
+colnames(d) <- c("COS", "SOS")
+d <- d[complete.cases(d), ]
+a1 <- plot(euler(d == "Positive"),
+  quantities = list(cex = 3),
+  fills = list(fill = c("#FFC107", "#1E88E5", "#004D40"))
+)
+a2 <- ggplot(as.data.frame(table(d$COS, d$SOS)), aes(Var1, Var2)) +
+  geom_tile(color = "white", fill = "#1E88E5") +
+  geom_text(aes(label = paste0(Freq, "\n(", round(Freq / sum(Freq), 3) * 100, "%)")),
+    color = "white"
+  ) +
+  xlab("COS") +
+  ylab("SOS") +
+  theme_bw() +
+  theme(text = element_text(size = 15))
+# MRSA
+d <- df[, c("staphylococcus_aureus_cos", "staphylococcus_aureus_sos")]
+colnames(d) <- c("COS", "SOS")
+d <- d[complete.cases(d), ]
+b1 <- plot(euler(d == "Positive"),
+  quantities = list(cex = 3),
+  fills = list(fill = c("#FFC107", "#1E88E5", "#004D40"))
+)
+b2 <- ggplot(as.data.frame(table(d$COS, d$SOS)), aes(Var1, Var2)) +
+  geom_tile(color = "white", fill = "#1E88E5") +
+  geom_text(aes(label = paste0(Freq, "\n(", round(Freq / sum(Freq), 3) * 100, "%)")),
+    color = "white"
+  ) +
+  xlab("COS") +
+  ylab("SOS") +
+  theme_bw() +
+  theme(text = element_text(size = 15))
+p <- ggarrange(a1, a2, b1, b2, nrow = 2, ncol = 2) +
+  bgcolor("White")
+ggsave("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Jordana Hoppe/SSwAB-IT/Dissemination/Figures/fig.png",
+  plot = p, width =9, height = 6, units = "in"
+)
 ```
