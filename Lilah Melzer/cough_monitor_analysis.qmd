@@ -733,9 +733,9 @@ surveys <- full_join(surveys, cfqr_teens_adults)
 cfqr_parent_6_13$sid <- as.numeric(cfqr_parent_6_13$sid)
 cfqr_children_6_11$sid <- as.numeric(cfqr_children_6_11$sid)
 cfqr_teens_adults$sid <- as.numeric(cfqr_teens_adults$sid)
-agg_counts <- left_join(agg_counts, cfqr_parent_6_13)
-agg_counts <- left_join(agg_counts, cfqr_children_6_11)
-agg_counts <- left_join(agg_counts, cfqr_teens_adults)
+agg_counts <- full_join(agg_counts, cfqr_parent_6_13)
+agg_counts <- full_join(agg_counts, cfqr_children_6_11)
+agg_counts <- full_join(agg_counts, cfqr_teens_adults)
 ```
 
 ## Respiratory scores
@@ -779,7 +779,3 @@ invisible(lapply(unique(agg_counts$sid), function(s) {
 }))
 ```
 
-## Correlation between baseline surveys and coughs
-
-```{r}
-```
