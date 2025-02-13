@@ -72,7 +72,7 @@ redcap <- read.csv(
 timepoints <- c(0, 10, 30, 60, 90, 120, 150, 180)
 glucose <- redcap %>%
   select(
-    study_id, date_visit,
+    study_id, date_visit, a1c_result, num_hospitalizations,
     all_of(paste("timepoint", timepoints, "min", sep = "_"))
   ) %>%
   filter(!is.na(date_visit)) %>%
@@ -194,7 +194,10 @@ hypo_symptoms <- redcap %>%
     neuro_score_0 = neuro_score_baseline, total_score_0 = total_score_baseline,
     num_symptoms_0 = num_symptoms_base
   ) %>%
-  filter(!is.na(Date))
+  filter(
+    !is.na(Date),
+    !if_all(adren_score_0:num_symptoms_180, ~ is.na(.))
+  )
 hypo_symptoms$Date <- ymd(hypo_symptoms$Date)
 #-------------------------------------------------------------------------------
 # CGM data
