@@ -35,21 +35,34 @@ df$CFRD <- factor(df$Glucose_120 >= 200,
   levels = c(F, T),
   labels = c("CFRD-", "CFRD+")
 )
+# HbA1c and number of exacerbations to categorical
+df$a1c_result <- cut(df$a1c_result, breaks = c(-Inf, 5.5, 6.5, Inf), right = F)
+df$num_hospitalizations <- factor(df$num_hospitalizations,
+  levels = c(0:9), labels = c("0", "1", "2", "3", rep("4+", 6))
+)
 # Long data for plotting
 long_df <- df %>%
   pivot_longer(Glucose_0:Insulin_180,
     names_to = c("Measure", "Timepoint"),
     names_pattern = "(.*)_(.*)", values_to = "Value"
   ) %>%
-  select(study_id, CFRD, Date, ogtt_num, Measure, Timepoint, Value) %>%
+  select(study_id, CFRD, Date, ogtt_num, a1c_result, num_hospitalizations, Measure, Timepoint, Value) %>%
   drop_na()
 long_df$Timepoint <- as.numeric(long_df$Timepoint)
 # Define timepoints
 timepoints <- c(0, 10, 30, 60, 90, 120, 150, 180)
-# Make a trajectory dataset for OGTT glucose, remove rows with < 3 values
+# Make trajectory datasets for OGTT glucose and insulin, remove rows with < 3 values
 glucose <- df %>%
   select(Glucose_0:Glucose_180) %>%
   filter(rowSums(!is.na(.)) > 3)
+insulin <- df %>%
+  select(Insulin_0:Insulin_180) %>%
+  filter(rowSums(!is.na(.)) > 3)
+# Make a dataframe for time
+time <- data.frame(matrix(rep(timepoints, nrow(glucose)),
+  byrow = T,
+  ncol = length(timepoints)
+))
 ```
 
 # fsOGTT Spaghetti Plot
@@ -66,15 +79,19 @@ ggplot(long_df, aes(
   theme_bw()
 ```
 
-# Basis Trajectory Analysis
+# Basic Trajectory Analysis
+
+## By A1c category
 
 ```{r}
 set.seed(1017)
-step1 <- Step1Measures(glucose, measures = 1:19)
+step1 <- Step1Measures(Data = glucose, Time = time, measures = 1:19)
 summary(step1)
 step2 <- Step2Selection(trajMeasures = step1)
 summary(step2)
 print(step2)
-step3 <- Step3Clusters(trajSelection = step2, nclusters = 4)
+step3 <- Step3Clusters(trajSelection = step2)
 plot(step3, spline = T)
+
+
 ```
