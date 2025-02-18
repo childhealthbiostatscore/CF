@@ -1,5 +1,5 @@
 ---
-title: "Title"
+title: "OGTT Trajectories in CF"
 author: "Tim Vigers"
 date: "today"
 date-format: long
@@ -8,15 +8,15 @@ format:
     toc: true
     toc-depth: 5
     toc-float: true
-    code-fold: true
+    code-fold: false
     self-contained: true
     fig-cap-location: top
     page-layout: full
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Documents/GitHub/styles/american-medical-association.csl
+bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /home/timvigers/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -24,7 +24,7 @@ editor: source
 #| include: false
 library(tidyverse)
 library(traj)
-knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF")
+knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/EnVision CF")
 ```
 
 ```{r data cleaning}
@@ -51,18 +51,22 @@ long_df <- df %>%
 long_df$Timepoint <- as.numeric(long_df$Timepoint)
 # Define timepoints
 timepoints <- c(0, 10, 30, 60, 90, 120, 150, 180)
+# Unique identifier
+df$ID <- 1:nrow(df)
 # Make trajectory datasets for OGTT glucose and insulin, remove rows with < 3 values
 glucose <- df %>%
-  select(Glucose_0:Glucose_180) %>%
-  filter(rowSums(!is.na(.)) > 3)
+  select(ID, Glucose_0:Glucose_180) %>%
+  filter(rowSums(!is.na(.)) > 4)
 insulin <- df %>%
-  select(Insulin_0:Insulin_180) %>%
-  filter(rowSums(!is.na(.)) > 3)
+  select(ID, Insulin_0:Insulin_180) %>%
+  filter(rowSums(!is.na(.)) > 4)
 # Make a dataframe for time
 time <- data.frame(matrix(rep(timepoints, nrow(glucose)),
   byrow = T,
   ncol = length(timepoints)
 ))
+time$ID <- glucose$ID
+time <- time %>% select(ID, everything())
 ```
 
 # fsOGTT Spaghetti Plot
@@ -83,9 +87,11 @@ ggplot(long_df, aes(
 
 ## By A1c category
 
+### Glucose
+
 ```{r}
 set.seed(1017)
-step1 <- Step1Measures(Data = glucose, Time = time, measures = 1:19)
+step1 <- Step1Measures(Data = glucose, Time = time, ID = T)
 summary(step1)
 step2 <- Step2Selection(trajMeasures = step1)
 summary(step2)
@@ -93,5 +99,26 @@ print(step2)
 step3 <- Step3Clusters(trajSelection = step2)
 plot(step3, spline = T)
 
+results <- data.frame(step3$data)
+results$cluster <- step3$partition$Cluster
+results <- full_join(df, results[, c("ID", "cluster")], join_by(ID))
+table(results$a1c_result, results$cluster)
+```
 
+### Insulin
+
+```{r}
+set.seed(1017)
+step1 <- Step1Measures(Data = insulin, Time = time, ID = T)
+summary(step1)
+step2 <- Step2Selection(trajMeasures = step1)
+summary(step2)
+print(step2)
+step3 <- Step3Clusters(trajSelection = step2)
+plot(step3, spline = T)
+
+results <- data.frame(step3$data)
+results$cluster <- step3$partition$Cluster
+results <- full_join(df, results[, c("ID", "cluster")], join_by(ID))
+table(results$a1c_result, results$cluster)
 ```
