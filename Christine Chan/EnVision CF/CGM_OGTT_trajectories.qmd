@@ -1,5 +1,5 @@
 ---
-title: "OGTT Trajectories in CF"
+title: "CGM and OGTT Trajectories in CF"
 author: "Tim Vigers"
 date: "today"
 date-format: long
@@ -23,20 +23,71 @@ editor: source
 ```{r setup}
 #| include: false
 library(tidyverse)
+library(lubridate)
+library(hms)
+library(tools)
+library(readxl)
 library(traj)
 knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/EnVision CF")
 ```
 
 ```{r data cleaning}
-# Import data
+# Import OGTT and insulin data
 df <- read.csv("./Data_Clean/envision_analysis_dataset.csv", na.strings = "")
 # CFRD by 2 hour OGTT
 df$CFRD <- factor(df$Glucose_120 >= 200,
   levels = c(F, T),
   labels = c("CFRD-", "CFRD+")
 )
-# HbA1c and number of exacerbations to categorical
-df$a1c_result <- cut(df$a1c_result, breaks = c(-Inf, 5.5, 6.5, Inf), right = F)
+# CGM data
+files <- list.files("./Data_Raw/FilesReport_CGM_2025-01-30_1306/FilesReport_CGM_2025-01-30_1306/documents",
+  full.names = T
+)
+cgms <- lapply(files, function(f) {
+  print(f)
+  # File extension
+  ext <- file_ext(f)
+  # ID
+  id <- basename(f)
+  visit <- str_extract(id, "visit_._arm_.")
+  id <- sub("_visit.*", "", id)
+  # Clean CGM
+  if (ext == "csv") {
+    cgm <- read.csv(f, na.strings = "")
+  } else if (ext == "xlsx" | ext == "xls") {
+    cgm <- read_excel(f, col_types = "text",.name_repair = "minimal")
+  } else if (ext=="txt"){
+    cgm <- read.delim(f,comment.char="#")
+  } 
+  if (ncol(cgm) == 19) {
+    cgm <- cgm[-c(1:2), c(3, 5)]
+    colnames(cgm) <- c("timestamp", "Glucose")
+  } else if(ncol(cgm)==4){
+    cgm <- cgm[-c(1:2), c(2, 4)]
+    colnames(cgm) <- c("timestamp", "Glucose")
+  } 
+  # Fix timestamps
+  if (all(!is.na(suppressWarnings(as.numeric(cgm$timestamp))))) {
+      cgm$timestamp <- as_datetime(as.numeric(cgm$timestamp) * 60 * 60 * 24,
+        origin = "1899-12-30"
+      )
+    } else {
+      cgm$timestamp <- parse_date_time(
+        cgm$timestamp,
+        c("ymd HM", "ymd HMS", "mdy HM", "mdy HMS")
+      )
+    }
+  # Order columns
+  cgm$ID <- id
+  cgm$Visit <- visit
+  cgm$Date <- date(cgm$timestamp)
+  cgm$Time <- as_hms(cgm$timestamp)
+  cgm$Glucose <- as.numeric(cgm$Glucose)
+  cgm <- cgm %>% select(ID, Visit, Date, Time, Glucose)
+  # Return cleaned CGM
+  return(cgm)
+})
+# Number of exacerbations to categorical
 df$num_hospitalizations <- factor(df$num_hospitalizations,
   levels = c(0:9), labels = c("0", "1", "2", "3", rep("4+", 6))
 )
