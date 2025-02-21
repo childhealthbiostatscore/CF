@@ -17,8 +17,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Personal/Miscellaneous/zotero.bib
-csl: /Users/timvigers/GitHub/styles/american-medical-association.csl
+bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /home/timvigers/GitHub/styles/american-medical-association.csl
 editor: source
 execute:
   warning: false
@@ -33,7 +33,8 @@ library(arsenal)
 library(ggpubr)
 library(lmerTest)
 library(performance)
-knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability")
+library(gt)
+knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Edith Zemanick/Sweat Variability")
 ```
 
 ```{r data cleaning}
@@ -312,6 +313,61 @@ ggplot(pre_model_df, aes(y = swhcavgpm, x = pre_ratio)) +
 # Model-based approaches
 
 ```{r}
-m <- glmer(pre_post ~ na + cl + (1 | subject), data = chec_long, family = "binomial")
-m2 <- lmer(cl ~ pre_post * na + (1 | subject), data = chec_long)
+model_df <- chec_long %>%
+  select(subject, cl, na, ratio, pre_post) %>%
+  drop_na()
+m <- lmer(cl ~ pre_post * na + (1 | subject), data = model_df)
+# From Amalia
+m1 <- glm(pre_post ~ cl, data = model_df, family = "binomial")
+m2 <- glm(pre_post ~ cl + na, data = model_df, family = "binomial")
+m3 <- glm(pre_post ~ cl * na, data = model_df, family = "binomial")
+m4 <- glm(pre_post ~ ratio, data = model_df, family = "binomial")
+gt(compare_performance(m1, m2, m3, m4, metrics = "common")) %>%
+  fmt_number(decimals = 3)
+model_df$m1_pred <- factor(predict(m1, type = "response") > 0.5,
+  levels = c(F, T), labels = c("pred_pre", "pred_post")
+)
+model_df$m2_pred <- factor(predict(m2, type = "response") > 0.5,
+  levels = c(F, T), labels = c("pred_pre", "pred_post")
+)
+model_df$m3_pred <- factor(predict(m3, type = "response") > 0.5,
+  levels = c(F, T), labels = c("pred_pre", "pred_post")
+)
+model_df$m4_pred <- factor(predict(m4, type = "response") > 0.5,
+  levels = c(F, T), labels = c("pred_pre", "pred_post")
+)
 ```
+
+I tried fitting Amalia's models with a random effect for participant, but the random effect variance was 0 and the model estimates are the exact same as a regular logistic model. We think that this is because the correlation in responses is accounted for by the design, so the mized effects are not necessary. This is worth thinking about a little bit more, but for now we'll go ahead with the simplified logistic models.
+
+## Model 1
+
+```{r}
+m1 %>% gtsummary::tbl_regression(exponentiate = T)
+table(model_df$pre_post, model_df$m1_pred)
+prop.table(table(model_df$pre_post, model_df$m1_pred))
+```
+
+## Model 2
+
+```{r}
+m2 %>% gtsummary::tbl_regression(exponentiate = T)
+table(model_df$pre_post, model_df$m2_pred)
+prop.table(table(model_df$pre_post, model_df$m2_pred))
+```
+
+## Model 3
+
+```{r}
+m3 %>% gtsummary::tbl_regression(exponentiate = T)
+table(model_df$pre_post, model_df$m3_pred)
+prop.table(table(model_df$pre_post, model_df$m3_pred))
+```
+
+## Model 4
+
+```{r}
+m4 %>% gtsummary::tbl_regression(exponentiate = T)
+```
+
+The model using the ratio alone does not really work due to the fitted probabilities issue.
