@@ -33,143 +33,74 @@ knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Christine Ch
 
 ```{r data cleaning}
 # Import OGTT and insulin data
-df <- read.csv("./Data_Clean/envision_analysis_dataset.csv", na.strings = "")
-# CFRD by 2 hour OGTT
-df$CFRD <- factor(df$Glucose_120 >= 200,
-  levels = c(F, T),
-  labels = c("CFRD-", "CFRD+")
-)
+df <- read.csv("./Data_Raw/EnvisionCF_DATA_2024-07-19_1236.csv", na.strings = "")
 # CGM data
-files <- list.files("./Data_Raw/FilesReport_CGM_2025-01-30_1306/FilesReport_CGM_2025-01-30_1306/documents",
-  full.names = T
-)
+files <- list.files("./Data_Clean/CGM/Cleaned", full.names = T)
 cgms <- lapply(files, function(f) {
-  print(f)
-  # File extension
-  ext <- file_ext(f)
-  # ID
+  # Read data
+  cgm <- read.csv(f, na.strings = "")
+  # Format ID and visit name
   id <- basename(f)
+  id <- sub("_sensor_raw_data_upload\\.csv", "", id)
   visit <- str_extract(id, "visit_._arm_.")
-  id <- sub("_visit.*", "", id)
-  # Clean CGM
-  if (ext == "csv") {
-    cgm <- read.csv(f, na.strings = "")
-  } else if (ext == "xlsx" | ext == "xls") {
-    cgm <- read_excel(f, col_types = "text",.name_repair = "minimal")
-  } else if (ext=="txt"){
-    cgm <- read.delim(f,comment.char="#")
-  } 
-  if (ncol(cgm) == 19) {
-    cgm <- cgm[-c(1:2), c(3, 5)]
-    colnames(cgm) <- c("timestamp", "Glucose")
-  } else if(ncol(cgm)==4){
-    cgm <- cgm[-c(1:2), c(2, 4)]
-    colnames(cgm) <- c("timestamp", "Glucose")
-  } 
-  # Fix timestamps
-  if (all(!is.na(suppressWarnings(as.numeric(cgm$timestamp))))) {
-      cgm$timestamp <- as_datetime(as.numeric(cgm$timestamp) * 60 * 60 * 24,
-        origin = "1899-12-30"
-      )
-    } else {
-      cgm$timestamp <- parse_date_time(
-        cgm$timestamp,
-        c("ymd HM", "ymd HMS", "mdy HM", "mdy HMS")
-      )
-    }
-  # Order columns
-  cgm$ID <- id
-  cgm$Visit <- visit
-  cgm$Date <- date(cgm$timestamp)
-  cgm$Time <- as_hms(cgm$timestamp)
-  cgm$Glucose <- as.numeric(cgm$Glucose)
-  cgm <- cgm %>% select(ID, Visit, Date, Time, Glucose)
-  # Return cleaned CGM
+  id <- sub("_visit_._arm_.", "", id)
+  # Split date and time for averaging
+  cgm$timestamp <- parse_date_time(cgm$timestamp, c("ymd HMS", "ymd"))
+  cgm$timestamp <- round_date(cgm$timestamp, "15 minutes")
+  cgm$date <- as.Date(cgm$timestamp)
+  cgm$time <- as_hms(cgm$timestamp)
+  # Format dataframe and return
+  cgm$study_id <- id
+  cgm$redcap_event_name <- visit
+  cgm <- cgm %>% select(study_id, redcap_event_name, date, time, sensorglucose)
   return(cgm)
 })
+cgms <- do.call(rbind, cgms)
+# For each wear, average by time of day and convert to wide
+cgms <- cgms %>%
+  mutate(time = as.numeric(time)) %>%
+  group_by(study_id, redcap_event_name, time) %>%
+  summarise(sensorglucose = mean(sensorglucose, na.rm = T), .groups = "drop") %>%
+  pivot_wider(names_from = time, values_from = sensorglucose)
+# Select and merge
+df <- df %>%
+  select(study_id, redcap_event_name, num_hospitalizations, timepoint_120_min) %>%
+  drop_na()
+df <- left_join(cgms, df)
 # Number of exacerbations to categorical
 df$num_hospitalizations <- factor(df$num_hospitalizations,
   levels = c(0:9), labels = c("0", "1", "2", "3", rep("4+", 6))
 )
-# Long data for plotting
-long_df <- df %>%
-  pivot_longer(Glucose_0:Insulin_180,
-    names_to = c("Measure", "Timepoint"),
-    names_pattern = "(.*)_(.*)", values_to = "Value"
-  ) %>%
-  select(study_id, CFRD, Date, ogtt_num, a1c_result, num_hospitalizations, Measure, Timepoint, Value) %>%
-  drop_na()
-long_df$Timepoint <- as.numeric(long_df$Timepoint)
-# Define timepoints
-timepoints <- c(0, 10, 30, 60, 90, 120, 150, 180)
+df <- df %>%
+  select(
+    study_id, redcap_event_name, num_hospitalizations, timepoint_120_min,
+    everything()
+  )
+# Save for Laura
+write.csv(df,file = "./Data_Clean/trajectories.csv",row.names = F,na="")
 # Unique identifier
 df$ID <- 1:nrow(df)
-# Make trajectory datasets for OGTT glucose and insulin, remove rows with < 3 values
-glucose <- df %>%
-  select(ID, Glucose_0:Glucose_180) %>%
-  filter(rowSums(!is.na(.)) > 4)
-insulin <- df %>%
-  select(ID, Insulin_0:Insulin_180) %>%
-  filter(rowSums(!is.na(.)) > 4)
 # Make a dataframe for time
-time <- data.frame(matrix(rep(timepoints, nrow(glucose)),
+time <- data.frame(matrix(rep(seq(0, 85500, by = 900), nrow(df)),
   byrow = T,
-  ncol = length(timepoints)
+  ncol = length(seq(0, 85500, by = 900))
 ))
-time$ID <- glucose$ID
+time$ID <- df$ID
 time <- time %>% select(ID, everything())
-```
-
-# fsOGTT Spaghetti Plot
-
-```{r}
-ggplot(long_df, aes(
-  x = Timepoint, y = Value,
-  group = interaction(study_id, ogtt_num)
-)) +
-  geom_point(shape = ".", alpha = 0.1) +
-  geom_line(alpha = 0.1) +
-  scale_x_continuous(breaks = timepoints) +
-  facet_wrap(~Measure) +
-  theme_bw()
 ```
 
 # Basic Trajectory Analysis
 
-## By A1c category
-
-### Glucose
-
 ```{r}
 set.seed(1017)
-step1 <- Step1Measures(Data = glucose, Time = time, ID = T)
+step1 <- Step1Measures(
+  Data = df[, c("ID", seq(0, 85500, by = 900))],
+  Time = time, ID = T
+)
 summary(step1)
 step2 <- Step2Selection(trajMeasures = step1)
 summary(step2)
 print(step2)
 step3 <- Step3Clusters(trajSelection = step2)
 plot(step3, spline = T)
-
-results <- data.frame(step3$data)
-results$cluster <- step3$partition$Cluster
-results <- full_join(df, results[, c("ID", "cluster")], join_by(ID))
-table(results$a1c_result, results$cluster)
-```
-
-### Insulin
-
-```{r}
-set.seed(1017)
-step1 <- Step1Measures(Data = insulin, Time = time, ID = T)
-summary(step1)
-step2 <- Step2Selection(trajMeasures = step1)
-summary(step2)
-print(step2)
-step3 <- Step3Clusters(trajSelection = step2)
-plot(step3, spline = T)
-
-results <- data.frame(step3$data)
-results$cluster <- step3$partition$Cluster
-results <- full_join(df, results[, c("ID", "cluster")], join_by(ID))
-table(results$a1c_result, results$cluster)
 ```
