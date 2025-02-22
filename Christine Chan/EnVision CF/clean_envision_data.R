@@ -208,7 +208,7 @@ hypo_symptoms$Date <- ymd(hypo_symptoms$Date)
 # cleandata(
 #   inputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM/Manually Edited",
 #   outputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM/Cleaned",
-#   id_filename = T
+#   id_filename = T, verbose = T
 # )
 # cgmvariables(
 #   inputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM/Cleaned",
