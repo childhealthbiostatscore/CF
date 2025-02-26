@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /Users/timvigers/GitHub/styles/american-medical-association.csl
+bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /home/timvigers/Documents/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -30,38 +30,40 @@ github_dir <- switch(Sys.info()["sysname"],
   "Windows" = "C:/Users/timvigers/GitHub",
   "Linux" = "/home/timvigers/GitHub"
 )
-knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Angela Metcalf/Quantifying Sweat Chloride in CF Carriers")
+knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Angela Metcalf/Quantifying Sweat Chloride in CF Carriers")
 ```
 
 ```{r data cleaning}
 #| message: false
 # Import from REDCap
-unlockREDCap(c(rcon = "Sweat Electrolytes in CF Carriers 24-0691"),
-  keyring = "API_KEYs",
-  envir = 1,
-  url = "https://redcap.ucdenver.edu/api/"
-)
-df <- exportRecordsTyped(rcon)
-# Format
-df <- df %>%
-  mutate(
-    `Cl Right` = as.numeric(cl_right), `Cl Left` = as.numeric(cl_left),
-    `Na Right` = as.numeric(na_right), `Na Left` = as.numeric(na_left)
-  )
-df$`Mean Cl` <- rowMeans(df[, c("Cl Right", "Cl Left")])
-df$`Mean Na` <- rowMeans(df[, c("Na Right", "Na Left")])
+# unlockREDCap(c(rcon = "Sweat Electrolytes in CF Carriers 24-0691"),
+#   keyring = "API_KEYs",
+#   envir = 1,
+#   url = "https://redcap.ucdenver.edu/api/"
+# )
+# df <- exportRecordsTyped(rcon)
+# # Format
+# df <- df %>%
+#   mutate(
+#     `Cl Right` = as.numeric(cl_right), `Cl Left` = as.numeric(cl_left),
+#     `Na Right` = as.numeric(na_right), `Na Left` = as.numeric(na_left)
+#   )
+# df$`Mean Cl` <- rowMeans(df[, c("Cl Right", "Cl Left")])
+# df$`Mean Na` <- rowMeans(df[, c("Na Right", "Na Left")])
 ```
 
-# Table 1
+# Confidence interval power calculations
 
 ```{r}
-t1 = tableby(carrier~`Mean Cl` +`Mean Na`,data = df )
-summary(t1)
-```
-
-# Plots
-
-```{r}
-ggplot(df, aes(x = carrier, y = `Mean Cl`)) +
-  geom_boxplot()
+ns <- 35:45
+power <- lapply(ns, function(n) {
+  se <- qt(0.05 / 2, lower.tail = F, df = n - 1) * (12 / sqrt(n))
+  return(c(
+    "Confidence level" = 0.95, "Sample size (N)" = n,
+    "Actual Distance from Mean to Limits" = se,
+    "Standard deviation of sweat chloride" = 12
+  ))
+})
+power <- do.call(rbind, power)
+knitr::kable(power)
 ```

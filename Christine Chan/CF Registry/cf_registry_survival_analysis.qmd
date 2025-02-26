@@ -34,7 +34,7 @@ library(eulerr)
 library(broom)
 library(emmeans)
 library(ggstats)
-knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry")
+knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry")
 ```
 
 # Data cleaning

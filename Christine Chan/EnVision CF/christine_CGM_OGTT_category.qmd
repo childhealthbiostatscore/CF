@@ -24,17 +24,12 @@ library(gtsummary)
 library(dplyr)
 library(pracma)
 library(ggplot2)
-home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/tim/OneDrive/Vigers/CF"
-)
-knitr::opts_knit$set(root.dir = home_dir)
+knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF")
 ```
 
 ```{r data cleaning}
 # Import
-df <- read.csv("./Christine Chan/EnVision CF/Data_Clean/analysis_dataset.csv",
+df <- read.csv("./Christine Chan/EnVision CF/Data_Clean/envision_analysis_dataset.csv",
   na.strings = ""
 )
 # Filter out those with no CGM data and those with no associated OGTT
@@ -60,8 +55,7 @@ df %>%
   filter(row_number() == 1) %>%
   ungroup() %>%
   select(
-    redcap_data_access_group, age_visit:origin_race, cftr_mutation_1,
-    cftr_mutation_2, weight
+    redcap_data_access_group, age_visit:origin_race, CFTR, weight
   ) %>%
   tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
   add_overall()
@@ -75,8 +69,7 @@ df %>%
   filter(row_number() == 1) %>%
   ungroup() %>%
   select(
-    redcap_data_access_group, age_visit:origin_race, cftr_mutation_1,
-    cftr_mutation_2, weight, scully140
+    redcap_data_access_group, age_visit:origin_race, CFTR, weight, scully140
   ) %>%
   tbl_summary(by = scully140, missing_text = "Missing") %>%
   add_p() %>%
@@ -92,8 +85,7 @@ df %>%
   filter(row_number() == 1) %>%
   ungroup() %>%
   select(
-    redcap_data_access_group, age_visit:origin_race, cftr_mutation_1,
-    cftr_mutation_2, weight, scully180
+    redcap_data_access_group, age_visit:origin_race, CFTR, weight, scully180
   ) %>%
   tbl_summary(by = scully180, missing_text = "Missing") %>%
   add_p() %>%

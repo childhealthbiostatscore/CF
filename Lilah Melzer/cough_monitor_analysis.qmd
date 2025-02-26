@@ -32,7 +32,7 @@ library(tidyverse)
 library(ggstats)
 library(corrplot)
 library(patchwork)
-knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor")
+knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Lilah Melzer/Lilah Cough Monitor")
 ```
 
 ```{r data import}
@@ -778,4 +778,3 @@ invisible(lapply(unique(agg_counts$sid), function(s) {
   cat("\n")
 }))
 ```
-

@@ -18,7 +18,7 @@ format:
       light: flatly
       dark: darkly
 bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /home/timvigers/GitHub/styles/american-medical-association.csl
+csl: /home/timvigers/Documents/GitHub/styles/american-medical-association.csl
 editor: source
 execute:
   warning: false
@@ -321,7 +321,7 @@ m <- lmer(cl ~ pre_post * na + (1 | subject), data = model_df)
 m1 <- glm(pre_post ~ cl, data = model_df, family = "binomial")
 m2 <- glm(pre_post ~ cl + na, data = model_df, family = "binomial")
 m3 <- glm(pre_post ~ cl * na, data = model_df, family = "binomial")
-m4 <- glm(pre_post ~ ratio, data = model_df, family = "binomial")
+m4 <- glm(pre_post ~ scale(ratio), data = model_df, family = "binomial")
 gt(compare_performance(m1, m2, m3, m4, metrics = "common")) %>%
   fmt_number(decimals = 3)
 model_df$m1_pred <- factor(predict(m1, type = "response") > 0.5,
