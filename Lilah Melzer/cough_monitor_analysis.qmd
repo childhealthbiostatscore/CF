@@ -32,6 +32,7 @@ library(tidyverse)
 library(ggstats)
 library(corrplot)
 library(patchwork)
+library(gt)
 knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Lilah Melzer/Lilah Cough Monitor")
 ```
 
@@ -272,55 +273,6 @@ ggplot(agg_counts, aes(x = Coughs)) +
 
 The distribution of coughs per night is extremely skewed, so coughs per night, etc. are reported as medians rather than means.
 
-# Coughs over time (aggregated)
-
-## Plot
-
-### All participants
-
-```{r}
-#| label: fig-coughs-by-night
-#| fig-cap: Coughs by nights from start
-#| warning: false
-ggplot(agg_counts[!is.na(agg_counts$Coughs), ], aes(
-  x = Night, y = Coughs, group = factor(sid), color = Diagnosis
-)) +
-  geom_point(alpha = 0.1) +
-  geom_line(alpha = 0.1) +
-  geom_smooth(aes(group = Diagnosis)) +
-  theme_bw()
-```
-
-### By participant
-
-```{r results='asis'}
-#| label: fig-coughs-by-night-2
-#| fig-cap: Coughs by nights from start
-#| warning: false
-invisible(lapply(unique(agg_counts$sid), function(s) {
-  d <- agg_counts[agg_counts$sid == s, ]
-  diag <- d$Diagnosis[1]
-  p <- ggplot(d, aes(
-    x = Night, y = Coughs, group = factor(sid), color = Sick
-  )) +
-    geom_point() +
-    geom_line() +
-    theme_bw() +
-    ylim(0, 50) +
-    xlim(0, 150) +
-    scale_color_manual(values = c("#377EB8", "#E41A1C")) +
-    ggtitle(paste0("Participant ", s, " (", diag, ")"))
-  if (s == 38) {
-    p <- p + ylim(0, 270)
-  }
-  cat("\n")
-  cat("\n")
-  print(p)
-  cat("\n")
-  cat("\n")
-}))
-```
-
 # Basic statistics excluding 0s
 
 ## Aggregated by person
@@ -381,6 +333,89 @@ summary(no_0_t, pfootnote = T)
 ```
 
 Spearman correlation between median coughs and pre-bronchodilator FEV1 was `r round(as.numeric(M$estimate),3)` (p = `r format.pval(M$p.value,eps = 0.001,digits = 3)`).
+
+# Coughs over time (aggregated)
+
+```{r}
+#| label: fig-coughs-by-night
+#| fig-cap: Coughs by nights from start
+#| warning: false
+ggplot(agg_counts[!is.na(agg_counts$Coughs), ], aes(
+  x = Night, y = Coughs, group = factor(sid), color = Diagnosis
+)) +
+  geom_point(alpha = 0.1) +
+  geom_line(alpha = 0.1) +
+  geom_smooth(aes(group = Diagnosis)) +
+  theme_bw()
+```
+
+# Zero-inflated models
+
+We compared several models using BIC. First, we compared a zero-inflated Poisson (ZIP) model with no fixed effects in the zero part of the model to one with time and diagnosis included as fixed effects in the zero part (both parts of the model included a random intercept for participant). The model with the same fixed effects in both parts was better (10088.29 vs. 10071.32).
+
+Next, we compared this model to the same model structure but with a negative binomial distribution (ZINB) rather than Poisson to account for overdispersion in the non-zero part of the model. The ZINB was significantly better than the ZIP model (10071.32 vs. 6810.49).
+
+Finally, we compared the ZINB model with random intercept in both parts of the model to one with an additional random slope in the zero part, one with random slope in the count part, and one with random slope in both parts. The ZINB model with random slope in the non-zero part of the model but only a random intercept in the zero part was better than the simple ZINB model (6810.49 vs. 6753.76). Interestingly, it was also better than the model with a random slope in both parts (6732.82 vs. 6801.86).
+
+```{r}
+zip1 <- mixed_model(Coughs ~ Night + Diagnosis,
+  data = agg_counts,
+  random = ~ 1 | sid, zi_random = ~ 1 | sid,
+  family = zi.poisson(), zi_fixed = ~1
+)
+zip2 <- update(zip1, zi_fixed = ~ Night + Diagnosis)
+
+zinb1 <- update(zip2, family = zi.negative.binomial())
+
+zinb2 <- update(zinb1, random = ~ Night | sid)
+
+zinb3 <- update(zinb1, zi_random = ~ Night | sid)
+
+zinb <- zinb2
+
+s <- summary(zinb)
+
+s$coef_table_zi %>%
+  data.frame() %>%
+  rownames_to_column() %>%
+  gt(caption = "Zero-part coefficients") %>%
+  fmt_number(decimals = 3)
+
+s$coef_table %>%
+  data.frame() %>%
+  rownames_to_column() %>%
+  gt(caption = "Count coefficients") %>%
+  fmt_number(decimals = 3)
+```
+
+For now, the results above are still on the log scale, so a negative value in the estimate column indicates a lower odds ratio or incidence rate ratio. The zero-part coefficients indicate that the odds of having a night with 0 coughs were significantly lower in the CF group (log(OR) = -1.277, OR = 0.279, p = 0.02). In other words, people with CF were more likely to cough than those without CF. However, the count coefficients table indicates that given a night with more than 0 coughs, people with CF coughed at a higher rate than those without CF, but this difference was not statistically significant (log(OR) = 0.591, OR = 1.805, p = 0.082).
+
+## By sick status
+
+To examine the effect of sickness on cough rate, we kept the same random effect structure as above, but added a fixed effect for sick status in both parts of the model.
+
+```{r}
+zinb_sick <- update(zinb,
+  fixed = Coughs ~ Night + Diagnosis + Sick,
+  zi_fixed = ~ Night + Diagnosis + Sick
+)
+
+s <- summary(zinb_sick)
+
+s$coef_table_zi %>%
+  data.frame() %>%
+  rownames_to_column() %>%
+  gt(caption = "Zero-part coefficients") %>%
+  fmt_number(decimals = 3)
+
+s$coef_table %>%
+  data.frame() %>%
+  rownames_to_column() %>%
+  gt(caption = "Count coefficients") %>%
+  fmt_number(decimals = 3)
+```
+
+The interpretation of these results is generally the same as above. The zero-part coefficients indicate that people with CF are still more likely to cough than people without CF (log(OR) = -1.301, OR = 0.272, p = 0.018), even after adjusting for sickness. Sickness increased the odds of coughing, but the difference was not statistically significant (log(OR) = 0.693, OR = 1.999, p = 0.346). However, given a night with coughs, sickness increased the rate of cough significantly (log(OR) = 1.244, OR = 3.468, p = 0.011).
 
 # CFQ-R
 
@@ -858,53 +893,207 @@ hc_surveys <- df %>%
   ) %>%
   filter(!if_all(q1:q5, ~ is.na(.)))
 hc_surveys$sid <- as.numeric(hc_surveys$sid)
-# Combine
-cf_surveys <- full_join(cfqr_parent_6_13, cfqr_children_6_11)
-cf_surveys <- full_join(cf_surveys, cfqr_children_12_13)
-cf_surveys <- full_join(cf_surveys, cfqr_teens_adults)
-cf_surveys$sid <- as.numeric(cf_surveys$sid)
-# Add to counts for plotting
-agg_counts <- full_join(agg_counts, cf_surveys, by = join_by(sid, Date))
-agg_counts <- full_join(agg_counts, hc_surveys, by = join_by(sid, Date, Survey))
 ```
 
 ## Respiratory scores
 
-### Plots by participant
+I tried to examine the association between respiratory scores and cough using similar ZINB to above, but there just isn't enough data to fit these models. For example, looking at the caregiver surveys, there are only two participants with both survey results and cough data on the same date. The two participants have 8 and 12 dates with data, but by using the model approach we would be excluding 5 participants who each took the survey only once. 
+
+So, instead of the model approach I did a more simple correlation between median coughs per night and median respiratory score.
+
+### CFQ-R Caregivers 6-13
+
+#### Median scores
+
+```{r}
+#| warning: false
+cfqr_parent_6_13$sid <- as.numeric(cfqr_parent_6_13$sid)
+caregivers <-
+  full_join(agg_counts, cfqr_parent_6_13, join_by(sid, Date)) %>%
+  select(sid, Sick, Night, Coughs, respirat) %>%
+  filter(!if_all(Coughs:respirat, ~ is.na(.)))
+caregivers_med <- caregivers %>%
+  group_by(sid) %>%
+  summarise(
+    `Median Coughs` = median(Coughs, na.rm = T),
+    `Median Resp. Score` = median(respirat, na.rm = T)
+  ) %>%
+  drop_na()
+M <- cor.test(caregivers_med$`Median Coughs`,
+  caregivers_med$`Median Resp. Score`,
+  method = "spearman"
+)
+ggplot(caregivers_med, aes(
+  y = `Median Coughs`, x = `Median Resp. Score`,
+  colour = factor(sid)
+)) +
+  geom_point() +
+  theme_bw()
+```
+
+Spearman's correlation between median coughs and median respiratory symptom score was `r round(as.numeric(M$estimate),3)` (p = `r format.pval(M$p.value,digits = 3,eps=0.001)`).
+
+#### Plots by participant
 
 ```{r}
 #| message: false
 #| warning: false
-invisible(lapply(unique(agg_counts$sid), function(s) {
-  d <- agg_counts[agg_counts$sid == s, ]
-  diag <- d$Diagnosis[1]
-  p <- ggplot(d, aes(
-    x = Night, y = Coughs, group = factor(sid), color = Sick
-  )) +
+invisible(lapply(unique(caregivers_med$sid), function(s) {
+  d <- caregivers[caregivers$sid == s, ]
+  d <- d %>% pivot_longer(c(Coughs, respirat))
+  p <- ggplot(d, aes(x = Night, y = value, color = Sick)) +
     geom_point() +
     geom_line() +
     theme_bw() +
-    ylim(0, 50) +
-    xlim(0, 150) +
     scale_color_manual(values = c("#377EB8", "#E41A1C")) +
-    ggtitle(paste0("Participant ", s, " (", diag, ")"))
-  if (s == 38) {
-    p <- p + ylim(0, 270)
-  }
-  p2 <- ggplot(d[!is.na(d$respirat), ], aes(
-    x = Night, y = respirat, group = factor(sid), color = Sick
-  )) +
-    geom_point() +
-    geom_line() +
-    theme_bw() +
-    ylim(50, 100) +
-    xlim(0, 150) +
-    scale_color_manual(values = c("#377EB8", "#E41A1C")) +
-    ggtitle(paste0("Participant ", s, " (", diag, ")"))
+    facet_wrap(~name, ncol = 1) +
+    ggtitle(paste0("Participant ", s))
   cat("\n")
   cat("\n")
-  print(p + p2 + plot_layout(guides = "collect"))
+  print(p)
   cat("\n")
   cat("\n")
 }))
 ```
+
+### CFQ-R Children Ages 12-13  
+
+#### Median scores
+
+```{r}
+#| warning: false
+cfqr_children_12_13$sid <- as.numeric(cfqr_children_12_13$sid)
+children_12_13 <-
+  full_join(agg_counts, cfqr_children_12_13, join_by(sid, Date)) %>%
+  select(sid, Sick, Night, Coughs, respirat) %>%
+  filter(!if_all(Coughs:respirat, ~ is.na(.)))
+children_12_13_med <- children_12_13 %>%
+  group_by(sid) %>%
+  summarise(
+    `Median Coughs` = median(Coughs, na.rm = T),
+    `Median Resp. Score` = median(respirat, na.rm = T)
+  ) %>%
+  drop_na()
+M <- cor.test(children_12_13_med$`Median Coughs`,
+  children_12_13_med$`Median Resp. Score`,
+  method = "spearman"
+)
+ggplot(children_12_13_med, aes(
+  y = `Median Coughs`, x = `Median Resp. Score`,
+  colour = factor(sid)
+)) +
+  geom_point() +
+  theme_bw()
+```
+
+Spearman's correlation between median coughs and median respiratory symptom score was `r round(as.numeric(M$estimate),3)` (p = `r format.pval(M$p.value,digits = 3,eps=0.001)`).
+
+#### Plots by participant
+
+```{r}
+#| message: false
+#| warning: false
+invisible(lapply(unique(children_12_13_med$sid), function(s) {
+  d <- children_12_13[children_12_13$sid == s, ]
+  d <- d %>% pivot_longer(c(Coughs, respirat))
+  p <- ggplot(d, aes(x = Night, y = value, color = Sick)) +
+    geom_point() +
+    geom_line() +
+    theme_bw() +
+    scale_color_manual(values = c("#377EB8", "#E41A1C")) +
+    facet_wrap(~name, ncol = 1) +
+    ggtitle(paste0("Participant ", s))
+  cat("\n")
+  cat("\n")
+  print(p)
+  cat("\n")
+  cat("\n")
+}))
+```
+
+### CFQ-R Adolescents and Adults 14 Years
+
+#### Median scores
+
+```{r}
+#| warning: false
+cfqr_teens_adults$sid <- as.numeric(cfqr_teens_adults$sid)
+teens_adults <-
+  full_join(agg_counts, cfqr_teens_adults, join_by(sid, Date)) %>%
+  select(sid, Sick, Night, Coughs, respirat) %>%
+  filter(!if_all(Coughs:respirat, ~ is.na(.)))
+teens_adults_med <- teens_adults %>%
+  group_by(sid) %>%
+  summarise(
+    `Median Coughs` = median(Coughs, na.rm = T),
+    `Median Resp. Score` = median(respirat, na.rm = T)
+  ) %>%
+  drop_na()
+M <- cor.test(teens_adults_med$`Median Coughs`,
+  teens_adults_med$`Median Resp. Score`,
+  method = "spearman"
+)
+ggplot(teens_adults_med, aes(
+  y = `Median Coughs`, x = `Median Resp. Score`,
+  colour = factor(sid)
+)) +
+  geom_point() +
+  theme_bw()
+```
+
+Spearman's correlation between median coughs and median respiratory symptom score was `r round(as.numeric(M$estimate),3)` (p = `r format.pval(M$p.value,digits = 3,eps=0.001)`).
+
+#### Plots by participant
+
+```{r}
+#| message: false
+#| warning: false
+invisible(lapply(unique(teens_adults_med$sid), function(s) {
+  d <- teens_adults[teens_adults$sid == s, ]
+  d <- d %>% pivot_longer(c(Coughs, respirat))
+  p <- ggplot(d, aes(x = Night, y = value, color = Sick)) +
+    geom_point() +
+    geom_line() +
+    theme_bw() +
+    scale_color_manual(values = c("#377EB8", "#E41A1C")) +
+    facet_wrap(~name, ncol = 1) +
+    ggtitle(paste0("Participant ", s))
+  cat("\n")
+  cat("\n")
+  print(p)
+  cat("\n")
+  cat("\n")
+}))
+```
+
+### Healthy controls
+
+#### Median scores
+
+```{r}
+#| warning: false
+hc_surveys$sid <- as.numeric(hc_surveys$sid)
+hcs <-
+  full_join(agg_counts, hc_surveys, join_by(sid, Date)) %>%
+  select(sid, Sick, Night, Coughs, q1:q5) %>%
+  filter(!if_all(q1:q5, ~ is.na(.)))
+hcs_med <- hcs %>%
+  group_by(sid) %>%
+  summarise(
+    `Median Coughs` = median(Coughs, na.rm = T),
+    `Median Resp. Score` = median(as.numeric(q1), na.rm = T)
+  ) %>%
+  drop_na()
+M <- cor.test(hcs_med$`Median Coughs`,
+  hcs_med$`Median Resp. Score`,
+  method = "spearman"
+)
+ggplot(hcs_med, aes(
+  y = `Median Coughs`, x = `Median Resp. Score`,
+  colour = factor(sid)
+)) +
+  geom_point() +
+  theme_bw()
+```
+
+Spearman's correlation between median coughs and median respiratory symptom score was `r round(as.numeric(M$estimate),3)` (p = `r format.pval(M$p.value,digits = 3,eps=0.001)`).
