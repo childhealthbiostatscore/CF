@@ -434,7 +434,9 @@ cfqr_parent_6_13 <- df %>%
   mutate(
     physical =
       ifelse(
-        sum(is.na(c(phys1, phys2, phys3, phys4, phys5, phys14, phys15, phys16))) <= 4,
+        sum(is.na(c(
+          phys1, phys2, phys3, phys4, phys5, phys14, phys15, phys16
+        ))) <= 4,
         (mean(c(phys1, phys2, phys3, phys4, phys5, phys14, phys15, phys16)) - 1)
         / 3 * 100, NA
       ),
@@ -553,14 +555,22 @@ cfqr_children_6_11 <- df %>%
       ),
     emotion =
       ifelse(
-        sum(is.na(c(emot7, emot8, emot9, emot10, emot11, emot12, emot13, emot14))) <= 4,
-        (mean(c(emot7, emot8, emot9, emot10, emot11, emot12, emot13, emot14)) - 1)
+        sum(is.na(c(
+          emot7, emot8, emot9, emot10, emot11, emot12, emot13, emot14
+        ))) <= 4,
+        (mean(c(
+          emot7, emot8, emot9, emot10, emot11, emot12, emot13, emot14
+        )) - 1)
         / 3 * 100, NA
       ),
     social =
       ifelse(
-        sum(is.na(c(social20, social21, social22, social23, social24, social25, social26))) <= 3,
-        (mean(c(social20, social21, social22, social23, social24, social25, social26)) - 1)
+        sum(is.na(c(
+          social20, social21, social22, social23, social24, social25, social26
+        ))) <= 3,
+        (mean(c(
+          social20, social21, social22, social23, social24, social25, social26
+        )) - 1)
         / 3 * 100, NA
       ),
     eat =
@@ -598,6 +608,108 @@ cfqr_children_6_11 <- df %>%
     Date = coalesce(Date, date_v1_cf),
     Date = coalesce(Date, date_v1_hc),
     Survey = "CFQ-R Children Ages 6-11"
+  ) %>%
+  select(
+    sid, Survey, Date, physical:digest
+  ) %>%
+  filter(!if_all(physical:digest, ~ is.na(.)))
+# Children aged 12 to 13
+cfqr_children_12_13_names <- list(
+  "cfq_r_o1" = "phys1", "cfq_r_o2" = "phys2", "cfq_r_o3" = "phys3",
+  "cfq_r_o4" = "phys4", "cfq_r_o5" = "phys5", "cfq_r_o6" = "phys6",
+  "cfq_r_o7" = "emot7", "cfq_r_o8" = "emot8", "cfq_r_or9" = "emot9",
+  "cfq_r_o10" = "emot10", "cfq_r_o11" = "emot11", "cfq_r_o12" = "emot12",
+  "cfq_r_o13" = "emot13", "cfq_r_o14" = "emot14", "cfq_r_o15" = "eat15",
+  "cfq_r_o16" = "treat16", "cfq_r_o17" = "eat17", "cfq_r_o18" = "treat18",
+  "cfq_r_o19" = "eat19", "cfq_r_o20" = "social20", "cfq_r_o21" = "social21",
+  "cfq_r_o22" = "social22", "cfq_r_o23" = "social23", "cfq_r_o24" = "social24",
+  "cfq_r_o25" = "social25", "cfq_r_o26" = "social26", "cfq_r_o27" = "body27",
+  "cfq_r_o28" = "body28", "cfq_r_o29" = "body29", "cfq_r_o30" = "treat30",
+  "cfq_r_o31" = "resp31", "cfq_r_o32" = "resp32", "cfq_r_o33" = "resp33",
+  "cfq_r_o34" = "resp34", "cfq_r_o35" = "digest35"
+)
+cfqr_children_12_13_names <-
+  setNames(names(cfqr_children_12_13_names), cfqr_children_12_13_names)
+# Some items need to be reverse scored
+cfqr_children_12_13_reverse <- c(
+  "phys1", "phys2", "phys3", "phys4", "phys5", "emot14", "treat18", "eat19",
+  "social20", "social22", "social24", "social26"
+)
+# Do all the calculations
+cfqr_children_12_13 <- df %>%
+  select(
+    sid, date_v1_cf, date_v1_hc,
+    cfqr_children_ages_1213_timestamp, cfq_r_o1:cfq_r_o35
+  ) %>%
+  mutate(
+    Date = as.Date(cfqr_children_ages_1213_timestamp),
+    across(cfq_r_o1:cfq_r_o35, ~ as.numeric(.x))
+  ) %>%
+  rename(all_of(unlist(cfqr_children_12_13_names))) %>%
+  mutate(across(all_of(cfqr_children_12_13_reverse), ~ 5 - .x)) %>%
+  rowwise() %>%
+  mutate(
+    physical =
+      ifelse(
+        sum(is.na(c(phys1, phys2, phys3, phys4, phys5, phys6))) <= 3,
+        (mean(c(phys1, phys2, phys3, phys4, phys5, phys6)) - 1)
+        / 3 * 100, NA
+      ),
+    emotion =
+      ifelse(
+        sum(is.na(c(
+          emot7, emot8, emot9, emot10, emot11, emot12, emot13, emot14
+        ))) <= 4,
+        (mean(c(
+          emot7, emot8, emot9, emot10, emot11, emot12, emot13, emot14
+        )) - 1)
+        / 3 * 100, NA
+      ),
+    social =
+      ifelse(
+        sum(is.na(c(
+          social20, social21, social22, social23, social24, social25, social26
+        ))) <= 3,
+        (mean(c(
+          social20, social21, social22, social23, social24, social25, social26
+        )) - 1)
+        / 3 * 100, NA
+      ),
+    eat =
+      ifelse(
+        sum(is.na(c(eat15, eat17, eat19))) <= 1,
+        (mean(c(eat15, eat17, eat19)) - 1)
+        / 3 * 100, NA
+      ),
+    body =
+      ifelse(
+        sum(is.na(c(body27, body28, body29))) <= 1,
+        (mean(c(body27, body28, body29)) - 1)
+        / 3 * 100, NA
+      ),
+    treat =
+      ifelse(
+        sum(is.na(c(treat16, treat18, treat30))) <= 1,
+        (mean(c(treat16, treat18, treat30)) - 1)
+        / 3 * 100, NA
+      ),
+    respirat =
+      ifelse(
+        sum(is.na(c(resp31, resp32, resp33, resp34))) <= 2,
+        (mean(c(resp31, resp32, resp33, resp34)) - 1)
+        / 3 * 100, NA
+      ),
+    digest =
+      ifelse(
+        sum(is.na(c(digest35))) == 0,
+        (mean(c(digest35)) - 1)
+        / 3 * 100, NA
+      )
+  ) %>%
+  mutate(
+    Date = coalesce(Date, date_v1_cf),
+    Date = coalesce(Date, date_v1_hc),
+    Survey = "CFQ-R Children Ages 12-13"
   ) %>%
   select(
     sid, Survey, Date, physical:digest
@@ -670,8 +782,12 @@ cfqr_teens_adults <- df %>%
       ),
     social =
       ifelse(
-        sum(is.na(c(social22, social23, social27, social28, social29, social30))) <= 3,
-        (mean(c(social22, social23, social27, social28, social29, social30)) - 1)
+        sum(is.na(c(
+          social22, social23, social27, social28, social29, social30
+        ))) <= 3,
+        (mean(c(
+          social22, social23, social27, social28, social29, social30
+        )) - 1)
         / 3 * 100, NA
       ),
     body =
@@ -726,16 +842,30 @@ cfqr_teens_adults <- df %>%
     sid, Survey, Date, physical:digest
   ) %>%
   filter(!if_all(physical:digest, ~ is.na(.)))
+# Controls
+hc_surveys <- df %>%
+  select(
+    sid, date_v1_cf, date_v1_hc, hc_pediatric_cough_survey_timestamp, q1:q5
+  ) %>%
+  mutate(
+    Date = as.Date(hc_pediatric_cough_survey_timestamp),
+    Date = coalesce(Date, date_v1_cf),
+    Date = coalesce(Date, date_v1_hc),
+    Survey = "HC Cough Survey"
+  ) %>%
+  select(
+    sid, Survey, Date, q1:q5
+  ) %>%
+  filter(!if_all(q1:q5, ~ is.na(.)))
+hc_surveys$sid <- as.numeric(hc_surveys$sid)
 # Combine
-surveys <- full_join(cfqr_parent_6_13, cfqr_children_6_11)
-surveys <- full_join(surveys, cfqr_teens_adults)
+cf_surveys <- full_join(cfqr_parent_6_13, cfqr_children_6_11)
+cf_surveys <- full_join(cf_surveys, cfqr_children_12_13)
+cf_surveys <- full_join(cf_surveys, cfqr_teens_adults)
+cf_surveys$sid <- as.numeric(cf_surveys$sid)
 # Add to counts for plotting
-cfqr_parent_6_13$sid <- as.numeric(cfqr_parent_6_13$sid)
-cfqr_children_6_11$sid <- as.numeric(cfqr_children_6_11$sid)
-cfqr_teens_adults$sid <- as.numeric(cfqr_teens_adults$sid)
-agg_counts <- full_join(agg_counts, cfqr_parent_6_13)
-agg_counts <- full_join(agg_counts, cfqr_children_6_11)
-agg_counts <- full_join(agg_counts, cfqr_teens_adults)
+agg_counts <- full_join(agg_counts, cf_surveys, by = join_by(sid, Date))
+agg_counts <- full_join(agg_counts, hc_surveys, by = join_by(sid, Date, Survey))
 ```
 
 ## Respiratory scores
