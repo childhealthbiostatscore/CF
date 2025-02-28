@@ -290,19 +290,13 @@ agreement <- function(bug, data = df) {
   cat("#### Euler diagram of negative results")
   cat("\n")
   cat("\n")
-  print(plot(euler(d == "Negative"),
-    quantities = list(cex = 3),
-    fills = list(fill = c("#FFC107", "#1E88E5", "#004D40"))
-  ))
+  print(plot(euler(d == "Negative"), quantities = list(cex = 3)))
   cat("\n")
   cat("\n")
   cat("#### Euler diagram of positive results")
   cat("\n")
   cat("\n")
-  print(plot(euler(d == "Positive"),
-    quantities = list(cex = 3),
-    fills = list(fill = c("#FFC107", "#1E88E5", "#004D40"))
-  ))
+  print(plot(euler(d == "Positive"), quantities = list(cex = 3)))
   cat("\n")
   cat("\n")
 }
@@ -600,16 +594,15 @@ invisible(lapply(names(bug_list), function(b) {
 
 ```{r}
 # All pathogens
-d <- df[, c("overall_cos", "overall_sos")]
-colnames(d) <- c("COS", "SOS")
-d <- d[complete.cases(d), ]
-a1 <- plot(euler(d == "Positive"),
-  quantities = list(cex = 3),
-  fills = list(fill = c("#FFC107", "#1E88E5", "#004D40"))
-)
-a2 <- ggplot(as.data.frame(table(d$COS, d$SOS)), aes(Var1, Var2)) +
+d_overall <- df[, c("overall_cos", "overall_sos")]
+colnames(d_overall) <- c("COS", "SOS")
+d_overall <- d_overall[complete.cases(d_overall), ]
+a1 <- plot(euler(d_overall == "Positive"), quantities = list(cex = 3))
+a2 <-
+  ggplot(as.data.frame(table(d_overall$COS, d_overall$SOS)), aes(Var1, Var2)) +
   geom_tile(color = "white", fill = "#1E88E5") +
-  geom_text(aes(label = paste0(Freq, "\n(", round(Freq / sum(Freq), 3) * 100, "%)")),
+  geom_text(
+    aes(label = paste0(Freq, "\n(", round(Freq / sum(Freq), 3) * 100, "%)")),
     color = "white"
   ) +
   xlab("COS") +
@@ -617,14 +610,12 @@ a2 <- ggplot(as.data.frame(table(d$COS, d$SOS)), aes(Var1, Var2)) +
   theme_bw() +
   theme(text = element_text(size = 15))
 # MRSA
-d <- df[, c("staphylococcus_aureus_cos", "staphylococcus_aureus_sos")]
-colnames(d) <- c("COS", "SOS")
-d <- d[complete.cases(d), ]
-b1 <- plot(euler(d == "Positive"),
-  quantities = list(cex = 3),
-  fills = list(fill = c("#FFC107", "#1E88E5", "#004D40"))
-)
-b2 <- ggplot(as.data.frame(table(d$COS, d$SOS)), aes(Var1, Var2)) +
+d_MSSA <- df[, c("staphylococcus_aureus_cos", "staphylococcus_aureus_sos")]
+colnames(d_MSSA) <- c("COS", "SOS")
+d_MSSA <- d_MSSA[complete.cases(d_MSSA), ]
+b1 <- plot(euler(d_MSSA == "Positive"), quantities = list(cex = 3))
+b2 <-
+  ggplot(as.data.frame(table(d_MSSA$COS, d_MSSA$SOS)), aes(Var1, Var2)) +
   geom_tile(color = "white", fill = "#1E88E5") +
   geom_text(aes(label = paste0(Freq, "\n(", round(Freq / sum(Freq), 3) * 100, "%)")),
     color = "white"
@@ -633,9 +624,35 @@ b2 <- ggplot(as.data.frame(table(d$COS, d$SOS)), aes(Var1, Var2)) +
   ylab("SOS") +
   theme_bw() +
   theme(text = element_text(size = 15))
-p <- ggarrange(a1, a2, b1, b2, nrow = 2, ncol = 2) +
+p1 <- ggarrange(a1, a2, b1, b2, nrow = 2, ncol = 2) +
   bgcolor("White")
-ggsave("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Jordana Hoppe/SSwAB-IT/Dissemination/Figures/fig.png",
-  plot = p, width =9, height = 6, units = "in"
+ggsave("/home/timvigers/OneDrive/Vigers/CF/Jordana Hoppe/SSwAB-IT/Dissemination/Figures/fig.png",
+  plot = p1, width = 9, height = 6, units = "in"
+)
+a1 <- plot(euler(d_overall == "Positive"),
+  quantities = list(cex = 3),
+  main = "Any CF Pathogen"
+)
+b1 <- plot(euler(d_MSSA == "Positive"),
+  quantities = list(cex = 3),
+  main = "MSSA"
+)
+p2 <- ggarrange(a1, b1, nrow = 1, ncol = 2) +
+  bgcolor("White")
+ggsave("/home/timvigers/OneDrive/Vigers/CF/Jordana Hoppe/SSwAB-IT/Dissemination/Figures/euler_bw.png",
+  plot = p2, width = 9, height = 6, units = "in"
+)
+a1 <- plot(venn(d_overall == "Positive"),
+  quantities = list(cex = 3),
+  main = "Any CF Pathogen"
+)
+b1 <- plot(venn(d_MSSA == "Positive"),
+  quantities = list(cex = 3),
+  main = "MSSA"
+)
+p3 <- ggarrange(a1, b1, nrow = 1, ncol = 2) +
+  bgcolor("White")
+ggsave("/home/timvigers/OneDrive/Vigers/CF/Jordana Hoppe/SSwAB-IT/Dissemination/Figures/venn_bw.png",
+  plot = p3, width = 9, height = 6, units = "in"
 )
 ```
