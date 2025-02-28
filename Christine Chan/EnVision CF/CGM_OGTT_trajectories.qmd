@@ -8,7 +8,7 @@ format:
     toc: true
     toc-depth: 5
     toc-float: true
-    code-fold: false
+    code-fold: true
     self-contained: true
     fig-cap-location: top
     page-layout: full
@@ -31,7 +31,7 @@ library(traj)
 knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/EnVision CF")
 ```
 
-```{r data cleaning}
+```{r}
 # Import OGTT and insulin data
 df <- read.csv("./Data_Raw/EnvisionCF_DATA_2024-07-19_1236.csv", na.strings = "")
 # CGM data
@@ -67,7 +67,8 @@ df <- df %>%
   select(study_id, redcap_event_name, num_hospitalizations, timepoint_120_min) %>%
   drop_na()
 df <- left_join(cgms, df)
-# Number of exacerbations to categorical
+# Categorical
+df$two_hour <- cut(df$timepoint_120_min, c(-Inf, 140, 200, Inf), right = F)
 df$num_hospitalizations <- factor(df$num_hospitalizations,
   levels = c(0:9), labels = c("0", "1", "2", "3", rep("4+", 6))
 )
@@ -76,8 +77,6 @@ df <- df %>%
     study_id, redcap_event_name, num_hospitalizations, timepoint_120_min,
     everything()
   )
-# Save for Laura
-write.csv(df,file = "./Data_Clean/trajectories.csv",row.names = F,na="")
 # Unique identifier
 df$ID <- 1:nrow(df)
 # Make a dataframe for time
@@ -89,7 +88,9 @@ time$ID <- df$ID
 time <- time %>% select(ID, everything())
 ```
 
-# Basic Trajectory Analysis
+# CGM trajectories
+
+## Automatic number of clusters
 
 ```{r}
 set.seed(1017)
@@ -103,4 +104,215 @@ summary(step2)
 print(step2)
 step3 <- Step3Clusters(trajSelection = step2)
 plot(step3, spline = T)
+# Check results
+df$predicted <- step3$partition$Cluster
+table(df$predicted, df$two_hour)
+table(df$predicted, df$num_hospitalizations)
+```
+
+## Four clusters
+
+```{r}
+step1 <- Step1Measures(
+  Data = df[, c("ID", seq(0, 85500, by = 900))],
+  Time = time, ID = T
+)
+summary(step1)
+step2 <- Step2Selection(trajMeasures = step1)
+summary(step2)
+print(step2)
+step3 <- Step3Clusters(trajSelection = step2, nclusters = 4)
+plot(step3, spline = T)
+# Check results
+df$predicted <- step3$partition$Cluster
+table(df$predicted, df$two_hour)
+table(df$predicted, df$num_hospitalizations)
+```
+
+## Three clusters
+
+```{r}
+step1 <- Step1Measures(
+  Data = df[, c("ID", seq(0, 85500, by = 900))],
+  Time = time, ID = T
+)
+summary(step1)
+step2 <- Step2Selection(trajMeasures = step1)
+summary(step2)
+print(step2)
+step3 <- Step3Clusters(trajSelection = step2, nclusters = 3)
+plot(step3, spline = T)
+# Check results
+df$predicted <- step3$partition$Cluster
+table(df$predicted, df$two_hour)
+table(df$predicted, df$num_hospitalizations)
+```
+
+# Insulin trajectories
+
+```{r}
+# Import OGTT and insulin data
+df <- read.csv("./Data_Clean/envision_analysis_dataset.csv", na.strings = "")
+timepoints <- c(0, 10, 30, 60, 90, 120, 150, 180)
+# Categorical variables
+df$two_hour <- cut(df$Glucose_120, c(-Inf, 140, 200, Inf), right = F)
+df$num_hospitalizations <- factor(df$num_hospitalizations,
+  levels = 0:9,
+  labels = c("0", "1", "2", "3", rep("4+", 6))
+)
+# Remove too many missing
+df <- df %>%
+  select(study_id:num_hospitalizations, two_hour, Insulin_0:Insulin_180) %>%
+  rowwise() %>%
+  filter(sum(is.na(c_across(Insulin_0:Insulin_180))) < 3)
+# Unique identifier
+df$ID <- 1:nrow(df)
+# Make a dataframe for time
+time <- data.frame(matrix(rep(timepoints, nrow(df)),
+  byrow = T,
+  ncol = length(timepoints)
+))
+time$ID <- df$ID
+time <- time %>% select(ID, everything())
+```
+
+## Automatic number of clusters
+
+```{r}
+step1 <- Step1Measures(
+  Data = df[, c("ID", paste0("Insulin_", timepoints))],
+  Time = time, ID = T
+)
+summary(step1)
+step2 <- Step2Selection(trajMeasures = step1)
+summary(step2)
+print(step2)
+step3 <- Step3Clusters(trajSelection = step2)
+plot(step3, spline = T)
+# Check results
+df$predicted <- step3$partition$Cluster
+table(df$predicted, df$two_hour)
+table(df$predicted, df$num_hospitalizations)
+```
+
+## Four clusters
+
+```{r}
+step1 <- Step1Measures(
+  Data = df[, c("ID", paste0("Insulin_", timepoints))],
+  Time = time, ID = T
+)
+summary(step1)
+step2 <- Step2Selection(trajMeasures = step1)
+summary(step2)
+print(step2)
+step3 <- Step3Clusters(trajSelection = step2, nclusters = 4)
+plot(step3, spline = T)
+# Check results
+df$predicted <- step3$partition$Cluster
+table(df$predicted, df$two_hour)
+table(df$predicted, df$num_hospitalizations)
+```
+
+## Three clusters
+
+```{r}
+step1 <- Step1Measures(
+  Data = df[, c("ID", paste0("Insulin_", timepoints))],
+  Time = time, ID = T
+)
+summary(step1)
+step2 <- Step2Selection(trajMeasures = step1)
+summary(step2)
+print(step2)
+step3 <- Step3Clusters(trajSelection = step2, nclusters = 3)
+plot(step3, spline = T)
+# Check results
+df$predicted <- step3$partition$Cluster
+table(df$predicted, df$two_hour)
+table(df$predicted, df$num_hospitalizations)
+```
+
+# Glucose trajectories
+
+```{r}
+# Import OGTT and insulin data
+df <- read.csv("./Data_Clean/envision_analysis_dataset.csv", na.strings = "")
+# Categorical variables
+df$two_hour <- cut(df$Glucose_120, c(-Inf, 140, 200, Inf), right = F)
+df$num_hospitalizations <- factor(df$num_hospitalizations,
+  levels = 0:9,
+  labels = c("0", "1", "2", "3", rep("4+", 6))
+)
+# Remove too many missing
+df <- df %>%
+  select(study_id:num_hospitalizations, two_hour, Glucose_0:Glucose_180) %>%
+  rowwise() %>%
+  filter(sum(is.na(c_across(Glucose_0:Glucose_180))) < 3)
+# Unique identifier
+df$ID <- 1:nrow(df)
+# Make a dataframe for time
+time <- data.frame(matrix(rep(timepoints, nrow(df)),
+  byrow = T,
+  ncol = length(timepoints)
+))
+time$ID <- df$ID
+time <- time %>% select(ID, everything())
+```
+
+## Automatic number of clusters
+
+```{r}
+step1 <- Step1Measures(
+  Data = df[, c("ID", paste0("Glucose_", timepoints))],
+  Time = time, ID = T
+)
+summary(step1)
+step2 <- Step2Selection(trajMeasures = step1)
+summary(step2)
+print(step2)
+step3 <- Step3Clusters(trajSelection = step2)
+plot(step3, spline = T)
+# Check results
+df$predicted <- step3$partition$Cluster
+table(df$predicted, df$two_hour)
+table(df$predicted, df$num_hospitalizations)
+```
+
+## Four clusters
+
+```{r}
+step1 <- Step1Measures(
+  Data = df[, c("ID", paste0("Glucose_", timepoints))],
+  Time = time, ID = T
+)
+summary(step1)
+step2 <- Step2Selection(trajMeasures = step1)
+summary(step2)
+print(step2)
+step3 <- Step3Clusters(trajSelection = step2, nclusters = 4)
+plot(step3, spline = T)
+# Check results
+df$predicted <- step3$partition$Cluster
+table(df$predicted, df$two_hour)
+table(df$predicted, df$num_hospitalizations)
+```
+
+## Three clusters
+
+```{r}
+step1 <- Step1Measures(
+  Data = df[, c("ID", paste0("Glucose_", timepoints))],
+  Time = time, ID = T
+)
+summary(step1)
+step2 <- Step2Selection(trajMeasures = step1)
+summary(step2)
+print(step2)
+step3 <- Step3Clusters(trajSelection = step2, nclusters = 3)
+plot(step3, spline = T)
+# Check results
+df$predicted <- step3$partition$Cluster
+table(df$predicted, df$two_hour)
+table(df$predicted, df$num_hospitalizations)
 ```
