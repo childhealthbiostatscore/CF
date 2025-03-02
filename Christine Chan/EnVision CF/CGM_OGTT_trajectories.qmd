@@ -15,8 +15,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /home/timvigers/Documents/GitHub/styles/american-medical-association.csl
+#bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
+#csl: /home/timvigers/Documents/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -28,7 +28,8 @@ library(hms)
 library(tools)
 library(readxl)
 library(traj)
-knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/EnVision CF")
+knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF"
+#knitr::opts_knit$set(root.dir = "/Users/pylell/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF")
 ```
 
 ```{r}
@@ -64,7 +65,7 @@ cgms <- cgms %>%
   pivot_wider(names_from = time, values_from = sensorglucose)
 # Select and merge
 df <- df %>%
-  select(study_id, redcap_event_name, num_hospitalizations, timepoint_120_min) %>%
+  select(study_id, redcap_event_name, num_hospitalizations, timepoint_120_min, homa_ir) %>%
   drop_na()
 df <- left_join(cgms, df)
 # Categorical
@@ -106,8 +107,19 @@ step3 <- Step3Clusters(trajSelection = step2)
 plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
+# vs. 2 hour
 table(df$predicted, df$two_hour)
-table(df$predicted, df$num_hospitalizations)
+mod <- lm(df$timepoint_120_min ~ df$predicted)
+summary(mod)
+p <- plot(df$timepoint_120_min ~ df$predicted)
+# Vs. homa-ir
+mod <- lm(df$homa_ir ~ df$predicted)
+summary(mod)
+p <- plot(df$homa_ir ~ df$predicted)
+# Vs. hospitalizations
+t <- table(df$predicted, df$num_hospitalizations)
+t
+chisq.test(t)
 ```
 
 ## Four clusters
@@ -124,9 +136,20 @@ print(step2)
 step3 <- Step3Clusters(trajSelection = step2, nclusters = 4)
 plot(step3, spline = T)
 # Check results
+# Vs. 2 hour glucose
 df$predicted <- step3$partition$Cluster
 table(df$predicted, df$two_hour)
-table(df$predicted, df$num_hospitalizations)
+mod <- lm(df$timepoint_120_min ~ df$predicted)
+summary(mod)
+p <- plot(df$timepoint_120_min ~ df$predicted)
+# Vs. homa-ir
+mod <- lm(df$homa_ir ~ df$predicted)
+summary(mod)
+p <- plot(df$homa_ir ~ df$predicted)
+# Vs. hospitalizations
+t <- table(df$predicted, df$num_hospitalizations)
+t
+chisq.test(t)
 ```
 
 ## Three clusters
@@ -143,9 +166,20 @@ print(step2)
 step3 <- Step3Clusters(trajSelection = step2, nclusters = 3)
 plot(step3, spline = T)
 # Check results
+# Vs. 2 hour
 df$predicted <- step3$partition$Cluster
 table(df$predicted, df$two_hour)
-table(df$predicted, df$num_hospitalizations)
+mod <- lm(df$timepoint_120_min ~ df$predicted)
+summary(mod)
+p <- plot(df$timepoint_120_min ~ df$predicted)
+# Vs. homa-ir
+mod <- lm(df$homa_ir ~ df$predicted)
+summary(mod)
+p <- plot(df$homa_ir ~ df$predicted)
+# Vs. hospitalizations
+t <- table(df$predicted, df$num_hospitalizations)
+t
+chisq.test(t)
 ```
 
 # Insulin trajectories
@@ -162,7 +196,7 @@ df$num_hospitalizations <- factor(df$num_hospitalizations,
 )
 # Remove too many missing
 df <- df %>%
-  select(study_id:num_hospitalizations, two_hour, Insulin_0:Insulin_180) %>%
+  select(study_id:num_hospitalizations, two_hour, homa_ir, Insulin_0:Insulin_180, Glucose_120) %>%
   rowwise() %>%
   filter(sum(is.na(c_across(Insulin_0:Insulin_180))) < 3)
 # Unique identifier
@@ -191,8 +225,19 @@ step3 <- Step3Clusters(trajSelection = step2)
 plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
+# Vs. 2 hour
 table(df$predicted, df$two_hour)
-table(df$predicted, df$num_hospitalizations)
+mod <- lm(df$Glucose_120 ~ df$predicted)
+summary(mod)
+p <- plot(df$Glucose_120 ~ df$predicted)
+# Vs. homa-ir
+mod <- lm(df$homa_ir ~ df$predicted)
+summary(mod)
+p <- plot(df$homa_ir ~ df$predicted)
+# Vs. hospitalizations
+t <- table(df$predicted, df$num_hospitalizations)
+t
+chisq.test(t)
 ```
 
 ## Four clusters
@@ -210,8 +255,19 @@ step3 <- Step3Clusters(trajSelection = step2, nclusters = 4)
 plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
+# Vs. 2 hour
 table(df$predicted, df$two_hour)
-table(df$predicted, df$num_hospitalizations)
+mod <- lm(df$Glucose_120 ~ df$predicted)
+summary(mod)
+p <- plot(df$Glucose_120 ~ df$predicted)
+# Vs. homa-ir
+mod <- lm(df$homa_ir ~ df$predicted)
+summary(mod)
+p <- plot(df$homa_ir ~ df$predicted)
+# Vs. hospitalizations
+t <- table(df$predicted, df$num_hospitalizations)
+t
+chisq.test(t)
 ```
 
 ## Three clusters
@@ -229,8 +285,19 @@ step3 <- Step3Clusters(trajSelection = step2, nclusters = 3)
 plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
+# Vs. 2 hour
 table(df$predicted, df$two_hour)
-table(df$predicted, df$num_hospitalizations)
+mod <- lm(df$Glucose_120 ~ df$predicted)
+summary(mod)
+p <- plot(df$Glucose_120 ~ df$predicted)
+# Vs. homa-ir
+mod <- lm(df$homa_ir ~ df$predicted)
+summary(mod)
+p <- plot(df$homa_ir ~ df$predicted)
+# Vs. hospitalizations
+t <- table(df$predicted, df$num_hospitalizations)
+t
+chisq.test(t)
 ```
 
 # Glucose trajectories
@@ -276,7 +343,13 @@ plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
 table(df$predicted, df$two_hour)
-table(df$predicted, df$num_hospitalizations)
+mod <- lm(df$Glucose_120 ~ df$predicted)
+summary(mod)
+p <- plot(df$Glucose_120 ~ df$predicted)
+# Vs. hospitalizations
+t <- table(df$predicted, df$num_hospitalizations)
+t
+chisq.test(t)
 ```
 
 ## Four clusters
@@ -295,7 +368,13 @@ plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
 table(df$predicted, df$two_hour)
-table(df$predicted, df$num_hospitalizations)
+mod <- lm(df$Glucose_120 ~ df$predicted)
+summary(mod)
+p <- plot(df$Glucose_120 ~ df$predicted)
+# Vs. hospitalizations
+t <- table(df$predicted, df$num_hospitalizations)
+t
+chisq.test(t)
 ```
 
 ## Three clusters
@@ -314,5 +393,11 @@ plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
 table(df$predicted, df$two_hour)
-table(df$predicted, df$num_hospitalizations)
+mod <- lm(df$Glucose_120 ~ df$predicted)
+summary(mod)
+p <- plot(df$Glucose_120 ~ df$predicted)
+# Vs. hospitalizations
+t <- table(df$predicted, df$num_hospitalizations)
+t
+chisq.test(t)
 ```
