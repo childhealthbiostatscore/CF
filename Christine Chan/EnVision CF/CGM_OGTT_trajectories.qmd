@@ -28,13 +28,36 @@ library(hms)
 library(tools)
 library(readxl)
 library(traj)
-knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF"
-#knitr::opts_knit$set(root.dir = "/Users/pylell/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF")
+# knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/EnVision CF")
+knitr::opts_knit$set(root.dir = "/Users/pylell/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF")
 ```
 
 ```{r}
-# Import OGTT and insulin data
-df <- read.csv("./Data_Raw/EnvisionCF_DATA_2024-07-19_1236.csv", na.strings = "")
+# Import REDCap and define timepoints
+df <- read.csv("./Data_Raw/EnvisionCF_DATA_2024-07-19_1236.csv",
+  na.strings = ""
+)
+timepoints <- c(0, 10, 30, 60, 90, 120, 150, 180)
+# Insulin
+insulin <- read.csv("./Data_Clean/envision_analysis_dataset.csv",
+  na.strings = ""
+)
+insulin <- insulin %>%
+  select(study_id, Glucose_0:Glucose_180, Insulin_0:Insulin_180)
+colnames(insulin) <- c(
+  "study_id", paste0("timepoint_", timepoints, "_min"),
+  paste0("insulin_", timepoints, "_min")
+)
+df <- left_join(df, insulin,
+  multiple = "first",
+  by = join_by(
+    study_id, timepoint_0_min, timepoint_10_min, timepoint_30_min,
+    timepoint_60_min, timepoint_90_min, timepoint_120_min, timepoint_150_min,
+    timepoint_180_min
+  )
+)
+# Calculate HOMA-IR
+df$homa_ir <- (df$timepoint_0_min * df$insulin_0_min) / 22.5
 # CGM data
 files <- list.files("./Data_Clean/CGM/Cleaned", full.names = T)
 cgms <- lapply(files, function(f) {
@@ -65,9 +88,12 @@ cgms <- cgms %>%
   pivot_wider(names_from = time, values_from = sensorglucose)
 # Select and merge
 df <- df %>%
-  select(study_id, redcap_event_name, num_hospitalizations, timepoint_120_min, homa_ir) %>%
+  select(
+    study_id, redcap_event_name, num_hospitalizations, timepoint_120_min,
+    homa_ir
+  ) %>%
   drop_na()
-df <- left_join(cgms, df)
+df <- left_join(cgms, df, by = join_by(study_id, redcap_event_name))
 # Categorical
 df$two_hour <- cut(df$timepoint_120_min, c(-Inf, 140, 200, Inf), right = F)
 df$num_hospitalizations <- factor(df$num_hospitalizations,
@@ -76,7 +102,7 @@ df$num_hospitalizations <- factor(df$num_hospitalizations,
 df <- df %>%
   select(
     study_id, redcap_event_name, num_hospitalizations, timepoint_120_min,
-    everything()
+    homa_ir, everything()
   )
 # Unique identifier
 df$ID <- 1:nrow(df)
@@ -187,7 +213,6 @@ chisq.test(t)
 ```{r}
 # Import OGTT and insulin data
 df <- read.csv("./Data_Clean/envision_analysis_dataset.csv", na.strings = "")
-timepoints <- c(0, 10, 30, 60, 90, 120, 150, 180)
 # Categorical variables
 df$two_hour <- cut(df$Glucose_120, c(-Inf, 140, 200, Inf), right = F)
 df$num_hospitalizations <- factor(df$num_hospitalizations,
