@@ -642,8 +642,9 @@ invisible(lapply(c(xvars, "A_Vx770", "A_VX809comb"), function(v) {
 t1 <- era1 %>% tbl_regression(exponentiate = T)
 t1
 ggcoef_model(era1,
-  show_p_values = F, add_reference_rows = T, exponentiate = T,
-  signif_stars = F, colour = F
+  show_p_values = F, add_reference_rows = T, exponentiate = T, shape_guide = F,
+  signif_stars = F, colour = "significance", shape = "reference_row",
+  shape_values = c(16, 15)
 )
 ```
 
@@ -653,8 +654,9 @@ ggcoef_model(era1,
 t2 <- era2 %>% tbl_regression(exponentiate = T)
 t2
 ggcoef_model(era2,
-  show_p_values = F, add_reference_rows = T, exponentiate = T,
-  signif_stars = F, colour = F
+  show_p_values = F, add_reference_rows = T, exponentiate = T, shape_guide = F,
+  signif_stars = F, colour = "significance", shape = "reference_row",
+  shape_values = c(16, 15)
 )
 ```
 
@@ -664,8 +666,9 @@ ggcoef_model(era2,
 t3 <- era3 %>% tbl_regression(exponentiate = T)
 t3
 ggcoef_model(era3,
-  show_p_values = F, add_reference_rows = T, exponentiate = T,
-  signif_stars = F, colour = F
+  show_p_values = F, add_reference_rows = T, exponentiate = T, shape_guide = F,
+  signif_stars = F, colour = "significance", shape = "reference_row",
+  shape_values = c(16, 15)
 )
 ```
 
@@ -678,7 +681,9 @@ tbl_merge(
 )
 comb_plot <- ggcoef_compare(
   list("2003 - 2008" = era1, "2009 - 2013" = era2, "2014 - 2018" = era3),
-  add_reference_rows = T, exponentiate = T, type = "faceted", colour = F
+  add_reference_rows = T, exponentiate = T, shape_guide = F,
+  colour = "significance", shape = "reference_row", shape_values = c(16, 15),
+  type = "faceted"
 )
 comb_plot
 ggsave("./Dissemination/Figures/time_combined_forest.png",
