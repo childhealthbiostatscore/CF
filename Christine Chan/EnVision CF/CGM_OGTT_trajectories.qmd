@@ -136,7 +136,9 @@ plot(step3, spline = T, legend.plot = FALSE)
 # Check results
 df$predicted <- step3$partition$Cluster
 # vs. 2 hour
-table(df$predicted, df$two_hour)
+t <- table(df$predicted, df$two_hour)
+t
+chisq.test(t)
 mod <- lm(df$timepoint_120_min ~ as.factor(df$predicted))
 summary(mod)
 anova(mod)
@@ -170,7 +172,9 @@ plot(step3, spline = T)
 # Check results
 # Vs. 2 hour glucose
 df$predicted <- step3$partition$Cluster
-table(df$predicted, df$two_hour)
+t <- table(df$predicted, df$two_hour)
+t
+chisq.test(t)
 mod <- lm(df$timepoint_120_min ~ as.factor(df$predicted))
 summary(mod)
 anova(mod)
@@ -204,7 +208,9 @@ plot(step3, spline = T)
 # Check results
 # Vs. 2 hour
 df$predicted <- step3$partition$Cluster
-table(df$predicted, df$two_hour)
+t <- table(df$predicted, df$two_hour)
+t
+chisq.test(t)
 mod <- lm(df$timepoint_120_min ~ as.factor(df$predicted))
 summary(mod)
 anova(mod)
@@ -266,7 +272,9 @@ plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
 # Vs. 2 hour
-table(df$predicted, df$two_hour)
+t <- table(df$predicted, df$two_hour)
+t
+chisq.test(t)
 mod <- lm(df$Glucose_120 ~ as.factor(df$predicted))
 summary(mod)
 anova(mod)
@@ -300,7 +308,9 @@ plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
 # Vs. 2 hour
-table(df$predicted, df$two_hour)
+t <- table(df$predicted, df$two_hour)
+t
+chisq.test(t)
 mod <- lm(df$Glucose_120 ~ as.factor(df$predicted))
 summary(mod)
 anova(mod)
@@ -334,7 +344,9 @@ plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
 # Vs. 2 hour
-table(df$predicted, df$two_hour)
+t <- table(df$predicted, df$two_hour)
+t
+chisq.test(t)
 mod <- lm(df$Glucose_120 ~ as.factor(df$predicted))
 summary(mod)
 anova(mod)
@@ -396,7 +408,9 @@ plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
 # vs. 2 hour glucose
-table(df$predicted, df$two_hour)
+t <- table(df$predicted, df$two_hour)
+t
+chisq.test(t)
 mod <- lm(df$Glucose_120 ~ as.factor(df$predicted))
 summary(mod)
 anova(mod)
@@ -429,7 +443,9 @@ plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
 # vs. 2 hour glucose
-table(df$predicted, df$two_hour)
+t <- table(df$predicted, df$two_hour)
+t
+chisq.test(t)
 mod <- lm(df$Glucose_120 ~ as.factor(df$predicted))
 summary(mod)
 anova(mod)
@@ -463,7 +479,9 @@ plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
 # vs. 2 hour glucose
-table(df$predicted, df$two_hour)
+t <- table(df$predicted, df$two_hour)
+t
+chisq.test(t)
 mod <- lm(df$Glucose_120 ~ as.factor(df$predicted))
 summary(mod)
 anova(mod)
