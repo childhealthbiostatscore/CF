@@ -27,6 +27,7 @@ library(lubridate)
 library(hms)
 library(tools)
 library(readxl)
+library(emmeans)
 library(traj)
 # knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/EnVision CF")
 knitr::opts_knit$set(root.dir = "/Users/pylell/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF")
@@ -58,6 +59,7 @@ df <- left_join(df, insulin,
 )
 # Calculate HOMA-IR
 df$homa_ir <- (df$timepoint_0_min * df$insulin_0_min) / 22.5
+df$log_homa_ir <- log(df$homa_ir+0.00001)
 # CGM data
 files <- list.files("./Data_Clean/CGM/Cleaned", full.names = T)
 cgms <- lapply(files, function(f) {
@@ -90,7 +92,7 @@ cgms <- cgms %>%
 df <- df %>%
   select(
     study_id, redcap_event_name, num_hospitalizations, timepoint_120_min,
-    homa_ir
+    homa_ir, log_homa_ir
   ) %>%
   drop_na()
 df <- left_join(cgms, df, by = join_by(study_id, redcap_event_name))
@@ -130,18 +132,22 @@ step2 <- Step2Selection(trajMeasures = step1)
 summary(step2)
 print(step2)
 step3 <- Step3Clusters(trajSelection = step2)
-plot(step3, spline = T)
+plot(step3, spline = T, legend.plot = FALSE)
 # Check results
 df$predicted <- step3$partition$Cluster
 # vs. 2 hour
 table(df$predicted, df$two_hour)
-mod <- lm(df$timepoint_120_min ~ df$predicted)
+mod <- lm(df$timepoint_120_min ~ as.factor(df$predicted))
 summary(mod)
-p <- plot(df$timepoint_120_min ~ df$predicted)
+anova(mod)
+emmeans(mod, "predicted")
+p <- plot(df$timepoint_120_min ~ as.factor(df$predicted))
 # Vs. homa-ir
-mod <- lm(df$homa_ir ~ df$predicted)
+mod <- lm(df$log_homa_ir ~ as.factor(df$predicted))
 summary(mod)
-p <- plot(df$homa_ir ~ df$predicted)
+anova(mod)
+emmeans(mod, "predicted")
+p <- plot(df$log_homa_ir ~ df$predicted)
 # Vs. hospitalizations
 t <- table(df$predicted, df$num_hospitalizations)
 t
@@ -165,13 +171,17 @@ plot(step3, spline = T)
 # Vs. 2 hour glucose
 df$predicted <- step3$partition$Cluster
 table(df$predicted, df$two_hour)
-mod <- lm(df$timepoint_120_min ~ df$predicted)
+mod <- lm(df$timepoint_120_min ~ as.factor(df$predicted))
 summary(mod)
+anova(mod)
+emmeans(mod, "predicted")
 p <- plot(df$timepoint_120_min ~ df$predicted)
 # Vs. homa-ir
-mod <- lm(df$homa_ir ~ df$predicted)
+mod <- lm(df$log_homa_ir ~ as.factor(df$predicted))
 summary(mod)
-p <- plot(df$homa_ir ~ df$predicted)
+anova(mod)
+emmeans(mod, "predicted")
+p <- plot(df$log_homa_ir ~ df$predicted)
 # Vs. hospitalizations
 t <- table(df$predicted, df$num_hospitalizations)
 t
@@ -195,13 +205,17 @@ plot(step3, spline = T)
 # Vs. 2 hour
 df$predicted <- step3$partition$Cluster
 table(df$predicted, df$two_hour)
-mod <- lm(df$timepoint_120_min ~ df$predicted)
+mod <- lm(df$timepoint_120_min ~ as.factor(df$predicted))
 summary(mod)
+anova(mod)
+emmeans(mod, "predicted")
 p <- plot(df$timepoint_120_min ~ df$predicted)
 # Vs. homa-ir
-mod <- lm(df$homa_ir ~ df$predicted)
+mod <- lm(df$log_homa_ir ~ as.factor(df$predicted))
 summary(mod)
-p <- plot(df$homa_ir ~ df$predicted)
+anova(mod)
+emmeans(mod, "predicted")
+p <- plot(df$log_homa_ir ~ df$predicted)
 # Vs. hospitalizations
 t <- table(df$predicted, df$num_hospitalizations)
 t
@@ -226,6 +240,7 @@ df <- df %>%
   filter(sum(is.na(c_across(Insulin_0:Insulin_180))) < 3)
 # Unique identifier
 df$ID <- 1:nrow(df)
+df$log_homa_ir <- log(df$homa_ir+0.00001)
 # Make a dataframe for time
 time <- data.frame(matrix(rep(timepoints, nrow(df)),
   byrow = T,
@@ -252,13 +267,17 @@ plot(step3, spline = T)
 df$predicted <- step3$partition$Cluster
 # Vs. 2 hour
 table(df$predicted, df$two_hour)
-mod <- lm(df$Glucose_120 ~ df$predicted)
+mod <- lm(df$Glucose_120 ~ as.factor(df$predicted))
 summary(mod)
+anova(mod)
+emmeans(mod, "predicted")
 p <- plot(df$Glucose_120 ~ df$predicted)
 # Vs. homa-ir
-mod <- lm(df$homa_ir ~ df$predicted)
+mod <- lm(df$log_homa_ir ~ as.factor(df$predicted))
 summary(mod)
-p <- plot(df$homa_ir ~ df$predicted)
+anova(mod)
+emmeans(mod, "predicted")
+p <- plot(df$log_homa_ir ~ df$predicted)
 # Vs. hospitalizations
 t <- table(df$predicted, df$num_hospitalizations)
 t
@@ -282,13 +301,17 @@ plot(step3, spline = T)
 df$predicted <- step3$partition$Cluster
 # Vs. 2 hour
 table(df$predicted, df$two_hour)
-mod <- lm(df$Glucose_120 ~ df$predicted)
+mod <- lm(df$Glucose_120 ~ as.factor(df$predicted))
 summary(mod)
+anova(mod)
+emmeans(mod, "predicted")
 p <- plot(df$Glucose_120 ~ df$predicted)
 # Vs. homa-ir
-mod <- lm(df$homa_ir ~ df$predicted)
+mod <- lm(df$log_homa_ir ~ as.factor(df$predicted))
 summary(mod)
-p <- plot(df$homa_ir ~ df$predicted)
+anova(mod)
+emmeans(mod, "predicted")
+p <- plot(df$log_homa_ir ~ df$predicted)
 # Vs. hospitalizations
 t <- table(df$predicted, df$num_hospitalizations)
 t
@@ -312,13 +335,17 @@ plot(step3, spline = T)
 df$predicted <- step3$partition$Cluster
 # Vs. 2 hour
 table(df$predicted, df$two_hour)
-mod <- lm(df$Glucose_120 ~ df$predicted)
+mod <- lm(df$Glucose_120 ~ as.factor(df$predicted))
 summary(mod)
+anova(mod)
+emmeans(mod, "predicted")
 p <- plot(df$Glucose_120 ~ df$predicted)
 # Vs. homa-ir
-mod <- lm(df$homa_ir ~ df$predicted)
+mod <- lm(df$log_homa_ir ~ as.factor(df$predicted))
 summary(mod)
-p <- plot(df$homa_ir ~ df$predicted)
+anova(mod)
+emmeans(mod, "predicted")
+p <- plot(df$log_homa_ir ~ df$predicted)
 # Vs. hospitalizations
 t <- table(df$predicted, df$num_hospitalizations)
 t
@@ -338,11 +365,12 @@ df$num_hospitalizations <- factor(df$num_hospitalizations,
 )
 # Remove too many missing
 df <- df %>%
-  select(study_id:num_hospitalizations, two_hour, Glucose_0:Glucose_180) %>%
+  select(study_id:num_hospitalizations, two_hour, homa_ir, Glucose_0:Glucose_180) %>%
   rowwise() %>%
   filter(sum(is.na(c_across(Glucose_0:Glucose_180))) < 3)
 # Unique identifier
 df$ID <- 1:nrow(df)
+df$log_homa_ir <- log(df$homa_ir+0.00001)
 # Make a dataframe for time
 time <- data.frame(matrix(rep(timepoints, nrow(df)),
   byrow = T,
@@ -367,10 +395,19 @@ step3 <- Step3Clusters(trajSelection = step2)
 plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
+# vs. 2 hour glucose
 table(df$predicted, df$two_hour)
-mod <- lm(df$Glucose_120 ~ df$predicted)
+mod <- lm(df$Glucose_120 ~ as.factor(df$predicted))
 summary(mod)
+anova(mod)
+emmeans(mod, "predicted")
 p <- plot(df$Glucose_120 ~ df$predicted)
+# Vs. homa-ir
+mod <- lm(df$log_homa_ir ~ as.factor(df$predicted))
+summary(mod)
+anova(mod)
+emmeans(mod, "predicted")
+p <- plot(df$log_homa_ir ~ df$predicted)
 # Vs. hospitalizations
 t <- table(df$predicted, df$num_hospitalizations)
 t
@@ -382,8 +419,7 @@ chisq.test(t)
 ```{r}
 step1 <- Step1Measures(
   Data = df[, c("ID", paste0("Glucose_", timepoints))],
-  Time = time, ID = T
-)
+  Time = time, ID = T)
 summary(step1)
 step2 <- Step2Selection(trajMeasures = step1)
 summary(step2)
@@ -392,10 +428,19 @@ step3 <- Step3Clusters(trajSelection = step2, nclusters = 4)
 plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
+# vs. 2 hour glucose
 table(df$predicted, df$two_hour)
-mod <- lm(df$Glucose_120 ~ df$predicted)
+mod <- lm(df$Glucose_120 ~ as.factor(df$predicted))
 summary(mod)
+anova(mod)
+emmeans(mod, "predicted")
 p <- plot(df$Glucose_120 ~ df$predicted)
+# Vs. homa-ir
+mod <- lm(df$log_homa_ir ~ as.factor(df$predicted))
+summary(mod)
+anova(mod)
+emmeans(mod, "predicted")
+p <- plot(df$log_homa_ir ~ df$predicted)
 # Vs. hospitalizations
 t <- table(df$predicted, df$num_hospitalizations)
 t
@@ -417,10 +462,19 @@ step3 <- Step3Clusters(trajSelection = step2, nclusters = 3)
 plot(step3, spline = T)
 # Check results
 df$predicted <- step3$partition$Cluster
+# vs. 2 hour glucose
 table(df$predicted, df$two_hour)
-mod <- lm(df$Glucose_120 ~ df$predicted)
+mod <- lm(df$Glucose_120 ~ as.factor(df$predicted))
 summary(mod)
+anova(mod)
+emmeans(mod, "predicted")
 p <- plot(df$Glucose_120 ~ df$predicted)
+# Vs. homa-ir
+mod <- lm(df$log_homa_ir ~ as.factor(df$predicted))
+summary(mod)
+anova(mod)
+emmeans(mod, "predicted")
+p <- plot(df$log_homa_ir ~ df$predicted)
 # Vs. hospitalizations
 t <- table(df$predicted, df$num_hospitalizations)
 t
