@@ -267,8 +267,14 @@ summary(t2, pfootnote = T)
 #| label: fig-coughs-dist
 #| fig-cap: Histogram of Coughs Across All Nights
 #| warning: false
-ggplot(agg_counts, aes(x = Coughs)) +
-  geom_histogram(binwidth = 1)
+hist <- ggplot(agg_counts, aes(x = Coughs)) +
+  geom_histogram() +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+hist
+ggsave("/home/timvigers/OneDrive/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Dissemination/Figures/histogram.png",
+  plot = hist, width = 9, height = 6, units = "in"
+)
 ```
 
 The distribution of coughs per night is extremely skewed, so coughs per night, etc. are reported as medians rather than means.
@@ -948,6 +954,10 @@ t3 <- tableby(
 summary(t3)
 ```
 
+## Association with coughs
+
+There were no statistically significant correlations between coughs and survey respiratory scores.
+
 # Healthy control surveys
 
 A total of `r length(unique(hc_surveys$sid))` controls filled out the surveys, with `r length(unique(hc_surveys$sid[duplicated(hc_surveys$sid)]))` filling it out more than once.
@@ -964,4 +974,45 @@ t4 <- tableby(
   data = hc, control = mycontrols
 )
 summary(t4)
+```
+
+## Association with coughs
+
+There were no statistically significant correlations between coughs and survey scores.
+
+# Participant figures
+
+```{r}
+#| warning: false
+cfqr_children_6_11$sid <- as.numeric(cfqr_children_6_11$sid)
+cfqr_parent_6_13$sid <- as.numeric(cfqr_parent_6_13$sid)
+p38 <- full_join(
+  agg_counts,
+  cfqr_children_6_11 %>% select(sid, Date, respirat) %>%
+    rename(`CFQ-R Children Ages 6-11` = respirat),
+  by = join_by(sid, Date)
+)
+p38 <- full_join(
+  p38,
+  cfqr_parent_6_13 %>% select(sid, Date, respirat) %>%
+    rename(`CFQ-R Caregivers 6-13` = respirat),
+  by = join_by(sid, Date)
+)
+p38 <- p38 %>%
+  filter(sid == 38) %>%
+  pivot_longer(c(Coughs, `CFQ-R Children Ages 6-11`, `CFQ-R Caregivers 6-13`)) %>%
+  filter(!is.na(value))
+p38$name <- factor(p38$name,
+  levels = c("Coughs", "CFQ-R Children Ages 6-11", "CFQ-R Caregivers 6-13")
+)
+p38_plot <- ggplot(p38, aes(x = Night, y = value)) +
+  geom_point() +
+  geom_line() +
+  theme_bw() +
+  theme(axis.title.y = element_blank()) +
+  facet_wrap(~name, nrow = 3, scales = "free")
+p38_plot
+ggsave("/home/timvigers/OneDrive/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Dissemination/Figures/participant_38.png",
+  plot = p38_plot, width = 9, height = 7, units = "in"
+)
 ```
