@@ -171,19 +171,23 @@ bugs <- c(
 )
 # Yes/No variables
 yn_vars <- c(
-  "A_IsOnEnzymes", "A_corticosteroids1", "A_feeding2",
+  "A_corticosteroids1", "A_feeding2",
   "A_Vx770", "A_VX809comb", bugs, "tube_feeding", "liver_disease"
 )
 annual[, yn_vars] <- lapply(annual[, yn_vars], factor,
   levels = 0:1,
   labels = c("No", "Yes")
 )
-annual$A_IsOnEnzymes <- factor(annual$A_IsOnEnzymes, levels = c("Yes", "No"))
+annual$A_IsOnEnzymes <- factor(annual$A_IsOnEnzymes,
+  levels = c(1, 0), labels = c(" Yes", " No")
+)
 # FEV1 to categorical
 annual$ppFEV1_cat <- cut(annual$A_FEV1_pct_predicted,
   breaks = c(0, 40, 80, 100, Inf), right = F
 )
-annual$ppFEV1_cat <- relevel(annual$ppFEV1_cat, ref = "[100,Inf)")
+annual$ppFEV1_cat <- factor(annual$ppFEV1_cat,
+  levels = c("[100,Inf)", "[80,100)", "[40,80)", "[0,40)")
+)
 # Males to reference group
 annual$Gender <- factor(annual$Gender, levels = c("M", "F"))
 # Hispanic no as reference
@@ -242,6 +246,10 @@ labels <- list(
 )
 label(annual[, which(colnames(annual) %in% names(labels))]) <-
   labels[colnames(annual)[which(colnames(annual) %in% names(labels))]]
+# Remove those on modulators
+# annual <- annual %>%
+#   filter((is.na(A_Vx770) | A_Vx770 == "No") &
+#     (is.na(A_VX809comb) | A_VX809comb == "No"))
 ```
 
 Registry fields included in our liver disease yes/no variable were:
@@ -278,11 +286,11 @@ annual %>%
 ## By year and age group
 
 ```{r}
-annual %>%
+prev_year_age <- annual %>%
   group_by(ReviewYear, age_group) %>%
   summarise(Prevalence = mean(CFRD == "CFRD+") * 100, .groups = "drop") %>%
-  pivot_wider(names_from = age_group, values_from = Prevalence) %>%
-  kable(., digits = 2)
+  pivot_wider(names_from = age_group, values_from = Prevalence)
+kable(prev_year_age, digits = 2)
 ```
 
 # CFRD incidence
@@ -391,13 +399,11 @@ screening <- annual %>%
       !is.na(A_ogttfast_bloodglucose) | !is.na(A_hgba1c)),
     .groups = "drop"
   )
-kable(
-  screening %>%
-    select(ReviewYear, age_group, `Screened OGTT`) %>%
-    mutate(`Screened OGTT` = round(`Screened OGTT` * 100, 2)) %>%
-    pivot_wider(names_from = age_group, values_from = `Screened OGTT`),
-  caption = "% Screened by OGTT"
-)
+screening_table <- screening %>%
+  select(ReviewYear, age_group, `Screened OGTT`) %>%
+  mutate(`Screened OGTT` = round(`Screened OGTT` * 100, 2)) %>%
+  pivot_wider(names_from = age_group, values_from = `Screened OGTT`)
+kable(screening_table, caption = "% Screened by OGTT")
 screening <- screening %>%
   pivot_longer(`Screened HbA1c`:`Screened Either`)
 screening_plot <- ggplot(screening, aes(
@@ -470,6 +476,49 @@ eth <- ogtts %>%
   add_ci() %>%
   add_p() %>%
   print()
+```
+
+# Figure 1
+
+```{r}
+p <- prev_year_age %>%
+  pivot_longer(`[10,19)`:`[31, Inf)`, names_to = "Age Group") %>%
+  rename(Year = ReviewYear)
+p$name <- "Prevalence"
+i <- incidence %>%
+  select(
+    Year, `Total Incidence Age 10-18`, `Total Incidence Age 19-30`,
+    `Total Incidence Age >= 31`
+  ) %>%
+  pivot_longer(`Total Incidence Age 10-18`:`Total Incidence Age >= 31`,
+    names_to = "Age Group"
+  )
+i$name <- "Incidence"
+s <- screening %>%
+  filter(name == "Screened OGTT") %>%
+  select(ReviewYear, age_group, value) %>%
+  rename(Year = ReviewYear, `Age Group` = age_group)
+s$name <- " Screening Rates for CFRD"
+s$value <- s$value * 100
+t <- rbind(p, i, s)
+t$`Age Group` <- factor(t$`Age Group`,
+  levels = c(
+    "[10,19)", "[19,31)", "[31, Inf)", "Total Incidence Age >= 31",
+    "Total Incidence Age 10-18", "Total Incidence Age 19-30"
+  ),
+  labels = c(
+    "10-18", "19-30", ">= 31", ">= 31",
+    "10-18", "19-30"
+  )
+)
+t <- t[t$Year >= 2004, ]
+fig1 <- ggplot(t, aes(x = Year, y = value, color = `Age Group`)) +
+  geom_line() +
+  facet_wrap(~name, scales = "free", nrow = 3)
+fig1
+ggsave("./Dissemination/Figures/fig1.png",
+  plot = fig1, width = 9, height = 12, units = "in"
+)
 ```
 
 # Survival analysis - first CFRD diagnosis
@@ -665,6 +714,7 @@ ggcoef_model(era2,
 ```{r}
 t3 <- era3 %>% tbl_regression(exponentiate = T)
 t3
+t <- ggcoef_table(era3)
 ggcoef_model(era3,
   show_p_values = F, add_reference_rows = T, exponentiate = T, shape_guide = F,
   signif_stars = F, colour = "significance", shape = "reference_row",
