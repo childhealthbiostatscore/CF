@@ -34,7 +34,7 @@ library(eulerr)
 library(broom)
 library(emmeans)
 library(ggstats)
-knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry")
+knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry/")
 ```
 
 # Data cleaning
@@ -250,6 +250,37 @@ label(annual[, which(colnames(annual) %in% names(labels))]) <-
 # annual <- annual %>%
 #   filter((is.na(A_Vx770) | A_Vx770 == "No") &
 #     (is.na(A_VX809comb) | A_VX809comb == "No"))
+```
+
+```{r}
+# Per reviewer, out of X individuals with a diagnosis of CFRD, X number had an
+# OGTT (and X had an A1c, but no OGTT) that year or the year prior.
+# This is super slow but idc idc
+t <- apply(first_cfrd, 1, function(r) {
+  id <- as.numeric(r["eDWID"])
+  year <- as.numeric(r["first_cfrd"])
+  d <- annual[annual$eDWID == id & annual$ReviewYear %in% c(year, year - 1), ]
+  if (any(!is.na(d$A_hgba1c))) {
+    a1c <- T
+  } else {
+    a1c <- F
+  }
+  if (any(!is.na(d["A_twohour_bloodglucose"]) |
+    !is.na(d["A_ogttfast_bloodglucose"]))) {
+    ogtt <- T
+  } else {
+    ogtt <- F
+  }
+  if (a1c & ogtt) {
+    return("both")
+  } else if (a1c & !ogtt) {
+    return("a1c")
+  } else if (ogtt & !a1c) {
+    return("ogtt")
+  } else if (!ogtt & !a1c) {
+    return("neither")
+  }
+})
 ```
 
 Registry fields included in our liver disease yes/no variable were:
