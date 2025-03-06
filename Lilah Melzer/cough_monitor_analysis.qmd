@@ -214,6 +214,8 @@ demo <- left_join(demo, sleep)
 demo <- demo %>%
   select(sid, height_perc, weight_perc, pre_fev_pp, total_sleep, everything()) %>%
   select(-height, -weight, -pre_fev)
+demo$nih_race <- droplevels(demo$nih_race)
+label(demo$nih_race) <- "Race"
 # Set table options for the document
 mycontrols <-
   tableby.control(
@@ -233,9 +235,9 @@ write.csv(agg_counts,
 ```{r results='asis'}
 #| label: tbl-mean-demo
 #| tbl-cap: Participant characteristics
-f <- as.formula(paste0("Diagnosis ~", paste0(colnames(demo), collapse = "+")))
-f <- update(f, . ~ . - Diagnosis - sid)
-t1 <- tableby(f, data = demo, control = mycontrols)
+t1 <- tableby(Diagnosis ~ nih_sex + age_at_consent + height_perc + weight_perc +
+  nih_race + nih_ethnicity + cftr_mod + cftr_mod_type + Genotype + post_fev +
+  total_sleep, data = demo, control = mycontrols)
 summary(t1, pfootnote = T)
 ```
 
