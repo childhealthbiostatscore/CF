@@ -33,7 +33,15 @@ library(ggstats)
 library(corrplot)
 library(patchwork)
 library(gt)
-knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Lilah Melzer/Lilah Cough Monitor")
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Lilah Melzer/Lilah Cough Monitor"
+)
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Documents/GitHub",
+  "Linux" = "/home/timvigers/Documents/GitHub"
+)
+knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data import}
@@ -183,7 +191,7 @@ demo <-
     fev1[, c("sid", "height_perc", "weight_perc", "pre_fev_pp", "post_fev_pp")]
   )
 label(demo$pre_fev_pp) <- "Pre-bronchodilator FEV1 % Predicted"
-label(demo$pre_fev_pp) <- "Post-bronchodilator FEV1 % Predicted"
+label(demo$post_fev_pp) <- "Post-bronchodilator FEV1 % Predicted"
 label(demo$height_perc) <- "Height %ile"
 label(demo$weight_perc) <- "Weight %ile"
 # CF genotype
@@ -236,7 +244,7 @@ write.csv(agg_counts,
 #| label: tbl-mean-demo
 #| tbl-cap: Participant characteristics
 t1 <- tableby(Diagnosis ~ nih_sex + age_at_consent + height_perc + weight_perc +
-  nih_race + nih_ethnicity + cftr_mod + cftr_mod_type + Genotype + post_fev +
+  nih_race + nih_ethnicity + cftr_mod + cftr_mod_type + Genotype + pre_fev_pp +
   total_sleep, data = demo, control = mycontrols)
 summary(t1, pfootnote = T)
 ```
@@ -274,7 +282,7 @@ hist <- ggplot(agg_counts, aes(x = Coughs)) +
   theme_bw() +
   theme(axis.title.y = element_blank())
 hist
-ggsave("/home/timvigers/OneDrive/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Dissemination/Figures/histogram.png",
+ggsave(paste0(home_dir, "/Dissemination/Figures/histogram.png"),
   plot = hist, width = 9, height = 6, units = "in"
 )
 ```
@@ -348,13 +356,17 @@ Spearman correlation between median coughs and pre-bronchodilator FEV1 was `r ro
 #| label: fig-coughs-by-night
 #| fig-cap: Coughs by nights from start
 #| warning: false
-ggplot(agg_counts[!is.na(agg_counts$Coughs), ], aes(
+fig2 <- ggplot(agg_counts[!is.na(agg_counts$Coughs), ], aes(
   x = Night, y = Coughs, group = factor(sid), color = Diagnosis
 )) +
   geom_point(alpha = 0.1) +
   geom_line(alpha = 0.1) +
   geom_smooth(aes(group = Diagnosis)) +
   theme_bw()
+fig2
+ggsave(paste0(home_dir, "/Dissemination/Figures/fig2.png"),
+  plot = fig2, width = 9, height = 6, units = "in"
+)
 ```
 
 # Zero-inflated models
@@ -1014,7 +1026,7 @@ p38_plot <- ggplot(p38, aes(x = Night, y = value)) +
   theme(axis.title.y = element_blank()) +
   facet_wrap(~name, nrow = 3, scales = "free")
 p38_plot
-ggsave("/home/timvigers/OneDrive/Vigers/CF/Lilah Melzer/Lilah Cough Monitor/Dissemination/Figures/participant_38.png",
+ggsave(paste0(home_dir, "/Dissemination/Figures/participant_38.png"),
   plot = p38_plot, width = 9, height = 7, units = "in"
 )
 ```
