@@ -32,6 +32,10 @@ knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Christine Ch
 annual <- read.csv("./Data_Raw/CFF19_Annualized_Del1.csv",
   na.strings = c("", "N/A")
 )
+# Exclude T1D and T2D
+annual <- annual %>% filter(!cfrd_status_annual %in% c(4, 5))
+annual$cfrd_registry <- as.numeric(annual$cfrd_status_annual == 3)
+annual$cfrd_ogtt <- as.numeric(annual$A_twohour_bloodglucose >= 200)
 # Demographic data
 demo <- read.csv("./Data_Raw/CFF19_DemogCFDiag_Del1.csv",
   na.strings = c("", "N/A")
@@ -77,18 +81,10 @@ annual <- left_join(
   demo %>% select(eDWID, Race, Hispanicrace, Gender, F508, MutClass),
   by = join_by(eDWID)
 )
-# CFRD by OGTT two hour
-annual$cfrd_ogtt <- factor(annual$A_twohour_bloodglucose >= 200,
-  levels = c(F, T), labels = c("CFRD-", "CFRD+")
-)
-# CFRD by registry definition
-annual$cfrd_registry <- factor(annual$cfrd_status_annual,
-  levels = c(1:5), labels = c("CFRD-", "CFRD-", "CFRD+", "CFRD-", "CFRD-")
-)
 # Assume that missing data for CFRD means "CFRD-" (some of these will get filled in
 # later)
-annual$cfrd_registry[is.na(annual$cfrd_registry)] <- "CFRD-"
-annual$cfrd_ogtt[is.na(annual$cfrd_ogtt)] <- "CFRD-"
+annual$cfrd_registry[is.na(annual$cfrd_registry)] <- 0
+annual$cfrd_ogtt[is.na(annual$cfrd_ogtt)] <- 0
 # Modulators
 annual$A_Vx770 <- factor(annual$A_Vx770, levels = 0:1, labels = c("No", "Yes"))
 annual$A_VX809comb <- factor(annual$A_VX809comb,
@@ -98,18 +94,16 @@ annual$A_VX809comb <- factor(annual$A_VX809comb,
 annual <- annual %>%
   group_by(eDWID) %>%
   mutate(
-    cfrd_registry_age = first(na.omit(Age_YrEnd[cfrd_registry == "CFRD+"])),
-    cfrd_ogtt_age = first(na.omit(Age_YrEnd[cfrd_ogtt == "CFRD+"]))
+    cfrd_registry_age = first(na.omit(Age_YrEnd[cfrd_registry == 1])),
+    cfrd_ogtt_age = first(na.omit(Age_YrEnd[cfrd_ogtt == 1]))
   )
 # Fill in CFRD diagnoses
 annual$cfrd_registry_age[is.na(annual$cfrd_registry_age)] <- Inf
 annual$cfrd_ogtt_age[is.na(annual$cfrd_ogtt_age)] <- Inf
-annual$cfrd_registry[annual$Age_YrEnd < annual$cfrd_registry_age] <- "CFRD-"
-annual$cfrd_registry[annual$Age_YrEnd >= annual$cfrd_registry_age] <- "CFRD+"
-annual$cfrd_ogtt[annual$Age_YrEnd < annual$cfrd_ogtt_age] <- "CFRD-"
-annual$cfrd_ogtt[annual$Age_YrEnd >= annual$cfrd_ogtt_age] <- "CFRD+"
-# Create start times
-annual$Age_YrStart <- annual$Age_YrEnd - 1
+annual$cfrd_registry[annual$Age_YrEnd < annual$cfrd_registry_age] <- 0
+annual$cfrd_registry[annual$Age_YrEnd >= annual$cfrd_registry_age] <- 1
+annual$cfrd_ogtt[annual$Age_YrEnd < annual$cfrd_ogtt_age] <- 0
+annual$cfrd_ogtt[annual$Age_YrEnd >= annual$cfrd_ogtt_age] <- 1
 # Format columns
 annual$MutClass <- factor(annual$MutClass,
   levels = c("1-3", "4-5", "Oth", "N/A"),
@@ -119,160 +113,66 @@ annual$NumPulmExacerbation <- cut(annual$NumPulmExacerbation,
   labels = c("0", "1", "2", ">=3"),
   breaks = c(0, 1, 2, 3, Inf), right = F
 )
+annual$A_IsOnEnzymes <- factor(annual$A_IsOnEnzymes,
+  levels = 1:0, labels = c("Yes", "No")
+)
+# Calculate bmi value
+annual$bmi <- annual$A_weight / ((annual$A_height / 100)^2)
+annual$bmi <- coalesce(annual$A_bmivalue, annual$bmi)
 # Labels
 labels <- list(
-  Age_YrStart = "Age at Year Start", Age_YrEnd = "Age at Year End",
+  Age_YrEnd = "Age at Year End",
   Hispanicrace = "Hispanic", A_Vx770 = "Use of CFTR modulator Vx770",
   A_VX809comb = "Use of CFTR modulator Vx809 combination",
   A_FEV1_pct_predicted = "FEV1 percent predicted", MutClass = "Mutation class",
-  NumPulmExacerbation = "Admissions for PEx"
+  NumPulmExacerbation = "Admissions for PEx",
+  A_IsOnEnzymes = "Pancreatic enzyme use", bmi = "BMI value"
 )
-# Select columns
-annual <- annual %>%
+# List of predictor variables
+predictors <- c(
+  "Gender", "Race", "Hispanicrace", "A_IsOnEnzymes",
+  "NumPulmExacerbation", "A_FEV1_pct_predicted", "bmi"
+)
+# Make survival datasets for registry and OGTT diagnoses
+ogtt <- annual %>%
   select(
-    eDWID, Race, Hispanicrace, Gender, F508, MutClass,
-    ReviewYear, Age_YrStart, Age_YrEnd, A_Vx770, A_VX809comb, A_bmivalue,
-    A_FEV1_pct_predicted, NumPulmExacerbation, A_IsOnEnzymes,
-    A_fast_bloodglucose, A_hgba1c, cfrd_registry, cfrd_ogtt,
-    A_twohour_bloodglucose, cfrd_status_annual
-  )
+    eDWID, ReviewYear, Age_YrEnd, A_hgba1c, all_of(predictors), cfrd_ogtt
+  ) %>%
+  drop_na() %>%
+  distinct()
+surv_ogtt <- annual %>%
+  filter(Age_YrEnd <= cfrd_ogtt_age) %>%
+  group_by(eDWID) %>%
+  slice_max(row_number()) %>%
+  select(eDWID, ReviewYear, Age_YrEnd, all_of(predictors), cfrd_ogtt) %>%
+  drop_na() %>%
+  distinct()
+ogtt_include <- intersect(ogtt$eDWID, surv_ogtt$eDWID)
 ```
 
 # Joint models
 
+## CFRD diagnosis by OGTT
+
 ```{r}
-# Complete cases
-model_df <- annual %>%
-  select(eDWID, Gender, Age_YrStart, Age_YrEnd, A_hgba1c, cfrd_registry) %>%
-  drop_na()
-# Fit mixed model and Cox model separately
-lme_fit_a1c <- lme(A_hgba1c ~ Age_YrStart + Gender,
-  random = ~ Age_YrStart | eDWID,
-  data = model_df
+# Formulas
+cox_f <- as.formula(paste0(
+  "Surv(time = Age_YrEnd, event = cfrd_ogtt)~",
+  paste0(predictors, collapse = "+")
+))
+lme_f <- as.formula(paste0(
+  "A_hgba1c~Age_YrEnd+",
+  paste0(predictors, collapse = "+")
+))
+# Fit Cox model first, and then pull the clusters
+cox_fit <- coxph(cox_f,
+  cluster = eDWID, x = T, model = T,
+  data = surv_ogtt[surv_ogtt$eDWID %in% ogtt_include, ]
 )
-cox_fit <- coxph(
-  Surv(
-    time = Age_YrStart, time2 = Age_YrEnd,
-    event = as.numeric(cfrd_registry == "CFRD+")
-  ) ~ Gender,
-  cluster = eDWID,
-  data = model_df, x = T, model = T
+lme_fit_a1c <- lme(lme_f,
+  random = ~ Age_YrEnd | eDWID, na.action = na.omit,
+  data = ogtt[ogtt$eDWID %in% ogtt_include, ]
 )
 # Combine
-joint_fit <- jointModel(lme_fit_a1c, cox_fit,
-  timeVar = "Age_YrStart", method = "piecewise-PH-aGH"
-)
-```
-
-# By registry CFRD status
-
-## Participant demographics
-
-Categorical variables are from either the first year with CFRD or the most recent year for those without CFRD.
-
-```{r results='asis'}
-v1 <- registry %>%
-  group_by(eDWID) %>%
-  slice_max(ReviewYear)
-t1 <- tableby(cfrd_registry ~ Race + Hispanicrace + Gender + F508 + MutClass +
-  Age_YrEnd + A_bmipercentile + A_hgba1c, data = v1)
-summary(t1, pfootnote = T)
-```
-
-## Kaplan-Meier plots
-
-```{r}
-# Plot
-survfit2(Surv(Age_YrStart, Age_YrEnd, as.numeric(cfrd_registry)) ~ 1,
-  data = registry
-) %>%
-  ggsurvfit() +
-  labs(
-    x = "Age",
-    y = "Overall CFRD- probability"
-  ) +
-  add_confidence_interval() +
-  add_risktable()
-# Median "survival" time
-survfit2(Surv(Age_YrStart, Age_YrEnd, as.numeric(cfrd_registry)) ~ 1,
-  data = registry
-) %>%
-  tbl_survfit(
-    probs = 0.5,
-    label_header = "**Median time to CFRD+ (95% CI)**"
-  )
-```
-
-## Cox PH model
-
-```{r}
-cph <- coxph(
-  update(f, Surv(time = Age_YrStart, time2 = Age_YrEnd, event = as.numeric(cfrd_registry) == 2) ~ .),
-  data = registry, cluster = eDWID
-)
-cph %>% tbl_regression(exponentiate = T)
-plot(cox.zph(cph), resid = F)
-cox.zph(cph)
-ggcoef_table(cph,
-  exponentiate = T, show_p_values = F, add_reference_rows = T, signif_stars = F,
-  colour = F
-)
-
-d <- model.frame(cph)
-d$pred <- predict(cph, type = "survival")
-```
-
-# By CFRD status based on 2 hour OGTT >= 200
-
-## Participant demographics
-
-Categorical variables are from either the first year with CFRD or the most recent year for those without CFRD.
-
-```{r results='asis'}
-v1 <- ogtt %>%
-  group_by(eDWID) %>%
-  slice_max(ReviewYear)
-t1 <- tableby(cfrd_ogtt ~ Race + Hispanicrace + Gender + F508 + MutClass +
-  Age_YrEnd + A_bmipercentile + A_hgba1c, data = v1)
-summary(t1, pfootnote = T)
-```
-
-## Kaplan-Meier plots
-
-```{r}
-# Plot
-survfit2(Surv(Age_YrStart, Age_YrEnd, as.numeric(cfrd_ogtt)) ~ 1,
-  data = ogtt
-) %>%
-  ggsurvfit() +
-  labs(
-    x = "Age",
-    y = "Overall CFRD- probability"
-  ) +
-  add_confidence_interval() +
-  add_risktable()
-# Median "survival" time
-survfit2(Surv(Age_YrStart, Age_YrEnd, as.numeric(cfrd_ogtt)) ~ 1,
-  data = ogtt
-) %>%
-  tbl_survfit(
-    probs = 0.5,
-    label_header = "**Median time to CFRD+ (95% CI)**"
-  )
-```
-
-## Cox PH model
-
-```{r}
-cph <- coxph(
-  update(f, Surv(time = Age_YrStart, time2 = Age_YrEnd, event = as.numeric(cfrd_ogtt)) ~ .),
-  data = ogtt, cluster = eDWID
-)
-cph %>% tbl_regression(exponentiate = T)
-plot(cox.zph(cph), resid = F)
-cox.zph(cph)
-ggcoef_table(cph,
-  exponentiate = T, show_p_values = F, add_reference_rows = T, signif_stars = F,
-  colour = F
-)
+joint_fit <- jointModel(lme_fit_a1c, cox_fit, timeVar = "Age_YrEnd")
 ```
