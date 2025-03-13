@@ -24,7 +24,15 @@ library(gtsummary)
 library(dplyr)
 library(pracma)
 library(ggplot2)
-knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF")
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+)
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Documents/GitHub",
+  "Linux" = "/home/timvigers/Documents/GitHub"
+)
+knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
@@ -54,9 +62,7 @@ df %>%
   group_by(study_id) %>%
   filter(row_number() == 1) %>%
   ungroup() %>%
-  select(
-    redcap_data_access_group, age_visit:origin_race, CFTR, weight
-  ) %>%
+  select(redcap_data_access_group:fvc, bmi_perc) %>%
   tbl_summary(by = redcap_data_access_group, missing_text = "Missing") %>%
   add_overall()
 ```
@@ -68,9 +74,7 @@ df %>%
   group_by(study_id) %>%
   filter(row_number() == 1) %>%
   ungroup() %>%
-  select(
-    redcap_data_access_group, age_visit:origin_race, CFTR, weight, scully140
-  ) %>%
+  select(redcap_data_access_group:fvc, bmi_perc, scully140) %>%
   tbl_summary(by = scully140, missing_text = "Missing") %>%
   add_p() %>%
   separate_p_footnotes() %>%
@@ -84,9 +88,7 @@ df %>%
   group_by(study_id) %>%
   filter(row_number() == 1) %>%
   ungroup() %>%
-  select(
-    redcap_data_access_group, age_visit:origin_race, CFTR, weight, scully180
-  ) %>%
+  select(redcap_data_access_group:fvc, bmi_perc, scully180) %>%
   tbl_summary(by = scully180, missing_text = "Missing") %>%
   add_p() %>%
   separate_p_footnotes() %>%

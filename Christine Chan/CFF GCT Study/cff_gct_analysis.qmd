@@ -36,7 +36,15 @@ library(childsds)
 library(arsenal)
 library(gt)
 library(reporttools)
-knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF")
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+)
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Documents/GitHub",
+  "Linux" = "/home/timvigers/Documents/GitHub"
+)
+knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}

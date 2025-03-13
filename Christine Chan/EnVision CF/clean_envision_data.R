@@ -72,7 +72,7 @@ redcap <- read.csv(
 timepoints <- c(0, 10, 30, 60, 90, 120, 150, 180)
 glucose <- redcap %>%
   select(
-    study_id, date_visit, a1c_result, num_hospitalizations,
+    study_id, date_visit, a1c_result, 
     all_of(paste("timepoint", timepoints, "min", sep = "_"))
   ) %>%
   filter(!is.na(date_visit)) %>%
@@ -90,13 +90,14 @@ glucose$Date <- ymd(glucose$Date)
 #-------------------------------------------------------------------------------
 visits <- redcap %>%
   select(
-    study_id, date_visit, age_visit, height, weight, bmi_study_visit,
-    sex, origin_race, ethnicity, redcap_data_access_group,
-    cftr_mutation_1, cftr_mutation_2
+    study_id, redcap_data_access_group, sex, origin_race, ethnicity,
+    cftr_mutation_1, cftr_mutation_2, pancreatic_status, liver_disease,
+    pulm_ex_last3months, corrector_yes_no, family_history_diabetes,
+    date_visit, age_visit, height, weight, bmi_study_visit, fev1, fvc
   ) %>%
   filter(!is.na(date_visit)) %>%
   rename(Date = date_visit) %>%
-  filter(!if_all(age_visit:ethnicity, is.na))
+  filter(!if_all(age_visit:fvc, is.na))
 visits$Date <- ymd(visits$Date)
 #-------------------------------------------------------------------------------
 # Date fixes per Holly's 7/19 emails
