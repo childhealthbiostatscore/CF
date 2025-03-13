@@ -7,7 +7,7 @@ library(lubridate)
 library(readxl)
 library(stringi)
 library(childsds)
-library(cgmanalysis)
+# library(cgmanalysis)
 library(pracma)
 # Home directory
 home_dir <- switch(Sys.info()["sysname"],
@@ -72,7 +72,7 @@ redcap <- read.csv(
 timepoints <- c(0, 10, 30, 60, 90, 120, 150, 180)
 glucose <- redcap %>%
   select(
-    study_id, date_visit, a1c_result, 
+    study_id, date_visit, a1c_result,
     all_of(paste("timepoint", timepoints, "min", sep = "_"))
   ) %>%
   filter(!is.na(date_visit)) %>%
@@ -90,10 +90,10 @@ glucose$Date <- ymd(glucose$Date)
 #-------------------------------------------------------------------------------
 visits <- redcap %>%
   select(
-    study_id, redcap_data_access_group, sex, origin_race, ethnicity,
+    study_id, redcap_data_access_group, date_visit, sex, origin_race, ethnicity,
     cftr_mutation_1, cftr_mutation_2, pancreatic_status, liver_disease,
     pulm_ex_last3months, corrector_yes_no, family_history_diabetes,
-    date_visit, age_visit, height, weight, bmi_study_visit, fev1, fvc
+    age_visit, height, weight, bmi_study_visit, fev1, fvc
   ) %>%
   filter(!is.na(date_visit)) %>%
   rename(Date = date_visit) %>%
@@ -301,19 +301,10 @@ final_df <- final_df %>%
   arrange(study_id, Date) %>%
   group_by(study_id) %>%
   mutate(ogtt_num = row_number()) %>%
-  ungroup() %>%
-  select(study_id, Date, ogtt_num, everything())
+  ungroup()
 final_df <- full_join(final_df, ogtts)
-final_df <- final_df %>% arrange(study_id, Date)
 # Add CGM
 final_df <- full_join(final_df, cgm)
-# Add HbA1c, etc.
-a1c <- redcap %>%
-  select(study_id, date_visit, a1c_result) %>%
-  rename(Date = date_visit) %>%
-  drop_na(a1c_result)
-a1c$Date <- ymd(a1c$Date)
-final_df <- full_join(final_df, a1c)
 #-------------------------------------------------------------------------------
 # Calculated fields
 #-------------------------------------------------------------------------------
