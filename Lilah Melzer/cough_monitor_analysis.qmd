@@ -33,6 +33,7 @@ library(ggstats)
 library(corrplot)
 library(patchwork)
 library(gt)
+library(ggbreak)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Lilah Melzer/Lilah Cough Monitor"
@@ -280,7 +281,8 @@ summary(t2, pfootnote = T)
 hist <- ggplot(agg_counts, aes(x = Coughs)) +
   geom_histogram() +
   theme_bw() +
-  theme(axis.title.y = element_blank())
+  theme(axis.title.y = element_blank()) +
+  facet_wrap(~Diagnosis, scales = "free_x")
 hist
 ggsave(paste0(home_dir, "/Dissemination/Figures/histogram.png"),
   plot = hist, width = 9, height = 6, units = "in"
@@ -359,10 +361,14 @@ Spearman correlation between median coughs and pre-bronchodilator FEV1 was `r ro
 fig2 <- ggplot(agg_counts[!is.na(agg_counts$Coughs), ], aes(
   x = Night, y = Coughs, group = factor(sid), color = Diagnosis
 )) +
-  geom_point(alpha = 0.1) +
-  geom_line(alpha = 0.1) +
+  geom_point(alpha = 0.2) +
+  geom_line(alpha = 0.2) +
   geom_smooth(aes(group = Diagnosis)) +
-  theme_bw()
+  ylim(c(1, 275)) +
+  xlim(c(0, 100)) +
+  theme_bw() +
+  scale_color_manual(values = c("#003092", "#FFAB5B")) +
+  scale_y_break(c(80, 265), scales = 0.25, ticklabels = c(265, 270, 275))
 fig2
 ggsave(paste0(home_dir, "/Dissemination/Figures/fig2.png"),
   plot = fig2, width = 9, height = 6, units = "in"
