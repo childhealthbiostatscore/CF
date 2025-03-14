@@ -7,7 +7,7 @@ library(lubridate)
 library(readxl)
 library(stringi)
 library(childsds)
-# library(cgmanalysis)
+library(cgmanalysis)
 library(pracma)
 # Home directory
 home_dir <- switch(Sys.info()["sysname"],
@@ -335,7 +335,7 @@ final_df$Diagnosis[rowSums(final_df[, glucose[6:8]] >= 140, na.rm = T) > 0] <-
 final_df$Diagnosis[final_df$Glucose_0 >= 126 | final_df$Glucose_120 >= 200] <-
   "CFRD"
 final_df$Diagnosis <- factor(final_df$Diagnosis,
-  levels = c("NGT", "IFG", "INDET", "IGF", "CFRD")
+  levels = c("NGT", "IFG", "INDET", "IGT", "CFRD")
 )
 # iAUCs
 final_df$iAUC30gluc <- apply(final_df, 1, function(r) {
