@@ -291,9 +291,13 @@ ogtts <- ogtts %>%
 # Merge
 final_df <- full_join(glucose, insulin)
 final_df <- full_join(final_df, catecholamines)
-final_df <- final_df %>% pivot_wider(
-  names_from = Timepoint, values_from = c(Glucose:Epinephrine)
-)
+final_df <- final_df %>%
+  group_by(study_id, Date) %>%
+  fill(a1c_result) %>%
+  pivot_wider(
+    names_from = Timepoint,
+    values_from = c(Glucose, Insulin, Norepinephrine, Epinephrine),
+  )
 final_df <- full_join(final_df, visits)
 final_df <- full_join(final_df, hypo_symptoms)
 # Add OGTT data
