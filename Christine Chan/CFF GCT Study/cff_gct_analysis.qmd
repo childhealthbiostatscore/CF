@@ -17,8 +17,8 @@ format:
     theme:
       light: flatly
       dark: darkly
-bibliography: /Users/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Documents/GitHub/styles/american-medical-association.csl
+bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
+csl: /home/timvigers/Documents/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -142,6 +142,8 @@ df$`BMI %ile` <- sds(df$BMI,
   male = "Male", female = "Female",
   sex = as.character(df$Gender)
 )
+df$`BMI Value (Adults Only)` <- df$BMI
+df$`BMI Value (Adults Only)`[df$Age < 20] <- NA
 # Time from OGTT to GCT
 df$OGTT.Date.Time <- mdy_hm(df$OGTT.Date.Time)
 df$Study.visit.PFTs.Date. <- mdy_hm(df$Study.visit.PFTs.Date.)
@@ -237,6 +239,7 @@ f <- ~ HbA1c + kwt(Age, "N", "Nmiss2", "medianq1q3", "range") +
   kwt(`Height %ile`, "N", "Nmiss2", "medianq1q3", "range") +
   kwt(`Weight %ile`, "N", "Nmiss2", "medianq1q3", "range") +
   kwt(`BMI %ile`, "N", "Nmiss2", "medianq1q3", "range") +
+  kwt(`BMI Value (Adults Only)`, "N", "Nmiss2", "medianq1q3", "range") +
   kwt(`Days From OGTT to GCT`, "N", "Nmiss2", "medianq1q3", "range") +
   fe(Diagnosis) + fe(Dysglycemia) + fe(Diabetes) + fe(CFRD)
 t1a <- tableby(update(f, `Got OGTT and GCT?` ~ . - `Got OGTT and GCT?`),
