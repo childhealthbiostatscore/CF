@@ -335,7 +335,7 @@ final_df$Diagnosis[final_df[, glucose[1]] >= 100] <- "IFG"
 final_df$Diagnosis[rowSums(final_df[, glucose[2:5]] >= 200, na.rm = T) > 0] <-
   "INDET"
 final_df$Diagnosis[rowSums(final_df[, glucose[6:8]] >= 140, na.rm = T) > 0] <-
-  "IGF"
+  "IGT"
 final_df$Diagnosis[final_df$Glucose_0 >= 126 | final_df$Glucose_120 >= 200] <-
   "CFRD"
 final_df$Diagnosis <- factor(final_df$Diagnosis,
