@@ -25,12 +25,13 @@ editor: source
 library(Hmisc)
 library(tidyverse)
 library(childsds)
+library(rspiro)
 library(survival)
 library(gtsummary)
 library(ggstats)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry"
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan"
 )
 github_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Documents/GitHub",
@@ -41,10 +42,10 @@ knitr::opts_knit$set(root.dir = home_dir)
 
 ```{r data cleaning}
 # Import data and codebook
-annual <- read.csv("./Data_Raw/CFF19_Annualized_Del1.csv",
+annual <- read.csv("./CF Registry/Data_Raw/CFF19_Annualized_Del1.csv",
   na.strings = c("", "N/A")
 )
-data_dict <- readxl::read_excel("./Data_Raw/Copy of Codes for CFFPR_2018.xlsx")
+data_dict <- readxl::read_excel("./CF Registry/Data_Raw/Copy of Codes for CFFPR_2018.xlsx")
 data_dict$var <- paste(data_dict$field_name, data_dict$code_value, sep = "_")
 # Remove those with T1D or T2D
 annual <- annual %>% arrange(eDWID, ReviewYear)
@@ -53,8 +54,8 @@ annual$cfrd_status_annual <- factor(annual$cfrd_status_annual,
   levels = 1:3,
   labels = c("CFRD-", "CFRD-", "CFRD+")
 )
-# Get mutations
-demogs <- read.csv("./Data_Raw/CFF19_DemogCFDiag_Del1.csv")
+# Get mutations, race, etc.
+demogs <- read.csv("./CF Registry/Data_Raw/CFF19_DemogCFDiag_Del1.csv", na.strings = "")
 races <- c(
   "White", "Black or African American", "American Indian or Alaska Native",
   "Asian", "Native Hawaiian or Other Pacific ", "Some other race"
@@ -216,14 +217,6 @@ annual <- annual %>%
 annual$age_group <- relevel(annual$age_group, ref = "[10,19)")
 annual <- annual %>% filter(Age_YrEnd != 0, Age_YrEnd >= 10)
 annual$age_group <- droplevels(annual$age_group)
-# List of covariates
-vars <- c(
-  "age_group", "Gender", "bmi_perc", "bmi_cat", "MutClass", "Race",
-  "Hispanicrace", "A_IsOnEnzymes", "ppFEV1_cat", "tube_feeding",
-  "NumPulmExacerbation", "A_pseudomonasaeruginosa", "A_fungalyeast1",
-  "A_mycocultureresults3", "A_corticosteroids1", "cfrd_status_annual",
-  "A_Vx770", "A_VX809comb", "liver_disease"
-)
 # Nice labels for plots and tables
 labels <- list(
   cfrd_status_annual = "CFRD Status", MutClass = "Mutation class",
@@ -261,9 +254,8 @@ annual$tstart <- as.numeric(annual$tstart) - as.numeric(og)
 annual$tstop <- as.numeric(annual$tstop) - as.numeric(og)
 # Formula for base model
 xvars <- c(
-  "age_group", "Gender", "Race", "Hispanicrace", "bmi_cat", "MutClass",
-  "A_IsOnEnzymes", "tube_feeding", "liver_disease", "ppFEV1_cat",
-  "NumPulmExacerbation", "A_corticosteroids1"
+  "Age_YrEnd", "Gender", "bmi", "MutClass", "tube_feeding", "liver_disease", "ppFEV1_cat",
+  "NumPulmExacerbation"
 )
 y <- "Surv(time = tstart, time2 = tstop, event = as.numeric(CFRD) == 2)"
 f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
@@ -293,14 +285,16 @@ ggcoef_table(cox_res,
 
 # 1 hour OGTT glucose in CFRD
 
+## 1 hour glucose alone
+
 ```{r}
 # read in separate data files
 
-ogtt <- read.csv("./Christine Chan/1 hour OGTT in CFRD/Data_raw/ogtt.csv")
-pft <- read.csv("./Christine Chan/1 hour OGTT in CFRD/Data_raw/pfts.csv")
-a1c <- read.csv("./Christine Chan/1 hour OGTT in CFRD/Data_raw/a1c.csv")
-demo <- read.csv("./Christine Chan/1 hour OGTT in CFRD/Data_raw/demographics.csv")
-dob <- read.csv("./Christine Chan/1 hour OGTT in CFRD/Data_raw/dob.csv")
+ogtt <- read.csv("./1 hour OGTT in CFRD/Data_raw/ogtt.csv", na.strings = "")
+pft <- read.csv("./1 hour OGTT in CFRD/Data_raw/pfts.csv", na.strings = "")
+a1c <- read.csv("./1 hour OGTT in CFRD/Data_raw/a1c.csv", na.strings = "")
+demo <- read.csv("./1 hour OGTT in CFRD/Data_raw/demographics.csv", na.strings = "")
+dob <- read.csv("./1 hour OGTT in CFRD/Data_raw/dob.csv", na.strings = "")
 
 # merge dob and pfts
 pft <- merge(pft, dob, by = "MRN", all.x = T, all.y = F)
@@ -601,7 +595,7 @@ colnames(lastogtt) <- c("MRN", "Date of last OGTT")
 alldata <- merge(alldata, lastogtt, by = "MRN", all.x = T, all.y = T)
 
 # read in date of modulator use
-mod <- read.csv("./Christine Chan/1 hour OGTT in CFRD/Data_raw/modulators.csv", na.strings = c("", " ", NA))
+mod <- read.csv("./1 hour OGTT in CFRD/Data_raw/modulators.csv", na.strings = c("", " ", NA))
 mod$Kalydeco.Start.Date <- as.Date(mod$Kalydeco.Start.Date, format = "%m/%d/%Y")
 mod$Orkambi.Start.Date <- as.Date(mod$Orkambi.Start.Date, format = "%m/%d/%Y")
 mod$Symdeko.Start.Date <- as.Date(mod$Symdeko.Start.Date, format = "%m/%d/%Y")
@@ -769,104 +763,41 @@ baseline_all$BMI <- unlist(apply(baseline_all, 1, function(r) {
 # create multogtt with time <4 years since there is little data beyond that
 multogtt_reduced <- multogtt[multogtt$time <= 4, ]
 
-
-##############
-# DESC STATS #
-##############
-
-# table of demographics in those with at least one pre-CFRD OGTT
-demovars <- c(
-  "Sex", "race_eth", "age", "genoRisk", "Fasting.Glucose", "X1.hour.Glucose", "X2.hour.Glucose", "onmod_baseline", "modstarted_fup",
-  "A1C", "FEV1.per.pred", "FVC.per.pred", "BMI", "bmipercentile", "FEV.1.per.pred_FVC.per.pred"
-)
-# Taking out these clinical variables - if they are to be added to table 1, need to figure out how
-# because they come from PFT visits, not the same date as OGTT
-#              "BMI","FEV1.per.pred","FVC.per.pred","FEF.25.75.per.pred","bmip")
-t1_alldata <- CreateTableOne(data = baseline_all, vars = demovars)
-t1_alldata <- print(t1_alldata, printToggle = F, varLabels = TRUE, missing = T, showAllLevels = T, test = F)
-
-# table of demographics in those with at least one pre-CFRD OGTT by sex
-t1_alldata_sex <- CreateTableOne(data = baseline_all, vars = demovars, strata = "Sex")
-t1_alldata_sex <- print(t1_alldata_sex, printToggle = F, varLabels = TRUE, missing = T, showAllLevels = T)
-
-# table of demographics in those with more than 1 OGTT
-t1_multogtt <- CreateTableOne(data = baseline_mult, vars = c(demovars, "Follow_up_time_yrs"))
-t1_multogtt <- print(t1_multogtt, printToggle = F, varLabels = TRUE, missing = T, showAllLevels = T, test = F)
-
-# table of demographics in those with more than 1 OGTT stratified by progression
-t1_multogtt_prog <- CreateTableOne(data = baseline_mult, vars = c(demovars, "Follow_up_time_yrs", "age_at_CFRD_dx"), strata = "CFRD")
-t1_multogtt_prog <- print(t1_multogtt_prog, printToggle = F, varLabels = TRUE, missing = T, showAllLevels = T, test = T)
-
-# table of demographics in those with more than 1 OGTT by sex
-t1_multogtt_sex <- CreateTableOne(data = baseline_mult, vars = demovars, strata = "Sex")
-t1_multogtt_sex <- print(t1_multogtt_sex, printToggle = F, varLabels = TRUE, missing = T, showAllLevels = T)
-
-# compare baseline glucose values in those who developed CFRD and those who did not
-# added other vars too
-gluctable <- CreateTableOne(baseline_mult, vars = demovars, strata = "CFRD")
-gluctable <- print(gluctable, printToggle = F, varLabels = TRUE, missing = T, showAllLevels = T, test = T)
-
-########################
-# LOGISTIC REGRESSIONS #
-########################
-
-# logistic regression of 1 hour and 2 hour glucose predicting cfrd
-log1 <- glm(data = baseline_mult, CFRD ~ Baseline_1hr_glucose, family = "binomial")
-or1 <- exp(cbind(OR = coef(log1), confint(log1)))
-log1_adj <- glm(data = baseline_mult, CFRD ~ Baseline_1hr_glucose + Base_age + Sex, family = "binomial")
-or1_adj <- exp(cbind(OR = coef(log1_adj), confint(log1_adj)))
-
-# add interaction with sex
-log1_adj_int <- glm(data = baseline_mult, CFRD ~ Baseline_1hr_glucose + Base_age + Sex + Sex * Baseline_1hr_glucose, family = "binomial")
-or1_adj_int <- exp(cbind(OR = coef(log1_adj_int), confint(log1_adj_int)))
-
-log1_cat <- glm(data = baseline_mult, CFRD ~ Baseline_1hr_glucose_155, family = "binomial")
-or1_cat <- exp(cbind(OR = coef(log1_cat), confint(log1_cat)))
-log1_cat_adj <- glm(data = baseline_mult, CFRD ~ Baseline_1hr_glucose_155 + Base_age + Sex, family = "binomial")
-or1_cat_adj <- exp(cbind(OR = coef(log1_cat_adj), confint(log1_cat_adj)))
-
-log1_cat_140 <- glm(data = baseline_mult, CFRD ~ Baseline_1hr_glucose_140, family = "binomial")
-or1_cat_140 <- exp(cbind(OR = coef(log1_cat_140), confint(log1_cat_140)))
-log1_cat_adj_140 <- glm(data = baseline_mult, CFRD ~ Baseline_1hr_glucose_140 + Base_age + Sex, family = "binomial")
-or1_cat_adj_140 <- exp(cbind(OR = coef(log1_cat_adj_140), confint(log1_cat_adj_140)))
-
-# add interaction with sex
-log1_cat_adj_int <- glm(
-  data = baseline_mult, CFRD ~ Baseline_1hr_glucose_155 + Base_age + Sex + Sex * Baseline_1hr_glucose_155,
-  family = "binomial"
-)
-or1_cat_adj_int <- exp(cbind(OR = coef(log1_cat_adj_int), confint(log1_cat_adj_int)))
-
-log2 <- glm(data = baseline_mult, CFRD ~ Baseline_2hr_glucose, family = "binomial")
-or2 <- exp(cbind(OR = coef(log2), confint(log2)))
-
-log2_adj <- glm(data = baseline_mult, CFRD ~ Baseline_2hr_glucose + Base_age + Sex, family = "binomial")
-or2_adj <- exp(cbind(OR = coef(log2_adj), confint(log2_adj)))
-
-# add interaction with sex
-log2_adj_int <- glm(data = baseline_mult, CFRD ~ Baseline_2hr_glucose + Base_age + Sex + Sex * Baseline_2hr_glucose, family = "binomial")
-or2_adj_int <- exp(cbind(OR = coef(log2_adj_int), confint(log2_adj_int)))
-
-# ROC for 1 hour glucose
-# get predicted values from logistic regression
-baseline_mult$pred_1hr <- predict(log1, type = "response", data.frame = baseline_mult)
-# perform the ROC analysis
-roc1 <- roc(data = baseline_mult, response = CFRD, predictor = X1.hour.Glucose)
-# find the cutoff that maximizes the Youden Index
-coords1 <- coords(roc1, "b", ret = c("t", "specificity", "sensitivity"), best.method = "youden") # default
-
-# ROC for 2 hour glucose
-baseline_mult$pred_2hr <- predict(log2, type = "response", data.frame = baseline_mult)
-roc2 <- roc(data = baseline_mult, response = CFRD, predictor = X2.hour.Glucose)
-coords2 <- coords(roc2, "b", ret = c("t", "specificity", "sensitivity"), best.method = "youden") # default
-
 ##############
 # COX MODELS #
 ##############
-
+baseline_mult$Race <- factor(baseline_mult$Race, levels = c("Caucasian", "Black", "Other"))
 # CPH model for baseline 1 hour glucose
-cox1hr <- coxph(Surv(Follow_up_time_yrs, CFRD) ~ Baseline_1hr_glucose, data = baseline_mult)
+f <- Surv(Follow_up_time_yrs, CFRD) ~ age + Sex + BMI + FEV1.per.pred + Baseline_1hr_glucose
+cox1hr <- coxph(f, data = baseline_mult)
+# Forest plot and coefficients table
+cox1hr %>%
+  tbl_regression(exponentiate = T)
+ggcoef_table(cox1hr,
+  show_p_values = F, add_reference_rows = T, exponentiate = T,
+  signif_stars = F, colour = F
+)
 ```
+
+## 1 hour glucose and HbA1c
+
+```{r}
+cox1hra1c <- coxph(update(f, . ~ . + A1C), data = baseline_mult)
+# Forest plot and coefficients table
+cox1hra1c %>%
+  tbl_regression(exponentiate = T)
+ggcoef_table(cox1hra1c,
+  show_p_values = F, add_reference_rows = T, exponentiate = T,
+  signif_stars = F, colour = F
+)
+```
+
+# Notes
+
+- There are no participants over 31 in Christine's 1 hour OGTT analysis data, so I used age as a continuous variable.
+- Because these models include age and sex, I also used raw BMI value as a continuous variable.
+- Race was removed from the models because the group sizes are so small in the one hour dataset (only 3 Black participants).
+- Pancreatic status was not available in the one hour glucose dataset, so was removed from the models.
 
 # Questions for Deb
 
