@@ -235,10 +235,13 @@ labels <- list(
   A_fungalyeast1 = "Aspergillus (any species)",
   A_mycocultureresults3 = "Microorganisms in myco culture", eDWID = "ID",
   tstart = "Interval start", tstop = "Interval stop",
-  Age_YrEnd = "Age", bmi_perc = "BMI %ile"
+  Age_YrEnd = "Age", bmi_perc = "BMI %ile",
+  A_hgba1c = "HbA1c"
 )
 label(annual[, which(colnames(annual) %in% names(labels))]) <-
   labels[colnames(annual)[which(colnames(annual) %in% names(labels))]]
+# Limit to after 2010
+annual <- annual %>% filter(ReviewYear >= 2010)
 ```
 
 # Registry
@@ -254,12 +257,14 @@ annual$tstart <- as.numeric(annual$tstart) - as.numeric(og)
 annual$tstop <- as.numeric(annual$tstop) - as.numeric(og)
 # Formula for base model
 xvars <- c(
-  "Age_YrEnd", "Gender", "bmi", "MutClass", "tube_feeding", "liver_disease", "ppFEV1_cat",
-  "NumPulmExacerbation"
+  "age_group", "Gender", "Race", "Hispanicrace", "bmi", "MutClass",
+  "A_IsOnEnzymes", "tube_feeding", "liver_disease", "A_FEV1_pct_predicted",
+  "NumPulmExacerbation", "A_corticosteroids1", "A_hgba1c"
 )
 y <- "Surv(time = tstart, time2 = tstop, event = as.numeric(CFRD) == 2)"
 f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
 cox_res <- coxph(f, data = annual, cluster = eDWID)
+cox.zph(cox_res)
 # Forest plot and coefficients table
 cox_res %>%
   tbl_regression(exponentiate = T)
@@ -269,11 +274,17 @@ ggcoef_table(cox_res,
 )
 ```
 
-## Base model plus HbA1c
+## Base model with variables available in Lorenz et al.
 
 ```{r}
 # Formula for base model
-cox_res <- coxph(update(f, . ~ . + A_hgba1c), data = annual, cluster = eDWID)
+xvars <- c(
+  "age_group", "Gender", "bmi", "MutClass", "A_FEV1_pct_predicted", "A_hgba1c"
+)
+y <- "Surv(time = tstart, time2 = tstop, event = as.numeric(CFRD) == 2)"
+f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
+cox_res <- coxph(f, data = annual, cluster = eDWID)
+cox.zph(cox_res)
 # Forest plot and coefficients table
 cox_res %>%
   tbl_regression(exponentiate = T)
@@ -283,18 +294,16 @@ ggcoef_table(cox_res,
 )
 ```
 
-# 1 hour OGTT glucose in CFRD
-
-## 1 hour glucose alone
+# Lorenz et al.
 
 ```{r}
 # read in separate data files
 
-ogtt <- read.csv("./1 hour OGTT in CFRD/Data_raw/ogtt.csv", na.strings = "")
-pft <- read.csv("./1 hour OGTT in CFRD/Data_raw/pfts.csv", na.strings = "")
-a1c <- read.csv("./1 hour OGTT in CFRD/Data_raw/a1c.csv", na.strings = "")
-demo <- read.csv("./1 hour OGTT in CFRD/Data_raw/demographics.csv", na.strings = "")
-dob <- read.csv("./1 hour OGTT in CFRD/Data_raw/dob.csv", na.strings = "")
+ogtt <- read.csv("./1 hour OGTT in CFRD/Data_raw/OGTT.csv")
+pft <- read.csv("./1 hour OGTT in CFRD/Data_raw/PFTs.csv")
+a1c <- read.csv("./1 hour OGTT in CFRD/Data_raw/A1c.csv")
+demo <- read.csv("./1 hour OGTT in CFRD/Data_raw/demographics.csv")
+dob <- read.csv("./1 hour OGTT in CFRD/Data_raw/dob.csv")
 
 # merge dob and pfts
 pft <- merge(pft, dob, by = "MRN", all.x = T, all.y = F)
@@ -454,7 +463,7 @@ alldata$genoRisk <- ifelse(alldata$severity1 == "Mild" | alldata$severity2 == "M
 )
 
 # write file of people with missing genotype risk
-# write.csv(alldata[alldata$genoRisk=="",],"./Christine Chan/1 hour OGTT in CFRD/Data_raw/missing_genotype_risk.csv")
+# write.csv(alldata[alldata$genoRisk=="",],"./1 hour OGTT in CFRD/Data_raw/missing_genotype_risk.csv")
 
 
 # merge back all baseline characteristics
@@ -499,12 +508,12 @@ col_check <- alldata[alldata$MRN %in% c(
   918124, 932695, 949042, 952250, 952252, 825118
 ), ]
 col_check <- col_check[order(col_check$MRN, col_check$Date), ]
-# write.csv(col_check,"./Christine Chan/1 hour OGTT in CFRD/Data_raw/check_cfrd.csv",na="",row.names = F)
+# write.csv(col_check,"./1 hour OGTT in CFRD/Data_raw/check_cfrd.csv",na="",row.names = F)
 
 # last 2 discrepant cases after fixing date issue
 col_check2 <- alldata[alldata$MRN %in% c(686476, 825118), ]
 col_check2 <- col_check2[order(col_check2$MRN, col_check2$Date), ]
-# write.csv(col_check2,"./Christine Chan/1 hour OGTT in CFRD/Data_raw/check_cfrd2.csv",na="",row.names = F)
+# write.csv(col_check2,"./1 hour OGTT in CFRD/Data_raw/check_cfrd2.csv",na="",row.names = F)
 
 # remove all visits before first OGTT
 # alldata$`Date of first OGTT` <- as.Date(as.character(alldata$`Date of first OGTT`),format="%m/%d/%Y")
@@ -766,10 +775,17 @@ multogtt_reduced <- multogtt[multogtt$time <= 4, ]
 ##############
 # COX MODELS #
 ##############
-baseline_mult$Race <- factor(baseline_mult$Race, levels = c("Caucasian", "Black", "Other"))
+```
+
+## Base model
+
+```{r}
 # CPH model for baseline 1 hour glucose
-f <- Surv(Follow_up_time_yrs, CFRD) ~ age + Sex + BMI + FEV1.per.pred + Baseline_1hr_glucose
-cox1hr <- coxph(f, data = baseline_mult)
+cox1hr <- coxph(
+  Surv(Follow_up_time_yrs, CFRD) ~ age + Sex + BMI + class1 + FEV1.per.pred +
+    A1C,
+  data = baseline_mult
+)
 # Forest plot and coefficients table
 cox1hr %>%
   tbl_regression(exponentiate = T)
@@ -779,14 +795,19 @@ ggcoef_table(cox1hr,
 )
 ```
 
-## 1 hour glucose and HbA1c
+## Model with one hour OGTT
 
 ```{r}
-cox1hra1c <- coxph(update(f, . ~ . + A1C), data = baseline_mult)
+# CPH model for baseline 1 hour glucose
+cox1hr <- coxph(
+  Surv(Follow_up_time_yrs, CFRD) ~ age + Sex + BMI + class1 + FEV1.per.pred +
+    A1C + Baseline_1hr_glucose,
+  data = baseline_mult
+)
 # Forest plot and coefficients table
-cox1hra1c %>%
+cox1hr %>%
   tbl_regression(exponentiate = T)
-ggcoef_table(cox1hra1c,
+ggcoef_table(cox1hr,
   show_p_values = F, add_reference_rows = T, exponentiate = T,
   signif_stars = F, colour = F
 )
@@ -794,11 +815,4 @@ ggcoef_table(cox1hra1c,
 
 # Notes
 
-- There are no participants over 31 in Christine's 1 hour OGTT analysis data, so I used age as a continuous variable.
-- Because these models include age and sex, I also used raw BMI value as a continuous variable.
-- Race was removed from the models because the group sizes are so small in the one hour dataset (only 3 Black participants).
-- Pancreatic status was not available in the one hour glucose dataset, so was removed from the models.
-
-# Questions for Deb
-
-- Part of the reason that we split the data into 3 eras was because the PH assumption was violated in the full model. How do you want to handle that for the power calculations?
+- I removed race from the models because the Lorenz et al. paper data only includes 8 non-white participants, so the coefficients exploded.
