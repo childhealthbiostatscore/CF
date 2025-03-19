@@ -259,7 +259,7 @@ annual$tstop <- as.numeric(annual$tstop) - as.numeric(og)
 xvars <- c(
   "age_group", "Gender", "Race", "Hispanicrace", "bmi", "MutClass",
   "A_IsOnEnzymes", "tube_feeding", "liver_disease", "A_FEV1_pct_predicted",
-  "NumPulmExacerbation", "A_corticosteroids1", "A_hgba1c"
+  "NumPulmExacerbation", "A_corticosteroids1"
 )
 y <- "Surv(time = tstart, time2 = tstop, event = as.numeric(CFRD) == 2)"
 f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
@@ -277,9 +277,11 @@ ggcoef_table(cox_res,
 ## Base model with variables available in Lorenz et al.
 
 ```{r}
+annual = annual%>% filter(Age_YrEnd<=22)
+annual$age_group = cut(annual$Age_YrEnd,c(7,11,22))
 # Formula for base model
 xvars <- c(
-  "age_group", "Gender", "bmi", "MutClass", "A_FEV1_pct_predicted", "A_hgba1c"
+  "age_group", "Gender"
 )
 y <- "Surv(time = tstart, time2 = tstop, event = as.numeric(CFRD) == 2)"
 f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
@@ -782,8 +784,7 @@ multogtt_reduced <- multogtt[multogtt$time <= 4, ]
 ```{r}
 # CPH model for baseline 1 hour glucose
 cox1hr <- coxph(
-  Surv(Follow_up_time_yrs, CFRD) ~ age + Sex + BMI + class1 + FEV1.per.pred +
-    A1C,
+  Surv(Follow_up_time_yrs, CFRD) ~ age + Sex ,
   data = baseline_mult
 )
 # Forest plot and coefficients table
@@ -799,11 +800,13 @@ ggcoef_table(cox1hr,
 
 ```{r}
 # CPH model for baseline 1 hour glucose
+baseline_mult$age_group = cut(baseline_mult$age,c(7,11,22))
+
 cox1hr <- coxph(
-  Surv(Follow_up_time_yrs, CFRD) ~ age + Sex + BMI + class1 + FEV1.per.pred +
-    A1C + Baseline_1hr_glucose,
+  Surv(Follow_up_time_yrs, CFRD) ~ age*Sex,
   data = baseline_mult
 )
+
 # Forest plot and coefficients table
 cox1hr %>%
   tbl_regression(exponentiate = T)
@@ -816,3 +819,21 @@ ggcoef_table(cox1hr,
 # Notes
 
 - I removed race from the models because the Lorenz et al. paper data only includes 8 non-white participants, so the coefficients exploded.
+
+To Do 
+
+- Plot HbA1c by age for those who do develop CFRD
+- Take out HbA1c for base model
+- Include generalized R2 for the models
+- Split age into equal tertiles
+  2 x 3 table with rows for diabetes status and age as columns, cells are numbers 
+  
+- PROC power has a cox reg option
+  - Base model is from the registry 
+  - 0.5, 1, 2 times the 1 hr glucose point estimate from Lorenz et al.
+  - 80, 85, 90% power
+  
+- Mixed model power calculations for aim 3
+  - Repeated measures with FEV1 and BMI
+  - Mutation class and sex as predictors
+  
