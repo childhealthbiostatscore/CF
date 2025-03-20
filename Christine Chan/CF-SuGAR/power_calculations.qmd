@@ -779,9 +779,9 @@ The above model had a generalized $R^2$ of `r as.numeric(summary(lorenz_1hr)$rsq
 ## HR for 1 hour OGTT glucose
 
 ```{r}
-exp(lorenz_1hr$coefficients["Baseline_1hr_glucose"] * 0.5)
+exp(lorenz_1hr$coefficients["Baseline_1hr_glucose"]) * 0.5
 exp(lorenz_1hr$coefficients["Baseline_1hr_glucose"])
-exp(lorenz_1hr$coefficients["Baseline_1hr_glucose"] * 2)
+exp(lorenz_1hr$coefficients["Baseline_1hr_glucose"]) * 2
 ```
 
 ## Regression of age group and sex on 1 hour OGTT glucose
