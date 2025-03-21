@@ -800,6 +800,10 @@ mean(lorenz$CFRD == 1)
 
 ```{r}
 registry$bmi[registry$bmi >= 200] <- NA
+# A1c group
+registry$a1c_group <- cut(registry$A_hgba1c, c(-Inf, 5.9, Inf))
+# Remove people with CFRD
+registry <- registry %>% filter(CFRD != "CFRD+")
 # Write for SAS
 write.csv(registry,
   file = "./CF-SuGAR/Background/Power Calculations/Data/registry.csv",
@@ -826,7 +830,7 @@ ggplot(plot_df, aes(x = Age_YrEnd, y = bmi, group = factor(eDWID))) +
 
 ```{r}
 mod1 <- lmer(bmi ~ Age_YrEnd + (1 | eDWID), data = registry)
-summary(mod1,ddf="Kenward-Roger")
+summary(mod1, ddf = "Kenward-Roger")
 ```
 
 ## FEV1 % predicted

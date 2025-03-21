@@ -13,6 +13,19 @@ proc power;
       ;
 run;
 
+proc power;
+   coxreg
+      hazardratio = 1.01
+      rsquare = 0.043
+      stddev = 45
+      power = 0.8 0.85 0.9
+      alpha = 0.05
+      sides = 2
+      eventprob = 0.15 0.3 0.4
+      NTOTAL= .
+      ;
+run;
+
 /*Aim 2 mixed models*/
 
 PROC IMPORT 
@@ -25,18 +38,24 @@ RUN;
  
 /*BMI*/
 
-proc glimmix 
+proc mixed 
 	data=registry;
-	class eDWID;
-	model bmi = Age_YrEnd / solution DDFM=KENWARDROGER2;
-	random intercept / type=un subject=eDWID;
+	class eDWID a1c_group;
+	model bmi = a1c_group Age_YrEnd Age_YrEnd*Age_YrEnd / solution DDFM=KENWARDROGER2;
+	repeated / subject=eDWID type=un;
+/*	random intercept Age_YrEnd / type=un subject=eDWID;*/
+run;
+
+proc univariate 
+data=registry;
+var eDWID;
 run;
 
 proc glimmix 
 	data=registry;
 	class eDWID;
-	model bmi = Age_YrEnd Age_YrEnd*Age_YrEnd / solution DDFM=KENWARDROGER2;
-	random intercept / type=un subject=eDWID;
+	model bmi = A_hgba1c Age_YrEnd Age_YrEnd*Age_YrEnd / solution DDFM=KENWARDROGER2;
+	random intercept Age_YrEnd / type=un subject=eDWID;
 run;
 
 proc glimmix 
