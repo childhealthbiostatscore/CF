@@ -25,6 +25,7 @@ library(rspiro)
 library(survival)
 library(gtsummary)
 library(ggstats)
+library(lmerTest)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan"
@@ -220,8 +221,6 @@ og <- ymd("2003-01-01")
 annual <- as.data.frame(annual)
 annual$tstart <- as.numeric(annual$tstart) - as.numeric(og)
 annual$tstop <- as.numeric(annual$tstop) - as.numeric(og)
-# Remove ages > 22 to match Lorenz et al.
-annual <- annual %>% filter(Age_YrEnd < 23)
 # Lorenz et al. data cleaning
 # read in separate data files
 
@@ -705,35 +704,22 @@ rm(annual, baseline_mult)
 
 # Data cleaning
 
-- Participants over age 23 were excluded from the registry data, along with data collected prior to 2010.
 - Age groups were chosen based on the Lorenz et al. data. We split the age column into equal tertiles:
 
 ```{r}
 lorenz$age_group <- cut(lorenz$age, c(7, 10.48, 13.3, 22.2), right = F)
 table(lorenz$age_group, lorenz$CFRD)
 registry$age_group <- cut(registry$Age_YrEnd, c(7, 10.48, 13.3, 22.2), right = F)
-```
-
-# Registry base model
-
-```{r}
-registry_base <- coxph(
-  Surv(time = tstart, time2 = tstop, event = as.numeric(CFRD) == 2) ~
-    age_group + Gender,
-  data = registry, cluster = eDWID
-)
-# Forest plot and coefficients table
-registry_base %>%
-  tbl_regression(exponentiate = T)
-ggcoef_table(registry_base,
-  show_p_values = F, add_reference_rows = T, exponentiate = T,
-  signif_stars = F, colour = F
+# Write data
+write.csv(lorenz,
+  file = "./CF-SuGAR/Background/Power Calculations/Data/lorenz.csv",
+  row.names = F, na = ""
 )
 ```
 
-The above model had a generalized $R^2$ of `r as.numeric(summary(registry_base)$rsq[1])`.
+# Aim 1
 
-# Lorenz et al.
+- Power calculations for Aim 1 used only the Lorenz et al. data and no registry data.
 
 ## Base model
 
@@ -774,9 +760,9 @@ ggcoef_table(lorenz_1hr,
 
 The above model had a generalized $R^2$ of `r as.numeric(summary(lorenz_1hr)$rsq[1])`.
 
-# PROC POWER
+## PROC POWER
 
-## HR for 1 hour OGTT glucose
+### HR for 1 hour OGTT glucose
 
 ```{r}
 exp(lorenz_1hr$coefficients["Baseline_1hr_glucose"]) * 0.5
@@ -784,20 +770,20 @@ exp(lorenz_1hr$coefficients["Baseline_1hr_glucose"])
 exp(lorenz_1hr$coefficients["Baseline_1hr_glucose"]) * 2
 ```
 
-## Regression of age group and sex on 1 hour OGTT glucose
+### Regression of age group and sex on 1 hour OGTT glucose
 
 ```{r}
 lin_mod <- lm(Baseline_1hr_glucose ~ age_group + Sex, data = lorenz)
 summary(lin_mod)$r.squared
 ```
 
-## SD of 1 hour OGTT glucose
+### SD of 1 hour OGTT glucose
 
 ```{r}
 sd(lorenz$Baseline_1hr_glucose)
 ```
 
-## Event probability
+### Event probability
 
 ```{r}
 registry %>%
@@ -807,14 +793,57 @@ registry %>%
 mean(lorenz$CFRD == 1)
 ```
 
-# To Do 
-  
-- PROC power has a cox reg option
-  - Base model is from the registry 
-  - 0.5, 1, 2 times the 1 hr glucose point estimate from Lorenz et al.
-  - 80, 85, 90% power
-  
-- Mixed model power calculations for aim 3
-  - Repeated measures with FEV1 and BMI
-  - Mutation class and sex as predictors
-  
+# Aim 2
+
+- All models below were fit using registry data.
+- One BMI value of > 200 was removed
+
+```{r}
+registry$bmi[registry$bmi >= 200] <- NA
+# Write for SAS
+write.csv(registry,
+  file = "./CF-SuGAR/Background/Power Calculations/Data/registry.csv",
+  row.names = F, na = ""
+)
+```
+
+## BMI
+
+### Plot
+
+```{r}
+plot_df <- registry %>%
+  select(eDWID, ReviewYear, Age_YrEnd, bmi) %>%
+  drop_na()
+ggplot(plot_df, aes(x = Age_YrEnd, y = bmi, group = factor(eDWID))) +
+  geom_point(alpha = 0.1) +
+  geom_line(alpha = 0.1) +
+  theme(legend.position = element_blank()) +
+  theme_bw()
+```
+
+### Models
+
+```{r}
+mod1 <- lmer(bmi ~ Age_YrEnd + (1 | eDWID), data = registry)
+summary(mod1,ddf="Kenward-Roger")
+```
+
+## FEV1 % predicted
+
+### Plot
+
+```{r}
+plot_df <- registry %>%
+  select(eDWID, ReviewYear, Age_YrEnd, A_FEV1_pct_predicted) %>%
+  drop_na()
+ggplot(plot_df, aes(
+  x = Age_YrEnd, y = A_FEV1_pct_predicted, group = factor(eDWID)
+)) +
+  geom_point(alpha = 0.1) +
+  geom_line(alpha = 0.1) +
+  theme(legend.position = element_blank()) +
+  theme_bw()
+```
+
+### Models
