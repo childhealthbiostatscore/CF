@@ -40,11 +40,14 @@ RUN;
 
 proc mixed 
 	data=registry;
-	class eDWID a1c_group;
-	model bmi = a1c_group Age_YrEnd Age_YrEnd*Age_YrEnd / solution DDFM=KENWARDROGER2;
+/*	class eDWID;*/
+	model bmi = a1c_group Age_YrEnd / solution DDFM=KENWARDROGER2 outpm=residual;
 	repeated / subject=eDWID type=un;
 /*	random intercept Age_YrEnd / type=un subject=eDWID;*/
 run;
+
+proc contents data=residual;run;
+proc means data=residual;var Resid;run;
 
 proc univariate 
 data=registry;

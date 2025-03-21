@@ -802,6 +802,7 @@ mean(lorenz$CFRD == 1)
 registry$bmi[registry$bmi >= 200] <- NA
 # A1c group
 registry$a1c_group <- cut(registry$A_hgba1c, c(-Inf, 5.9, Inf))
+registry$a1c_group = as.numeric(registry$a1c_group=="(-Inf,5.9]")
 # Remove people with CFRD
 registry <- registry %>% filter(CFRD != "CFRD+")
 # Write for SAS
