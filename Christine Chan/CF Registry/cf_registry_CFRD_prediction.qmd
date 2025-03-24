@@ -24,7 +24,11 @@ library(nlme)
 library(JM)
 library(dplyr)
 library(tidyr)
-knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry")
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry"
+)
+knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
@@ -176,3 +180,11 @@ lme_fit_a1c <- lme(lme_f,
 # Combine
 joint_fit <- jointModel(lme_fit_a1c, cox_fit, timeVar = "Age_YrEnd")
 ```
+
+
+- Check for HbA1c measures after the survival time (not sure if needs to be strictly less than)
+- Set parameterization = "slope" to see if change in HbA1c increases hazard 
+- Look into dynamic predictions in JMBayes
+- Could try re-fitting this with a left-censored model 
+  - If it says the same thing, it's probably okay to use the right-censored
+  - Could also try using the half interval model Kristen described
