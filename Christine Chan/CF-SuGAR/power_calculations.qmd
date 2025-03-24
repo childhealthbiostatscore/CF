@@ -10,13 +10,9 @@ format:
     toc: true
     toc-depth: 5
     toc-float: true
-    code-fold: true
     self-contained: true
     fig-cap-location: top
     page-layout: full
-    theme:
-      light: flatly
-      dark: darkly
 editor: source
 ---
 
@@ -29,6 +25,7 @@ library(rspiro)
 library(survival)
 library(gtsummary)
 library(ggstats)
+library(lmerTest)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan"
@@ -41,6 +38,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
+#| include: false
 # Import data and codebook
 annual <- read.csv("./CF Registry/Data_Raw/CFF19_Annualized_Del1.csv",
   na.strings = c("", "N/A")
@@ -126,31 +124,6 @@ annual$bmi_perc_who <- sds(annual$bmi,
   item = "bmi", ref = who.ref, type = "perc"
 ) * 100
 annual$bmi_perc <- coalesce(annual$bmi_perc_cdc, annual$bmi_perc_who)
-annual$bmi_cat <- apply(annual, 1, function(r) {
-  age <- as.numeric(r["Age_YrEnd"])
-  gender <- as.character(r["Gender"])
-  bmi <- as.numeric(r["bmi"])
-  bmi_perc <- as.numeric(r["bmi_perc"])
-  if (age <= 20) {
-    return(cut(bmi_perc, c(-Inf, 10, 50, 85, Inf),
-      right = F,
-      labels = c("Undernourished", "At Risk", "Target/Goal", "Overweight")
-    ))
-  } else if (age > 20) {
-    if (gender == "M") {
-      return(cut(bmi, c(-Inf, 18.5, 23, 25, Inf),
-        right = F,
-        labels = c("Undernourished", "At Risk", "Target/Goal", "Overweight")
-      ))
-    } else if (gender == "F") {
-      return(cut(bmi, c(-Inf, 18.5, 22, 25, Inf),
-        right = F,
-        labels = c("Undernourished", "At Risk", "Target/Goal", "Overweight")
-      ))
-    }
-  }
-})
-annual$bmi_cat <- relevel(annual$bmi_cat, ref = "Target/Goal")
 # Format columns
 annual$MutClass <- factor(annual$MutClass,
   levels = c("1-3", "4-5", "Oth", "N/A"),
@@ -242,63 +215,13 @@ label(annual[, which(colnames(annual) %in% names(labels))]) <-
   labels[colnames(annual)[which(colnames(annual) %in% names(labels))]]
 # Limit to after 2010
 annual <- annual %>% filter(ReviewYear >= 2010)
-```
-
-# Registry
-
-## Base model
-
-```{r}
 # Origin for survival analyses
 og <- ymd("2003-01-01")
 # Need to use a dataframe not a tibble
 annual <- as.data.frame(annual)
 annual$tstart <- as.numeric(annual$tstart) - as.numeric(og)
 annual$tstop <- as.numeric(annual$tstop) - as.numeric(og)
-# Formula for base model
-xvars <- c(
-  "age_group", "Gender", "Race", "Hispanicrace", "bmi", "MutClass",
-  "A_IsOnEnzymes", "tube_feeding", "liver_disease", "A_FEV1_pct_predicted",
-  "NumPulmExacerbation", "A_corticosteroids1"
-)
-y <- "Surv(time = tstart, time2 = tstop, event = as.numeric(CFRD) == 2)"
-f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
-cox_res <- coxph(f, data = annual, cluster = eDWID)
-cox.zph(cox_res)
-# Forest plot and coefficients table
-cox_res %>%
-  tbl_regression(exponentiate = T)
-ggcoef_table(cox_res,
-  show_p_values = F, add_reference_rows = T, exponentiate = T,
-  signif_stars = F, colour = F
-)
-```
-
-## Base model with variables available in Lorenz et al.
-
-```{r}
-annual = annual%>% filter(Age_YrEnd<=22)
-annual$age_group = cut(annual$Age_YrEnd,c(7,11,22))
-# Formula for base model
-xvars <- c(
-  "age_group", "Gender"
-)
-y <- "Surv(time = tstart, time2 = tstop, event = as.numeric(CFRD) == 2)"
-f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
-cox_res <- coxph(f, data = annual, cluster = eDWID)
-cox.zph(cox_res)
-# Forest plot and coefficients table
-cox_res %>%
-  tbl_regression(exponentiate = T)
-ggcoef_table(cox_res,
-  show_p_values = F, add_reference_rows = T, exponentiate = T,
-  signif_stars = F, colour = F
-)
-```
-
-# Lorenz et al.
-
-```{r}
+# Lorenz et al. data cleaning
 # read in separate data files
 
 ogtt <- read.csv("./1 hour OGTT in CFRD/Data_raw/OGTT.csv")
@@ -773,67 +696,159 @@ baseline_all$BMI <- unlist(apply(baseline_all, 1, function(r) {
 
 # create multogtt with time <4 years since there is little data beyond that
 multogtt_reduced <- multogtt[multogtt$time <= 4, ]
-
-##############
-# COX MODELS #
-##############
+# rename data
+lorenz <- baseline_mult
+registry <- annual
+rm(annual, baseline_mult)
 ```
+
+# Data cleaning
+
+- Age groups were chosen based on the Lorenz et al. data. We split the age column into equal tertiles:
+
+```{r}
+lorenz$age_group <- cut(lorenz$age, c(7, 10.48, 13.3, 22.2), right = F)
+table(lorenz$age_group, lorenz$CFRD)
+registry$age_group <- cut(registry$Age_YrEnd, c(7, 10.48, 13.3, 22.2), right = F)
+# Write data
+write.csv(lorenz,
+  file = "./CF-SuGAR/Background/Power Calculations/Data/lorenz.csv",
+  row.names = F, na = ""
+)
+```
+
+# Aim 1
+
+- Power calculations for Aim 1 used only the Lorenz et al. data and no registry data.
 
 ## Base model
 
 ```{r}
 # CPH model for baseline 1 hour glucose
-cox1hr <- coxph(
-  Surv(Follow_up_time_yrs, CFRD) ~ age + Sex ,
-  data = baseline_mult
+lorenz_base <- coxph(
+  Surv(Follow_up_time_yrs, CFRD) ~ age_group + Sex,
+  data = lorenz
 )
 # Forest plot and coefficients table
-cox1hr %>%
+lorenz_base %>%
   tbl_regression(exponentiate = T)
-ggcoef_table(cox1hr,
+ggcoef_table(lorenz_base,
   show_p_values = F, add_reference_rows = T, exponentiate = T,
   signif_stars = F, colour = F
 )
 ```
+
+The above model had a generalized $R^2$ of `r as.numeric(summary(lorenz_base)$rsq[1])`.
 
 ## Model with one hour OGTT
 
 ```{r}
 # CPH model for baseline 1 hour glucose
-baseline_mult$age_group = cut(baseline_mult$age,c(7,11,22))
-
-cox1hr <- coxph(
-  Surv(Follow_up_time_yrs, CFRD) ~ age*Sex,
-  data = baseline_mult
+lorenz_1hr <- coxph(
+  Surv(Follow_up_time_yrs, CFRD) ~ age_group + Sex + Baseline_1hr_glucose,
+  data = lorenz
 )
-
+summary(lorenz_1hr)
 # Forest plot and coefficients table
-cox1hr %>%
+lorenz_1hr %>%
   tbl_regression(exponentiate = T)
-ggcoef_table(cox1hr,
+ggcoef_table(lorenz_1hr,
   show_p_values = F, add_reference_rows = T, exponentiate = T,
   signif_stars = F, colour = F
 )
 ```
 
-# Notes
+The above model had a generalized $R^2$ of `r as.numeric(summary(lorenz_1hr)$rsq[1])`.
 
-- I removed race from the models because the Lorenz et al. paper data only includes 8 non-white participants, so the coefficients exploded.
+## PROC POWER
 
-To Do 
+### HR for 1 hour OGTT glucose
 
-- Plot HbA1c by age for those who do develop CFRD
-- Take out HbA1c for base model
-- Include generalized R2 for the models
-- Split age into equal tertiles
-  2 x 3 table with rows for diabetes status and age as columns, cells are numbers 
-  
-- PROC power has a cox reg option
-  - Base model is from the registry 
-  - 0.5, 1, 2 times the 1 hr glucose point estimate from Lorenz et al.
-  - 80, 85, 90% power
-  
-- Mixed model power calculations for aim 3
-  - Repeated measures with FEV1 and BMI
-  - Mutation class and sex as predictors
-  
+```{r}
+exp(lorenz_1hr$coefficients["Baseline_1hr_glucose"]) * 0.5
+exp(lorenz_1hr$coefficients["Baseline_1hr_glucose"])
+exp(lorenz_1hr$coefficients["Baseline_1hr_glucose"]) * 2
+```
+
+### Regression of age group and sex on 1 hour OGTT glucose
+
+```{r}
+lin_mod <- lm(Baseline_1hr_glucose ~ age_group + Sex, data = lorenz)
+summary(lin_mod)$r.squared
+```
+
+### SD of 1 hour OGTT glucose
+
+```{r}
+sd(lorenz$Baseline_1hr_glucose)
+```
+
+### Event probability
+
+```{r}
+registry %>%
+  group_by(eDWID) %>%
+  summarise(cfrd = unique(first_cfrd), .groups = "drop") %>%
+  summarise(cfrd = mean(!is.na(cfrd)))
+mean(lorenz$CFRD == 1)
+```
+
+# Aim 2
+
+- All models below were fit using registry data.
+- One BMI value of > 200 was removed
+
+```{r}
+registry$bmi[registry$bmi >= 200] <- NA
+# A1c group
+registry$a1c_group <- cut(registry$A_hgba1c, c(-Inf, 5.9, Inf))
+registry$a1c_group = as.numeric(registry$a1c_group=="(-Inf,5.9]")
+# Remove people with CFRD
+registry <- registry %>% filter(CFRD != "CFRD+")
+# Write for SAS
+write.csv(registry,
+  file = "./CF-SuGAR/Background/Power Calculations/Data/registry.csv",
+  row.names = F, na = ""
+)
+```
+
+## BMI
+
+### Plot
+
+```{r}
+plot_df <- registry %>%
+  select(eDWID, ReviewYear, Age_YrEnd, bmi) %>%
+  drop_na()
+ggplot(plot_df, aes(x = Age_YrEnd, y = bmi, group = factor(eDWID))) +
+  geom_point(alpha = 0.1) +
+  geom_line(alpha = 0.1) +
+  theme(legend.position = element_blank()) +
+  theme_bw()
+```
+
+### Models
+
+```{r}
+mod1 <- lmer(bmi ~ Age_YrEnd + (1 | eDWID), data = registry)
+summary(mod1, ddf = "Kenward-Roger")
+```
+
+## FEV1 % predicted
+
+### Plot
+
+```{r}
+plot_df <- registry %>%
+  select(eDWID, ReviewYear, Age_YrEnd, A_FEV1_pct_predicted) %>%
+  drop_na()
+ggplot(plot_df, aes(
+  x = Age_YrEnd, y = A_FEV1_pct_predicted, group = factor(eDWID)
+)) +
+  geom_point(alpha = 0.1) +
+  geom_line(alpha = 0.1) +
+  theme(legend.position = element_blank()) +
+  theme_bw()
+```
+
+### Models
