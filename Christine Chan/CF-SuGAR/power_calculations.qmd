@@ -28,7 +28,8 @@ library(ggstats)
 library(lmerTest)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan"
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan",
+  "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan"
 )
 github_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Documents/GitHub",
@@ -802,19 +803,33 @@ mean(lorenz$CFRD == 1)
 registry$bmi[registry$bmi >= 200] <- NA
 # A1c group
 registry$a1c_group <- cut(registry$A_hgba1c, c(-Inf, 5.9, Inf))
-registry$a1c_group = as.numeric(registry$a1c_group=="(-Inf,5.9]")
+registry$a1c_group <- relevel(registry$a1c_group, ref = "(5.9, Inf]")
 # Remove people with CFRD
-registry <- registry %>% filter(CFRD != "CFRD+")
+registry <- registry %>%
+  filter(CFRD != "CFRD+") %>%
+  arrange(eDWID, ReviewYear)
 # Write for SAS
 write.csv(registry,
   file = "./CF-SuGAR/Background/Power Calculations/Data/registry.csv",
   row.names = F, na = ""
 )
+# Proportion of good and bad A1c
+# Overall
+prop.table(table(registry$a1c_group))
+# By person (take each person's worst)
+t <- registry %>%
+  group_by(eDWID) %>%
+  summarise(
+    a1c_group = ifelse(any(a1c_group == "(5.9, Inf]"), "(5.9, Inf]", "(-Inf,5.9]")
+  )
+prop.table(table(t$a1c_group))
 ```
 
 ## BMI
 
-### Plot
+### Plots
+
+#### Spaghetti
 
 ```{r}
 plot_df <- registry %>%
@@ -827,16 +842,33 @@ ggplot(plot_df, aes(x = Age_YrEnd, y = bmi, group = factor(eDWID))) +
   theme_bw()
 ```
 
+#### BMI correlation matrix by visit number
+
+```{r}
+t <- registry %>%
+  group_by(eDWID) %>%
+  mutate(visit_number = row_number()) %>%
+  filter(!is.na(bmi)) %>%
+  select(eDWID, visit_number, bmi) %>%
+  pivot_wider(names_from = visit_number, values_from = bmi)
+head(t)
+cor(data.matrix(t[, -c(1)]), use = "pairwise.complete.obs")
+```
+
 ### Models
 
 ```{r}
-mod1 <- lmer(bmi ~ Age_YrEnd + (1 | eDWID), data = registry)
+mod1 <- lmer(bmi ~ a1c_group + Age_YrEnd + (Age_YrEnd | eDWID),
+  data = registry
+)
 summary(mod1, ddf = "Kenward-Roger")
 ```
 
 ## FEV1 % predicted
 
-### Plot
+### Plots
+
+#### Spaghetti
 
 ```{r}
 plot_df <- registry %>%
@@ -851,4 +883,15 @@ ggplot(plot_df, aes(
   theme_bw()
 ```
 
-### Models
+#### FEV1 correlation matrix by visit number
+
+```{r}
+t <- registry %>%
+  group_by(eDWID) %>%
+  mutate(visit_number = row_number()) %>%
+  filter(!is.na(A_FEV1_pct_predicted)) %>%
+  select(eDWID, visit_number, A_FEV1_pct_predicted) %>%
+  pivot_wider(names_from = visit_number, values_from = A_FEV1_pct_predicted)
+head(t)
+cor(data.matrix(t[, -c(1)]), use = "pairwise.complete.obs")
+```
