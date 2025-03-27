@@ -858,7 +858,7 @@ cor(data.matrix(t[, -c(1)]), use = "pairwise.complete.obs")
 ### Models
 
 ```{r}
-mod1 <- lmer(bmi ~ a1c_group + Age_YrEnd + (Age_YrEnd | eDWID),
+mod1 <- lmer(bmi ~ a1c_group + Age_YrEnd + (1 | eDWID),
   data = registry
 )
 summary(mod1, ddf = "Kenward-Roger")

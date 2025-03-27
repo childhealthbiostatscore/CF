@@ -37,7 +37,7 @@ RUN;
 /*BMI*/
 proc mixed 
 	data=registry ratio;
-	class eDWID a1c_group;
+	class eDWID a1c_group(ref='(5.9, Inf]');
 	model bmi = a1c_group Age_YrEnd / solution influence DDFM=KENWARDROGER2 outpm=influence residual;
 	repeated / subject=eDWID type=un;
 /*	random intercept Age_YrEnd / type=un subject=eDWID;*/
@@ -50,11 +50,11 @@ proc univariate plot normal data=influence;var Resid StudentResid;run;
 /*FEV1 % predicted*/
 proc mixed 
 	data=registry ratio;
-	class eDWID a1c_group;
-	model A_FEV1_pct_predicted = a1c_group Age_YrEnd Age_YrEnd*Age_YrEnd / solution influence DDFM=KENWARDROGER2 outpm=influence residual;
+	class eDWID a1c_group(ref='(5.9, Inf]');
+	model A_FEV1_pct_predicted = a1c_group Age_YrEnd / solution influence DDFM=KENWARDROGER2 outpm=influence residual;
 	repeated / subject=eDWID type=un;
 /*	random intercept Age_YrEnd / type=un subject=eDWID;*/
 run;
 
-proc means data=residual;var Resid;run;
+proc means data=influence;var Resid;run;
 proc means data=influence;var StudentResid;run;
