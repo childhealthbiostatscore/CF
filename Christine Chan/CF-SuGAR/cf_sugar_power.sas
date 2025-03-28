@@ -50,7 +50,7 @@ proc univariate plot normal data=influence;var Resid StudentResid;run;
 /*FEV1 % predicted*/
 proc mixed 
 	data=registry ratio;
-	class eDWID a1c_group(ref='(5.9, Inf]');
+	class eDWID;
 	model A_FEV1_pct_predicted = a1c_group Age_YrEnd / solution influence DDFM=KENWARDROGER2 outpm=influence residual;
 	repeated / subject=eDWID type=un;
 /*	random intercept Age_YrEnd / type=un subject=eDWID;*/

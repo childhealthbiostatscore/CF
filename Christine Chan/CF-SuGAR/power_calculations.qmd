@@ -802,8 +802,7 @@ mean(lorenz$CFRD == 1)
 ```{r}
 registry$bmi[registry$bmi >= 200] <- NA
 # A1c group
-registry$a1c_group <- cut(registry$A_hgba1c, c(-Inf, 5.9, Inf))
-registry$a1c_group <- relevel(registry$a1c_group, ref = "(5.9, Inf]")
+registry$a1c_group <- as.numeric(registry$A_hgba1c <= 5.9)
 # Remove people with CFRD
 registry <- registry %>%
   filter(CFRD != "CFRD+") %>%
@@ -858,10 +857,10 @@ cor(data.matrix(t[, -c(1)]), use = "pairwise.complete.obs")
 ### Models
 
 ```{r}
-mod1 <- lmer(bmi ~ a1c_group + Age_YrEnd + (1 | eDWID),
-  data = registry
-)
-summary(mod1, ddf = "Kenward-Roger")
+bmi_mod <- lm(BMI ~ age + as.numeric(Baseline_1hr_glucose >= 140), data = lorenz)
+summary(bmi_mod)
+sd(resid(bmi_mod))
+prop.table(table(lorenz$Baseline_1hr_glucose >= 140))
 ```
 
 ## FEV1 % predicted
@@ -894,4 +893,12 @@ t <- registry %>%
   pivot_wider(names_from = visit_number, values_from = A_FEV1_pct_predicted)
 head(t)
 cor(data.matrix(t[, -c(1)]), use = "pairwise.complete.obs")
+```
+
+### Models
+
+```{r}
+fev1_mod <- lm(FEV1.per.pred ~ age + as.numeric(Baseline_1hr_glucose >= 140), data = lorenz)
+summary(fev1_mod)
+sd(resid(fev1_mod))
 ```
