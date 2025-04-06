@@ -14,11 +14,6 @@ format:
     fig-width: 9
     fig-height: 7
     page-layout: full
-    theme:
-      light: flatly
-      dark: darkly
-bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /home/timvigers/Documents/GitHub/styles/american-medical-association.csl
 editor: source
 execute:
   warning: false
@@ -34,7 +29,11 @@ library(ggpubr)
 library(lmerTest)
 library(performance)
 library(gt)
-knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Edith Zemanick/Sweat Variability")
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CFEdith Zemanick/Sweat Variability"
+)
+knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
@@ -371,3 +370,74 @@ m4 %>% gtsummary::tbl_regression(exponentiate = T)
 ```
 
 The model using the ratio alone does not really work due to the fitted probabilities issue.
+
+# NACFC
+
+## Normalized ratio by modulator status
+
+```{r results='asis'}
+# Check if ratio >= 1.2
+chec$post_ratio_1.2 <- chec$post_ratio >= 1.2
+label(chec$post_ratio_1.2) <- "Post-Modulator Sweat Na:Cl >= 1.2"
+summary(tableby(modqual ~ post_ratio + post_ratio_1.2,
+  data = chec,
+  control = list(
+    numeric.stats = c("N", "Nmiss2", "meanCI", "range"),
+    cat.stats = c("N", "Nmiss2", "countpct")
+  )
+), pfootnote = T)
+```
+
+## Scatterplots pre-modulator
+
+```{r}
+chec_long %>%
+  filter(pre_post == "pre") %>%
+  ggplot(., aes(x = ratio, y = cl)) +
+  geom_point() +
+  ylab("Cl") +
+  xlab("Na:Cl") +
+  theme_bw() +
+  facet_wrap(~modqual)
+```
+
+## Scatterplots post-modulator
+
+```{r}
+chec_long %>%
+  filter(pre_post == "post") %>%
+  ggplot(., aes(x = ratio, y = cl)) +
+  geom_point() +
+  ylab("Cl") +
+  xlab("Na:Cl") +
+  theme_bw() +
+  facet_wrap(~modqual)
+```
+
+## Boxplot
+
+```{r}
+plot_df <- chec_long
+plot_df$modqual[plot_df$pre_post == "pre"] <- "Pre-Modulator"
+plot_df$modqual <- factor(plot_df$modqual,
+  levels = c(
+    "Pre-Modulator", "Lumacaftor / Ivacaftor", "Tezacaftor / Ivacaftor",
+    "Ivacaftor", "Elexacaftor / Tezacaftor / Ivacaftor"
+  )
+)
+ggplot(plot_df,aes(x=modqual,y=ratio))+geom_boxplot()+
+  ylab("Na:Cl") +
+  theme_bw()+
+  theme(axis.title.x = element_blank())
+```
+
+## Change plot
+
+```{r}
+ggplot(chec_long, aes(x = pre_post, y = ratio, group = subject)) +
+  geom_point(alpha = 0.2) +
+  geom_line(alpha = 0.2) +
+  ylab("Na:Cl") +
+  theme_classic() +
+  theme(axis.title.x = element_blank())
+```
