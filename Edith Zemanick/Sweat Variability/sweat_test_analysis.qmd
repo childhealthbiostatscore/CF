@@ -22,128 +22,153 @@ editor: source
 ```{r setup}
 #| include: false
 library(Hmisc)
-library(tidyverse)
+library(lubridate)
 library(readxl)
-library(gtsummary)
-knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability")
+library(tidyverse)
+library(arsenal)
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Edith Zemanick/Sweat Variability"
+)
+knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
 #| message: false
-# Import data
-chco <- read.csv("./Data_Raw/SweatVariability2025_DATA_LABELS_2025-01-21_1211.csv",
-  na.strings = ""
-)
-# Format dates
-chco$Birth.Date <- as.Date(chco$Birth.Date, "%Y-%m-%d")
-chco$Sweat.test.date <- as.Date(chco$Sweat.test.date, "%Y-%m-%d")
-# Exclude people without demographics
-chco <- chco %>% filter(Demographics.Available == "True")
-# Fix diagnoses/exclusion data for CHCO (based on Angela's review)
-diagnoses <- read_excel("./Data_Cleaned/AM reclassifications All Patients with CF or Non-CF.xlsx")
-exclude <- diagnoses$PatientID[!is.na(diagnoses$Exclude) |
-  diagnoses$Code == "Exclude"]
-exclude <- exclude[!is.na(exclude)]
-chco <- chco[!(chco$Patient.ID %in% exclude), ]
-chco$New.Diagnosis <- diagnoses$Diagnosis[match(chco$Patient.ID, diagnoses$PatientID)]
-diagnosis_check <- chco %>% select(Patient.ID, Diagnosis, New.Diagnosis)
-# Import NJH data, remove those without demographics
-njh <- read_excel("./Data_Raw/SweatVariability2025_CFgenotypes 2024-08-21.xlsx", .name_repair = "universal")
-# Filter and select similar to CHCO
-njh <- njh %>% filter(Demographics.Available)
-# Convert dates
-njh$Birth.Date <- as.Date(njh$Birth.Date, origin = "1899-12-30")
-njh$Sweat.test.date <- as.Date(njh$Sweat.test.date, origin = "1899-12-30")
-# Import detailed diagnoses from Katie
-diagnoses <- read.csv("./Data_Cleaned/SweatVariability2025_CFgenotypes.csv",
-  na.strings = c("", ".")
-)
-# Merge NJH and diagnoses
-diagnoses <- diagnoses %>% select(Patient.ID, Diagnosis...DataScout)
-colnames(diagnoses) <- c("PatientID", "Diagnosis")
-# Less detailed diagnoses
-diagnoses$Diagnosis <- factor(diagnoses$Diagnosis,
-  levels = c(
-    "Abnormal sweat choride test without diagnosis of cystic fibrosis",
-    "Abnormal sweat test",
-    "Alpha-1-antitrypsin deficiency",
-    "Alpha-1-antitrypsin deficiency carrier",
-    "Alpha-1-antitrypsin deficiency, Positive cystic fibrosis sweat test without diagnosis of cystic fibrosis",
-    "CF", "CF carrier, Alpha-1-antitrypsin deficiency",
-    "CF, alpha 1-antitrypsin deficiency",
-    "CF, alpha 1-antitrypsin deficiency carrier",
-    "CF, Alpha-1-antitrypsin deficiency",
-    "Cystic fibrosis carrier",
-    "Cystic fibrosis carrier, Alpha-1-antitrypsin deficiency",
-    "Cystic fibrosis carrier, Alpha-1-antitrypsin deficiency carrier",
-    "Cystic fibrosis screening",
-    "Cystic fibrosis transmembrane conductance regulator (CFTR)-related disorder",
-    "Positive cystic fibrosis sweat test without diagnosis of cystic fibrosis",
-    "Primary ciliary dyskinesia",
-    "Primary Ciliary dyskinesia, Cystic Fibrosis carrier"
-  ),
-  labels = c(
-    "Non-CF", "Non-CF", "Non-CF", "CF Carrier", "Non-CF", "Cystic Fibrosis",
-    "CF Carrier", "Cystic Fibrosis", "Cystic Fibrosis", "Cystic Fibrosis",
-    "CF Carrier", "CF Carrier", "CF Carrier", "Non-CF", "CFTR-RD or CRMS",
-    "Non-CF", "Non-CF", "CF Carrier"
+# Import CHCO, filter out those with no demo data, rename columns, etc.
+chco <- read.csv("./Data_Cleaned/chco_reidentified.csv",
+  na.strings = c(
+    "", "Test not performed", "Insufficient quant.",
+    "repeat sweat chloride testing", "Please reorder testing and re",
+    "The received specimen cannot"
   )
 )
-# Patient ids may not match so keep CHCO and NJH separate and check names after
-njh$New.Diagnosis <- diagnoses$Diagnosis[match(njh$Patient.ID, diagnoses$PatientID)]
-diagnosis_check_njh <- njh %>% select(Patient.ID, Diagnosis, New.Diagnosis)
-# Remove unnecessary columns and combine
 chco <- chco %>%
-  mutate(Dataset = "CHCO") %>%
+  group_by(PatientID) %>%
+  filter(Demographics.Available == "TRUE") %>%
+  # Get only the earliest test
+  slice_min(Age.at.Test.in.Weeks) %>%
   select(
-    Dataset, Record.ID, Patient.ID, Patient.Name, Birth.Date, Diagnosis,
-    New.Diagnosis, Genotype.1, Genotype.2, Sweat.test.date,
-    Age.at.test..in.years., Site.of.test:Sweat.chloride.right.arm
-  )
-njh <- njh %>%
-  mutate(Dataset = "NJH") %>%
-  select(
-    Dataset, Record.ID, Patient.ID, Patient.Name, Birth.Date, Diagnosis,
-    New.Diagnosis, Genotype.1, Genotype.2, Sweat.test.date,
-    Age.at.test..in.years., Site.of.test:Sweat.chloride.right.arm
-  )
-df <- rbind(chco, njh)
-df <- df %>% arrange(Patient.ID, Sweat.test.date, Dataset)
-# Save
-write.csv(df, file = "./Data_Cleaned/combined_data.csv", row.names = F, na = "")
-```
-
-```{r}
-#| message: false
-#| warning: false
-df %>%
-  ggplot(
-    aes(x = Na, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
-  ) +
-  geom_point() +
-  theme()
-df %>%
-  ggplot(
-    aes(x = Cl, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
-  ) +
-  geom_point() +
-  theme()
-df %>%
-  ggplot(
-    aes(x = Na / Cl, y = TotalGenotypeFunction, color = Diagnosis, group = Diagnosis)
-  ) +
-  geom_point() +
-  theme()
-```
-
-```{r}
-df %>%
-  filter(Diagnosis == "Cystic Fibrosis") %>%
-  mutate(
-    `Age group` = cut(Age.at.Test.in.Years, c(-Inf, 18, Inf), right = F),
-    `Cl < 60` = Cl < 60
+    PatientID, Name, Genotypes1, Genotypes2, Sex, Age.at.Test.in.Years,
+    Na, K, Cl, Na_Left, Na_Right, K_Left, K_Right, Cl_Left, Cl_Right
   ) %>%
-  select(Na, Cl, TotalGenotypeFunction, `Cl < 60`, `Age group`) %>%
-  tbl_summary(by = `Age group`, missing_text = "Missing") %>%
-  add_p()
+  rename(Age = Age.at.Test.in.Years) %>%
+  mutate(Name = tolower(gsub("[[:punct:] ]+", "", Name)))
+# Fix CHCO diagnoses per Angela
+chco_diagnoses <- read.csv("./Data_Cleaned/chco_diagnoses.csv")
+chco <- full_join(chco, chco_diagnoses, by = join_by(PatientID))
+chco$PatientID <- NULL
+# For "LESS THAN 10", replace with half the limit of detection
+chco[chco == "LESS THAN 10"] <- "5"
+chco[, c("Cl", "Cl_Left", "Cl_Right")] <-
+  lapply(chco[, c("Cl", "Cl_Left", "Cl_Right")], as.numeric)
+# Import NJH and add diagnoses from Katie
+njh <- read.csv("./Data_Cleaned/njh_full_list.csv",
+  na.strings = c(
+    "", "Test not performed", "Insufficient quant.",
+    "repeat sweat chloride testing"
+  )
+)
+njh_diagnoses <- read.csv("./Data_Cleaned/njh_diagnoses.csv", na.strings = "")
+njh_diagnoses <- njh_diagnoses %>% filter(!is.na(Diagnosis))
+njh <- full_join(njh, njh_diagnoses)
+# Filter out those with no demo data, rename columns, etc.
+njh <- njh %>%
+  group_by(Patient.ID) %>%
+  filter(Demographics.Available == "TRUE") %>%
+  # Get only the earliest test
+  slice_min(Age.at.test..in.years.) %>%
+  select(
+    Patient.ID, Patient.Name, Genotype.1, Genotype.2, Sex, Age.at.test..in.years.,
+    Sweat.sodium, Sweat.potassium, Sweat.chloride, Sweat.sodium.left.arm,
+    Sweat.sodium.right.arm, Sweat.potassium.left.arm, Sweat.potassium.right.arm,
+    Sweat.chloride.left.arm, Sweat.chloride.right.arm, Diagnosis
+  ) %>%
+  rename(
+    Name = Patient.Name, Genotypes1 = Genotype.1,
+    Genotypes2 = Genotype.2, Age = Age.at.test..in.years., Na = Sweat.sodium,
+    K = Sweat.potassium, Cl = Sweat.chloride, Na_Left = Sweat.sodium.left.arm,
+    Na_Right = Sweat.sodium.right.arm, K_Left = Sweat.potassium.left.arm,
+    K_Right = Sweat.potassium.right.arm, Cl_Left = Sweat.chloride.left.arm,
+    Cl_Right = Sweat.chloride.right.arm
+  ) %>%
+  mutate(Name = tolower(gsub("[[:punct:] ]+", "", Name)))
+njh$Patient.ID <- NULL
+# Row bind, fill diagnosis, then remove dupes
+df <- rbind(chco, njh)
+df <- df %>%
+  group_by(Name) %>%
+  fill(Diagnosis) %>%
+  distinct() %>%
+  select(Name, Diagnosis, everything()) %>%
+  arrange(Name, Age)
+# Use each person's first sweat test
+df <- df %>%
+  group_by(Name) %>%
+  slice_min(Age)
+# If there are still duplicates, exclude them
+dups <- df$Name[duplicated(df$Name)]
+df <- df[!df$Name %in% dups, ]
+# For those with left and right, average them
+df$Na_mean <- rowMeans(df[, c("Na_Left", "Na_Right")])
+df$Na <- coalesce(df$Na, df$Na_mean)
+df$Cl_mean <- rowMeans(df[, c("Cl_Left", "Cl_Right")])
+df$Cl <- coalesce(df$Cl, df$Cl_mean)
+df$K_mean <- rowMeans(df[, c("K_Left", "K_Right")])
+df$K <- coalesce(df$K, df$K_mean)
+# Get rid of unnecessary columns, remove those with no diagnosis
+df <- df %>%
+  select(Name, Diagnosis, Genotypes1, Genotypes2, Sex, Age, Na, K, Cl) %>%
+  filter(!is.na(Diagnosis))
+# Set table options
+mycontrols <-
+  tableby.control(numeric.stats = c("Nmiss", "meansd", "medianq1q3", "range"))
+# Save this for Angela et al. to check
+write.csv(df,
+  file = "./Data_Cleaned/sweat_variability_analysis_dataset.csv",
+  row.names = F, na = ""
+)
 ```
+
+# Data cleaning steps
+
+- Imported re-identified CHCO data from Elin (5,046 rows and 4,748 unique IDs)
+- Removed rows with `Demographics Available` not equal to `TRUE` and selected each person's earliest test by age.
+  - This resulted in 3,123 rows with 3,084 unique IDs.
+- Merged in the diagnoses from Angela.
+- Values below the limit of detection were replaced with half the limit (e.g. "LESS THAN 10" was replaced with 5). Approximately 5% of the values were below the L.O.D.
+
+- Imported NJH data (1,958 rows with 1,748 unique IDs) and merged in diagnoses from Katie.
+- Removed 1,662 rows with `Demographics Available` not equal to `TRUE` (all of these were `FALSE`)
+  - This resulted in 172 rows with unique IDs.
+- Concatenated the CHCO and NJH data and removed duplicate rows, resulting in 3,178 rows with 3,162 unique IDs.
+- For the remaining people with multiple sweat tests (i.e. tests from both CHCO and NJH), kept only the earliest test (based on age at test). This resulted in 3,169 rows with 3,162 unique IDs.
+- The remaining 7 people with different values for the same test in the CHCO and NJH data were excluded. The final analysis dataset includes 3,155 unique participants, 3,111 of which have a diagnosis.
+- For people with both left and right arm values, the two were averaged.
+
+# Table 1: Participant Demographics by Diagnosis
+
+```{r results='asis'}
+summary(tableby(Diagnosis ~ Sex + Age + Na + K + Cl,
+  data = df, control = mycontrols
+))
+```
+
+# Boxplots
+
+```{r}
+ggplot(df, aes(x = Diagnosis, y = Cl)) +
+  geom_boxplot() +
+  theme_bw()
+ggplot(df, aes(x = Diagnosis, y = Na)) +
+  geom_boxplot() +
+  theme_bw()
+ggplot(df, aes(x = Diagnosis, y = Na / Cl)) +
+  geom_boxplot() +
+  theme_bw()
+ggplot(df, aes(x = Diagnosis, y = K)) +
+  geom_boxplot() +
+  theme_bw()
+```
+
+
