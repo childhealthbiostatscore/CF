@@ -42,7 +42,7 @@ chec <- read.csv("./Data_Raw/CHEC sweat sodium and chloride.csv",
   na.strings = c("", "NA")
 )
 # Only include people with either a pre-modulator or post-modulator sodium
-chec <- chec %>% filter(!is.na(swhsavgpm) | !is.na(swsavg))
+chec <- chec %>% filter(!is.na(swsavg))
 # Calculate ratios
 chec$pre_ratio <- chec$swhsavgpm / chec$swhcavgpm
 chec$post_ratio <- chec$swsavg / chec$swcavg
@@ -74,8 +74,11 @@ label(chec_long$ratio) <- "Sweat Na:Cl"
 ## Table 1: Participant demographics by CFTR modulator
 
 ```{r results='asis'}
-f <- modqual~sex + age + agecat_txt + race_txt + genotype_group
-t1 <- tableby(f, data = chec, control = mycontrols)
+t1 <- tableby(
+  modqual ~ sex + kwt(age, "N", "Nmiss2", "medianq1q3") + agecat_txt +
+    race_txt + genotype_group + swcavg + swhcavgpm + swsavg + swhsavgpm,
+  data = chec, cat.test = "fe", simulate.p.value = TRUE
+)
 summary(t1, pfootnote = T)
 ```
 
@@ -425,9 +428,10 @@ plot_df$modqual <- factor(plot_df$modqual,
     "Ivacaftor", "Elexacaftor / Tezacaftor / Ivacaftor"
   )
 )
-ggplot(plot_df,aes(x=modqual,y=ratio))+geom_boxplot()+
+ggplot(plot_df, aes(x = modqual, y = ratio)) +
+  geom_boxplot() +
   ylab("Na:Cl") +
-  theme_bw()+
+  theme_bw() +
   theme(axis.title.x = element_blank())
 ```
 
