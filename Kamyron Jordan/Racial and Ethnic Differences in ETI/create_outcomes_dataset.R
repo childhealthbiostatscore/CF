@@ -171,6 +171,18 @@ encounter <- encounter[-early, ]
 encounter <- encounter[-late, ]
 n_enc_5 <- nrow(encounter)
 n_people_5 <- length(unique(encounter$eDWID))
+# Lung function cutoffs
+lower <- 20
+upper <- 150
+# Remove impossible lung function values
+low_fev1 <- which(encounter$gli_fev1_ppred_rn < lower)
+high_fev1 <- which(encounter$gli_fev1_ppred_rn > upper)
+encounter$gli_fev1_ppred_rn[low_fev1] <- NA
+encounter$gli_fev1_ppred_rn[high_fev1] <- NA
+low_fvc <- which(encounter$gli_fvc_ppred_rn < lower)
+high_fvc <- which(encounter$gli_fvc_ppred_rn > upper)
+encounter$gli_fvc_ppred_rn[low_fvc] <- NA
+encounter$gli_fvc_ppred_rn[high_fvc] <- NA
 # Get some summary statistics by participant
 t1_participant <- encounter %>%
   group_by(eDWID) %>%
@@ -192,18 +204,6 @@ encounter <- encounter[-no_post_visits, ]
 n_enc_6 <- nrow(encounter)
 n_people_6 <- length(unique(encounter$eDWID))
 t1_participant <- t1_participant %>% filter(!eDWID %in% no_post)
-# Lung function cutoffs
-lower <- 20
-upper <- 150
-# Remove impossible lung function values
-low_fev1 <- which(encounter$gli_fev1_ppred_rn < lower)
-high_fev1 <- which(encounter$gli_fev1_ppred_rn > upper)
-encounter$gli_fev1_ppred_rn[low_fev1] <- NA
-encounter$gli_fev1_ppred_rn[high_fev1] <- NA
-low_fvc <- which(encounter$gli_fvc_ppred_rn < lower)
-high_fvc <- which(encounter$gli_fvc_ppred_rn > upper)
-encounter$gli_fvc_ppred_rn[low_fvc] <- NA
-encounter$gli_fvc_ppred_rn[high_fvc] <- NA
 # Flowchart
 # Make labels
 tots1 <- paste0(n_people_1, " People\n", n_enc_1, " Encounters")
