@@ -1,0 +1,189 @@
+---
+title: "fsOGTT Pre- and Post-ETI"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+editor: source
+---
+
+```{r setup}
+#| include: false
+library(tidyverse)
+library(readxl)
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/EnVision CF"
+)
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Documents/GitHub",
+  "Linux" = "/home/timvigers/Documents/GitHub"
+)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r data cleaning}
+# Import cleaned EnVision data
+df <- read.csv("./Data_Clean/envision_analysis_dataset.csv", na.strings = "")
+# Import GEM data
+gem <- read.csv(
+  "./Data_Raw/CGMInHealthyControls-FsOGTTDataForMonique_DATA_2025-04-10_0903.csv",
+  na.strings = ""
+)
+# ID linking from Monique
+ids <- read_excel("./Data_Raw/ETI participant IDs_TV.xlsx")
+ids <- ids[!is.na(ids$`GEM ID`), ]
+ids$`EnVision ID` <- sub("-2", "", ids$`EnVision ID`)
+# Select columns for EnVision per Monique and combine race and ethnicity
+df <- df %>%
+  select(
+    study_id, Date, age_visit, sex, origin_race, ethnicity, CFTR,
+    pancreatic_status, corrector___4, bmi, fev1,
+    Diagnosis, Glucose_0:Glucose_180, Insulin_0:Insulin_180,
+    C.Peptide_0:C.Peptide_180
+  ) %>%
+  unite(race_ethnicity, c(origin_race, ethnicity)) %>%
+  rename(ETI = corrector___4)
+df$race_ethnicity <- factor(df$race_ethnicity,
+  levels = c(
+    "American Indian or Alaska Native (N. S. & Central America)_Hispanic/Latino",
+    "American Indian or Alaska Native (N. S. & Central America)_Not Hispanic/Latino",
+    "Black or African American (Africa)_N/A",
+    "Black or African American (Africa)_Not Hispanic/Latino",
+    "Declined_Hispanic/Latino",
+    "Declined_Not Hispanic/Latino",
+    "NA_NA",
+    "Native Hawaiian or Other Pacific Islander (Hawaii, Guam, Samoa, Pacific Islands)_Not Hispanic/Latino",
+    "White (Europe, Middle East, North Africa)_Hispanic/Latino",
+    "White (Europe, Middle East, North Africa)_N/A",
+    "White (Europe, Middle East, North Africa)_Not Hispanic/Latino"
+  ),
+  labels = c(
+    "Hispanic", "Native American", "Black/African American", "Black/African American",
+    "Hispanic", "Other/Multiple", "Other/Multiple", "Other/Multiple", "Hispanic", "White", "White"
+  )
+)
+df$pancreatic_status <- factor(df$pancreatic_status, levels = 1:2)
+df$ETI <- factor(df$ETI, levels = 0:1, labels = c("No", "Yes"))
+# Select the same columns from GEM
+gem <- gem %>%
+  mutate(ETI = 0) %>%
+  select(
+    subject_id, date_of_visit, age_at_visit_1, gender, race_ethnicity,
+    cf_genotype, cf_pancreatic, ETI, average_bmi, fev1_percent,
+    group_category, lab_ogtt_fasting, min_10_glucose, min_30_glucose,
+    lab_ogtt_1_hour_glucose, min_90_glucose, lab_ogtt_2_hour_glucose,
+    min_150_glucose, min_180_glucose, min_0_insulin, min_10_insulin,
+    min_30_insulin, min_60_insulin, min_90_insulin, min_120_insulin,
+    min_150_insulin, min_180_insulin, min_0_c_peptide, min_10_c_peptide,
+    min_30_c_peptide, min_60_c_peptide, min_90_c_peptide, min_120_c_peptide,
+    min_150_c_peptide, min_180_c_peptide
+  ) %>%
+  rename(
+    study_id = subject_id, Date = date_of_visit, age_visit = age_at_visit_1,
+    sex = gender, CFTR = cf_genotype, pancreatic_status = cf_pancreatic,
+    bmi = average_bmi, fev1 = fev1_percent, Diagnosis = group_category,
+    min_0_glucose = lab_ogtt_fasting, min_60_glucose = lab_ogtt_1_hour_glucose,
+    min_120_glucose = lab_ogtt_2_hour_glucose
+  ) %>%
+  rename_with(
+    ~ paste0("Glucose_", parse_number(.)), min_0_glucose:min_180_glucose
+  ) %>%
+  rename_with(
+    ~ paste0("Insulin_", parse_number(.)), min_0_insulin:min_180_insulin
+  ) %>%
+  rename_with(
+    ~ paste0("C.Peptide_", parse_number(.)), min_0_c_peptide:min_180_c_peptide
+  )
+# GEM factors
+gem$sex <- factor(gem$sex, levels = 1:2, labels = c("Male", "Female"))
+gem$race_ethnicity <- factor(gem$race_ethnicity,
+  levels = 1:6,
+  labels = c(
+    "White", "Black/African American", "Asian", "Native American",
+    "Hispanic", "Other/Multiple"
+  )
+)
+gem$CFTR <- factor(gem$CFTR,
+  levels = c(
+    "2184delA/M1101K", "2585delT/G551D", "3849+10kb C>T/F508del",
+    "508del/508del", "F508del/1078delA", "f508DEL/1154INStc",
+    "F508del/1154insTC", "F508del/1811 + 1634A > G", "F508del/1811+1634>G",
+    "F508del/2183delAA->G", "F508del/2183delAA>G", "F508del/2184insA",
+    "F508del/2711delT", "F508del/2789+5G>A", "F508del/27895GA",
+    "F508del/3659delC", "F508del/3849+10kbC>T", "F508del/394delTT",
+    "F508del/5492F", "F508del/A561E", "F508del/E60X",
+    "f508del/F508del", "F508del/F508del", "F508del/G542X",
+    "F508del/G551D", "F508del/N1303K", "F508del/Q98R",
+    "F508del/R1162X", "F508del/R117H 9T", "F508del/R117H 9T/5T",
+    "F508del/R553X", "F508del/R709X", "F508del/S492F",
+    "F508del/W1282X", "F5o8del/F508del", "G542X/1078delT",
+    "G542X/W1089X", "G551D/W846X", "I507del/G551D",
+    "N1303K/1154insTC", "N1303K/2789 + 5G > A", "N1303K/2789+5G>A",
+    "R117H 5t/G576A and R668C on exon 13", "R117H5t/G576A and R668C on exon 13",
+    "V520F/3791delC", "W1089X/S492F", "W1090X/S492F"
+  ),
+  labels = c(
+    "Other/Other", "Other/Other", "Other/Other", "F508del homozygous",
+    "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
+    "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
+    "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
+    "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
+    "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
+    "F508del heterozygous", "F508del heterozygous", "F508del homozygous",
+    "F508del homozygous", "F508del heterozygous", "F508del heterozygous",
+    "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
+    "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
+    "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
+    "F508del homozygous", "Other/Other", "Other/Other", "Other/Other",
+    "Other/Other", "Other/Other", "Other/Other", "Other/Other", "Other/Other",
+    "Other/Other", "Other/Other", "Other/Other", "Other/Other"
+  )
+)
+gem$pancreatic_status <- factor(gem$pancreatic_status, levels = 1:2)
+gem$ETI <- factor(gem$ETI, levels = 0:1, labels = c("No", "Yes"))
+gem$Diagnosis <- factor(gem$Diagnosis,
+  levels = 1:4,
+  labels = c("Healthy Control", "NGT", "AGT", "CFRD")
+)
+df$Diagnosis <- factor(df$Diagnosis,
+  levels = c("NGT", "IFG", "IGT", "INDET", "CFRD"),
+  labels = c("NGT", "AGT", "AGT", "AGT", "CFRD")
+)
+# Limit GEM per Monique's list
+gem <- gem %>% filter(study_id %in% ids$`GEM ID`)
+# Convert to EnVision IDs
+gem$study_id <- ids$`EnVision ID`[match(gem$study_id, ids$`GEM ID`)]
+# Merge
+df <- full_join(df, gem)
+```
+
+- Make the plot of number of people with OGTTs pre and post
+- If people were on Ivacaftor prior to ETI we can still include those visits as pre-ETI
+- Adjust models for age
+- Paneled figure with results for glucose, c-peptide, and insulin
+- Look at acute insulin response (change in 30 minute c peptide)/(change in 30 minute glucose)
+  - Can also do across the whole time period and can use insulin in the numerator also
+- See Teams folder document for detailed plan
+
+# Table
+
+```{r}
+#| label: tbl-planets
+#| tbl-cap: Planets
+```
+
+# Figure
+
+```{r}
+#| label: fig-planets
+#| fig-cap: Planets
+```

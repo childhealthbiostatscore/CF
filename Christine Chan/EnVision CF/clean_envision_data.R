@@ -92,7 +92,8 @@ visits <- redcap %>%
   select(
     study_id, redcap_data_access_group, date_visit, sex, origin_race, ethnicity,
     cftr_mutation_1, cftr_mutation_2, pancreatic_status, liver_disease,
-    pulm_ex_last3months, corrector_yes_no, family_history_diabetes,
+    pulm_ex_last3months, family_history_diabetes,
+    corrector_yes_no, corrector_start_date, corrector___1:corrector___5,
     age_visit, height, weight, bmi_study_visit, fev1, fvc
   ) %>%
   filter(!is.na(date_visit)) %>%
@@ -459,6 +460,22 @@ final_df$CFTR <- factor(final_df$CFTR,
 )
 final_df$cftr_mutation_1 <- NULL
 final_df$cftr_mutation_2 <- NULL
+# Race and ethnicity
+final_df$origin_race <- factor(final_df$origin_race,
+  levels = c("1", "2", "3", "5", "6"),
+  labels = c(
+    "White (Europe, Middle East, North Africa)",
+    "Black or African American (Africa)",
+    "American Indian or Alaska Native (N. S. & Central America)",
+    "Native Hawaiian or Other Pacific Islander (Hawaii, Guam, Samoa, Pacific Islands)",
+    "Declined"
+  )
+)
+final_df$ethnicity <- factor(final_df$ethnicity,
+  levels = 1:3, labels = c("Hispanic/Latino", "Not Hispanic/Latino", "N/A")
+)
+# Sex
+final_df$sex <- factor(final_df$sex, levels = 1:2, labels = c("Male", "Female"))
 # Final formatting
 final_df$redcap_data_access_group <- gsub("\\d", "", final_df$study_id)
 final_df$redcap_data_access_group <- factor(
