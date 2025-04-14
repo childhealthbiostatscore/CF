@@ -33,7 +33,6 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
-#| message: false
 # Import from REDCap
 unlockREDCap(c(rcon = ""),
   keyring = "API_KEYs",

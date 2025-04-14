@@ -24,6 +24,8 @@ library(nlme)
 library(JM)
 library(dplyr)
 library(tidyr)
+library(arsenal)
+library(knitr)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry"
@@ -123,6 +125,7 @@ annual$A_IsOnEnzymes <- factor(annual$A_IsOnEnzymes,
 # Calculate bmi value
 annual$bmi <- annual$A_weight / ((annual$A_height / 100)^2)
 annual$bmi <- coalesce(annual$A_bmivalue, annual$bmi)
+annual$Gender <- factor(annual$Gender, levels = c("M", "F"))
 # Labels
 labels <- list(
   Age_YrEnd = "Age at Year End",
@@ -137,21 +140,33 @@ predictors <- c(
   "Gender", "Race", "Hispanicrace", "A_IsOnEnzymes",
   "NumPulmExacerbation", "A_FEV1_pct_predicted", "bmi"
 )
-# Make survival datasets for registry and OGTT diagnoses
-ogtt <- annual %>%
+# Make datasets
+registry <- annual %>%
+  filter(Age_YrEnd <= cfrd_registry_age) %>%
   select(
-    eDWID, ReviewYear, Age_YrEnd, A_hgba1c, all_of(predictors), cfrd_ogtt
+    eDWID, ReviewYear, Age_YrEnd, A_hgba1c, all_of(predictors), cfrd_registry
   ) %>%
   drop_na() %>%
   distinct()
-surv_ogtt <- annual %>%
-  filter(Age_YrEnd <= cfrd_ogtt_age) %>%
+surv_reg <- annual %>%
+  filter(Age_YrEnd <= cfrd_registry_age) %>%
   group_by(eDWID) %>%
   slice_max(row_number()) %>%
-  select(eDWID, ReviewYear, Age_YrEnd, all_of(predictors), cfrd_ogtt) %>%
+  select(eDWID, ReviewYear, Age_YrEnd, all_of(predictors), cfrd_registry) %>%
   drop_na() %>%
   distinct()
-ogtt_include <- intersect(ogtt$eDWID, surv_ogtt$eDWID)
+reg_include <- intersect(registry$eDWID, surv_reg$eDWID)
+```
+
+# Demographics
+
+```{r,results='asis'}
+t <- registry[registry$eDWID %in% reg_include, ] %>%
+  group_by(eDWID) %>%
+  summarise(n())
+
+t1 <- tableby(cfrd_registry ~ Age_YrEnd + Gender + Race + Hispanicrace + A_IsOnEnzymes + NumPulmExacerbation + A_FEV1_pct_predicted + bmi, data = surv_reg[surv_reg$eDWID %in% reg_include, ])
+summary(t1)
 ```
 
 # Joint models
@@ -161,7 +176,7 @@ ogtt_include <- intersect(ogtt$eDWID, surv_ogtt$eDWID)
 ```{r}
 # Formulas
 cox_f <- as.formula(paste0(
-  "Surv(time = Age_YrEnd, event = cfrd_ogtt)~",
+  "Surv(time = Age_YrEnd, event = cfrd_registry)~",
   paste0(predictors, collapse = "+")
 ))
 lme_f <- as.formula(paste0(
@@ -171,16 +186,32 @@ lme_f <- as.formula(paste0(
 # Fit Cox model first, and then pull the clusters
 cox_fit <- coxph(cox_f,
   cluster = eDWID, x = T, model = T,
-  data = surv_ogtt[surv_ogtt$eDWID %in% ogtt_include, ]
+  data = surv_reg[surv_reg$eDWID %in% reg_include, ]
 )
 lme_fit_a1c <- lme(lme_f,
   random = ~ Age_YrEnd | eDWID, na.action = na.omit,
-  data = ogtt[ogtt$eDWID %in% ogtt_include, ]
+  data = registry[registry$eDWID %in% reg_include, ]
 )
 # Combine
-joint_fit <- jointModel(lme_fit_a1c, cox_fit, timeVar = "Age_YrEnd")
+joint_fit_value <- jointModel(lme_fit_a1c, cox_fit, timeVar = "Age_YrEnd", parameterization = "value")
+# joint_fit_slope <- jointModel(lme_fit_a1c, cox_fit, timeVar = "Age_YrEnd",parameterization ="slope")
+# joint_fit_both <- jointModel(lme_fit_a1c, cox_fit, timeVar = "Age_YrEnd",parameterization ="both")
+s <- summary(joint_fit_value)
+long <- data.frame(s$`CoefTable-Long`)
+long <- long[, c(1, 4)]
+long$p.value <- format.pval(long$p.value, eps = 0.001, digits = 3)
+event <- data.frame(s$`CoefTable-Event`)
+event <- event[, c(1, 4)]
+event$Value <- exp(event$Value)
+rownames(event)[nrow(event)] <- "shape"
+event$p.value <- format.pval(event$p.value, eps = 0.001, digits = 3)
+# summary(joint_fit_slope)
+# summary(joint_fit_both)
+kable(long, caption = "Longitudinal Process", digits = 3)
+kable(event, caption = "Event Process", digits = 3)
 ```
 
+# To do
 
 - Check for HbA1c measures after the survival time (not sure if needs to be strictly less than)
 - Set parameterization = "slope" to see if change in HbA1c increases hazard 
@@ -188,3 +219,5 @@ joint_fit <- jointModel(lme_fit_a1c, cox_fit, timeVar = "Age_YrEnd")
 - Could try re-fitting this with a left-censored model 
   - If it says the same thing, it's probably okay to use the right-censored
   - Could also try using the half interval model Kristen described
+  
+https://erandrinopoulou.github.io/EducationalCorner_JMpred/
