@@ -157,18 +157,27 @@ summary(tableby(Diagnosis ~ Sex + Age + Na + K + Cl,
 # Boxplots
 
 ```{r}
-ggplot(df, aes(x = Diagnosis, y = Cl)) +
+clp <- ggplot(df, aes(x = Diagnosis, y = Cl)) +
   geom_boxplot() +
   theme_bw()
-ggplot(df, aes(x = Diagnosis, y = Na)) +
+clp
+nap <- ggplot(df, aes(x = Diagnosis, y = Na)) +
   geom_boxplot() +
   theme_bw()
-ggplot(df, aes(x = Diagnosis, y = Na / Cl)) +
+nap
+ratiop <- ggplot(df, aes(x = Diagnosis, y = Na / Cl)) +
+  geom_boxplot() +
+  theme_bw() +
+  ylab("Sweat sodium to chloride ratio")+
+  xlab("Modulator")
+ratiop
+kp <- ggplot(df, aes(x = Diagnosis, y = K)) +
   geom_boxplot() +
   theme_bw()
-ggplot(df, aes(x = Diagnosis, y = K)) +
-  geom_boxplot() +
-  theme_bw()
+kp
 ```
 
+# NACFC 2025
 
+```{r}
+```

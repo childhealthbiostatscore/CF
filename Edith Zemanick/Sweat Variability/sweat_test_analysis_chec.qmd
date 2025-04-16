@@ -28,10 +28,12 @@ library(arsenal)
 library(ggpubr)
 library(lmerTest)
 library(performance)
+library(gtsummary)
 library(gt)
+library(patchwork)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CFEdith Zemanick/Sweat Variability"
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Edith Zemanick/Sweat Variability"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -382,8 +384,36 @@ The model using the ratio alone does not really work due to the fitted probabili
 # Check if ratio >= 1.2
 chec$post_ratio_1.2 <- chec$post_ratio >= 1.2
 label(chec$post_ratio_1.2) <- "Post-Modulator Sweat Na:Cl >= 1.2"
-summary(tableby(modqual ~ post_ratio + post_ratio_1.2,
+chec$post_cl <- cut(chec$swcavg, c(-Inf, 30, 60, Inf),
+  right = F,
+  labels = c("< 30", ">= 30 and < 60", ">= 60")
+)
+label(chec$post_cl) <- "Post-Modulator Sweat Cl Group"
+summary(tableby(modqual ~ post_cl + post_ratio + post_ratio_1.2,
   data = chec,
+  control = list(
+    numeric.stats = c("N", "Nmiss2", "meanCI", "range"),
+    cat.stats = c("N", "Nmiss2", "countpct")
+  )
+), pfootnote = T)
+```
+
+## Normalized ratio by modulator status and age
+
+We fit a logistic regression model with post-modulator ratio >= 1.2 as the binary outcome. The model with an interaction term was significantly better than the mode with only main effects (p=0.003).
+
+```{r results='asis'}
+m1 <- glm(post_ratio_1.2 ~ modqual + age, data = chec, family = "binomial")
+m1 %>% tbl_regression(., intercept = T, exponentiate = T)
+```
+
+The main effects suggest that people on LUM/IVA or TEZ/IVA were less likely to have a post-modulator ratio >= 1.2 compared to those on ETI, but there was no difference for those on Ivacaftor, after adjusting for age. Also, there was no effect of age on the odds of having a post-modulator ratio >= 1.2.
+
+## Normalized ratio by post-ETI sweat chloride
+
+```{r results='asis'}
+summary(tableby(post_cl ~ post_ratio + post_ratio_1.2,
+  data = chec[chec$modqual == "Elexacaftor / Tezacaftor / Ivacaftor", ],
   control = list(
     numeric.stats = c("N", "Nmiss2", "meanCI", "range"),
     cat.stats = c("N", "Nmiss2", "countpct")
@@ -394,27 +424,35 @@ summary(tableby(modqual ~ post_ratio + post_ratio_1.2,
 ## Scatterplots pre-modulator
 
 ```{r}
-chec_long %>%
+sp_pre <- chec_long %>%
   filter(pre_post == "pre") %>%
   ggplot(., aes(x = ratio, y = cl)) +
   geom_point() +
+  geom_hline(yintercept = 60, color = "red") +
+  geom_vline(xintercept = 1.2, color = "red") +
   ylab("Cl") +
   xlab("Na:Cl") +
   theme_bw() +
-  facet_wrap(~modqual)
+  facet_wrap(~modqual) +
+  ggtitle("Pre-Modulator")
+sp_pre
 ```
 
 ## Scatterplots post-modulator
 
 ```{r}
-chec_long %>%
+sp_post <- chec_long %>%
   filter(pre_post == "post") %>%
   ggplot(., aes(x = ratio, y = cl)) +
   geom_point() +
+  geom_hline(yintercept = 60, color = "red") +
+  geom_vline(xintercept = 1.2, color = "red") +
   ylab("Cl") +
   xlab("Na:Cl") +
   theme_bw() +
-  facet_wrap(~modqual)
+  facet_wrap(~modqual) +
+  ggtitle("Post-Modulator")
+sp_post
 ```
 
 ## Boxplot
@@ -428,11 +466,18 @@ plot_df$modqual <- factor(plot_df$modqual,
     "Ivacaftor", "Elexacaftor / Tezacaftor / Ivacaftor"
   )
 )
-ggplot(plot_df, aes(x = modqual, y = ratio)) +
+boxp <- ggplot(plot_df, aes(x = modqual, y = ratio)) +
   geom_boxplot() +
   ylab("Na:Cl") +
   theme_bw() +
   theme(axis.title.x = element_blank())
+boxp
+```
+
+## Combined figure
+
+```{r}
+boxp / (sp_pre + sp_post)
 ```
 
 ## Change plot

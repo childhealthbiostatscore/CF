@@ -48,10 +48,24 @@ df <- df %>%
     `Cl Right` = as.numeric(cl_right), `Cl Left` = as.numeric(cl_left),
     `Na Right` = as.numeric(na_right), `Na Left` = as.numeric(na_left)
   )
-df$`Mean Cl` <- rowMeans(df[, c("Cl Right", "Cl Left")])
-df$`Mean Na` <- rowMeans(df[, c("Na Right", "Na Left")])
-# Per Angela, exclude number 15 due to additional mutation
-df <- df[-which(df$pid == 15), ]
+df$`Mean Cl` <- rowMeans(df[, c("Cl Right", "Cl Left")], na.rm = T)
+df$`Mean Na` <- rowMeans(df[, c("Na Right", "Na Left")], na.rm = T)
+df$Ratio <- df$`Mean Na` / df$`Mean Cl`
+# Per Angela, exclude some participants
+df <- df[!df$pid %in% c(15, 36), ]
+```
+
+# NACFC 2025
+
+```{r results='asis'}
+interim <- read.csv("./Data_Clean/Interim reduced data set.csv")
+interim$`Chloride >= 30`=interim$Chloride >= 30
+summary(tableby(
+  Carrier ~ kwt(Average.sodium, "medianq1q3", "iqr") +
+    kwt(Chloride, "medianq1q3", "iqr") + kwt(Ratio, "medianq1q3", "iqr") +
+    `Chloride >= 30`,
+  data = interim
+), pfootnote = T)
 ```
 
 # Confidence interval power calculations
