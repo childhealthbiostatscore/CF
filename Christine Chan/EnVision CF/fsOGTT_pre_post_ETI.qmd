@@ -19,6 +19,10 @@ editor: source
 #| include: false
 library(tidyverse)
 library(readxl)
+library(lmerTest)
+library(performance)
+library(gtsummary)
+library(emmeans)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/EnVision CF"
@@ -31,6 +35,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
+#| message: false
 # Import cleaned EnVision data
 df <- read.csv("./Data_Clean/envision_analysis_dataset.csv", na.strings = "")
 # Import GEM data
@@ -42,11 +47,18 @@ gem <- read.csv(
 ids <- read_excel("./Data_Raw/ETI participant IDs_TV.xlsx")
 ids <- ids[!is.na(ids$`GEM ID`), ]
 ids$`EnVision ID` <- sub("-2", "", ids$`EnVision ID`)
+# Get pre-/post-ETI
+df$eti_start <- ifelse(df$corrector___4 == 1, df$corrector_start_date, NA)
+df <- df %>%
+  group_by(study_id) %>%
+  fill(eti_start, .direction = "downup")
+df$pre_post <-
+  factor(df$Date >= df$eti_start, levels = c(F, T), labels = c("Pre", "Post"))
 # Select columns for EnVision per Monique and combine race and ethnicity
 df <- df %>%
   select(
     study_id, Date, age_visit, sex, origin_race, ethnicity, CFTR,
-    pancreatic_status, corrector___4, bmi, fev1,
+    pancreatic_status, corrector___4, pre_post, bmi, fev1,
     Diagnosis, Glucose_0:Glucose_180, Insulin_0:Insulin_180,
     C.Peptide_0:C.Peptide_180
   ) %>%
@@ -75,10 +87,10 @@ df$pancreatic_status <- factor(df$pancreatic_status, levels = 1:2)
 df$ETI <- factor(df$ETI, levels = 0:1, labels = c("No", "Yes"))
 # Select the same columns from GEM
 gem <- gem %>%
-  mutate(ETI = 0) %>%
+  mutate(ETI = 0, pre_post = "Pre") %>%
   select(
     subject_id, date_of_visit, age_at_visit_1, gender, race_ethnicity,
-    cf_genotype, cf_pancreatic, ETI, average_bmi, fev1_percent,
+    cf_genotype, cf_pancreatic, ETI, pre_post, average_bmi, fev1_percent,
     group_category, lab_ogtt_fasting, min_10_glucose, min_30_glucose,
     lab_ogtt_1_hour_glucose, min_90_glucose, lab_ogtt_2_hour_glucose,
     min_150_glucose, min_180_glucose, min_0_insulin, min_10_insulin,
@@ -162,28 +174,58 @@ df$Diagnosis <- factor(df$Diagnosis,
 gem <- gem %>% filter(study_id %in% ids$`GEM ID`)
 # Convert to EnVision IDs
 gem$study_id <- ids$`EnVision ID`[match(gem$study_id, ids$`GEM ID`)]
-# Merge
-df <- full_join(df, gem)
+# Merge, keep only pre/post
+df <- full_join(df, gem) %>% filter(!is.na(pre_post))
+df$pre_post <- factor(df$pre_post, levels = c("Pre", "Post"))
 ```
 
-- Make the plot of number of people with OGTTs pre and post
-- If people were on Ivacaftor prior to ETI we can still include those visits as pre-ETI
+# Plot
+
+```{r}
+df %>%
+  group_by(study_id) %>%
+  count(pre_post) %>%
+  ggplot(., aes(y = study_id, x = n)) +
+  geom_point() +
+  theme_bw() +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) +
+  facet_wrap(~pre_post)
+```
+
 - Adjust models for age
 - Paneled figure with results for glucose, c-peptide, and insulin
 - Look at acute insulin response (change in 30 minute c peptide)/(change in 30 minute glucose)
   - Can also do across the whole time period and can use insulin in the numerator also
 - See Teams folder document for detailed plan
 
-# Table
+# Glucose
 
 ```{r}
-#| label: tbl-planets
-#| tbl-cap: Planets
-```
-
-# Figure
-
-```{r}
-#| label: fig-planets
-#| fig-cap: Planets
+# Make a long DF for models
+long_df <- df %>% pivot_longer(Glucose_0:Glucose_180,
+  names_to = c(".value", "timepoint"),
+  names_pattern = "(.*)_(.*)",
+  values_to = "Glucose"
+)
+long_df$timepoint <- factor(long_df$timepoint,
+  levels = c("0", "10", "30", "60", "90", "120", "150", "180")
+)
+mod1 <- lmer(
+  Glucose ~ timepoint * pre_post + age_visit + (1 | study_id),
+  data = long_df
+)
+mod1 %>% tbl_regression(.)
+means <- data.frame(emmeans(mod1, ~ timepoint + pre_post))
+knitr::kable(means)
+ggplot(means, aes(
+  x = as.numeric(as.character(timepoint)), y = emmean,
+  color = pre_post, group = pre_post
+)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 1) +
+  geom_line() +
+  theme_bw() +
+  xlab("Timepoint") +
+  ylab("Glucose (mg/dL)") +
+  scale_x_continuous(breaks = c(0, 10, 30, 60, 90, 120, 150, 180))
 ```
