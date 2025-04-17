@@ -164,8 +164,10 @@ reg_include <- intersect(registry$eDWID, surv_reg$eDWID)
 t <- registry[registry$eDWID %in% reg_include, ] %>%
   group_by(eDWID) %>%
   summarise(n())
-
-t1 <- tableby(cfrd_registry ~ Age_YrEnd + Gender + Race + Hispanicrace + A_IsOnEnzymes + NumPulmExacerbation + A_FEV1_pct_predicted + bmi, data = surv_reg[surv_reg$eDWID %in% reg_include, ])
+t2 <- registry[registry$eDWID %in% reg_include, ] %>%
+  group_by(eDWID) %>%
+  filter(row_number() == 1)
+t1 <- tableby(cfrd_registry ~ Age_YrEnd + Gender + Race + Hispanicrace + A_IsOnEnzymes + NumPulmExacerbation + A_FEV1_pct_predicted + bmi, data = t2)
 summary(t1)
 ```
 
@@ -193,15 +195,13 @@ lme_fit_a1c <- lme(lme_f,
   data = registry[registry$eDWID %in% reg_include, ]
 )
 # Combine
-joint_fit_value <- jointModel(lme_fit_a1c, cox_fit, timeVar = "Age_YrEnd", parameterization = "value")
+joint_fit_value <- jointModel(lme_fit_a1c, cox_fit, timeVar = "Age_YrEnd")
 # joint_fit_slope <- jointModel(lme_fit_a1c, cox_fit, timeVar = "Age_YrEnd",parameterization ="slope")
 # joint_fit_both <- jointModel(lme_fit_a1c, cox_fit, timeVar = "Age_YrEnd",parameterization ="both")
 s <- summary(joint_fit_value)
 long <- data.frame(s$`CoefTable-Long`)
-long <- long[, c(1, 4)]
 long$p.value <- format.pval(long$p.value, eps = 0.001, digits = 3)
 event <- data.frame(s$`CoefTable-Event`)
-event <- event[, c(1, 4)]
 event$Value <- exp(event$Value)
 rownames(event)[nrow(event)] <- "shape"
 event$p.value <- format.pval(event$p.value, eps = 0.001, digits = 3)
