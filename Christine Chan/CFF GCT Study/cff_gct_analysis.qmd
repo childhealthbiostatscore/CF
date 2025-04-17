@@ -14,11 +14,6 @@ format:
     fig-height: 9
     fig-width: 12
     page-layout: full
-    theme:
-      light: flatly
-      dark: darkly
-bibliography: /home/timvigers/Documents/Miscellaneous/zotero.bib
-csl: /home/timvigers/Documents/GitHub/styles/american-medical-association.csl
 editor: source
 ---
 
@@ -353,19 +348,20 @@ Dysglycemia was defined as any diagnosis on OGTT other than normal glucose toler
 #| message: false
 gctpl_roc <- roc(Dysglycemia ~ `GCT 60 min plasma`, data = df)
 gctcap_roc <- roc(Dysglycemia ~ `GCT 60 min capillary`, data = df)
+ogtt0_roc <- roc(Dysglycemia ~ `OGTT 0 min`, data = df)
 ogtt1_roc <- roc(Dysglycemia ~ `OGTT 60 min`, data = df)
 rpg_roc <- roc(Dysglycemia ~ `GCT 0 min plasma`, data = df)
 rcg_roc <- roc(Dysglycemia ~ `GCT 0 min capillary`, data = df)
 a1c_roc <- roc(Dysglycemia ~ HbA1c, data = df)
 roc_table <-
   lapply(
-    list(gctpl_roc, gctcap_roc, ogtt1_roc, rpg_roc, rcg_roc, a1c_roc),
+    list(gctpl_roc, gctcap_roc, ogtt0_roc, ogtt1_roc, rpg_roc, rcg_roc, a1c_roc),
     function(roc) {
       coords(roc, "best", ret = "all")
     }
   )
 roc_table <- do.call(rbind, roc_table)
-rownames(roc_table) <- c("GCTpl", "GCTcap", "OGTT 1 hr", "RPG", "RCG", "A1c")
+rownames(roc_table) <- c("GCTpl", "GCTcap", "OGTT 0 min", "OGTT 1 hr", "RPG", "RCG", "A1c")
 gt(roc_table, rownames_to_stub = T) %>% fmt_number(decimals = 3)
 ```
 
@@ -393,6 +389,13 @@ gt(data.frame(coords(gctpl_roc, "all", ret = "all"))) %>%
 
 ```{r}
 gt(data.frame(coords(gctcap_roc, "all", ret = "all"))) %>%
+  fmt_number(n_sigfig = 3)
+```
+
+#### OGTT 0 min
+
+```{r}
+gt(data.frame(coords(ogtt0_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 3)
 ```
 
@@ -475,19 +478,20 @@ CFRD was defined as a two hour OGTT $\geq$ 200 mg/dL.
 #| message: false
 gctpl_roc <- roc(CFRD ~ `GCT 60 min plasma`, data = df)
 gctcap_roc <- roc(CFRD ~ `GCT 60 min capillary`, data = df)
+ogtt0_roc <- roc(CFRD ~ `OGTT 0 min`, data = df)
 ogtt1_roc <- roc(CFRD ~ `OGTT 60 min`, data = df)
 rpg_roc <- roc(CFRD ~ `GCT 0 min plasma`, data = df)
 rcg_roc <- roc(CFRD ~ `GCT 0 min capillary`, data = df)
 a1c_roc <- roc(CFRD ~ HbA1c, data = df)
 roc_table <-
   lapply(
-    list(gctpl_roc, gctcap_roc, ogtt1_roc, rpg_roc, rcg_roc, a1c_roc),
+    list(gctpl_roc, gctcap_roc, ogtt0_roc, ogtt1_roc, rpg_roc, rcg_roc, a1c_roc),
     function(roc) {
       coords(roc, "best", ret = "all")
     }
   )
 roc_table <- do.call(rbind, roc_table)
-rownames(roc_table) <- c("GCTpl", "GCTcap", "OGTT 1 hr", "RPG", "RCG", "A1c")
+rownames(roc_table) <- c("GCTpl", "GCTcap", "OGTT 0 min", "OGTT 1 hr", "RPG", "RCG", "A1c")
 gt(roc_table, rownames_to_stub = T) %>% fmt_number(decimals = 3)
 ```
 
@@ -495,7 +499,7 @@ gt(roc_table, rownames_to_stub = T) %>% fmt_number(decimals = 3)
 
 ```{r}
 invisible(lapply(
-  list(gctpl_roc, gctcap_roc, ogtt1_roc, rpg_roc, rcg_roc, a1c_roc),
+  list(gctpl_roc, gctcap_roc, ogtt0_roc, ogtt1_roc, rpg_roc, rcg_roc, a1c_roc),
   function(roc) {
     print(plot(roc, print.auc = T, print.thres = T, legacy.axes = T))
   }
@@ -515,6 +519,111 @@ gt(data.frame(coords(gctpl_roc, "all", ret = "all"))) %>%
 
 ```{r}
 gt(data.frame(coords(gctcap_roc, "all", ret = "all"))) %>%
+  fmt_number(n_sigfig = 3)
+```
+
+#### OGTT 0 min
+
+```{r}
+gt(data.frame(coords(ogtt0_roc, "all", ret = "all"))) %>%
+  fmt_number(n_sigfig = 3)
+```
+
+#### OGTT 1 hour
+
+```{r}
+gt(data.frame(coords(ogtt1_roc, "all", ret = "all"))) %>%
+  fmt_number(n_sigfig = 3)
+```
+
+#### RPG
+
+```{r}
+gt(data.frame(coords(rpg_roc, "all", ret = "all"))) %>%
+  fmt_number(n_sigfig = 3)
+```
+
+#### RCG
+
+```{r}
+gt(data.frame(coords(rcg_roc, "all", ret = "all"))) %>%
+  fmt_number(n_sigfig = 3)
+```
+
+#### HbA1c
+
+```{r}
+gt(data.frame(coords(a1c_roc, "all", ret = "all"))) %>%
+  fmt_number(n_sigfig = 3)
+```
+
+## CFRD + INDET
+
+CFRD + INDET was defined as a one hour OGTT $\geq$ 200 mg/dL OR two hour OGTT $\geq$ 200 mg/dL.
+
+```{r}
+df$CFRD_INDET <- factor(df$Diagnosis,
+  levels = c("NGT", "IFG", "INDET", "IGT", "CFRD"),
+  labels = c("No", "No", "Yes", "No", "Yes")
+)
+```
+
+### Youden indices
+
+```{r}
+#| label: tbl-roc-cfrd-indet
+#| tbl-cap: Accuracy of different screening tests to predict CFRD + INDET
+#| message: false
+gctpl_roc <- roc(CFRD_INDET ~ `GCT 60 min plasma`, data = df)
+gctcap_roc <- roc(CFRD_INDET ~ `GCT 60 min capillary`, data = df)
+ogtt0_roc <- roc(CFRD_INDET ~ `OGTT 0 min`, data = df)
+ogtt1_roc <- roc(CFRD_INDET ~ `OGTT 60 min`, data = df)
+rpg_roc <- roc(CFRD_INDET ~ `GCT 0 min plasma`, data = df)
+rcg_roc <- roc(CFRD_INDET ~ `GCT 0 min capillary`, data = df)
+a1c_roc <- roc(CFRD_INDET ~ HbA1c, data = df)
+roc_table <-
+  lapply(
+    list(gctpl_roc, gctcap_roc, ogtt0_roc, ogtt1_roc, rpg_roc, rcg_roc, a1c_roc),
+    function(roc) {
+      coords(roc, "best", ret = "all")
+    }
+  )
+roc_table <- do.call(rbind, roc_table)
+rownames(roc_table) <- c("GCTpl", "GCTcap", "OGTT 0 min", "OGTT 1 hr", "RPG", "RCG", "A1c")
+gt(roc_table, rownames_to_stub = T) %>% fmt_number(decimals = 3)
+```
+
+### ROC curves
+
+```{r}
+invisible(lapply(
+  list(gctpl_roc, gctcap_roc, ogtt0_roc, ogtt1_roc, rpg_roc, rcg_roc, a1c_roc),
+  function(roc) {
+    print(plot(roc, print.auc = T, print.thres = T, legacy.axes = T))
+  }
+))
+```
+
+### Full cutoff tables
+
+#### GCTpl
+
+```{r}
+gt(data.frame(coords(gctpl_roc, "all", ret = "all"))) %>%
+  fmt_number(n_sigfig = 3)
+```
+
+#### GCTcap
+
+```{r}
+gt(data.frame(coords(gctcap_roc, "all", ret = "all"))) %>%
+  fmt_number(n_sigfig = 3)
+```
+
+#### OGTT 0 min
+
+```{r}
+gt(data.frame(coords(ogtt0_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 3)
 ```
 
