@@ -177,6 +177,11 @@ gem$study_id <- ids$`EnVision ID`[match(gem$study_id, ids$`GEM ID`)]
 # Merge, keep only pre/post
 df <- full_join(df, gem) %>% filter(!is.na(pre_post))
 df$pre_post <- factor(df$pre_post, levels = c("Pre", "Post"))
+# Write for checking
+write.csv(df,
+  file = "./Data_Clean/fsOGTT_pre_post_ETI.csv",
+  row.names = F, na = ""
+)
 ```
 
 # Plot

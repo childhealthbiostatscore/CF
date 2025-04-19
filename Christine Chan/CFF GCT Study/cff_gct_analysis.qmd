@@ -382,49 +382,77 @@ invisible(lapply(
 
 ```{r}
 gt(data.frame(coords(gctpl_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(gctpl_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/GCTpl_dysglycemia.csv"
+)
 ```
 
 #### GCTcap
 
 ```{r}
 gt(data.frame(coords(gctcap_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(gctcap_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/GCTcap_dysglycemia.csv"
+)
 ```
 
 #### OGTT 0 min
 
 ```{r}
 gt(data.frame(coords(ogtt0_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(ogtt0_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/OGTT_0_dysglycemia.csv"
+)
 ```
 
 #### OGTT 1 hour
 
 ```{r}
 gt(data.frame(coords(ogtt1_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(ogtt1_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/OGTT_1_dysglycemia.csv"
+)
 ```
 
 #### RPG
 
 ```{r}
 gt(data.frame(coords(rpg_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(rpg_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/RPG_dysglycemia.csv"
+)
 ```
 
 #### RCG
 
 ```{r}
 gt(data.frame(coords(rcg_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(rcg_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/RCG_dysglycemia.csv"
+)
 ```
 
 #### HbA1c
 
 ```{r}
 gt(data.frame(coords(a1c_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(a1c_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/A1c_dysglycemia.csv"
+)
 ```
 
 ### Predefined cutoffs
@@ -512,49 +540,77 @@ invisible(lapply(
 
 ```{r}
 gt(data.frame(coords(gctpl_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(gctpl_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/GCTpl_CFRD.csv"
+)
 ```
 
 #### GCTcap
 
 ```{r}
 gt(data.frame(coords(gctcap_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(gctcap_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/GCTcap_CFRD.csv"
+)
 ```
 
 #### OGTT 0 min
 
 ```{r}
 gt(data.frame(coords(ogtt0_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(ogtt0_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/OGTT_0_CFRD.csv"
+)
 ```
 
 #### OGTT 1 hour
 
 ```{r}
 gt(data.frame(coords(ogtt1_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(ogtt1_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/OGTT_1_CFRD.csv"
+)
 ```
 
 #### RPG
 
 ```{r}
 gt(data.frame(coords(rpg_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(rpg_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/RPG_CFRD.csv"
+)
 ```
 
 #### RCG
 
 ```{r}
 gt(data.frame(coords(rcg_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(rcg_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/RCG_CFRD.csv"
+)
 ```
 
 #### HbA1c
 
 ```{r}
 gt(data.frame(coords(a1c_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(a1c_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/A1c_CFRD.csv"
+)
 ```
 
 ## CFRD + INDET
@@ -610,47 +666,75 @@ invisible(lapply(
 
 ```{r}
 gt(data.frame(coords(gctpl_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(gctpl_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/GCTpl_CFRD_INDET.csv"
+)
 ```
 
 #### GCTcap
 
 ```{r}
 gt(data.frame(coords(gctcap_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(gctcap_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/GCTcap_CFRD_INDET.csv"
+)
 ```
 
 #### OGTT 0 min
 
 ```{r}
 gt(data.frame(coords(ogtt0_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(ogtt0_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/OGTT_0_CFRD_INDET.csv"
+)
 ```
 
 #### OGTT 1 hour
 
 ```{r}
 gt(data.frame(coords(ogtt1_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(ogtt1_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/OGTT_1_CFRD_INDET.csv"
+)
 ```
 
 #### RPG
 
 ```{r}
 gt(data.frame(coords(rpg_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(rpg_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/RPG_CFRD_INDET.csv"
+)
 ```
 
 #### RCG
 
 ```{r}
 gt(data.frame(coords(rcg_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(rcg_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/RCG_CFRD_INDET.csv"
+)
 ```
 
 #### HbA1c
 
 ```{r}
 gt(data.frame(coords(a1c_roc, "all", ret = "all"))) %>%
-  fmt_number(n_sigfig = 3)
+  fmt_number(n_sigfig = 4)
+write.csv(coords(a1c_roc, "all", ret = "all"),
+  row.names = F, na = "",
+  file = "./Christine Chan/CFF GCT Study/Reports/Tables/A1c_CFRD_INDET.csv"
+)
 ```
