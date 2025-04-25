@@ -296,7 +296,10 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   ylab("gli_fev1_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression(intercept = T)
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
 # Table of predicted values
 pop_dat %>%
   select(-slope_change_years) %>%
@@ -306,7 +309,7 @@ pop_dat %>%
 # Linear hypotheses
 white_vs_black_pre <- glht(
   change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+  "Years + `Years:RaceBlack or African American` = 1.13856555"
 )
 white_vs_black_pre <- tidy(summary(white_vs_black_pre))
 white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
@@ -315,7 +318,7 @@ white_vs_black_pre %>%
   fmt_number(decimals = 3)
 white_vs_black_post <- glht(
   change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
+  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.63633"
 )
 white_vs_black_post <- tidy(summary(white_vs_black_post))
 white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
@@ -385,7 +388,10 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   ylab("GLI_FEV1_pct_predicted") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression(intercept = T)
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
 # Table of predicted values
 pop_dat %>%
   select(-slope_change_years) %>%
@@ -477,7 +483,10 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   ylab("gli_fev1_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression(intercept = T)
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
 # Table of predicted values
 pop_dat %>%
   select(-slope_change_years) %>%
@@ -658,7 +667,10 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   ylab("gli_fev1_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression(intercept = T)
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
 # Table of predicted values
 pop_dat %>%
   select(-slope_change_years) %>%
@@ -840,7 +852,10 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   ylab("gli_fvc_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression(intercept = T)
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
 # Table of predicted values
 pop_dat %>%
   select(-slope_change_years) %>%
@@ -1021,7 +1036,10 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   ylab("gli_fvc_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression(intercept = T)
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
 # Table of predicted values
 pop_dat %>%
   select(-slope_change_years) %>%
@@ -1202,7 +1220,10 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   ylab("gli_fvc_ppred_rn") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression(intercept = T)
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
 # Table of predicted values
 pop_dat %>%
   select(-slope_change_years) %>%
@@ -1909,7 +1930,7 @@ white_vs_other_post %>%
 ```{r}
 # Fit mixed model with change point
 change_mod <- lmer(
-  bmipercentile ~ Years * Race + slope_change_years * Race + age_group +
+  bmipercentile ~ Years * Race + slope_change_years * Race +
     Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
     (1 | eDWID),
   data = encounter[encounter$age_eti_start < 20, ]
@@ -1927,7 +1948,10 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   ylab("bmipercentile") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression(intercept = T)
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
 # Table of predicted values
 pop_dat %>%
   select(-slope_change_years) %>%
@@ -1997,7 +2021,7 @@ white_vs_other_post %>%
 
 ```{r}
 change_mod <- lmer(
-  bmivalue ~ Years * Race + slope_change_years * Race + age_group +
+  bmivalue ~ Years * Race + slope_change_years * Race +
     Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
     (1 | eDWID),
   data = encounter[encounter$age_eti_start >= 20, ]
@@ -2015,7 +2039,10 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   ylab("bmivalue") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression(intercept = T)
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
 # Table of predicted values
 pop_dat %>%
   select(-slope_change_years) %>%
@@ -2088,7 +2115,7 @@ white_vs_other_post %>%
 ```{r}
 # Fit mixed model with change point
 change_mod <- lmer(
-  heightpercentile ~ Years * Race + slope_change_years * Race + age_group +
+  heightpercentile ~ Years * Race + slope_change_years * Race +
     Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
     (1 | eDWID),
   data = encounter[encounter$age_eti_start < 20, ]
@@ -2176,7 +2203,7 @@ white_vs_other_post %>%
 
 ```{r}
 change_mod <- lmer(
-  height ~ Years * Race + slope_change_years * Race + age_group + Insurance +
+  height ~ Years * Race + slope_change_years * Race + Insurance +
     prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID),
   data = encounter[encounter$age_eti_start >= 20, ]
 )
@@ -2266,7 +2293,7 @@ white_vs_other_post %>%
 ```{r}
 # Fit mixed model with change point
 change_mod <- lmer(
-  weightpercentile ~ Years * Race + slope_change_years * Race + age_group +
+  weightpercentile ~ Years * Race + slope_change_years * Race +
     Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
     (1 | eDWID),
   data = encounter[encounter$age_eti_start < 20, ]
@@ -2284,7 +2311,10 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   ylab("weightpercentile") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression(intercept = T)
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
 # Table of predicted values
 pop_dat %>%
   select(-slope_change_years) %>%
@@ -2354,7 +2384,7 @@ white_vs_other_post %>%
 
 ```{r}
 change_mod <- lmer(
-  weight ~ Years * Race + slope_change_years * Race + age_group + Insurance +
+  weight ~ Years * Race + slope_change_years * Race + Insurance +
     prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID),
   data = encounter[encounter$age_eti_start >= 20, ]
 )
@@ -2371,7 +2401,10 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   ylab("weight") +
   theme_classic()
 # Model summary
-change_mod %>% gtsummary::tbl_regression(intercept = T)
+change_mod %>% 
+  gtsummary::tbl_regression(intercept = T)%>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
 # Table of predicted values
 pop_dat %>%
   select(-slope_change_years) %>%
