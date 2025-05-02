@@ -19,6 +19,7 @@ editor: source
 #| include: false
 library(tidyverse)
 library(readxl)
+library(arsenal)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Emily Muther",
   "Linux" = "/home/timvigers/OneDrive"
@@ -31,6 +32,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
+#| message: false
 # Import
 df <- read_excel("./Muther Research Group - General/PSC manuscript 2025/PSC_9-20-19 thru 4-18-25_pulled 4-21-25.xlsx")
 # Fill down MRN, select columns, remove duplicates
@@ -40,19 +42,112 @@ df <- df %>%
     `Pat Mrn Id`, `Payor Name`, `AGE AT CONTACT`, `Internalizing subscale`,
     `Attention subscale`, `Externalizing subscale`, Score
   ) %>%
+  # pivot_wider(names_from = `Payor Name`,values_from = `Payor Name`)
   distinct(`Pat Mrn Id`, `AGE AT CONTACT`, .keep_all = T)
+# Convert to numeric
+df$`AGE AT CONTACT` <- as.numeric(df$`AGE AT CONTACT`)
+df$`Internalizing subscale` <- as.numeric(df$`Internalizing subscale`)
+df$`Attention subscale` <- as.numeric(df$`Attention subscale`)
+df$`Externalizing subscale` <- as.numeric(df$`Externalizing subscale`)
+df$Score <- as.numeric(df$Score)
+# Make age group
+df$`Age Group` <- cut(df$`AGE AT CONTACT`,
+  breaks = c(-Inf, 6, 10, Inf),
+  labels = c("Age < 6", "Age >= 6 and < 10", "Age >= 10"), right = F
+)
+# Set table options
+mycontrols <-
+  tableby.control(
+    numeric.stats = c("N", "Nmiss", "medianq1q3", "range"),
+    cat.stats = c("N", "Nmiss", "countpct")
+  )
 ```
 
-# Table
+# Insurance providers
 
-```{r}
-#| label: tbl-planets
-#| tbl-cap: Planets
+MEDICAID = Public
+MEDICAID NEW MEXICO = Public
+MEDICAID WYOMING = Public
+UNITED HEALTHCARE = Private
+CIGNA = Private
+ANTHEM BCBS = Private
+ROCKY MOUNTAIN HEALTH PLAN = ?
+AETNA = Private
+MEDICAID OTHER STATES = Public
+TRICARE = Tricare
+CICP = ?
+CHP+COLORADO ACCESS = ?
+CU GME HEALTH = ?
+MIDLANDS CHOICE = ?
+BRIGHT HEALTH = ?
+FIRST HEALTH GROUP = ?
+ROCKY MOUNTAIN MEDICAID = Public
+KAISER = Kaiser
+MEDICAID NEBRASKA = Public
+MEDICAID OKLAHOMA = Public
+EBMS = ?
+COFINITY = ?
+SIMPLIFIED BENEFITS ADMINISTRATORS = ?
+FRIDAY HEALTH PLANS = ?
+SELECTHEALTH = INC. = Private?
+
+# Score summary
+
+## At first visit
+
+```{r results='asis'}
+first_visit <- df %>%
+  group_by(`Pat Mrn Id`) %>%
+  slice_min(`AGE AT CONTACT`)
+t1 <- tableby(
+  `Age Group` ~ `Internalizing subscale` + `Attention subscale` +
+    `Externalizing subscale` + Score,
+  data = first_visit
+)
+summary(t1, pfootnote = T)
 ```
 
-# Figure
+## All visits
+
+The table below treats multiple visits from the same participant as independent.
+
+```{r results='asis'}
+t1 <- tableby(
+  `Age Group` ~ `Internalizing subscale` + `Attention subscale` +
+    `Externalizing subscale` + Score,
+  data = df
+)
+summary(t1, pfootnote = T)
+```
+
+# Figures
+
+## Histograms
 
 ```{r}
-#| label: fig-planets
-#| fig-cap: Planets
+hist(df$`Internalizing subscale`)
+hist(df$`Attention subscale`)
+hist(df$`Externalizing subscale`)
+hist(df$Score)
+```
+
+## Scores by age
+
+```{r}
+#| warning: false
+ggplot(df, aes(x = `AGE AT CONTACT`, y = `Internalizing subscale`)) +
+  geom_point() +
+  geom_line(aes(group = `Pat Mrn Id`))
+
+ggplot(df, aes(x = `AGE AT CONTACT`, y = `Attention subscale`)) +
+  geom_point() +
+  geom_line(aes(group = `Pat Mrn Id`))
+
+ggplot(df, aes(x = `AGE AT CONTACT`, y = `Externalizing subscale`)) +
+  geom_point() +
+  geom_line(aes(group = `Pat Mrn Id`))
+
+ggplot(df, aes(x = `AGE AT CONTACT`, y = Score)) +
+  geom_point() +
+  geom_line(aes(group = `Pat Mrn Id`))
 ```
