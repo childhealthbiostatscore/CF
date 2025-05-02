@@ -34,7 +34,15 @@ library(eulerr)
 library(broom)
 library(emmeans)
 library(ggstats)
-knitr::opts_knit$set(root.dir = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry/")
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
+  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry"
+)
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/timvigers/Documents/GitHub",
+  "Linux" = "/home/timvigers/Documents/GitHub"
+)
+knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 # Data cleaning
@@ -768,6 +776,6 @@ comb_plot <- ggcoef_compare(
 )
 comb_plot
 ggsave("./Dissemination/Figures/time_combined_forest.png",
-  plot = comb_plot, width = 12, height = 9, units = "in"
+  plot = comb_plot, width = 12, height = 9, units = "in", dpi = 900
 )
 ```
