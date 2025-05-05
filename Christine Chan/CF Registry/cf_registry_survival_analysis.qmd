@@ -34,6 +34,7 @@ library(eulerr)
 library(broom)
 library(emmeans)
 library(ggstats)
+library(patchwork)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry"
@@ -523,7 +524,7 @@ eth <- ogtts %>%
 p <- prev_year_age %>%
   pivot_longer(`[10,19)`:`[31, Inf)`, names_to = "Age Group") %>%
   rename(Year = ReviewYear)
-p$name <- "Prevalence"
+p$name <- "Prevalence of CFRD"
 i <- incidence %>%
   select(
     Year, `Total Incidence Age 10-18`, `Total Incidence Age 19-30`,
@@ -532,12 +533,12 @@ i <- incidence %>%
   pivot_longer(`Total Incidence Age 10-18`:`Total Incidence Age >= 31`,
     names_to = "Age Group"
   )
-i$name <- "Incidence"
+i$name <- "Incidence of CFRD"
 s <- screening %>%
   filter(name == "Screened OGTT") %>%
   select(ReviewYear, age_group, value) %>%
   rename(Year = ReviewYear, `Age Group` = age_group)
-s$name <- " Screening Rates for CFRD"
+s$name <- "Screening Rates for CFRD"
 s$value <- s$value * 100
 t <- rbind(p, i, s)
 t$`Age Group` <- factor(t$`Age Group`,
@@ -551,12 +552,65 @@ t$`Age Group` <- factor(t$`Age Group`,
   )
 )
 t <- t[t$Year >= 2004, ]
-fig1 <- ggplot(t, aes(x = Year, y = value, color = `Age Group`)) +
+# Figure 1
+fig1a <- ggplot(
+  t[t$name == "Screening Rates for CFRD", ],
+  aes(x = Year, y = value, linetype = `Age Group`)
+) +
   geom_line() +
-  facet_wrap(~name, scales = "free", nrow = 3)
+  theme_bw() +
+  ylab("Percentage") +
+  ggtitle("Screening Rates for CFRD")
+fig1b <- ggplot(
+  t[t$name == "Incidence of CFRD", ],
+  aes(x = Year, y = value, linetype = `Age Group`)
+) +
+  geom_line() +
+  theme_bw() +
+  ylab("Per 1,000 Person-Years") +
+  ggtitle("Incidence of CFRD")
+fig1c <- ggplot(
+  t[t$name == "Prevalence of CFRD", ],
+  aes(x = Year, y = value, linetype = `Age Group`)
+) +
+  geom_line() +
+  theme_bw() +
+  ylab("Per 1,000 Person-Years") +
+  ggtitle("Prevalence of CFRD")
+fig1 <- fig1a + fig1b + fig1c + plot_layout(guides = "collect")
 fig1
 ggsave("./Dissemination/Figures/fig1.png",
-  plot = fig1, width = 9, height = 12, units = "in"
+  plot = fig1, width = 12, height = 3, units = "in", dpi = 900
+)
+# Graphical abstract is the same but with color
+fig1a <- ggplot(
+  t[t$name == "Screening Rates for CFRD", ],
+  aes(x = Year, y = value, color = `Age Group`)
+) +
+  geom_line() +
+  theme_bw() +
+  ylab("Percentage") +
+  ggtitle("Screening Rates for CFRD")
+fig1b <- ggplot(
+  t[t$name == "Incidence of CFRD", ],
+  aes(x = Year, y = value, color = `Age Group`)
+) +
+  geom_line() +
+  theme_bw() +
+  ylab("Per 1,000 Person-Years") +
+  ggtitle("Incidence of CFRD")
+fig1c <- ggplot(
+  t[t$name == "Prevalence of CFRD", ],
+  aes(x = Year, y = value, color = `Age Group`)
+) +
+  geom_line() +
+  theme_bw() +
+  ylab("Per 1,000 Person-Years") +
+  ggtitle("Prevalence of CFRD")
+fig1 <- fig1a + fig1b + fig1c + plot_layout(guides = "collect")
+fig1
+ggsave("./Dissemination/Figures/graphical_abstract.png",
+  plot = fig1, width = 12, height = 3, units = "in", dpi = 900
 )
 ```
 
