@@ -3,7 +3,7 @@ library(lubridate)
 library(parallel)
 # Paths
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
   "Linux" = "/home/tim/CF"
 )
@@ -172,7 +172,7 @@ encounter <- encounter[-late, ]
 n_enc_5 <- nrow(encounter)
 n_people_5 <- length(unique(encounter$eDWID))
 # Lung function cutoffs
-lower <- 20
+lower <- 10
 upper <- 150
 # Remove impossible lung function values
 low_fev1 <- which(encounter$gli_fev1_ppred_rn < lower)

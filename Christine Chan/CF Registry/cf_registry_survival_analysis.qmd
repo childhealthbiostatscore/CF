@@ -577,7 +577,8 @@ fig1c <- ggplot(
   theme_bw() +
   ylab("Per 1,000 Person-Years") +
   ggtitle("Prevalence of CFRD")
-fig1 <- fig1a + fig1b + fig1c + plot_layout(guides = "collect")
+fig1 <- fig1a + fig1b + fig1c + plot_layout(guides = "collect") +
+  plot_annotation(title = "Figure 1: Trends in Screening, Incidence, and Prevalence of CFRD from 2003-2018, by age group ")
 fig1
 ggsave("./Dissemination/Figures/fig1.png",
   plot = fig1, width = 12, height = 3, units = "in", dpi = 900
@@ -607,10 +608,11 @@ fig1c <- ggplot(
   theme_bw() +
   ylab("Per 1,000 Person-Years") +
   ggtitle("Prevalence of CFRD")
-fig1 <- fig1a + fig1b + fig1c + plot_layout(guides = "collect")
+fig1 <- fig1a + fig1b + fig1c + plot_layout(guides = "collect")+
+  plot_annotation(title = "US Cystic Fibrosis Foundation Patient Registry Trends in Screening, Incidence, and Prevalence of Cystic Fibrosis Related Diabetes from 2003-2018")
 fig1
 ggsave("./Dissemination/Figures/graphical_abstract.png",
-  plot = fig1, width = 12, height = 3, units = "in", dpi = 900
+  plot = fig1, width = 13, height = 3, units = "in", dpi = 900
 )
 ```
 

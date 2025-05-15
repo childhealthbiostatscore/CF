@@ -20,6 +20,7 @@ editor: source
 library(tidyverse)
 library(readxl)
 library(arsenal)
+library(GLMMadaptive)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Emily Muther",
   "Linux" = "/home/timvigers/OneDrive"
@@ -35,15 +36,38 @@ knitr::opts_knit$set(root.dir = home_dir)
 #| message: false
 # Import
 df <- read_excel("./Muther Research Group - General/PSC manuscript 2025/PSC_9-20-19 thru 4-18-25_pulled 4-21-25.xlsx")
-# Fill down MRN, select columns, remove duplicates
+# Classify insurance per Emily
+df$Insurance <- factor(df$`Payor Name`,
+  levels = c(
+    "MEDICAID", "MEDICAID NEW MEXICO", "MEDICAID WYOMING", "UNITED HEALTHCARE",
+    "CIGNA", "ANTHEM BCBS", "ROCKY MOUNTAIN HEALTH PLAN", "AETNA",
+    "MEDICAID OTHER STATES", "TRICARE", "CICP", "CHP+COLORADO ACCESS",
+    "CU GME HEALTH", "MIDLANDS CHOICE", "BRIGHT HEALTH", "FIRST HEALTH GROUP",
+    "ROCKY MOUNTAIN MEDICAID", "KAISER", "MEDICAID NEBRASKA",
+    "MEDICAID OKLAHOMA", "EBMS", "COFINITY", "SIMPLIFIED BENEFITS ADMINISTRATORS",
+    "FRIDAY HEALTH PLANS", "SELECTHEALTH, INC."
+  ),
+  labels = c(
+    "Public", "Public", "Public", "Private", "Private", "Private", "Public",
+    "Private", "Public", "Private", "Public", "Public", "Private", "Private",
+    "Private", "Private", "Public", "Private", "Public", "Public", "Private",
+    "Private", "Private", "Private", "Private"
+  )
+)
+# Fill down MRN and select columns
 df <- df %>%
   fill(`Pat Mrn Id`, .direction = "down") %>%
   select(
-    `Pat Mrn Id`, `Payor Name`, `AGE AT CONTACT`, `Internalizing subscale`,
+    `Pat Mrn Id`, Insurance, `AGE AT CONTACT`, `Internalizing subscale`,
     `Attention subscale`, `Externalizing subscale`, Score
   ) %>%
-  # pivot_wider(names_from = `Payor Name`,values_from = `Payor Name`)
-  distinct(`Pat Mrn Id`, `AGE AT CONTACT`, .keep_all = T)
+  distinct() %>%
+  pivot_wider(names_from = Insurance, values_from = Insurance) %>%
+  unite("Insurance", Public, Private, `NA`, remove = T, na.rm = T)
+df$Insurance <- factor(df$Insurance,
+  levels = c("", "Private", "Public", "Public_Private"),
+  labels = c("None", "Private", "Public", "Both")
+)
 # Convert to numeric
 df$`AGE AT CONTACT` <- as.numeric(df$`AGE AT CONTACT`)
 df$`Internalizing subscale` <- as.numeric(df$`Internalizing subscale`)
@@ -55,68 +79,67 @@ df$`Age Group` <- cut(df$`AGE AT CONTACT`,
   breaks = c(-Inf, 6, 10, Inf),
   labels = c("Age < 6", "Age >= 6 and < 10", "Age >= 10"), right = F
 )
+# Make variables for 0 scores on each scale
+df$`Internalizing subscale symptoms` <- factor(df$`Internalizing subscale` == 0,
+  levels = c(F, T),
+  labels = c(
+    "No internalizing symptoms (score = 0)",
+    "Any internalizing symptoms (score > 0)"
+  )
+)
+df$`Attention subscale symptoms` <- factor(df$`Attention subscale` == 0,
+  levels = c(F, T),
+  labels = c(
+    "No attention symptoms (score = 0)",
+    "Any attention symptoms (score > 0)"
+  )
+)
+df$`Externalizing subscale symptoms` <- factor(df$`Externalizing subscale`==0,
+  levels = c(F, T),
+  labels = c(
+    "No externalizing symptoms (score = 0)",
+    "Any externalizing symptoms (score > 0)"
+  )
+)
+df$`Any symptoms` <- factor(df$Score == 0,
+  levels = c(F, T),
+  labels = c(
+    "No symptoms (total score = 0)",
+    "Any symptoms (total score > 0)"
+  )
+)
 # Set table options
 mycontrols <-
   tableby.control(
     numeric.stats = c("N", "Nmiss", "medianq1q3", "range"),
     cat.stats = c("N", "Nmiss", "countpct")
   )
+# Basic formula
+f <- ~ Insurance + `Internalizing subscale` + `Internalizing subscale symptoms` +
+  `Attention subscale` + `Attention subscale symptoms` +
+  `Externalizing subscale` + `Externalizing subscale symptoms` +
+  Score + `Any symptoms`
 ```
 
-# Insurance providers
+# Score summary at first visit
 
-MEDICAID = Public
-MEDICAID NEW MEXICO = Public
-MEDICAID WYOMING = Public
-UNITED HEALTHCARE = Private
-CIGNA = Private
-ANTHEM BCBS = Private
-ROCKY MOUNTAIN HEALTH PLAN = ?
-AETNA = Private
-MEDICAID OTHER STATES = Public
-TRICARE = Tricare
-CICP = ?
-CHP+COLORADO ACCESS = ?
-CU GME HEALTH = ?
-MIDLANDS CHOICE = ?
-BRIGHT HEALTH = ?
-FIRST HEALTH GROUP = ?
-ROCKY MOUNTAIN MEDICAID = Public
-KAISER = Kaiser
-MEDICAID NEBRASKA = Public
-MEDICAID OKLAHOMA = Public
-EBMS = ?
-COFINITY = ?
-SIMPLIFIED BENEFITS ADMINISTRATORS = ?
-FRIDAY HEALTH PLANS = ?
-SELECTHEALTH = INC. = Private?
-
-# Score summary
-
-## At first visit
+## By age group
 
 ```{r results='asis'}
 first_visit <- df %>%
   group_by(`Pat Mrn Id`) %>%
   slice_min(`AGE AT CONTACT`)
-t1 <- tableby(
-  `Age Group` ~ `Internalizing subscale` + `Attention subscale` +
-    `Externalizing subscale` + Score,
-  data = first_visit
-)
+t1 <- tableby(update(f, `Age Group` ~ .), data = first_visit)
 summary(t1, pfootnote = T)
 ```
 
-## All visits
-
-The table below treats multiple visits from the same participant as independent.
+## By insurance type
 
 ```{r results='asis'}
-t1 <- tableby(
-  `Age Group` ~ `Internalizing subscale` + `Attention subscale` +
-    `Externalizing subscale` + Score,
-  data = df
-)
+first_visit <- df %>%
+  group_by(`Pat Mrn Id`) %>%
+  slice_min(`AGE AT CONTACT`)
+t1 <- tableby(update(f, Insurance ~ .), data = first_visit)
 summary(t1, pfootnote = T)
 ```
 
@@ -151,3 +174,28 @@ ggplot(df, aes(x = `AGE AT CONTACT`, y = Score)) +
   geom_point() +
   geom_line(aes(group = `Pat Mrn Id`))
 ```
+
+# Mixed models
+
+## Total score
+
+```{r}
+# First determine whether we need Poisson or negative binomial
+pm1 <- mixed_model(Score ~ `AGE AT CONTACT`,
+  random = ~ 1 | `Pat Mrn Id`, data = df,
+  family = zi.poisson(), zi_fixed = ~`AGE AT CONTACT`
+)
+nbm1 <- mixed_model(Score ~ `AGE AT CONTACT`,
+  random = ~ 1 | `Pat Mrn Id`, data = df,
+  family = zi.negative.binomial(), zi_fixed = ~`AGE AT CONTACT`
+)
+# anova(pm1, nbm1, test = FALSE) - NB better by AIC and BIC
+summary(nbm1)
+```
+
+
+
+# Questions for Emily
+
+- If payor is blank, does that indicate no insurance? Or is it missing?
+- Should we ask Elin for gender and lung function data? Not sure how much work that would be for her.

@@ -32,7 +32,7 @@ library(gtsummary)
 library(ggflowchart)
 library(lmerTest)
 library(broom)
-knitr::opts_knit$set(root.dir = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF")
+knitr::opts_knit$set(root.dir = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF")
 ```
 
 ```{r data import}
@@ -60,6 +60,7 @@ t1_participant %>%
   tbl_summary(
     by = Race,
     type = list(`Years With Data` ~ "continuous"),
+    statistic = list(c(gli_fev1_ppred_rn,gli_fvc_ppred_rn)~"{mean} [{sd}]"),
     missing_text = "Missing"
   ) %>%
   add_overall()

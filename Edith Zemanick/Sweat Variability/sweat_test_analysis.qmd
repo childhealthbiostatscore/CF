@@ -27,7 +27,7 @@ library(readxl)
 library(tidyverse)
 library(arsenal)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability",
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Edith Zemanick/Sweat Variability"
 )
 knitr::opts_knit$set(root.dir = home_dir)
@@ -59,7 +59,7 @@ chco_diagnoses <- read.csv("./Data_Cleaned/chco_diagnoses.csv")
 chco <- full_join(chco, chco_diagnoses, by = join_by(PatientID))
 chco$PatientID <- NULL
 # For "LESS THAN 10", replace with half the limit of detection
-chco[chco == "LESS THAN 10"] <- "5"
+chco[chco == "LESS THAN 10"] <- "9"
 chco[, c("Cl", "Cl_Left", "Cl_Right")] <-
   lapply(chco[, c("Cl", "Cl_Left", "Cl_Right")], as.numeric)
 # Import NJH and add diagnoses from Katie
@@ -136,7 +136,7 @@ write.csv(df,
 - Removed rows with `Demographics Available` not equal to `TRUE` and selected each person's earliest test by age.
   - This resulted in 3,123 rows with 3,084 unique IDs.
 - Merged in the diagnoses from Angela.
-- Values below the limit of detection were replaced with half the limit (e.g. "LESS THAN 10" was replaced with 5). Approximately 5% of the values were below the L.O.D.
+- Values below the limit of detection were replaced with half the limit (e.g. "LESS THAN 10" was replaced with 9). Approximately 5% of the values were below the L.O.D.
 
 - Imported NJH data (1,958 rows with 1,748 unique IDs) and merged in diagnoses from Katie.
 - Removed 1,662 rows with `Demographics Available` not equal to `TRUE` (all of these were `FALSE`)
