@@ -86,6 +86,18 @@ glucose$Timepoint <- sub("_min", "", glucose$Timepoint)
 glucose$Timepoint <- as.numeric(glucose$Timepoint)
 glucose$Date <- ymd(glucose$Date)
 #-------------------------------------------------------------------------------
+# C-peptide
+#-------------------------------------------------------------------------------
+cpep <- read.table(
+  "./Christine Chan/EnVision CF/Data_Raw/CpepData-May2025.data",
+  na.strings = c("", "no serum", "no sample"), header = T
+)
+cpep <- cpep %>% select(ID:Cpep)
+colnames(cpep) <- c("study_id", "Date", "Timepoint", "C.Peptide")
+cpep$Date <- ymd(cpep$Date)
+cpep$C.Peptide <- as.numeric(cpep$C.Peptide)
+cpep <- cpep %>% distinct()
+#-------------------------------------------------------------------------------
 # Demographics and visit data
 #-------------------------------------------------------------------------------
 visits <- redcap %>%
@@ -286,18 +298,19 @@ ogtts <- ogtts %>%
   group_by(study_id) %>%
   mutate(ogtt_num = row_number()) %>%
   ungroup()
+ogtts <- ogtts %>% select(-Status, -iowa_run_date)
 #-------------------------------------------------------------------------------
 # Combine everything in a wide format
 #-------------------------------------------------------------------------------
 # Merge
 final_df <- full_join(glucose, insulin)
+final_df <- full_join(final_df, cpep)
 final_df <- full_join(final_df, catecholamines)
 final_df <- final_df %>%
   group_by(study_id, Date) %>%
-  fill(a1c_result) %>%
   pivot_wider(
     names_from = Timepoint,
-    values_from = c(Glucose, Insulin, Norepinephrine, Epinephrine),
+    values_from = c(Glucose, Insulin, C.Peptide, Norepinephrine, Epinephrine),
   )
 final_df <- full_join(final_df, visits)
 final_df <- full_join(final_df, hypo_symptoms)
@@ -310,6 +323,8 @@ final_df <- final_df %>%
 final_df <- full_join(final_df, ogtts)
 # Add CGM
 final_df <- full_join(final_df, cgm)
+# C-peptide checking
+
 #-------------------------------------------------------------------------------
 # Calculated fields
 #-------------------------------------------------------------------------------
