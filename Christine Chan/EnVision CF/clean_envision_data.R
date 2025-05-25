@@ -191,6 +191,8 @@ insulin$Insulin[insulin$Insulin %in%
     "1 Slightly hemolyzed", "2 Slightly hemolyzed", "No Sample Received"
   )] <- NA
 insulin$Insulin <- as.numeric(insulin$Insulin)
+# Remove those with missing dates
+insulin <- insulin[!is.na(insulin$Date), ]
 #-------------------------------------------------------------------------------
 # Hypoglycemia symptom surveys
 #-------------------------------------------------------------------------------
@@ -307,6 +309,8 @@ final_df <- full_join(glucose, insulin)
 final_df <- full_join(final_df, cpep)
 final_df <- full_join(final_df, catecholamines)
 final_df <- final_df %>%
+  group_by(study_id, Date) %>%
+  fill(a1c_result) %>%
   pivot_wider(
     names_from = Timepoint,
     values_from = c(Glucose, Insulin, C.Peptide, Norepinephrine, Epinephrine),
@@ -508,17 +512,24 @@ final_df$redcap_data_access_group <- factor(
   levels = c("CC", "ia", "IA", "MN", "WU"),
   labels = c("Colorado", "Iowa", "Iowa", "Minnesota", "Washington University")
 )
+# Remove the CC0010 CGM not attached to an OGTT
+final_df <- final_df[-which(final_df$study_id == "CC0010" &
+  final_df$redcap_event_name == "unscheduled_visit_arm_1"), ]
+# Remove the IA0005 catecholamines from	7/1/21 (date doesn't match any other
+# dates for IA0005)
+final_df <- final_df[-which(final_df$study_id == "IA0005" &
+  final_df$Date == "2021-07-01"), ]
 # Order the columns
 final_df <- final_df %>%
-  arrange(study_id, Date) %>%
+  arrange(redcap_data_access_group, study_id, Date) %>%
   select(
     study_id, Date, ogtt_num, redcap_event_name, redcap_data_access_group:fvc,
-    bmi, bmi_perc, CFTR, Diagnosis, a1c_result, contains("Glucose_"), 
-    matches("iAUC\\d{2,3}gluc"), Hypo60, Hypo70, contains("Insulin_"), 
-    matches("iAUC\\d{2,3}ins"), homa_ir, contains("C.Peptide_"), 
-    contains("Glucagon_"), contains("GLP.1.Active_"), contains("GIP_"), 
-    contains("PP_"), contains("Active.Ghrelin_"), contains("adren_score_"), 
-    contains("neuro_score_"), everything()
+    bmi, bmi_perc, CFTR, Diagnosis, a1c_result, contains("Glucose_"),
+    matches("iAUC\\d{2,3}gluc"), Hypo60, Hypo70, contains("Insulin_"),
+    matches("iAUC\\d{2,3}ins"), homa_ir, contains("C.Peptide_"),
+    contains("Glucagon_"), contains("GLP.1.Active_"), contains("GIP_"),
+    contains("PP_"), contains("Active.Ghrelin_"), contains("adren_score_"),
+    contains("neuro_score_"), everything(), -redcap_event_name
   )
 # Write
 write.csv(final_df,
