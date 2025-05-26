@@ -11,7 +11,7 @@ library(cgmanalysis)
 library(pracma)
 # Home directory
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
 )
@@ -191,6 +191,8 @@ insulin$Insulin[insulin$Insulin %in%
     "1 Slightly hemolyzed", "2 Slightly hemolyzed", "No Sample Received"
   )] <- NA
 insulin$Insulin <- as.numeric(insulin$Insulin)
+# Remove those with missing dates
+insulin <- insulin[!is.na(insulin$Date), ]
 #-------------------------------------------------------------------------------
 # Hypoglycemia symptom surveys
 #-------------------------------------------------------------------------------
@@ -300,7 +302,7 @@ ogtts <- ogtts %>%
   ungroup()
 ogtts <- ogtts %>% select(-Status, -iowa_run_date)
 #-------------------------------------------------------------------------------
-# Combine everything in a wide format
+# Combine everything into a wide format
 #-------------------------------------------------------------------------------
 # Merge
 final_df <- full_join(glucose, insulin)
@@ -308,6 +310,7 @@ final_df <- full_join(final_df, cpep)
 final_df <- full_join(final_df, catecholamines)
 final_df <- final_df %>%
   group_by(study_id, Date) %>%
+  fill(a1c_result) %>%
   pivot_wider(
     names_from = Timepoint,
     values_from = c(Glucose, Insulin, C.Peptide, Norepinephrine, Epinephrine),
@@ -320,11 +323,22 @@ final_df <- final_df %>%
   group_by(study_id) %>%
   mutate(ogtt_num = row_number()) %>%
   ungroup()
-final_df <- full_join(final_df, ogtts)
+# Because full_join doesn't replace missing values and instead treats an NA
+# and a numeric value as a mismatch, we need to join by ID and OGTT number
+# (the OGTT data from Andy don't include the date the sample was drawn). Then,
+# we run coalesce on the C peptide columns.
+final_df <- full_join(final_df, ogtts, by = join_by(study_id, ogtt_num))
+final_df <- final_df %>%
+  unite(C.Peptide_0, C.Peptide_0.x, C.Peptide_0.y, na.rm = T) %>%
+  unite(C.Peptide_10, C.Peptide_10.x, C.Peptide_10.y, na.rm = T) %>%
+  unite(C.Peptide_30, C.Peptide_30.x, C.Peptide_30.y, na.rm = T) %>%
+  unite(C.Peptide_60, C.Peptide_60.x, C.Peptide_60.y, na.rm = T) %>%
+  unite(C.Peptide_90, C.Peptide_90.x, C.Peptide_90.y, na.rm = T) %>%
+  unite(C.Peptide_120, C.Peptide_120.x, C.Peptide_120.y, na.rm = T) %>%
+  unite(C.Peptide_150, C.Peptide_150.x, C.Peptide_150.y, na.rm = T) %>%
+  unite(C.Peptide_180, C.Peptide_180.x, C.Peptide_180.y, na.rm = T)
 # Add CGM
 final_df <- full_join(final_df, cgm)
-# C-peptide checking
-
 #-------------------------------------------------------------------------------
 # Calculated fields
 #-------------------------------------------------------------------------------
@@ -498,6 +512,25 @@ final_df$redcap_data_access_group <- factor(
   levels = c("CC", "ia", "IA", "MN", "WU"),
   labels = c("Colorado", "Iowa", "Iowa", "Minnesota", "Washington University")
 )
+# Remove the CC0010 CGM not attached to an OGTT
+final_df <- final_df[-which(final_df$study_id == "CC0010" &
+  final_df$redcap_event_name == "unscheduled_visit_arm_1"), ]
+# Remove the IA0005 catecholamines from	7/1/21 (date doesn't match any other
+# dates for IA0005)
+final_df <- final_df[-which(final_df$study_id == "IA0005" &
+  final_df$Date == "2021-07-01"), ]
+# Order the columns
+final_df <- final_df %>%
+  arrange(redcap_data_access_group, study_id, Date) %>%
+  select(
+    study_id, Date, ogtt_num, redcap_event_name, redcap_data_access_group:fvc,
+    bmi, bmi_perc, CFTR, Diagnosis, a1c_result, contains("Glucose_"),
+    matches("iAUC\\d{2,3}gluc"), Hypo60, Hypo70, contains("Insulin_"),
+    matches("iAUC\\d{2,3}ins"), homa_ir, contains("C.Peptide_"),
+    contains("Glucagon_"), contains("GLP.1.Active_"), contains("GIP_"),
+    contains("PP_"), contains("Active.Ghrelin_"), contains("adren_score_"),
+    contains("neuro_score_"), everything(), -redcap_event_name
+  )
 # Write
 write.csv(final_df,
   file = "./Christine Chan/EnVision CF/Data_Clean/envision_analysis_dataset.csv",
