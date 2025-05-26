@@ -23,11 +23,13 @@ library(tidyverse)
 library(redcapAPI)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Documents/GitHub",
-  "Linux" = "/home/timvigers/Documents/GitHub"
+  "Darwin" = "/Users/tim/Documents/GitHub",
+  "Windows" = "C:/Users/Tim/Documents/GitHub",
+  "Linux" = "/home/tim/Documents/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -47,7 +49,6 @@ df <- exportRecordsTyped(rcon)
 ```{r}
 #| label: tbl-planets
 #| tbl-cap: Planets
-
 ```
 
 # Figure
@@ -55,5 +56,4 @@ df <- exportRecordsTyped(rcon)
 ```{r}
 #| label: fig-planets
 #| fig-cap: Planets
-
 ```
