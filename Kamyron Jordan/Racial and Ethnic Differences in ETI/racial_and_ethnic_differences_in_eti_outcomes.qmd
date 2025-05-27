@@ -15,9 +15,6 @@ format:
     fig-height: 10
     fig-width: 10
     page-layout: full
-    theme:
-      light: flatly
-      dark: darkly
 editor: source
 ---
 
@@ -308,6 +305,7 @@ pop_dat %>%
   gt(caption = "Predicted Values at Various Timepoints") %>%
   fmt_number(decimals = 3)
 # Linear hypotheses
+
 white_vs_black_pre <- glht(
   change_mod,
   "Years + `Years:RaceBlack or African American` = 1.13856555"
