@@ -371,6 +371,10 @@ final_df$Diagnosis[final_df$Glucose_0 >= 126 | final_df$Glucose_120 >= 200] <-
 final_df$Diagnosis <- factor(final_df$Diagnosis,
   levels = c("NGT", "IFG", "INDET", "IGT", "CFRD")
 )
+# Create CFRD+ vs. CFRD- variable
+final_df$CFRD <- factor(final_df$Diagnosis,
+  labels = c("CFRD-", "CFRD-", "CFRD-", "CFRD-", "CFRD+")
+)
 # iAUCs
 final_df$iAUC30gluc <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[glucose[1:3]]) - as.numeric(r[glucose[1]])
@@ -524,7 +528,7 @@ final_df <- final_df %>%
   arrange(redcap_data_access_group, study_id, Date) %>%
   select(
     study_id, Date, ogtt_num, redcap_event_name, redcap_data_access_group:fvc,
-    bmi, bmi_perc, CFTR, Diagnosis, a1c_result, contains("Glucose_"),
+    bmi, bmi_perc, CFTR, Diagnosis, CFRD, a1c_result, contains("Glucose_"),
     matches("iAUC\\d{2,3}gluc"), Hypo60, Hypo70, contains("Insulin_"),
     matches("iAUC\\d{2,3}ins"), homa_ir, contains("C.Peptide_"),
     contains("Glucagon_"), contains("GLP.1.Active_"), contains("GIP_"),

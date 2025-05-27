@@ -1,0 +1,112 @@
+---
+title: "Using CGM to Predict CFRD in the Envision Cohort"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+editor: source
+---
+
+```{r setup}
+#| include: false
+library(tidyverse)
+library(arsenal)
+library(pROC)
+library(gt)
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/EnVision CF",
+  "Linux" = "/home/tim/OneDrive/Vigers/CF/Christine Chan/EnVision CF"
+)
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/tim/Documents/GitHub",
+  "Windows" = "C:/Users/Tim/Documents/GitHub",
+  "Linux" = "/home/tim/Documents/GitHub"
+)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r data cleaning}
+# Import cleaned dataset
+df <- read.csv("./Data_Clean/envision_analysis_dataset.csv", na.strings = "")
+# Limit to those with CGM data (based on mean glucose)
+df <- df %>% filter(!is.na(mean_sensor))
+```
+
+- **All tables and analyses below treat CGM wears as independent**, but we will need to think about how to handle this in future analyses. 
+
+# Participant demographics
+
+- In the cleaned EnVision dataset we have a total of `r nrow(df)` CGMs from `r length(unique(df$study_id))` unique individuals. Of these CGM wears, `r sum(is.na(df$Diagnosis))` are missing a diagnosis due to missing OGTT timepoints.
+- BMI percentile was calculated with age = 20 for adults. 
+
+```{r results='asis'}
+t1 <- tableby(
+  CFRD ~ redcap_data_access_group + sex + origin_race + ethnicity +
+    pancreatic_status + CFTR + fev1 + fvc + bmi_perc + a1c_result,
+  data = df
+)
+summary(t1, pfootnote = T)
+```
+
+# ROC Analyses
+
+## Mean sensor glucose 
+
+```{r}
+r <- roc(CFRD ~ mean_sensor, data = df, quiet = T)
+plot(r, print.auc = T, print.thres = T, legacy.axes = T)
+gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+```
+
+## Percent time spent >140 mg/dL 
+
+```{r}
+r <- roc(CFRD ~ percent_time_over_140, data = df, quiet = T)
+plot(r, print.auc = T, print.thres = T, legacy.axes = T)
+gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+```
+
+## Percent time spent >180 mg/dL
+
+```{r}
+r <- roc(CFRD ~ percent_time_over_180, data = df, quiet = T)
+plot(r, print.auc = T, print.thres = T, legacy.axes = T)
+gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+```
+
+## GMI
+
+```{r}
+r <- roc(CFRD ~ gmi, data = df, quiet = T)
+plot(r, print.auc = T, print.thres = T, legacy.axes = T)
+gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+```
+
+## SD
+
+```{r}
+r <- roc(CFRD ~ standard_deviation, data = df, quiet = T)
+plot(r, print.auc = T, print.thres = T, legacy.axes = T)
+gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+```
+
+## CV
+
+```{r}
+r <- roc(CFRD ~ cv, data = df, quiet = T)
+plot(r, print.auc = T, print.thres = T, legacy.axes = T)
+gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+```
+
+# Questions
+
+- Are we including fasting glucose >= 126 in the definition of CFRD for this analysis?
