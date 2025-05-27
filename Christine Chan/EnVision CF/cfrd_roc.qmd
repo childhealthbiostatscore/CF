@@ -64,7 +64,7 @@ summary(t1, pfootnote = T)
 ```{r}
 r <- roc(CFRD ~ mean_sensor, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
-gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
 ## Percent time spent >140 mg/dL 
@@ -72,7 +72,7 @@ gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```{r}
 r <- roc(CFRD ~ percent_time_over_140, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
-gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
 ## Percent time spent >180 mg/dL
@@ -80,7 +80,7 @@ gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```{r}
 r <- roc(CFRD ~ percent_time_over_180, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
-gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
 ## GMI
@@ -88,7 +88,7 @@ gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```{r}
 r <- roc(CFRD ~ gmi, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
-gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
 ## SD
@@ -96,7 +96,7 @@ gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```{r}
 r <- roc(CFRD ~ standard_deviation, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
-gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
 ## CV
@@ -104,7 +104,7 @@ gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```{r}
 r <- roc(CFRD ~ cv, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
-gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
 # Questions
