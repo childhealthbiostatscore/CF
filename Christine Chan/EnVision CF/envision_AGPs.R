@@ -1,7 +1,7 @@
 library(tidyverse)
 library(lubridate)
 library(hms)
-files <- list.files("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF/Data_Raw/FilesReport_CGM_2025-01-30_1306/FilesReport_CGM_2025-01-30_1306/documents", full.names = T)
+files <- list.files("/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF/Data_Raw/FilesReport_CGM_2025-01-30_1306/FilesReport_CGM_2025-01-30_1306/documents", full.names = T)
 lapply(files, function(f) {
   # ID
   id <- basename(f)
@@ -29,7 +29,7 @@ lapply(files, function(f) {
     theme_bw() +
     scale_color_discrete("Date")
   # Save
-  ggsave(paste0("/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF/Reports/AGPs/", id, ".png"),
+  ggsave(paste0("/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF/Reports/AGPs/", id, ".png"),
     plot = p, width = 9, height = 6, units = "in", device = "png"
   )
 })

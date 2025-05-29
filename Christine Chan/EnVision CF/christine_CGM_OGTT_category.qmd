@@ -21,11 +21,11 @@ editor: source
 ```{r setup}
 #| include: false
 library(gtsummary)
-library(dplyr)
+library(tidyverse)
 library(pracma)
 library(ggplot2)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
