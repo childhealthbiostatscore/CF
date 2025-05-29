@@ -34,13 +34,16 @@ library(reporttools)
 library(rpart)
 library(rpart.plot)
 library(rms)
+library(patchwork)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Documents/GitHub",
-  "Linux" = "/home/timvigers/Documents/GitHub"
+  "Darwin" = "/Users/tim/Documents/GitHub",
+  "Windows" = "C:/Users/Tim/Documents/GitHub",
+  "Linux" = "/home/tim/Documents/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -296,6 +299,8 @@ summary(t1c, pfootnote = T, digits = 2)
 #| label: fig-boxplot
 #| fig-cap: Boxplot of OGTT glucose values by diabetes status
 #| warning: false
+# The code below is a total mess because Larry keeps sending requests -
+# clean up later
 plot_df <- df %>%
   pivot_longer(c(`OGTT 0 min`, `OGTT 60 min`, `OGTT 120 min`),
     names_to = "OGTT Timepoint", values_to = "Glucose"
@@ -321,6 +326,150 @@ ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
   box_p,
   device = "png"
 )
+# Dotplot
+dotplot <- ggplot(df, aes(x = Diagnosis, y = `GCT 60 min plasma`)) +
+  geom_point() +
+  theme_bw()
+dotplot
+dotplot +
+  theme(text = element_blank())
+# Additional boxplots/dotplot per Christine and Larry
+plot_df <- df %>%
+  pivot_longer(c(`OGTT 0 min`, `OGTT 60 min`, `OGTT 120 min`, `GCT 60 min plasma`),
+    names_to = "OGTT Timepoint", values_to = "Glucose"
+  ) %>%
+  filter(`OGTT Timepoint` != "OGTT 60 min")
+plot_df$`OGTT Timepoint` <- factor(plot_df$`OGTT Timepoint`,
+  levels = c("OGTT 0 min", "GCT 60 min plasma", "OGTT 120 min")
+)
+box_p <- ggplot(
+  plot_df,
+  aes(x = `OGTT Timepoint`, y = Glucose, fill = `OGTT Timepoint`)
+) +
+  geom_boxplot() +
+  scale_y_continuous(breaks = c(100, 140, 200, 300)) +
+  facet_wrap(~Diabetes) +
+  theme_bw(base_size = 20) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_blank()
+  )
+box_p
+ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
+  box_p,
+  device = "png"
+)
+# GCTpl, RCG, and HbA1c
+plot_df <- df %>%
+  pivot_longer(c(`GCT 60 min plasma`, `GCT 0 min capillary`, HbA1c),
+    names_to = "Measure", values_to = "Value"
+  )
+box_p1 <- ggplot(
+  plot_df[plot_df$Measure == "GCT 60 min plasma", ],
+  aes(x = Diabetes, y = Value, fill = Diabetes)
+) +
+  geom_boxplot() +
+  geom_hline(yintercept = 146.5, linetype = "dashed") +
+  ylim(c(50, 300)) +
+  ylab("mg/dL") +
+  ggtitle("GCTpl") +
+  theme_bw(base_size = 15) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_blank()
+  )
+box_p2 <- ggplot(
+  plot_df[plot_df$Measure == "GCT 0 min capillary", ],
+  aes(x = Diabetes, y = Value, fill = Diabetes)
+) +
+  geom_boxplot() +
+  geom_hline(yintercept = 98.5, linetype = "dashed") +
+  ylim(c(50, 300)) +
+  ggtitle("RCG") +
+  theme_bw(base_size = 15) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+  )
+box_p3 <- ggplot(
+  plot_df[plot_df$Measure == "HbA1c", ],
+  aes(x = Diabetes, y = Value, fill = Diabetes)
+) +
+  geom_boxplot() +
+  geom_hline(yintercept = 5.45, linetype = "dashed") +
+  ylab("%") +
+  ggtitle("HbA1c") +
+  theme_bw(base_size = 15) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+  )
+box_p <- box_p1 + box_p2 + box_p3
+ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot2.png",
+  box_p,
+  device = "png"
+)
+# Dotplot
+plot_df <- df %>%
+  pivot_longer(c(`GCT 60 min plasma`, `GCT 0 min capillary`, HbA1c),
+    names_to = "Measure", values_to = "Value"
+  )
+box_p1 <- ggplot(
+  plot_df[plot_df$Measure == "GCT 60 min plasma", ],
+  aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
+) +
+  geom_jitter() +
+  geom_hline(yintercept = 146.5, linetype = "dashed") +
+  ylim(c(50, 300)) +
+  ylab("mg/dL") +
+  ggtitle("GCTpl") +
+  theme_bw(base_size = 15) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_blank()
+  )
+box_p2 <- ggplot(
+  plot_df[plot_df$Measure == "GCT 0 min capillary", ],
+  aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
+) +
+  geom_jitter() +
+  geom_hline(yintercept = 98.5, linetype = "dashed") +
+  ylim(c(50, 300)) +
+  ggtitle("RCG") +
+  theme_bw(base_size = 15) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+  )
+box_p3 <- ggplot(
+  plot_df[plot_df$Measure == "HbA1c", ],
+  aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
+) +
+  geom_jitter() +
+  geom_hline(yintercept = 5.45, linetype = "dashed") +
+  ylab("%") +
+  ggtitle("HbA1c") +
+  theme_bw(base_size = 15) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+  )
+box_p <- box_p1 + box_p2 + box_p3
+ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/dotplot2.png",
+  box_p,
+  device = "png"
+)
 # OGTT 1 hour and GCT 1 hour regression
 scatter_p <- ggplot(df, aes(x = `GCT 60 min plasma`, y = `OGTT 60 min`)) +
   geom_point() +
@@ -336,6 +485,8 @@ ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/scatterplot.png",
   device = "png"
 )
 ```
+
+
 
 # ROC analyses
 
@@ -754,7 +905,7 @@ f <- lrm(CFRD ~ `GCT 0 min capillary` + HbA1c,
 )
 ddist <- datadist(df)
 options(datadist = "ddist")
-nom <- nomogram(f, fun = plogis, funlabel = "Risk of CFRD",lp = F)
+nom <- nomogram(f, fun = plogis, funlabel = "Risk of CFRD", lp = F)
 plot(nom)
 ```
 
@@ -779,7 +930,7 @@ f <- lrm(CFRD ~ `GCT 0 min capillary` + HbA1c + `GCT 60 min plasma`,
 )
 ddist <- datadist(df)
 options(datadist = "ddist")
-nom <- nomogram(f, fun = plogis, funlabel = "Risk of CFRD",lp = F)
+nom <- nomogram(f, fun = plogis, funlabel = "Risk of CFRD", lp = F)
 plot(nom)
 ```
 
@@ -791,7 +942,7 @@ f <- lrm(CFRD ~ `GCT 0 min capillary` + `GCT 60 min plasma`,
 )
 ddist <- datadist(df)
 options(datadist = "ddist")
-nom <- nomogram(f, fun = plogis, funlabel = "Risk of CFRD",lp = F)
+nom <- nomogram(f, fun = plogis, funlabel = "Risk of CFRD", lp = F)
 plot(nom)
 ```
 
