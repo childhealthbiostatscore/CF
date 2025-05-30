@@ -360,9 +360,13 @@ ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
   box_p,
   device = "png"
 )
-# GCTpl, RCG, and HbA1c
+# GCTpl, RCG, HbA1c, OGTT1hr
 plot_df <- df %>%
-  pivot_longer(c(`GCT 60 min plasma`, `GCT 0 min capillary`, HbA1c),
+  pivot_longer(
+    c(
+      `GCT 60 min plasma`, `GCT 0 min capillary`, HbA1c,
+      `OGTT 60 min`
+    ),
     names_to = "Measure", values_to = "Value"
   )
 box_p1 <- ggplot(
@@ -410,16 +414,27 @@ box_p3 <- ggplot(
     axis.title.x = element_blank(),
     axis.title.y = element_blank()
   )
-box_p <- box_p1 + box_p2 + box_p3
+box_p4 <- ggplot(
+  plot_df[plot_df$Measure == "OGTT 60 min", ],
+  aes(x = Diabetes, y = Value, fill = Diabetes)
+) +
+  geom_boxplot() +
+  geom_hline(yintercept = 228.5, linetype = "dashed") +
+  ylim(c(50, 300)) +
+  ggtitle("OGTT 60 min") +
+  theme_bw(base_size = 15) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+  )
+box_p <- box_p1 + box_p2 + box_p3 + box_p4
 ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot2.png",
   box_p,
   device = "png"
 )
 # Dotplot
-plot_df <- df %>%
-  pivot_longer(c(`GCT 60 min plasma`, `GCT 0 min capillary`, HbA1c),
-    names_to = "Measure", values_to = "Value"
-  )
 box_p1 <- ggplot(
   plot_df[plot_df$Measure == "GCT 60 min plasma", ],
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
@@ -462,10 +477,24 @@ box_p3 <- ggplot(
   theme(
     legend.position = "none",
     axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_blank()
+  )
+box_p4 <- ggplot(
+  plot_df[plot_df$Measure == "OGTT 60 min", ],
+  aes(x = Diabetes, y = Value, fill = Diabetes,colour = Diabetes)
+) +
+  geom_jitter() +
+  geom_hline(yintercept = 228.5, linetype = "dashed") +
+  ylim(c(50, 300)) +
+  ggtitle("OGTT 60 min") +
+  theme_bw(base_size = 15) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
     axis.title.y = element_blank()
   )
-box_p <- box_p1 + box_p2 + box_p3
+box_p <- box_p1 + box_p2 + box_p4+box_p3+plot_layout(ncol = 4)
 ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/dotplot2.png",
   box_p,
   device = "png"
