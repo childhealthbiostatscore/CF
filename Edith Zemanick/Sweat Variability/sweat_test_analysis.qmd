@@ -21,14 +21,17 @@ editor: source
 
 ```{r setup}
 #| include: false
+library(knitr)
 library(Hmisc)
 library(lubridate)
 library(readxl)
 library(tidyverse)
 library(arsenal)
+library(pROC)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Edith Zemanick/Sweat Variability"
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Edith Zemanick/Sweat Variability",
+  "Linux" = "/home/tim/OneDrive/Vigers/CF/Edith Zemanick/Sweat Variability"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -46,8 +49,6 @@ chco <- read.csv("./Data_Cleaned/chco_reidentified.csv",
 chco <- chco %>%
   group_by(PatientID) %>%
   filter(Demographics.Available == "TRUE") %>%
-  # Get only the earliest test
-  slice_min(Age.at.Test.in.Weeks) %>%
   select(
     PatientID, Name, Genotypes1, Genotypes2, Sex, Age.at.Test.in.Years,
     Na, K, Cl, Na_Left, Na_Right, K_Left, K_Right, Cl_Left, Cl_Right
@@ -76,8 +77,6 @@ njh <- full_join(njh, njh_diagnoses)
 njh <- njh %>%
   group_by(Patient.ID) %>%
   filter(Demographics.Available == "TRUE") %>%
-  # Get only the earliest test
-  slice_min(Age.at.test..in.years.) %>%
   select(
     Patient.ID, Patient.Name, Genotype.1, Genotype.2, Sex, Age.at.test..in.years.,
     Sweat.sodium, Sweat.potassium, Sweat.chloride, Sweat.sodium.left.arm,
@@ -120,9 +119,17 @@ df$K <- coalesce(df$K, df$K_mean)
 df <- df %>%
   select(Name, Diagnosis, Genotypes1, Genotypes2, Sex, Age, Na, K, Cl) %>%
   filter(!is.na(Diagnosis))
+# Combine CFTR-related disorder and CRMS
+df$Diagnosis <- factor(df$Diagnosis,
+  levels = c("Cystic Fibrosis", "CFTR-related disorder", "CRMS", "Non-CF"),
+  labels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "CFTR-RD or CRMS", "Non-CF")
+)
+# Calculate Na:Cl ratio
+df$`Na:Cl` <- df$Na / df$Cl
 # Set table options
-mycontrols <-
-  tableby.control(numeric.stats = c("Nmiss", "meansd", "medianq1q3", "range"))
+mycontrols <- tableby.control(
+  numeric.stats = c("N", "Nmiss", "meansd", "medianq1q3", "range")
+)
 # Save this for Angela et al. to check
 write.csv(df,
   file = "./Data_Cleaned/sweat_variability_analysis_dataset.csv",
@@ -149,35 +156,151 @@ write.csv(df,
 # Table 1: Participant Demographics by Diagnosis
 
 ```{r results='asis'}
-summary(tableby(Diagnosis ~ Sex + Age + Na + K + Cl,
+summary(tableby(Diagnosis ~ Sex + Age + Na + Cl + `Na:Cl` + K,
   data = df, control = mycontrols
 ))
 ```
 
 # Boxplots
 
+## Chloride
+
 ```{r}
+#| warning: false
 clp <- ggplot(df, aes(x = Diagnosis, y = Cl)) +
   geom_boxplot() +
   theme_bw()
 clp
+```
+
+## Sodium
+
+```{r}
+#| warning: false
 nap <- ggplot(df, aes(x = Diagnosis, y = Na)) +
   geom_boxplot() +
   theme_bw()
 nap
-ratiop <- ggplot(df, aes(x = Diagnosis, y = Na / Cl)) +
-  geom_boxplot() +
-  theme_bw() +
-  ylab("Sweat sodium to chloride ratio")+
-  xlab("Modulator")
-ratiop
-kp <- ggplot(df, aes(x = Diagnosis, y = K)) +
-  geom_boxplot() +
-  theme_bw()
-kp
 ```
 
-# NACFC 2025
+## Na:Cl
 
 ```{r}
+#| warning: false
+ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_hline(yintercept = 1.25, color = "red") +
+  theme_bw() +
+  ylab("Na:Cl") +
+  xlab("Modulator")
+ratiop
+ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_hline(yintercept = 1.25, color = "red") +
+  ylim(0, 2) +
+  theme_bw() +
+  ylab("Na:Cl") +
+  xlab("Modulator")
+ratiop
 ```
+
+# Histograms and Density Plots
+
+## Chloride
+
+```{r}
+#| warning: false
+ggplot(df, aes(x = Cl, fill = Diagnosis)) +
+  geom_histogram(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
+  geom_histogram(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
+  geom_histogram(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+ggplot(df, aes(x = Cl, fill = Diagnosis)) +
+  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+```
+
+## Sodium
+
+```{r}
+#| warning: false
+ggplot(df, aes(x = Na, fill = Diagnosis)) +
+  geom_histogram(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
+  geom_histogram(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
+  geom_histogram(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+ggplot(df, aes(x = Na, fill = Diagnosis)) +
+  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+```
+
+## Na:Cl
+
+```{r}
+#| warning: false
+ggplot(df, aes(x = `Na:Cl`, fill = Diagnosis)) +
+  geom_histogram(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
+  geom_histogram(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
+  geom_histogram(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+ggplot(df, aes(x = `Na:Cl`, fill = Diagnosis)) +
+  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+ggplot(df, aes(x = `Na:Cl`, fill = Diagnosis)) +
+  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  xlim(0, 2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+```
+
+# Na:Cl ROC Curves
+
+```{r}
+# Fit a multiclass ROC
+mc_roc <- multiclass.roc(df$Diagnosis, df$`Na:Cl`, quiet = T)
+roc_list <- list(
+  "Cystic Fibrosis vs. Non-CF" = mc_roc$rocs[[2]],
+  "CFTR-RD or CRMS vs. Cystic Fibrosis" = mc_roc$rocs[[1]],
+  "CFTR-RD or CRMS vs. Non-CF" = mc_roc$rocs[[3]]
+)
+ggroc(roc_list, legacy.axes = T) +
+  theme_bw() +
+  theme(legend.title = element_blank())
+roc_table <- lapply(roc_list, function(r) {
+  coords(r, "best",
+    best.method = "youden",
+    ret = c(
+      "threshold", "sensitivity", "specificity", "accuracy", "tpr", "fpr",
+      "tnr", "fnr"
+    )
+  )
+})
+roc_table <- do.call(rbind, roc_table)
+kable(roc_table, digits = 3)
+```
+
+- The multiclass AUC for Na:Cl is `r round(as.numeric(auc(mc_roc)),3)`. 
+- The AUC for using Na:Cl to distinguish CF from non-CF was `r round(as.numeric(auc(mc_roc$rocs[[2]])),3)`
+- The best threshold for distinguishing CF from non-CF (based on the Youden index) was `r round(roc_table["Cystic Fibrosis vs. Non-CF","threshold"],3)`, and provided a sensitivity of `r round(roc_table["Cystic Fibrosis vs. Non-CF","sensitivity"],3)` and specificity of `r round(roc_table["Cystic Fibrosis vs. Non-CF","specificity"],3)`
+
+- The AUC for using Na:Cl to distinguish CF from CFTR-RD or CRMS was `r round(as.numeric(auc(mc_roc$rocs[[1]])),3)`
+- The best threshold for distinguishing CF from CFTR-RD or CRMS (based on the Youden index) was `r round(roc_table["CFTR-RD or CRMS vs. Cystic Fibrosis","threshold"],3)`, and provided a sensitivity of `r round(roc_table["CFTR-RD or CRMS vs. Cystic Fibrosis","sensitivity"],3)` and specificity of `r round(roc_table["CFTR-RD or CRMS vs. Cystic Fibrosis","specificity"],3)`
+
+- The AUC for using Na:Cl to distinguish non-CF from CFTR-RD or CRMS was `r round(as.numeric(auc(mc_roc$rocs[[3]])),3)`
+- The best threshold for distinguishing CF from CFTR-RD or CRMS (based on the Youden index) was `r round(roc_table["CFTR-RD or CRMS vs. Non-CF","threshold"],3)`, and provided a sensitivity of `r round(roc_table["CFTR-RD or CRMS vs. Non-CF","sensitivity"],3)` and specificity of `r round(roc_table["CFTR-RD or CRMS vs. Non-CF","specificity"],3)`
