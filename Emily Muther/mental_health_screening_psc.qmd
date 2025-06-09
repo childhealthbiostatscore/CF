@@ -20,14 +20,19 @@ editor: source
 library(tidyverse)
 library(readxl)
 library(arsenal)
+library(lubridate)
+library(lmerTest)
 library(GLMMadaptive)
+library(knitr)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Emily Muther",
-  "Linux" = "/home/timvigers/OneDrive"
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Documents/GitHub",
-  "Linux" = "/home/timvigers/Documents/GitHub"
+  "Darwin" = "/Users/tim/Documents/GitHub",
+  "Windows" = "C:/Users/Tim/Documents/GitHub",
+  "Linux" = "/home/tim/Documents/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -35,7 +40,14 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```{r data cleaning}
 #| message: false
 # Import
-df <- read_excel("./Muther Research Group - General/PSC manuscript 2025/PSC_9-20-19 thru 4-18-25_pulled 4-21-25.xlsx")
+df <- read_excel("./Emily Muther/Muther Research Group - General/PSC manuscript 2025/Data_Raw/PSC_9-20-19 thru 4-18-25_pulled 4-21-25.xlsx")
+df$`Contact Date` <- mdy(df$`Contact Date`)
+# Fill down MRN abd contact date
+df <- df %>%
+  fill(`Pat Mrn Id`, .direction = "down")
+df <- df %>%
+  group_by(`Pat Mrn Id`, `AGE AT CONTACT`) %>%
+  fill(`Contact Date`)
 # Classify insurance per Emily
 df$Insurance <- factor(df$`Payor Name`,
   levels = c(
@@ -54,12 +66,12 @@ df$Insurance <- factor(df$`Payor Name`,
     "Private", "Private", "Private", "Private"
   )
 )
-# Fill down MRN and select columns
+# Convert to wide
 df <- df %>%
-  fill(`Pat Mrn Id`, .direction = "down") %>%
   select(
-    `Pat Mrn Id`, Insurance, `AGE AT CONTACT`, `Internalizing subscale`,
-    `Attention subscale`, `Externalizing subscale`, Score
+    `Pat Mrn Id`, `Contact Date`, `AGE AT CONTACT`, Insurance,
+    `Internalizing subscale`, `Attention subscale`, `Externalizing subscale`,
+    Score
   ) %>%
   distinct() %>%
   pivot_wider(names_from = Insurance, values_from = Insurance) %>%
@@ -68,6 +80,36 @@ df$Insurance <- factor(df$Insurance,
   levels = c("", "Private", "Public", "Public_Private"),
   labels = c("None", "Private", "Public", "Both")
 )
+# Add data from Elin
+demo <- read_excel("./Emily Muther/Muther Research Group - General/PSC manuscript 2025/Data_Raw/PSC Data 2025 05 21.xlsx", sheet = "Demographics")
+demo$`Pat Mrn Id` <- as.character(demo$`Pat Mrn Id`)
+demo$Genotype <- rowSums(demo[, c("Mutation 1", "Mutation 2")] == "F508del")
+demo$Genotype <- factor(demo$Genotype,
+  levels = c(2, 1, 0),
+  labels = c("F508del homozygous", "F508del heterozygous", "Other/Other")
+)
+demo$Sex <- factor(demo$Sex, levels = c("M", "F"), labels = c("Male", "Female"))
+races <- c(
+  "Asian", "Black/African-American", "White", "Native American/Alaska Native",
+  "Middle Eastern/Arabic", "Race Unknown"
+)
+demo$Race <- apply(demo %>% select(Asian:`Race Unknown`), 1, function(r) {
+  w <- which(r == T)
+  if (length(w) > 1 | w == 6) {
+    "Unknown/More than one"
+  } else {
+    races[w]
+  }
+})
+demo$Race <- factor(demo$Race)
+demo$`Hispanic or Latino` <-
+  factor(demo$`Hispanic or Latino`, levels = c(F, T), labels = c("No", "Yes"))
+visits <- read_excel("./Emily Muther/Muther Research Group - General/PSC manuscript 2025/Data_Raw/PSC Data 2025 05 21.xlsx", sheet = "Visits")
+visits$`Pat Mrn Id` <- as.character(visits$`Pat Mrn Id`)
+visits <- visits %>% select(-`FEV1 raw value`)
+# Combine levels of family income
+df <- left_join(df, demo, by = join_by(`Pat Mrn Id`))
+df <- left_join(df, visits, by = join_by(`Pat Mrn Id`, `Contact Date`))
 # Convert to numeric
 df$`AGE AT CONTACT` <- as.numeric(df$`AGE AT CONTACT`)
 df$`Internalizing subscale` <- as.numeric(df$`Internalizing subscale`)
@@ -79,35 +121,63 @@ df$`Age Group` <- cut(df$`AGE AT CONTACT`,
   breaks = c(-Inf, 6, 10, Inf),
   labels = c("Age < 6", "Age >= 6 and < 10", "Age >= 10"), right = F
 )
-# Make variables for 0 scores on each scale
-df$`Internalizing subscale symptoms` <- factor(df$`Internalizing subscale` == 0,
+# Make variables for 0 scores and elevated scores on each scale
+df$`Internalizing subscale elevated` <- factor(df$`Internalizing subscale` >= 5,
+  levels = c(F, T), labels = c("Not elevated", "Elevated")
+)
+df$`Internalizing subscale symptoms` <- factor(df$`Internalizing subscale` > 0,
   levels = c(F, T),
   labels = c(
     "No internalizing symptoms (score = 0)",
     "Any internalizing symptoms (score > 0)"
   )
 )
-df$`Attention subscale symptoms` <- factor(df$`Attention subscale` == 0,
+df$`Attention subscale elevated` <- factor(df$`Attention subscale` >= 7,
+  levels = c(F, T), labels = c("Not elevated", "Elevated")
+)
+df$`Attention subscale symptoms` <- factor(df$`Attention subscale` > 0,
   levels = c(F, T),
   labels = c(
     "No attention symptoms (score = 0)",
     "Any attention symptoms (score > 0)"
   )
 )
-df$`Externalizing subscale symptoms` <- factor(df$`Externalizing subscale`==0,
+df$`Externalizing subscale elevated` <- factor(df$`Internalizing subscale` >= 7,
+  levels = c(F, T), labels = c("Not elevated", "Elevated")
+)
+df$`Externalizing subscale symptoms` <- factor(df$`Externalizing subscale` > 0,
   levels = c(F, T),
   labels = c(
     "No externalizing symptoms (score = 0)",
     "Any externalizing symptoms (score > 0)"
   )
 )
-df$`Any symptoms` <- factor(df$Score == 0,
+df$`Score elevated` <- factor(
+  df$Score >= 15 |
+    df$`Internalizing subscale` >= 5 |
+    df$`Attention subscale` >= 7 |
+    df$`Internalizing subscale` >= 7,
+  levels = c(F, T), labels = c("Not elevated", "Elevated")
+)
+df$`Any symptoms` <- factor(df$Score > 0,
   levels = c(F, T),
   labels = c(
     "No symptoms (total score = 0)",
     "Any symptoms (total score > 0)"
   )
 )
+# Determine if they were ever elevated on each subscale
+df <- df %>%
+  group_by(`Pat Mrn Id`) %>%
+  mutate(
+    `Internalizing subscale ever elevated` =
+      any(`Internalizing subscale elevated` == "Elevated"),
+    `Attention subscale ever elevated` =
+      any(`Attention subscale elevated` == "Elevated"),
+    `Externalizing subscale ever elevated` =
+      any(`Externalizing subscale elevated` == "Elevated"),
+    `Score ever elevated` = any(`Score elevated` == "Elevated"),
+  )
 # Set table options
 mycontrols <-
   tableby.control(
@@ -115,10 +185,13 @@ mycontrols <-
     cat.stats = c("N", "Nmiss", "countpct")
   )
 # Basic formula
-f <- ~ Insurance + `Internalizing subscale` + `Internalizing subscale symptoms` +
-  `Attention subscale` + `Attention subscale symptoms` +
-  `Externalizing subscale` + `Externalizing subscale symptoms` +
-  Score + `Any symptoms`
+f <- ~ Genotype + Race + `Hispanic or Latino` + Insurance +
+  `Annual Family Income` + BMI + `FEV1 % predicted` + Alyftrek + Kalydeco +
+  Orkambi + Symdeko + Trikafta +
+  `Internalizing subscale` + `Internalizing subscale elevated` + `Internalizing subscale symptoms` +
+  `Attention subscale` + `Attention subscale elevated` + `Attention subscale symptoms` +
+  `Externalizing subscale` + `Externalizing subscale elevated` + `Externalizing subscale symptoms` +
+  Score + `Score elevated` + `Any symptoms`
 ```
 
 # Score summary at first visit
@@ -133,69 +206,56 @@ t1 <- tableby(update(f, `Age Group` ~ .), data = first_visit)
 summary(t1, pfootnote = T)
 ```
 
-## By insurance type
+# Plots of participants who were ever elevated
 
-```{r results='asis'}
-first_visit <- df %>%
-  group_by(`Pat Mrn Id`) %>%
-  slice_min(`AGE AT CONTACT`)
-t1 <- tableby(update(f, Insurance ~ .), data = first_visit)
-summary(t1, pfootnote = T)
-```
-
-# Figures
-
-## Histograms
+## Internalizing subscale
 
 ```{r}
-hist(df$`Internalizing subscale`)
-hist(df$`Attention subscale`)
-hist(df$`Externalizing subscale`)
-hist(df$Score)
+ggplot(
+  subset(df, `Internalizing subscale ever elevated` == T),
+  aes(x = `AGE AT CONTACT`, y = `Internalizing subscale`)
+) +
+  geom_hline(yintercept = 5, color = "red") +
+  geom_point() +
+  geom_line(aes(group = `Pat Mrn Id`)) +
+  theme_bw()
 ```
 
-## Scores by age
+## Attention subscale
 
 ```{r}
-#| warning: false
-ggplot(df, aes(x = `AGE AT CONTACT`, y = `Internalizing subscale`)) +
+ggplot(
+  subset(df, `Attention subscale ever elevated` == T),
+  aes(x = `AGE AT CONTACT`, y = `Attention subscale`)
+) +
+  geom_hline(yintercept = 7, color = "red") +
   geom_point() +
-  geom_line(aes(group = `Pat Mrn Id`))
-
-ggplot(df, aes(x = `AGE AT CONTACT`, y = `Attention subscale`)) +
-  geom_point() +
-  geom_line(aes(group = `Pat Mrn Id`))
-
-ggplot(df, aes(x = `AGE AT CONTACT`, y = `Externalizing subscale`)) +
-  geom_point() +
-  geom_line(aes(group = `Pat Mrn Id`))
-
-ggplot(df, aes(x = `AGE AT CONTACT`, y = Score)) +
-  geom_point() +
-  geom_line(aes(group = `Pat Mrn Id`))
+  geom_line(aes(group = `Pat Mrn Id`)) +
+  theme_bw()
 ```
 
-# Mixed models
+## Externalizing subscale
+
+```{r}
+ggplot(
+  subset(df, `Externalizing subscale ever elevated` == T),
+  aes(x = `AGE AT CONTACT`, y = `Externalizing subscale`)
+) +
+  geom_hline(yintercept = 7, color = "red") +
+  geom_point() +
+  geom_line(aes(group = `Pat Mrn Id`)) +
+  theme_bw()
+```
 
 ## Total score
 
 ```{r}
-# First determine whether we need Poisson or negative binomial
-pm1 <- mixed_model(Score ~ `AGE AT CONTACT`,
-  random = ~ 1 | `Pat Mrn Id`, data = df,
-  family = zi.poisson(), zi_fixed = ~`AGE AT CONTACT`
-)
-nbm1 <- mixed_model(Score ~ `AGE AT CONTACT`,
-  random = ~ 1 | `Pat Mrn Id`, data = df,
-  family = zi.negative.binomial(), zi_fixed = ~`AGE AT CONTACT`
-)
-# anova(pm1, nbm1, test = FALSE) - NB better by AIC and BIC
-summary(nbm1)
+ggplot(
+  subset(df, `Score ever elevated` == T),
+  aes(x = `AGE AT CONTACT`, y = Score)
+) +
+  geom_hline(yintercept = 15, color = "red") +
+  geom_point() +
+  geom_line(aes(group = `Pat Mrn Id`)) +
+  theme_bw()
 ```
-
-
-
-# Questions for Emily
-
-- If payor is blank, does that indicate no insurance? Or is it missing?
-- Should we ask Elin for gender and lung function data? Not sure how much work that would be for her.
