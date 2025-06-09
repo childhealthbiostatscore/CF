@@ -371,8 +371,14 @@ final_df$Diagnosis[final_df$Glucose_0 >= 126 | final_df$Glucose_120 >= 200] <-
 final_df$Diagnosis <- factor(final_df$Diagnosis,
   levels = c("NGT", "IFG", "INDET", "IGT", "CFRD")
 )
+# Dysglycemia variable
+final_df$Dysglycemia <- factor(final_df$Diagnosis,
+  levels = c("NGT", "IFG", "INDET", "IGT", "CFRD"),
+  labels = c("NGT", "AGT", "AGT", "AGT", "CFRD")
+)
 # Create CFRD+ vs. CFRD- variable
 final_df$CFRD <- factor(final_df$Diagnosis,
+  levels = c("NGT", "IFG", "INDET", "IGT", "CFRD"),
   labels = c("CFRD-", "CFRD-", "CFRD-", "CFRD-", "CFRD+")
 )
 # iAUCs
@@ -540,3 +546,4 @@ write.csv(final_df,
   file = "./Christine Chan/EnVision CF/Data_Clean/envision_analysis_dataset.csv",
   row.names = F, na = ""
 )
+save(final_df, file = "./Christine Chan/EnVision CF/Data_Clean/envision_analysis_dataset.RData")
