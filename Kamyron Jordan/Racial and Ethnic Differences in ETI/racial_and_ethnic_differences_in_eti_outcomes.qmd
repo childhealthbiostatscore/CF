@@ -42,7 +42,7 @@ encounter$age_group <- relevel(encounter$age_group, ref = "[18,30)")
 # Data cleaning
 
 ```{r flowchart}
-ggflowchart(flow_chart)
+ggflowchart(flow_chart,text_size = 3,y_nudge = 0.4,x_nudge = 0.45)
 ```
 
 # Table 1

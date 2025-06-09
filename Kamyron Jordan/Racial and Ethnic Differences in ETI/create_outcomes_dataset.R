@@ -206,43 +206,67 @@ n_people_6 <- length(unique(encounter$eDWID))
 t1_participant <- t1_participant %>% filter(!eDWID %in% no_post)
 # Flowchart
 # Make labels
-tots1 <- paste0(n_people_1, " People\n", n_enc_1, " Encounters")
+tots1 <- paste0(
+  format(n_people_1, big.mark = ","), " People\n",
+  format(n_enc_1, big.mark = ","), " Encounters"
+)
 no_date <- paste0(
-  "No ETI Date:\n", n_people_no_eti_date, " People\n",
-  length(no_eti_date), " Encounters"
+  "No ETI Date:\n", format(n_people_no_eti_date, big.mark = ","), " People\n",
+  format(length(no_eti_date), big.mark = ","), " Encounters"
 )
-tots2 <- paste0(n_people_2, " People\n", n_enc_2, " Encounters")
+tots2 <- paste0(
+  format(n_people_2, big.mark = ","), " People\n",
+  format(n_enc_2, , big.mark = ","), " Encounters"
+)
 hosps <- paste0(
-  "Care Episodes:\n", n_people_hosp, " People\n",
-  length(hosp), " Encounters"
+  "Care Episodes:\n", format(n_people_hosp, big.mark = ","), " People\n",
+  format(length(hosp), big.mark = ","), " Encounters"
 )
-tots3 <- paste0(n_people_3, " People\n", n_enc_3, " Encounters")
+tots3 <- paste0(
+  format(n_people_3, big.mark = ","), " People\n",
+  format(n_enc_3, big.mark = ","), " Encounters"
+)
 pregs <- paste0(
-  "Pregnancies:\n", n_people_preg, " People\n",
-  length(preg), " Encounters"
+  "Pregnancies:\n", format(n_people_preg, big.mark = ","), " People\n",
+  format(length(preg), big.mark = ","), " Encounters"
 )
-tots4 <- paste0(n_people_4, " People\n", n_enc_4, " Encounters")
+tots4 <- paste0(
+  format(n_people_4, big.mark = ","), " People\n",
+  format(n_enc_4, big.mark = ","), " Encounters"
+)
 earlies <- paste0(
-  "Visits > ", 365.25 * 3, " Days BEFORE ETI:\n", n_people_early, " People\n",
-  length(early), " Encounters"
+  "Visits > ", format(365.25 * 3, big.mark = ","), " Days BEFORE ETI:\n",
+  format(n_people_early, big.mark = ","), " People\n",
+  format(length(early), big.mark = ","), " Encounters"
 )
 lates <- paste0(
-  "Visits > ", 365.25 * 2, " Days AFTER ETI:\n", n_people_late, " People\n",
-  length(late), " Encounters"
+  "Visits > ", format(365.25 * 2, big.mark = ","), " Days AFTER ETI:\n",
+  format(n_people_late, big.mark = ","), " People\n",
+  format(length(late), big.mark = ","), " Encounters"
 )
-tots5 <- paste0(n_people_5, " People\n", n_enc_5, " Encounters")
+tots5 <- paste0(
+  format(n_people_5, big.mark = ","), " People\n",
+  format(n_enc_5, big.mark = ","), " Encounters"
+)
 no_posts <- paste0(
-  "No Post-ETI Visits:\n", length(no_post), " People\n",
-  length(no_post_visits), " Encounters (Pre-ETI)"
+  "No Post-ETI Visits:\n", format(length(no_post), big.mark = ","), " People\n",
+  format(length(no_post_visits), big.mark = ","), " Encounters (Pre-ETI)"
 )
-tots6 <- paste0(n_people_6, " People\n", n_enc_6, " Encounters")
+tots6 <- paste0(
+  format(n_people_6, big.mark = ","), " People\n",
+  format(n_enc_6, big.mark = ","), " Encounters"
+)
 fev1s <- paste0(
-  length(low_fev1), " FEV1 < ", lower, "\n",
-  length(high_fev1), " FEV1 > ", upper
+  format(length(low_fev1), big.mark = ","), " FEV1 < ",
+  format(lower, big.mark = ","), "\n",
+  format(length(high_fev1), big.mark = ","), " FEV1 > ",
+  format(upper, big.mark = ",")
 )
 fvcs <- paste0(
-  length(low_fvc), " FVC < ", lower, "\n",
-  length(high_fvc), " FVC > ", upper
+  format(length(low_fvc), big.mark = ","), " FVC < ",
+  format(lower, big.mark = ","), "\n",
+  format(length(high_fvc), big.mark = ","), " FVC > ",
+  format(upper, big.mark = ",")
 )
 # Assemble the chart!
 flow_chart <- tibble(
