@@ -12,16 +12,11 @@ format:
     self-contained: true
     fig-cap-location: top
     page-layout: full
-    theme:
-      light: flatly
-      dark: darkly
-bibliography: /Users/timvigers/Dropbox/Miscellaneous/zotero.bib
-csl: /Users/timvigers/Dropbox/Miscellaneous/american-medical-association.csl
 editor: source
 ---
 
-```{r data cleaning}
-#| message: false
+```{r}
+#| include: false
 library(tidyverse)
 library(redcapAPI)
 library(Hmisc)
@@ -29,12 +24,30 @@ library(knitr)
 library(fastDummies)
 library(lmerTest)
 library(performance)
-# Import data
-api <- read.table("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt", header = F)
-rcon <- redcapConnection(
-  url = "https://redcap.ucdenver.edu/api/",
-  token = api[1, 1]
+# REDCap
+unlockREDCap(c(rcon = "NTM CT Scoring"),
+  keyring = "API_KEYs",
+  envir = globalenv(),
+  url = "https://redcap.ucdenver.edu/api/"
 )
+# Home directory
+home_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/tim/OneDrive/Vigers/CF"
+)
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/tim/Documents/GitHub",
+  "Windows" = "C:/Users/Tim/Documents/GitHub",
+  "Linux" = "/home/tim/Documents/GitHub"
+)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r data cleaning}
+#| message: false
+#| warning: false
+# Import data from REDCap
 data <- exportRecordsTyped(rcon, labels = F)
 data <- data.frame(lapply(data, as.character))
 data$scan_id <- as.numeric(data$scan_id)
@@ -49,8 +62,8 @@ old <- c("AF", "DL", "JW")
 new <- c("A", "B", "C")
 data$scorer[data$scorer %in% old] <- new[match(data$scorer, old, nomatch = 0)]
 # Revert duplicate IDs back to original to match with gold standard
-training <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
-dups <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
+training <- read.csv("./Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
+dups <- read.csv("./Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
 training$Training_id <- as.numeric(sub("T00", "", training$Training_id))
 # Change duplicates to OG IDs
 old <- dups$duplicated_ssid..dates.shifted..17.days.
@@ -122,6 +135,7 @@ data_gs <- data_gs %>%
 ## Singletons
 
 ```{r}
+#| message: false
 # Find scans with disagreement on certain features, so Stacey can discuss them with radiologists
 t <- data %>%
   group_by(scan_id, Feature, scorer) %>%
@@ -300,15 +314,39 @@ data_gs %>%
   kable()
 ```
 
+# Comparison of scores between groups
+
+```{r}
+# Import disease state
+outcomes <- read.csv("./Stacey Martiniano/NTM CT Scoring/Data_Clean/disease.key.csv", na.strings = "")
+outcomes$NTM.PD..Y.N. <- factor(outcomes$NTM.PD..Y.N.,
+  levels = c("No", "Yes"), ordered = T
+)
+# For the duplicated scans, just use the first reading and combine with the
+# singletons
+scores <- rbind(data, data_dups[data_dups$scorer_repeat == 1, ])
+# Add gold standards
+scores <- rbind(scores, data_gs[data_gs$scorer == "GS", ])
+# Add outcome info
+scores <- left_join(scores,
+  outcomes %>% select(cff_registry_id, NTM.PD..Y.N.),
+  by = join_by(scan_id == cff_registry_id)
+) %>%
+  rename(`NTM-PD` = NTM.PD..Y.N.)
+# Calculate the scores for each feature.
+# When calculating the scores, take the majority vote by scan, feature, and
+# location, since that's how they scored it.
+# For example: If one scorer detected atelectasis in the RUL, one in the RML,
+# and one in the RLL, but the majority at each location was "absent," then that
+# scan would have a 0 for atelectasis. In other words, score the locations by
+# majority first, then add the locations together for the feature score.
+feature_scores <- scores %>% group_by(scan_id, Feature, `NTM-PD`)
+```
+
 # Mixed Model Approach
 
 ```{r data cleaning 2}
 # Import data
-api <- read.table("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/api.txt", header = F)
-rcon <- redcapConnection(
-  url = "https://redcap.ucdenver.edu/api/",
-  token = api[1, 1]
-)
 data <- exportRecordsTyped(rcon, labels = F)
 data <- data.frame(lapply(data, as.character))
 data$scan_id <- as.numeric(data$scan_id)
@@ -323,8 +361,8 @@ old <- c("AF", "DL", "JW")
 new <- c("A", "B", "C")
 data$scorer[data$scorer %in% old] <- new[match(data$scorer, old, nomatch = 0)]
 # Revert duplicate IDs back to original to match with gold standard
-training <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
-dups <- read.csv("/Volumes/PEDS/RI Biostatistics Core/Shared/Shared Projects/Vigers/CF/Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
+training <- read.csv("./Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
+dups <- read.csv("./Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
 training$Training_id <- as.numeric(sub("T00", "", training$Training_id))
 # Change duplicates to OG IDs
 old <- dups$duplicated_ssid..dates.shifted..17.days.
