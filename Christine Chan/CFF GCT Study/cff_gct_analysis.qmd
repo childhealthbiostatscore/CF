@@ -306,14 +306,17 @@ plot_df <- df %>%
     names_to = "OGTT Timepoint", values_to = "Glucose"
   )
 plot_df$`OGTT Timepoint` <- factor(plot_df$`OGTT Timepoint`,
-  levels = c("OGTT 0 min", "OGTT 60 min", "OGTT 120 min")
+  levels = c("OGTT 0 min", "OGTT 60 min", "OGTT 120 min"),
+  labels = c("Fasting", "OGTT-1hG", "OGTT-2hG")
 )
 box_p <- ggplot(
   plot_df,
   aes(x = `OGTT Timepoint`, y = Glucose, fill = `OGTT Timepoint`)
 ) +
   geom_boxplot() +
+  ylab("Glucose (mg/dL)") +
   scale_y_continuous(breaks = c(100, 140, 200, 300)) +
+  scale_fill_manual(values = RColorBrewer::brewer.pal(3, "Paired")) +
   facet_wrap(~Diabetes) +
   theme_bw(base_size = 20) +
   theme(
@@ -329,6 +332,7 @@ ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
 # Dotplot
 dotplot <- ggplot(df, aes(x = Diagnosis, y = `GCT 60 min plasma`)) +
   geom_point() +
+  ylab("GCTpl (mg/dL)") +
   theme_bw()
 dotplot
 dotplot +
@@ -440,13 +444,14 @@ box_p1 <- ggplot(
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
   geom_jitter() +
-  geom_hline(yintercept = 146.5, linetype = "dashed") +
+  geom_hline(yintercept = 146.5, linetype = "dashed", size = 1) +
   ylim(c(50, 300)) +
-  ylab("mg/dL") +
+  ylab("Glucose (mg/dL)") +
   ggtitle("GCTpl") +
   theme_bw(base_size = 15) +
+  scale_colour_manual(values = RColorBrewer::brewer.pal(3, "Set2")) +
   theme(
-    legend.position = "none",
+    legend.position = "none", plot.title = element_text(hjust = 0.5),
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank()
   )
@@ -455,12 +460,13 @@ box_p2 <- ggplot(
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
   geom_jitter() +
-  geom_hline(yintercept = 98.5, linetype = "dashed") +
+  geom_hline(yintercept = 98.5, linetype = "dashed", size = 1) +
   ylim(c(50, 300)) +
   ggtitle("RCG") +
   theme_bw(base_size = 15) +
+  scale_colour_manual(values = RColorBrewer::brewer.pal(3, "Set2")) +
   theme(
-    legend.position = "none",
+    legend.position = "none", plot.title = element_text(hjust = 0.5),
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
     axis.title.y = element_blank()
@@ -469,32 +475,35 @@ box_p3 <- ggplot(
   plot_df[plot_df$Measure == "HbA1c", ],
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
-  geom_jitter() +
-  geom_hline(yintercept = 5.45, linetype = "dashed") +
+  geom_jitter(show.legend = F) +
+  geom_hline(aes(yintercept = 5.45, linetype = "Youden Index"), size = 1) +
   ylab("%") +
   ggtitle("HbA1c") +
   theme_bw(base_size = 15) +
+  scale_colour_manual(values = RColorBrewer::brewer.pal(3, "Set2")) +
+  scale_linetype_manual(values = c("Youden Index" = "dashed")) +
   theme(
-    legend.position = "none",
+    legend.title = element_blank(), plot.title = element_text(hjust = 0.5),
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank()
   )
 box_p4 <- ggplot(
   plot_df[plot_df$Measure == "OGTT 60 min", ],
-  aes(x = Diabetes, y = Value, fill = Diabetes,colour = Diabetes)
+  aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
   geom_jitter() +
-  geom_hline(yintercept = 228.5, linetype = "dashed") +
+  geom_hline(yintercept = 228.5, linetype = "dashed", size = 1) +
   ylim(c(50, 300)) +
-  ggtitle("OGTT 60 min") +
+  ggtitle("OGTT 1hPG") +
   theme_bw(base_size = 15) +
+  scale_colour_manual(values = RColorBrewer::brewer.pal(3, "Set2")) +
   theme(
-    legend.position = "none",
+    legend.position = "none", plot.title = element_text(hjust = 0.5),
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
     axis.title.y = element_blank()
   )
-box_p <- box_p1 + box_p2 + box_p4+box_p3+plot_layout(ncol = 4)
+box_p <- box_p1 + box_p2 + box_p4 + box_p3 + plot_layout(ncol = 4)
 ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/dotplot2.png",
   box_p,
   device = "png"
@@ -507,6 +516,8 @@ scatter_p <- ggplot(df, aes(x = `GCT 60 min plasma`, y = `OGTT 60 min`)) +
     size = 5,
     label.y = "bottom", label.x = "right"
   ) +
+  ylab("OGTT-1hG ") +
+  xlab("GCTpl") +
   theme_bw(base_size = 20)
 scatter_p
 ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/scatterplot.png",
