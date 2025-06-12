@@ -64,6 +64,8 @@ chco$PatientID <- NULL
 chco$Na_Right[791] <- 61.3
 chco$Na_Right[826] <- 72.4
 chco$Na_Left[826] <- 72.4
+chco$Na_Right[790] <- 21.1
+chco$Na_Left[790] <- 24.1
 # For "LESS THAN 10", replace with half the limit of detection
 chco[chco == "LESS THAN 10"] <- "9"
 chco[, c("Cl", "Cl_Left", "Cl_Right")] <-
@@ -113,6 +115,9 @@ df$Cl_mean <- rowMeans(df[, c("Cl_Left", "Cl_Right")], na.rm = T)
 df$Cl <- coalesce(df$Cl, df$Cl_mean)
 df$K_mean <- rowMeans(df[, c("K_Left", "K_Right")], na.rm = T)
 df$K <- coalesce(df$K, df$K_mean)
+# Change Cl under 10 to 9 per CHEC
+df$Cl[df$Cl < 10] <- 9
+df$Na[df$Na < 10] <- 9
 # Calculate Na:Cl ratio
 df$`Na:Cl` <- df$Na / df$Cl
 # Use each person's first sweat test with both sodium and chloride
@@ -139,6 +144,25 @@ mycontrols <- tableby.control(
 # Save this for Angela et al. to check
 write.csv(df,
   file = "./Data_Cleaned/sweat_variability_analysis_dataset.csv",
+  row.names = F, na = ""
+)
+# Additional lists for Angela
+write.csv(
+  df %>%
+    filter(Diagnosis == "Non-CF" & Cl >= 60),
+  file = "./Data_Cleaned/sweat_variability_non_cf_cl_60.csv",
+  row.names = F, na = ""
+)
+write.csv(
+  df %>%
+    filter(Diagnosis == "Cystic Fibrosis" & `Na:Cl` >= 1.2),
+  file = "./Data_Cleaned/sweat_variability_cf_nacl_1_2.csv",
+  row.names = F, na = ""
+)
+write.csv(
+  df %>%
+    filter(Diagnosis == "Non-CF" & `Na:Cl` < 1.2),
+  file = "./Data_Cleaned/sweat_variability_non_cf_nacl_1_2.csv",
   row.names = F, na = ""
 )
 ```
@@ -302,11 +326,3 @@ kable(roc_table, digits = 3)
 ```
 
 - The multiclass AUC for Na:Cl is `r round(as.numeric(auc(mc_roc)),3)`. 
-- The AUC for using Na:Cl to distinguish CF from non-CF was `r round(as.numeric(auc(mc_roc$rocs[[2]])),3)`
-- The best threshold for distinguishing CF from non-CF (based on the Youden index) was `r round(roc_table["Cystic Fibrosis vs. Non-CF","threshold"],3)`, and provided a sensitivity of `r round(roc_table["Cystic Fibrosis vs. Non-CF","sensitivity"],3)` and specificity of `r round(roc_table["Cystic Fibrosis vs. Non-CF","specificity"],3)`
-
-- The AUC for using Na:Cl to distinguish CF from CFTR-RD or CRMS was `r round(as.numeric(auc(mc_roc$rocs[[1]])),3)`
-- The best threshold for distinguishing CF from CFTR-RD or CRMS (based on the Youden index) was `r round(roc_table["CFTR-RD or CRMS vs. Cystic Fibrosis","threshold"],3)`, and provided a sensitivity of `r round(roc_table["CFTR-RD or CRMS vs. Cystic Fibrosis","sensitivity"],3)` and specificity of `r round(roc_table["CFTR-RD or CRMS vs. Cystic Fibrosis","specificity"],3)`
-
-- The AUC for using Na:Cl to distinguish non-CF from CFTR-RD or CRMS was `r round(as.numeric(auc(mc_roc$rocs[[3]])),3)`
-- The best threshold for distinguishing CF from CFTR-RD or CRMS (based on the Youden index) was `r round(roc_table["CFTR-RD or CRMS vs. Non-CF","threshold"],3)`, and provided a sensitivity of `r round(roc_table["CFTR-RD or CRMS vs. Non-CF","sensitivity"],3)` and specificity of `r round(roc_table["CFTR-RD or CRMS vs. Non-CF","specificity"],3)`
