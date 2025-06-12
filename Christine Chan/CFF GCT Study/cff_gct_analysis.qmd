@@ -35,6 +35,7 @@ library(rpart)
 library(rpart.plot)
 library(rms)
 library(patchwork)
+library(ggflowchart)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
@@ -341,17 +342,19 @@ dotplot +
 plot_df <- df %>%
   pivot_longer(c(`OGTT 0 min`, `OGTT 60 min`, `OGTT 120 min`, `GCT 60 min plasma`),
     names_to = "OGTT Timepoint", values_to = "Glucose"
-  ) %>%
-  filter(`OGTT Timepoint` != "OGTT 60 min")
+  )
 plot_df$`OGTT Timepoint` <- factor(plot_df$`OGTT Timepoint`,
-  levels = c("OGTT 0 min", "GCT 60 min plasma", "OGTT 120 min")
+  levels = c("OGTT 0 min", "OGTT 60 min", "OGTT 120 min", "GCT 60 min plasma"),
+  labels = c("Fasting", "OGTT-1hG", "OGTT-2hG", "GCTpl")
 )
 box_p <- ggplot(
   plot_df,
   aes(x = `OGTT Timepoint`, y = Glucose, fill = `OGTT Timepoint`)
 ) +
   geom_boxplot() +
+  ylab("Glucose (mg/dL)") +
   scale_y_continuous(breaks = c(100, 140, 200, 300)) +
+  scale_fill_manual(values = RColorBrewer::brewer.pal(4, "Set2")) +
   facet_wrap(~Diabetes) +
   theme_bw(base_size = 20) +
   theme(
@@ -526,7 +529,26 @@ ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/scatterplot.png",
 )
 ```
 
+# Flowchart
 
+```{r}
+flow_df <- tibble(
+  from = c(
+    "Initial Screen with GCT",
+    "Initial Screen with GCT", 
+    "GCTpl >= 147",
+    "GCTpl < 147"
+  ),
+  to = c(
+    "GCTpl >= 147", 
+    "GCTpl < 147", 
+    "Oral Glucose Tolerance Test", 
+    "Repeat Screen in 1 Year"
+  )
+)
+
+ggflowchart(flow_df)
+```
 
 # ROC analyses
 
