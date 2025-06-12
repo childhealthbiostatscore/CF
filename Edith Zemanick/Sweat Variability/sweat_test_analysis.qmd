@@ -59,6 +59,11 @@ chco <- chco %>%
 chco_diagnoses <- read.csv("./Data_Cleaned/chco_diagnoses.csv")
 chco <- full_join(chco, chco_diagnoses, by = join_by(PatientID))
 chco$PatientID <- NULL
+# Manually add some Na and Cl values that Angela was able to find (using
+# numbers so that no PHI is on GitHub)
+chco$Na_Right[791] <- 61.3
+chco$Na_Right[826] <- 72.4
+chco$Na_Left[826] <- 72.4
 # For "LESS THAN 10", replace with half the limit of detection
 chco[chco == "LESS THAN 10"] <- "9"
 chco[, c("Cl", "Cl_Left", "Cl_Right")] <-
@@ -101,31 +106,32 @@ df <- df %>%
   distinct() %>%
   select(Name, Diagnosis, everything()) %>%
   arrange(Name, Age)
-# Use each person's first sweat test
+# For those with left and right, average them
+df$Na_mean <- rowMeans(df[, c("Na_Left", "Na_Right")], na.rm = T)
+df$Na <- coalesce(df$Na, df$Na_mean)
+df$Cl_mean <- rowMeans(df[, c("Cl_Left", "Cl_Right")], na.rm = T)
+df$Cl <- coalesce(df$Cl, df$Cl_mean)
+df$K_mean <- rowMeans(df[, c("K_Left", "K_Right")], na.rm = T)
+df$K <- coalesce(df$K, df$K_mean)
+# Calculate Na:Cl ratio
+df$`Na:Cl` <- df$Na / df$Cl
+# Use each person's first sweat test with both sodium and chloride
 df <- df %>%
+  filter(!is.na(`Na:Cl`)) %>%
   group_by(Name) %>%
   slice_min(Age)
 # If there are still duplicates, exclude them
 dups <- df$Name[duplicated(df$Name)]
 df <- df[!df$Name %in% dups, ]
-# For those with left and right, average them
-df$Na_mean <- rowMeans(df[, c("Na_Left", "Na_Right")])
-df$Na <- coalesce(df$Na, df$Na_mean)
-df$Cl_mean <- rowMeans(df[, c("Cl_Left", "Cl_Right")])
-df$Cl <- coalesce(df$Cl, df$Cl_mean)
-df$K_mean <- rowMeans(df[, c("K_Left", "K_Right")])
-df$K <- coalesce(df$K, df$K_mean)
 # Get rid of unnecessary columns, remove those with no diagnosis
 df <- df %>%
-  select(Name, Diagnosis, Genotypes1, Genotypes2, Sex, Age, Na, K, Cl) %>%
+  select(Name, Diagnosis, Genotypes1, Genotypes2, Sex, Age, Na, K, Cl, `Na:Cl`) %>%
   filter(!is.na(Diagnosis))
 # Combine CFTR-related disorder and CRMS
 df$Diagnosis <- factor(df$Diagnosis,
   levels = c("Cystic Fibrosis", "CFTR-related disorder", "CRMS", "Non-CF"),
   labels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "CFTR-RD or CRMS", "Non-CF")
 )
-# Calculate Na:Cl ratio
-df$`Na:Cl` <- df$Na / df$Cl
 # Set table options
 mycontrols <- tableby.control(
   numeric.stats = c("N", "Nmiss", "meansd", "medianq1q3", "range")
