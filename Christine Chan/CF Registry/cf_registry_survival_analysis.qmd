@@ -36,7 +36,7 @@ library(emmeans)
 library(ggstats)
 library(patchwork)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry"
 )
 github_dir <- switch(Sys.info()["sysname"],
@@ -259,6 +259,8 @@ label(annual[, which(colnames(annual) %in% names(labels))]) <-
 # annual <- annual %>%
 #   filter((is.na(A_Vx770) | A_Vx770 == "No") &
 #     (is.na(A_VX809comb) | A_VX809comb == "No"))
+# Write cleaned data
+save(annual,file = "./Data_Clean/survival_dataset.RData")
 ```
 
 ```{r}
