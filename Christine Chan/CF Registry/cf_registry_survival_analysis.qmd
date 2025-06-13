@@ -259,8 +259,6 @@ label(annual[, which(colnames(annual) %in% names(labels))]) <-
 # annual <- annual %>%
 #   filter((is.na(A_Vx770) | A_Vx770 == "No") &
 #     (is.na(A_VX809comb) | A_VX809comb == "No"))
-# Write cleaned data
-save(annual,file = "./Data_Clean/survival_dataset.RData")
 ```
 
 ```{r}
@@ -633,6 +631,8 @@ og <- ymd("2003-01-01")
 annual <- as.data.frame(annual)
 annual$tstart <- as.numeric(annual$tstart) - as.numeric(og)
 annual$tstop <- as.numeric(annual$tstop) - as.numeric(og)
+# Write cleaned data
+save(annual,file = "./Data_Clean/survival_dataset.RData")
 # Formula for base model
 xvars <- c(
   "age_group", "Gender", "Race", "Hispanicrace", "bmi_cat", "MutClass",
@@ -650,10 +650,7 @@ ggcoef_table(cox_res,
   signif_stars = F, colour = F
 )
 # Diagnostics
-test.ph <- data.frame(cox.zph(cox_res)$table)
-test.ph <- test.ph[rownames(test.ph) != "GLOBAL", ]
-# Find which variables technically violate PH assumption
-time_varying <- rownames(test.ph)[test.ph$p < 0.05]
+cox.zph(cox_res)
 # Just split data by time period so we're only fitting 3 models
 # "[2003,2009)", "[2009,2014)", "[2014,2019)"
 annual$time_period <- cut(annual$ReviewYear,
@@ -691,7 +688,7 @@ annual %>%
 ```
 
 ```{r results='asis'}
-f_vx770 <- update(f, . ~ . + A_Vx770)
+f_vx770 <- update(f, . ~ . + A_Vx770-A_corticosteroids1-NumPulmExacerbation-age_group)
 vx770_cox_res <- coxph(f_vx770,
   data = annual[annual$ReviewYear >= 2011, ],
   cluster = eDWID
@@ -717,7 +714,7 @@ annual %>%
 ```
 
 ```{r}
-f_vx809comb <- update(f, . ~ . + A_VX809comb)
+f_vx809comb <- update(f, . ~ . + A_VX809comb-A_corticosteroids1-NumPulmExacerbation-age_group-Hispanicrace)
 vx809comb_cox_res <- coxph(f_vx809comb,
   data = annual[annual$ReviewYear >= 2015, ],
   cluster = eDWID
@@ -836,4 +833,5 @@ comb_plot
 ggsave("./Dissemination/Figures/time_combined_forest.png",
   plot = comb_plot, width = 12, height = 9, units = "in", dpi = 900
 )
+
 ```
