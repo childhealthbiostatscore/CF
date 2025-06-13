@@ -58,3 +58,21 @@ run;
 
 proc means data=influence;var Resid;run;
 proc means data=influence;var StudentResid;run;
+
+/*Import encounter-level data data*/
+PROC IMPORT OUT= WORK.ENCOUNTERS 
+            DATAFILE= "C:\Users\vigerst\OneDrive - The University of Col
+orado Denver\Vigers\CF\Christine Chan\CF-SuGAR\Background\Power Calculat
+ions\Data\encounters.csv" 
+            DBMS=CSV REPLACE;
+     GETNAMES=YES;
+     DATAROW=2; 
+RUN;
+/*FEV1 % predicted by modulator status*/
+proc mixed 
+	data=encounters ratio;
+	class eDWID modulator;
+	model GLI_FEV1_pct_predicted = visit*modulator / solution influence DDFM=KENWARDROGER2 outpm=influence residual;
+	repeated / subject=eDWID type=un;
+/*	random intercept Age_YrEnd / type=un subject=eDWID;*/
+run;

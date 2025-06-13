@@ -27,13 +27,14 @@ library(gtsummary)
 library(ggstats)
 library(lmerTest)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan",
-  "Windows" = "C:/Users/timvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan"
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Documents/GitHub",
-  "Linux" = "/home/timvigers/Documents/GitHub"
+  "Darwin" = "/Users/tim/Documents/GitHub",
+  "Windows" = "C:/Users/Tim/Documents/GitHub",
+  "Linux" = "/home/tim/Documents/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -901,4 +902,57 @@ cor(data.matrix(t[, -c(1)]), use = "pairwise.complete.obs")
 fev1_mod <- lm(FEV1.per.pred ~ age + as.numeric(Baseline_1hr_glucose >= 140), data = lorenz)
 summary(fev1_mod)
 sd(resid(fev1_mod))
+```
+
+# Change in FEV1
+
+```{r}
+encounters <- read.csv("C:/Users/vigerst/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry/Data_Raw/CFF19_encountersMerged_Del1.csv")
+# Exclude T1D and T2D
+encounters <- encounters %>%
+  filter(!cfrd_status %in% c(4, 5))
+# Find each person's first year on modulators
+encounters$Vx770[is.na(encounters$Vx770)] <- 0
+encounters$Vx809comb[is.na(encounters$Vx809comb)] <- 0
+encounters <- encounters %>%
+  arrange(eDWID, reviewyear, encounternum) %>%
+  group_by(eDWID) %>%
+  mutate(
+    modulator = factor(Vx770 == 1 | Vx809comb == 1,
+      levels = c(F, T),
+      labels = c("Not on Modulator", "On Modulator")
+    ),
+    first_modulator =
+      first(reviewyear[modulator == "On Modulator"], na_rm = T)
+  )
+# Limit to two years prior and one year post-modulator
+encounters <- encounters %>%
+  filter(
+    !is.na(first_modulator),
+    reviewyear >= first_modulator - 2 & reviewyear <= first_modulator + 1
+  )
+# Limit dataset to people who were seen regularly but not too often
+# (likely hospitalized), make a new encounter number
+year_picker <- encounters %>%
+  group_by(eDWID, reviewyear) %>%
+  summarise(n = n()) %>%
+  filter(n >= 3 & n <= 10) %>%
+  ungroup() %>%
+  mutate(id = paste(eDWID, reviewyear, sep = "_"))
+encounters <- encounters %>%
+  filter(paste(eDWID, reviewyear, sep = "_") %in% year_picker$id) %>%
+  group_by(eDWID) %>%
+  mutate(visit = row_number()) %>%
+  select(
+    eDWID, reviewyear, encounternum, visit, modulator,
+    GLI_FEV1_pct_predicted
+  )
+# Plot
+# ggplot(encounters, aes(x = visit, y = GLI_FEV1_pct_predicted, group = eDWID)) +
+#   geom_line(alpha = 0.5)
+# ggplot(encounters, aes(x = visit, y = GLI_FEV1_pct_predicted, group = eDWID)) +
+#   geom_point(alpha = 0.1) +
+#   geom_smooth(aes(color = modulator, group = modulator))
+# Write for SAS models
+write.csv(encounters, file = "C:/Users/vigerst/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF-SuGAR/Background/Power Calculations/Data/encounters.csv",row.names = F,na = "")
 ```
