@@ -24,7 +24,7 @@ library(gt)
 library(patchwork)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/EnVision CF",
+  "Windows" = "C:/Users/vigerst/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/EnVision CF",
   "Linux" = "/home/tim/OneDrive/Vigers/CF/Christine Chan/EnVision CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
@@ -36,6 +36,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
+set.seed(1017)
 # Import cleaned dataset
 load("./Data_Clean/envision_analysis_dataset.RData")
 df <- final_df
@@ -98,6 +99,10 @@ summary(t3, pfootnote = T)
 ```{r}
 r <- roc(CFRD ~ mean_sensor, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
+ci.auc(r)
+gt(data.frame(ci.coords(r, "best",
+  ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
+))) %>% fmt_number(decimals = 3)
 gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
@@ -106,6 +111,10 @@ gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```{r}
 r <- roc(CFRD ~ percent_time_over_140, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
+ci.auc(r)
+gt(data.frame(ci.coords(r, "best",
+  ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
+))) %>% fmt_number(decimals = 3)
 gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
@@ -114,6 +123,10 @@ gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```{r}
 r <- roc(CFRD ~ percent_time_over_180, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
+ci.auc(r)
+gt(data.frame(ci.coords(r, "best",
+  ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
+))) %>% fmt_number(decimals = 3)
 gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
@@ -122,6 +135,10 @@ gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```{r}
 r <- roc(CFRD ~ gmi, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
+ci.auc(r)
+gt(data.frame(ci.coords(r, "best",
+  ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
+))) %>% fmt_number(decimals = 3)
 gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
@@ -130,6 +147,10 @@ gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```{r}
 r <- roc(CFRD ~ standard_deviation, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
+ci.auc(r)
+gt(data.frame(ci.coords(r, "best",
+  ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
+))) %>% fmt_number(decimals = 3)
 gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
@@ -138,6 +159,10 @@ gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```{r}
 r <- roc(CFRD ~ cv, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
+ci.auc(r)
+gt(data.frame(ci.coords(r, "best",
+  ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
+))) %>% fmt_number(decimals = 3)
 gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
@@ -146,6 +171,10 @@ gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```{r}
 r <- roc(CFRD ~ a1c_result, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
+ci.auc(r)
+gt(data.frame(ci.coords(r, "best",
+  ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
+))) %>% fmt_number(decimals = 3)
 gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
