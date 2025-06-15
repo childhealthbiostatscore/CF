@@ -1,0 +1,362 @@
+---
+title: "The Changing Landscape of Cystic Fibrosis Related Diabetes Risk Factors Between 2003-2018"
+author: "Tim Vigers"
+date: "June 17, 2025"
+date-format: long
+format: 
+  revealjs:
+    scrollable: true
+    embed-resources: true
+editor: source
+bibliography: wnar_references.bib
+csl: american-medical-association.csl
+---
+
+```{r setup}
+#| include: false
+library(tidyverse)
+library(survival)
+library(survminer)
+library(gtsummary)
+library(ggstats)
+knitr::opts_knit$set(root.dir = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry")
+```
+
+# Background
+
+## The *CFTR* Gene
+
+- Cystic fibrosis (CF) is an autosomal recessive disease caused by mutations in the cystic fibrosis transmembrane conductance regulator (*CFTR*) gene.[@grasemannCysticFibrosis2023]
+- The CFTR protein is an ion channel that regulates electrolyte balance across cell membranes.[@stoltzOriginsCysticFibrosis2015]
+- As of 2023, over 2000 *CFTR* variants have been described. Of these, we are certain that over 700 are disease-causing.[@grasemannCysticFibrosis2023]
+- The *CFTR* gene is expressed in the upper and lower airways, **pancreas**, intestine, biliary tree, cervix, sweat glands, and other organ systems.[@grasemannCysticFibrosis2023]
+
+## Cystic Fibrosis-Related Diabetes
+
+- Because *CFTR* is highly expressed in the pancreas, *CFTR* dysfunction commonly leads to pancreatic insufficiency.[@moheetNewConceptsPathogenesis2022]
+- The pathophysiology of CFRD is not fully understood, but we think that $\beta$-cell loss related to pancreas destruction is one of the major drivers of diabetes in people with CF.[@moheetNewConceptsPathogenesis2022]
+- CFRD is the most common non-pulmonary complication in CF. A diagnosis before the age of 10 is unusual, but 50% of adults over 40 have CFRD.[@moheetNewConceptsPathogenesis2022]
+- CFRD is associated with a decline in nutritional status, lung function, and early mortality. [@moranClinicalCareGuidelines2010]
+
+## Advancements in Treatment
+
+- Median predicted survival increased from 33 to 44 years between 2003-2018.[@cysticfibrosisfoundationCysticFibrosisFoundation2018]
+- We expect to see even greater gains with the approval of new highly effective *CFTR* modulator therapies. [@Bessonova731; @middletonElexacaftorTezacaftorIvacaftor2019]
+- However, despite these advances CFRD remains prevalent and there have been few large-scale studies examining changes in the epidemiology of CFRD over time.[@moranClinicalCareGuidelines2010; @marshallEpidemiologyCysticFibrosisrelated2005; @adlerHyperglycemiaDeathCystic2011; @chamnanDiabetesDeterminantMortality2010]
+
+# How Have CFRD Risk Factors Changed With the Introduction of Highly Effective *CFTR* Modulators?
+
+## Known Risk Factors {.smaller}
+
+- Earlier CFRD studies [@marshallEpidemiologyCysticFibrosisrelated2005; @moranCysticFibrosisRelated2009] found positive associations between CFRD risk and:
+  - Age
+  - Female sex
+  - Race/ethnicity from marginalized groups
+  - BMI
+  - Genotype
+  - Pancreatic insufficiency
+  - Nutritional status
+  - Liver disease
+  - Worse pulmonary disease
+  - Use of corticosteroids
+
+## Known Risk Factors (cont.)
+
+- Other studies have identified additional potential risk factors, but these are the most well-established.
+- These variables were also readily available in the United States Cystic Fibrosis Foundation Patient Registry (CFFPR) and have been collected consistently since 2003.
+- Very few model selection issues (yay!)
+
+# The Fun Part!
+
+## Participant Demographics in 2018 {.scrolling}
+
+```{r}
+#| message: false
+load("./Data_Clean/survival_dataset.RData")
+annual %>%
+  filter(ReviewYear == 2018) %>%
+  select(
+    CFRD, Age_YrEnd, Gender, Race, Hispanicrace, bmi_perc,
+    bmi_cat, MutClass, tube_feeding, liver_disease,
+    A_FEV1_pct_predicted, A_FVC_pct_predicted, NumPulmExacerbation,
+    A_corticosteroids1, A_IsOnEnzymes, A_Vx770, A_VX809comb
+  ) %>%
+  tbl_summary(
+    by = CFRD, missing_text = "Missing",
+    type = list(A_corticosteroids1 ~ "categorical"),
+    statistic = list(c(
+      "Age_YrEnd", "bmi_perc", "A_FEV1_pct_predicted",
+      "A_FVC_pct_predicted"
+    ) ~ "{mean} ({sd})")
+  ) %>%
+  add_p(test = list(c(
+    "Age_YrEnd", "bmi_perc", "A_FEV1_pct_predicted",
+    "A_FVC_pct_predicted"
+  ) ~ "t.test")) %>%
+  add_overall() %>%
+  separate_p_footnotes()
+```
+
+## Kaplan-Meier Plot
+
+```{r}
+#| fig-width: 16
+#| fig-height: 9
+# KM plot
+fit <- survfit(
+  Surv(time = tstop, event = as.numeric(CFRD) == 2) ~ age_group,
+  data = annual %>%
+    group_by(eDWID) %>%
+    slice_max(ReviewYear)
+)
+# Visualize with survminer
+ggsurvplot(fit,
+  data = annual, risk.table = T, cumevents = T, palette = "simpsons",
+  conf.int = T
+)
+```
+
+## Data Setup
+
+```{r}
+xvars <- c(
+  "age_group", "Gender", "Race", "Hispanicrace", "bmi_cat", "MutClass",
+  "A_IsOnEnzymes", "tube_feeding", "liver_disease", "ppFEV1_cat",
+  "NumPulmExacerbation", "A_corticosteroids1"
+)
+annual %>%
+  select(eDWID, ReviewYear, tstart, tstop, all_of(xvars), CFRD) %>%
+  head(20) %>%
+  gt::gt()
+```
+
+## Data Setup Notes {.smaller}
+
+- Because we don't have an exact date of CFRD diagnosis, the only information we have is that the diagnosis occurred between January 1st of one year and January 1st of the next.
+  - In other words, data are interval censored.
+- Intervals are on a discrete grid (i.e. start and stop times are the same for all participants in a given year).
+- Data include time-varying covariates such as age group, BMI category, etc.
+- We categorized variables such as BMI and FEV1 mostly for the sake of interpretability for a clinical audience.
+  - For BMI in particular though, we were not sure that the effect would be linear and categorization allowed for more flexible models.
+
+## Our First Model {.scrolling}
+
+```{r}
+#| fig-width: 12
+#| fig-height: 9
+# Formula for base model
+y <- "Surv(time = tstart, time2 = tstop, event = as.numeric(CFRD) == 2)"
+f <- as.formula(paste0(y, "~", paste0(xvars, collapse = "+")))
+cox_res <- coxph(f, data = annual, cluster = eDWID)
+ggcoef_model(cox_res,
+  show_p_values = F, add_reference_rows = T, exponentiate = T,
+  signif_stars = F, colour = F
+)
+```
+
+## Proportional Hazards Assumption
+
+```{r}
+cox.zph(cox_res)
+```
+
+## Proportional Hazards Assumption
+
+```{r}
+plot(cox.zph(cox_res)[2], resid = F)
+```
+
+## Proportional Hazards Assumption
+
+```{r}
+plot(cox.zph(cox_res)[7], resid = F)
+```
+
+# What do we do when the proportional hazards assumption is violated?
+
+## Two good options
+
+1. Joint modeling of longitudinal and survival data.[@hendersonJointModellingLongitudinal2000]
+  - The gold standard, do this if you can.
+  - Complex, requires somewhat specialized knowledge.
+  - Ask Elizabeth for help with this.
+
+2. Time-dependent Cox models
+  - More appropriate for external covariates (measures that vary independent of the failure time).
+  - Or baseline covariates where the effect changes over time.[@zhangTimevaryingCovariatesCoefficients2018]
+
+## Time Dependent Covariates and Coefficients
+
+- The hazard function for the Cox proportional hazards model with time dependent coefficients is[@therneauUsingTimeDependent2024]:
+
+$$
+\lambda(t)=\lambda_0(t)exp(\beta(t)X)
+$$
+
+- Where the proportional hazard assumption is[@therneauUsingTimeDependent2024]
+
+$$
+\beta(t)=\beta
+$$
+
+## Time Dependent Covariates and Coefficients
+
+- Another way to write this model:
+
+$$
+\lambda(t)=\lambda_0(t)exp(g(\beta,t)X)
+$$
+
+- Where $g(\beta,t)$ is a function of time that we can define.[@zhangTimevaryingCovariatesCoefficients2018]
+
+## Time as a Step Function
+
+```{r}
+data(cancer)
+vet2 <- survSplit(Surv(time, status) ~ .,
+  data = cancer, cut = c(90, 180), episode = "tgroup", id = "id"
+)
+vfit2 <- coxph(Surv(tstart, time, status) ~ age + sex + ph.ecog +
+  pat.karno:strata(tgroup), data = vet2)
+vfit2
+```
+
+# Applying This to Our CFRD Data
+
+## The Code
+
+```{r}
+annual_split <- survSplit(Surv(time = tstart, time2 = tstop, event = as.numeric(CFRD) == 2) ~ .,
+  data = annual, cut = c(2192, 4018), episode = "tgroup"
+)
+cox_res2 <- coxph(
+  Surv(time = tstart, time2 = tstop, event) ~
+    age_group:strata(tgroup) + Gender + Race + Hispanicrace + bmi_cat + 
+    MutClass:strata(tgroup) + A_IsOnEnzymes:strata(tgroup) + 
+    tube_feeding:strata(tgroup) + liver_disease:strata(tgroup) + 
+    ppFEV1_cat:strata(tgroup) + NumPulmExacerbation:strata(tgroup) + 
+    A_corticosteroids1:strata(tgroup),
+  data = annual_split, cluster = eDWID
+)
+```
+
+## The Results
+
+```{r}
+cox_res2 %>%
+  tbl_regression(exponentiate = T)
+```
+
+## The Interpretation
+
+![](homer.jpg)
+
+## Eras of CFTR Modulators
+
+- We split our data into three different eras: 2003-2008, 2009-2013, and 2014-2018.
+  - Ivacaftor (VX-770) was approved January 2012 and lumacaftor/ivacaftor (combination VX-809) was approved July 2015.
+  - Three eras of equal lengths of time, the first with no modulators, second with one modulator, and the third with combination therapy.
+
+## Eras of CFTR Modulators
+
+```{r}
+annual$time_period <- cut(annual$ReviewYear,
+  breaks = c(-Inf, 2009, 2014, Inf), right = F
+)
+era1 <- coxph(f,
+  data = annual[as.numeric(annual$time_period) == 1, ],
+  cluster = eDWID
+)
+t1 <- era1 %>% tbl_regression(exponentiate = T)
+era2 <- coxph(f,
+  data = annual[as.numeric(annual$time_period) == 2, ],
+  cluster = eDWID
+)
+t2 <- era2 %>% tbl_regression(exponentiate = T)
+era3 <- coxph(f,
+  data = annual[as.numeric(annual$time_period) == 3, ],
+  cluster = eDWID
+)
+t3 <- era3 %>% tbl_regression(exponentiate = T)
+tbl_merge(
+  tbls = list(t1, t2, t3),
+  tab_spanner = c("2003 - 2008", "2009 - 2013", "2014 - 2018")
+)
+```
+
+## Eras of CFTR Modulators
+
+```{r}
+#| fig-width: 12
+#| fig-height: 9
+comb_plot <- ggcoef_compare(
+  list("2003 - 2008" = era1, "2009 - 2013" = era2, "2014 - 2018" = era3),
+  add_reference_rows = T, exponentiate = T, shape_guide = F, colour = F,
+  type = "faceted"
+)
+comb_plot
+```
+
+# The Effect of *CFTR* Modulators
+
+- Is this even worth including? From a statistics point of view it's not that interesting.
+
+## Ivacaftor
+
+```{r}
+#| fig-width: 12
+#| fig-height: 9
+f_vx770 <- update(f, . ~ . + A_Vx770 - A_corticosteroids1 -
+  NumPulmExacerbation - age_group - Hispanicrace)
+vx770_cox_res <- coxph(f_vx770,
+  data = annual[annual$ReviewYear >= 2011, ],
+  cluster = eDWID
+)
+ggcoef_model(vx770_cox_res,
+  show_p_values = F, add_reference_rows = T, exponentiate = T,
+  signif_stars = F, colour = F
+)
+```
+
+## Lumacaftor/ivacaftor
+
+```{r}
+#| fig-width: 12
+#| fig-height: 9
+f_vx809comb <- update(f, . ~ . + A_VX809comb - A_corticosteroids1 -
+  NumPulmExacerbation - age_group - Hispanicrace)
+vx809comb_cox_res <- coxph(f_vx809comb,
+  data = annual[annual$ReviewYear >= 2015, ],
+  cluster = eDWID
+)
+ggcoef_model(vx809comb_cox_res,
+  show_p_values = F, add_reference_rows = T, exponentiate = T,
+  signif_stars = F, colour = F
+)
+```
+
+## Conclusions
+
+- The middle age group is no longer at increased risk compared to the youngest.
+- Female and Black people with CF remain at increased risk of developing CFRD.
+- People with CF who are in the "undernourished" BMI category are no longer at increased risk, but those who are overweight are.
+- Other risk factors appear relatively stable over time.
+- Ivcaftor may reduce the risk of CFRD, although combination therapy does not appear to have an effect.
+
+## Limitations and Future Directions
+
+- Methods available for interval censored data in the `survival` R package[@therneauPackageSurvivalAnalysis2024] are slightly limited.
+  - Other packages such as `icenReg`[@anderson-bergmanIcenRegRegressionModels2017] may be able to fit more flexible models.
+- Categorizing variables is not always ideal, and there is some concern about loss of information.
+  - Currently we are working on extending this analysis using joint modeling for more flexibility.
+- Data end in 2018 but Trikafta (a triple combination therapy of Elexacaftor, Ivacaftor, and Tezacaftor) was approved in 2019.
+  - Need to study later generations of CFTR modulators.
+- Registry data has natural limitations because each center must track and report their own data.
+
+## Special Thanks To
+
+- The Cystic Fibrosis Foundation for the use of CF Foundation Patient Registry data.\
+- The patients, care providers, and clinic coordinators at CF centers.
+- Kristen Miller, MS
+
+## References
