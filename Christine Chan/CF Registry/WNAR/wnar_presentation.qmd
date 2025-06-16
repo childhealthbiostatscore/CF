@@ -368,7 +368,6 @@ ggcoef_model(vx809comb_cox_res,
 - Other risk factors appear relatively stable over time.
 - Ivcaftor may reduce the risk of CFRD, although combination therapy does not appear to have an effect.
 - Time-varying Cox models strike a nice balance between clinical interpretability and statistical rigor.
-- Everyone should take a survival class!
 
 ## Limitations and Future Directions
 
