@@ -33,13 +33,13 @@ knitr::opts_knit$set(root.dir = "/Users/tim/Library/CloudStorage/OneDrive-TheUni
 
 - Cystic fibrosis (CF) is an autosomal recessive disease caused by mutations in the cystic fibrosis transmembrane conductance regulator (*CFTR*) gene.[@grasemannCysticFibrosis2023]
 - The CFTR protein is an ion channel that regulates electrolyte balance across cell membranes.[@stoltzOriginsCysticFibrosis2015]
-- As of 2023, over 2000 *CFTR* variants have been described. Of these, we are certain that over 700 are disease-causing.[@grasemannCysticFibrosis2023]
-- The *CFTR* gene is expressed in the upper and lower airways, **pancreas**, intestine, biliary tree, cervix, sweat glands, and other organ systems.[@grasemannCysticFibrosis2023]
+- CF affects approximately 40,000 people in the US and 105,000 people have been diagnosed worldwide.
+- The *CFTR* gene is expressed in the upper and lower airways, pancreas, intestine, biliary tree, cervix, sweat glands, and other organ systems.[@grasemannCysticFibrosis2023]
 
 ## Cystic Fibrosis-Related Diabetes
 
 - Because *CFTR* is highly expressed in the pancreas, *CFTR* dysfunction commonly leads to pancreatic insufficiency.[@moheetNewConceptsPathogenesis2022]
-- The pathophysiology of CFRD is not fully understood, but we think that $\beta$-cell loss related to pancreas destruction is one of the major drivers of diabetes in people with CF.[@moheetNewConceptsPathogenesis2022]
+- The pathophysiology of CFRD is not fully understood, but we think that $\beta$-cell loss related to pancreas destruction is one of the major drivers of diabetes in people with CF (pwCF).[@moheetNewConceptsPathogenesis2022]
 - CFRD is the most common non-pulmonary complication in CF. A diagnosis before the age of 10 is unusual, but 50% of adults over 40 have CFRD.[@moheetNewConceptsPathogenesis2022]
 - CFRD is associated with a decline in nutritional status, lung function, and early mortality. [@moranClinicalCareGuidelines2010]
 
@@ -69,14 +69,14 @@ knitr::opts_knit$set(root.dir = "/Users/tim/Library/CloudStorage/OneDrive-TheUni
 ## The CFF-PR
 
 - These variables were also readily available in the United States Cystic Fibrosis Foundation Patient Registry (CFFPR) and have been collected consistently since 2003.
-- The CFF-PR is national database that aims to collect information on everyone with CF who receive care in CF Foundation-accredited care centers.
+- The CFF-PR is national database that aims to collect information on everyone with CF who receives care in CF Foundation-accredited care centers.
 
 ## The CFF-PR
 
-- In 2023 there were 33,288 people in the registry (about 95%).
+- In 2023 there were 33,288 people in the registry (between 85-95% of pwCF in the US).
 - The study P.I. wanted to use annualized data for this analysis.
   - Easier to get permission for this because there are fewer PHI concerns than encounter-level data.
-- Very few model selection issues (yay!)
+- No model selection necessary (yay!)
 
 # The Fun Part!
 
@@ -130,7 +130,6 @@ ggsurvplot(fit,
 - Because we don't have an exact date of CFRD diagnosis, the only information we have is that the diagnosis occurred between January 1st of one year and January 1st of the next.
   - Participants had to have two consecutive rows with CFRD, but first instance was considered onset.
 - Data are interval censored.
-- Intervals are on a discrete grid (i.e. start and stop times are the same for all participants in a given year).
 - Data include time-varying covariates such as age group, BMI category, etc.
 - We categorized variables such as BMI and FEV1 mostly for the sake of interpretability for a clinical audience.
   - For BMI in particular though, we were not sure that the effect would be linear and categorization allowed for more flexible models.
@@ -357,25 +356,22 @@ ggcoef_model(vx809comb_cox_res,
 )
 ```
 
-## Conclusions
+## Conclusions {.smaller}
 
-- The middle age group is no longer at increased risk compared to the youngest.
-- Female and Black people with CF remain at increased risk of developing CFRD.
-- People with CF who are in the "undernourished" BMI category are no longer at increased risk, but those who are overweight are.
-
-## Conclusions
-
-- Other risk factors appear relatively stable over time.
-- Ivcaftor may reduce the risk of CFRD, although combination therapy does not appear to have an effect.
 - Time-varying Cox models strike a nice balance between clinical interpretability and statistical rigor.
+- Some risk factors are indeed changing over time, and new treatments may reduce the risk of CFRD.
+  - These changes should be accounted for when building CFRD prediction models in the modulator era.
+  - May also impact our work on updating the CFRD screening process.
+- Easy to code and fit these models.
+  - No more work than a couple logistic models, but you're still accounting for interval censoring, etc.
 
 ## Limitations and Future Directions
 
 - Methods available for interval censored data in the `survival` R package[@therneauPackageSurvivalAnalysis2024] are slightly limited.
   - Other packages such as `icenReg`[@anderson-bergmanIcenRegRegressionModels2017] may be able to fit more flexible models.
-- Categorizing variables is not always ideal, and there is some concern about loss of information.
-  - Currently we are working on extending this analysis using joint modeling for more flexibility.
-    - We will be able to use encounter-level data for this.
+- Categorizing variables is not always ideal, and there is always some concern about loss of information.
+- Currently we are working on extending this analysis using joint modeling for more flexibility.
+  - We will be able to use encounter-level data for this.
     
 ## Limitations and Future Directions
 
@@ -385,9 +381,9 @@ ggcoef_model(vx809comb_cox_res,
 
 ## Special Thanks
 
-- The Cystic Fibrosis Foundation for the use of CF Foundation Patient Registry data.
+- The Cystic Fibrosis Foundation for funding some of this work and the use of CF Foundation Patient Registry data.
 - The patients, care providers, and clinic coordinators at CF centers.
-- 2025 WNAR/IMS
+- The organizers of WNAR/IMS 2025
 - Elizabeth Juarez-Colunga, PhD
 - Kristen Miller, MS
 
