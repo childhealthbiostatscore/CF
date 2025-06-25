@@ -24,7 +24,7 @@ library(gt)
 library(patchwork)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF",
-  "Windows" = "C:/Users/vigerst/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/EnVision CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/EnVision CF",
   "Linux" = "/home/tim/OneDrive/Vigers/CF/Christine Chan/EnVision CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
@@ -41,21 +41,19 @@ set.seed(1017)
 load("./Data_Clean/envision_analysis_dataset.RData")
 df <- final_df
 # Limit to those with CGM data (based on mean glucose) and OGTT diagnosis
-df <- df %>% filter(!is.na(mean_sensor))
+df <- df %>% filter(!is.na(mean_sensor),!is.na(Diagnosis))
 # Convert CV units to match Scully et al.
 df$cv <- df$cv * 100
+# First CGM and OGTT pair only
+df <- df %>%
+  group_by(study_id) %>%
+  slice_min(Date)
 ```
-
-- **All tables and analyses below treat CGM wears as independent**, but we will need to think about how to handle this in future analyses. 
 
 # Participant demographics
 
 - In the cleaned EnVision dataset we have a total of `r nrow(df)` CGMs from `r length(unique(df$study_id))` unique individuals. Of these CGM wears, `r sum(is.na(df$Diagnosis))` were missing a diagnosis due to missing OGTT timepoints. Those without a diagnosis were excluded from all analyses.
-- BMI percentile was calculated with age = 20 for adults. 
-
-```{r}
-df <- df %>% filter(!is.na(Diagnosis))
-```
+- BMI percentile was calculated with age = 20 for adults.
 
 ## By OGTT categories
 
@@ -101,6 +99,7 @@ r <- roc(CFRD ~ mean_sensor, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
 gt(data.frame(ci.coords(r, "best",
+  best.policy = "random",
   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
 ))) %>% fmt_number(decimals = 3)
 gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
@@ -113,6 +112,7 @@ r <- roc(CFRD ~ percent_time_over_140, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
 gt(data.frame(ci.coords(r, "best",
+  best.policy = "random",
   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
 ))) %>% fmt_number(decimals = 3)
 gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
@@ -125,6 +125,7 @@ r <- roc(CFRD ~ percent_time_over_180, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
 gt(data.frame(ci.coords(r, "best",
+  best.policy = "random",
   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
 ))) %>% fmt_number(decimals = 3)
 gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
@@ -137,6 +138,7 @@ r <- roc(CFRD ~ gmi, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
 gt(data.frame(ci.coords(r, "best",
+  best.policy = "random",
   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
 ))) %>% fmt_number(decimals = 3)
 gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
@@ -149,6 +151,7 @@ r <- roc(CFRD ~ standard_deviation, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
 gt(data.frame(ci.coords(r, "best",
+  best.policy = "random",
   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
 ))) %>% fmt_number(decimals = 3)
 gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
@@ -161,6 +164,7 @@ r <- roc(CFRD ~ cv, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
 gt(data.frame(ci.coords(r, "best",
+  best.policy = "random",
   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
 ))) %>% fmt_number(decimals = 3)
 gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
@@ -173,6 +177,7 @@ r <- roc(CFRD ~ a1c_result, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
 gt(data.frame(ci.coords(r, "best",
+  best.policy = "random",
   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
 ))) %>% fmt_number(decimals = 3)
 gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
