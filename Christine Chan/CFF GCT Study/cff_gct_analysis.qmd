@@ -151,6 +151,7 @@ df$OGTT.Date.Time <- mdy_hm(df$OGTT.Date.Time)
 df$Study.visit.PFTs.Date. <- mdy_hm(df$Study.visit.PFTs.Date.)
 df$`Days From OGTT to GCT` <-
   as.numeric(as.Date(df$OGTT.Date.Time) - as.Date(df$Study.visit.PFTs.Date.))
+df$`Days From OGTT to GCT (Absolute Value)` <- abs(df$`Days From OGTT to GCT`)
 df$OGTT.Date.Time <- NULL
 df$Study.visit.PFTs.Date. <- NULL
 # Per Christine, we can exclude C046's 140 value and keep them in the NGT
@@ -243,6 +244,10 @@ f <- ~ HbA1c + kwt(Age, "N", "Nmiss2", "medianq1q3", "range") +
   kwt(`BMI %ile`, "N", "Nmiss2", "medianq1q3", "range") +
   kwt(`BMI Value (Adults Only)`, "N", "Nmiss2", "medianq1q3", "range") +
   kwt(`Days From OGTT to GCT`, "N", "Nmiss2", "medianq1q3", "range") +
+  kwt(
+    `Days From OGTT to GCT (Absolute Value)`,
+    "N", "Nmiss2", "medianq1q3", "range"
+  ) +
   fe(Diagnosis) + fe(Dysglycemia) + fe(Diabetes) + fe(CFRD)
 t1a <- tableby(update(f, `Got OGTT and GCT?` ~ . - `Got OGTT and GCT?`),
   data = df, control = mycontrols
@@ -932,77 +937,4 @@ write.csv(coords(a1c_roc, "all", ret = "all"),
   row.names = F, na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/A1c_CFRD_INDET.csv"
 )
-```
-
-# Nomogram
-
-## CFRD
-
-### `GCT 0 min capillary` and HbA1c
-
-```{r}
-f <- lrm(CFRD ~ `GCT 0 min capillary` + HbA1c,
-  data = df
-)
-ddist <- datadist(df)
-options(datadist = "ddist")
-nom <- nomogram(f, fun = plogis, funlabel = "Risk of CFRD", lp = F)
-plot(nom)
-```
-
-Here’s how to use a nomogram. Pick a point on the GCT 0 min capillary and HbA1c scales and get the associated points for each. Add the points together to get the associated probability based on the Total Points line.
-
-For example:
-
-- GCT 0 min capillary = 130 (40 points)
-- HbA1c = 6.6 (10 points)
-
-Add up the points:
-
-40 + 10 = 50 Total Points
-
-50 Total Points lines up at about 0.08, so this person has approximately an 8% chance of CFRD. The process is the same for the nomograms below.
-
-### `GCT 0 min capillary`, HbA1c, and `GCT 60 min plasma`
-
-```{r}
-f <- lrm(CFRD ~ `GCT 0 min capillary` + HbA1c + `GCT 60 min plasma`,
-  data = df
-)
-ddist <- datadist(df)
-options(datadist = "ddist")
-nom <- nomogram(f, fun = plogis, funlabel = "Risk of CFRD", lp = F)
-plot(nom)
-```
-
-### `GCT 0 min capillary`, and `GCT 60 min plasma`
-
-```{r}
-f <- lrm(CFRD ~ `GCT 0 min capillary` + `GCT 60 min plasma`,
-  data = df
-)
-ddist <- datadist(df)
-options(datadist = "ddist")
-nom <- nomogram(f, fun = plogis, funlabel = "Risk of CFRD", lp = F)
-plot(nom)
-```
-
-# Decision trees
-
-## Predicting CFRD
-
-```{r}
-tree <- rpart(CFRD ~ `GCT 0 min capillary` + HbA1c + `GCT 60 min plasma`,
-  data = df
-)
-rpart.plot(tree, type = 0)
-```
-
-We just don't have enough data to do this properly for CFRD.
-
-## Predicting dysglycemia
-
-```{r}
-tree <- rpart(Dysglycemia ~ `GCT 0 min capillary` + `GCT 60 min plasma`, data = df)
-rpart.plot(tree, type = 0)
 ```
