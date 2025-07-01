@@ -35,7 +35,7 @@ library(patchwork)
 library(gt)
 library(ggbreak)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor",
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Lilah Melzer/Lilah Cough Monitor",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Lilah Melzer/Lilah Cough Monitor"
 )
 github_dir <- switch(Sys.info()["sysname"],
@@ -152,16 +152,16 @@ df$Diagnosis <- factor(df$redcap_event_name,
     "Visits (Arm 1: CF)", "Interim (Arm 1: CF)", "Visits (Arm 2: Control)",
     "Interim (Arm 2: Control)"
   ),
-  labels = c("CF", "CF", "Non-CF", "Non-CF")
+  labels = c("CF", "CF", "Healthy Control", "Healthy Control")
 )
-df$Diagnosis <- relevel(df$Diagnosis, ref = "Non-CF")
+df$Diagnosis <- relevel(df$Diagnosis, ref = "Healthy Control")
 demo <- df %>%
   group_by(sid) %>%
   filter(row_number() == 1) %>%
   select(
     sid, Diagnosis, age_at_consent, height, weight, pre_fev, post_fev,
     nih_sex:nih_ethnicity, mutation1, mutation2,
-    cftr_mod, cftr_mod_type, mucolytic:antih
+    cftr_mod, cftr_mod_type, mucolytic:antih, pulm_ex, contains("micro_type___")
   )
 # Calculate FEV1% - rspiro not accepting NA values for gender, which is really
 # annoying
@@ -244,9 +244,13 @@ write.csv(agg_counts,
 ```{r results='asis'}
 #| label: tbl-mean-demo
 #| tbl-cap: Participant characteristics
-t1 <- tableby(Diagnosis ~ nih_sex + age_at_consent + height_perc + weight_perc +
-  nih_race + nih_ethnicity + cftr_mod + cftr_mod_type + Genotype + pre_fev_pp +
-  total_sleep, data = demo, control = mycontrols)
+t1 <- tableby(
+  Diagnosis ~ nih_sex + age_at_consent + height_perc + weight_perc +
+    nih_race + nih_ethnicity + cftr_mod + cftr_mod_type + Genotype + pre_fev_pp +
+    total_sleep + pulm_ex + micro_type___1 + micro_type___2 + micro_type___3 +
+    micro_type___4,
+  data = demo, control = mycontrols
+)
 summary(t1, pfootnote = T)
 ```
 
@@ -260,13 +264,14 @@ per_person <- agg_counts %>%
     `Nights With Data` = sum(!is.na(Coughs)),
     `Prop. Nights With Data` = sum(!is.na(Coughs)) / n(),
     `Median Coughs per Night` = median(Coughs, na.rm = T),
+    `Prop. Nights With Cough` = sum(Coughs > 0, na.rm = T) / n(),
     .groups = "drop"
   )
 # Exclude the people with 0 nights of data
 per_person <- per_person %>% filter(`Nights With Data` != 0)
 t2 <- tableby(
   Diagnosis ~ `Nights` + `Nights With Data` + `Prop. Nights With Data` +
-    `Median Coughs per Night`,
+    `Prop. Nights With Cough` + `Median Coughs per Night`,
   data = per_person, control = mycontrols
 )
 summary(t2, pfootnote = T)
@@ -278,12 +283,22 @@ summary(t2, pfootnote = T)
 #| label: fig-coughs-dist
 #| fig-cap: Histogram of Coughs Across All Nights
 #| warning: false
-hist <- ggplot(agg_counts, aes(x = Coughs)) +
-  geom_histogram() +
+hist1 <- ggplot(
+  agg_counts[agg_counts$Diagnosis == "Healthy Control", ],
+  aes(x = Coughs)
+) +
+  geom_histogram(binwidth = 1) +
+  ylab("Nights") +
+  ggtitle("Healthy Control") +
   theme_bw() +
-  theme(axis.title.y = element_blank()) +
-  facet_wrap(~Diagnosis, scales = "free_x")
-hist
+  scale_x_break(c(80, 80), ticklabels = 80, space = 0, scales = 0.0000001)
+hist2 <- ggplot(agg_counts[agg_counts$Diagnosis == "CF", ], aes(x = Coughs)) +
+  geom_histogram(binwidth = 1) +
+  ylab("Nights") +
+  ggtitle("CF") +
+  theme_bw() +
+  scale_x_break(c(85, 260), ticklabels = c(260, 269), scales = 0.25)
+hist <- hist1 + hist2 + plot_layout(guides = "collect")
 ggsave(paste0(home_dir, "/Dissemination/Figures/histogram.png"),
   plot = hist, width = 9, height = 6, units = "in"
 )
@@ -359,15 +374,16 @@ Spearman correlation between median coughs and pre-bronchodilator FEV1 was `r ro
 #| fig-cap: Coughs by nights from start
 #| warning: false
 fig2 <- ggplot(agg_counts[!is.na(agg_counts$Coughs), ], aes(
-  x = Night, y = Coughs, group = factor(sid), color = Diagnosis
+  x = Night, y = Coughs, group = factor(sid)
 )) +
-  geom_point(alpha = 0.2) +
-  geom_line(alpha = 0.2) +
-  geom_smooth(aes(group = Diagnosis)) +
+  geom_point(alpha = 0.1) +
+  geom_line(alpha = 0.2, aes(linetype = Diagnosis)) +
+  geom_smooth(color = "black", aes(group = Diagnosis, linetype = Diagnosis)) +
+  annotate("rect", xmin = 1, xmax = 29, ymin = 1, ymax = 275, alpha = 0.1) +
+  annotate("rect", xmin = 41, xmax = 76, ymin = 1, ymax = 275, alpha = 0.1) +
   ylim(c(1, 275)) +
   xlim(c(0, 100)) +
   theme_bw() +
-  scale_color_manual(values = c("#003092", "#FFAB5B")) +
   scale_y_break(c(80, 265), scales = 0.25, ticklabels = c(265, 270, 275))
 fig2
 ggsave(paste0(home_dir, "/Dissemination/Figures/fig2.png"),
