@@ -24,7 +24,7 @@ library(performance)
 library(gtsummary)
 library(emmeans)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF",
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/EnVision CF"
 )
 github_dir <- switch(Sys.info()["sysname"],

@@ -302,8 +302,6 @@ summary(t1c, pfootnote = T, digits = 2)
 # OGTT Figures
 
 ```{r}
-#| label: fig-boxplot
-#| fig-cap: Boxplot of OGTT glucose values by diabetes status
 #| warning: false
 # The code below is a total mess because Larry keeps sending requests -
 # clean up later
