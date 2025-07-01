@@ -41,7 +41,7 @@ set.seed(1017)
 load("./Data_Clean/envision_analysis_dataset.RData")
 df <- final_df
 # Limit to those with CGM data (based on mean glucose) and OGTT diagnosis
-df <- df %>% filter(!is.na(mean_sensor),!is.na(Diagnosis))
+df <- df %>% filter(!is.na(mean_sensor), !is.na(Diagnosis))
 # Convert CV units to match Scully et al.
 df$cv <- df$cv * 100
 # First CGM and OGTT pair only
@@ -61,8 +61,9 @@ df <- df %>%
 
 ```{r results='asis'}
 t1 <- tableby(
-  Diagnosis ~ redcap_data_access_group + sex + origin_race + ethnicity +
-    pancreatic_status + CFTR + fev1 + fvc + bmi_perc + a1c_result,
+  Diagnosis ~ redcap_data_access_group + age_visit + height + weight +
+    bmi_perc + sex + origin_race + ethnicity + pancreatic_status + CFTR + fev1 +
+    fvc + a1c_result + corrector_yes_no,
   data = df
 )
 summary(t1, pfootnote = T)
@@ -72,8 +73,9 @@ summary(t1, pfootnote = T)
 
 ```{r results='asis'}
 t2 <- tableby(
-  Dysglycemia ~ redcap_data_access_group + sex + origin_race + ethnicity +
-    pancreatic_status + CFTR + fev1 + fvc + bmi_perc + a1c_result,
+  Dysglycemia ~ redcap_data_access_group + age_visit + height + weight +
+    bmi_perc + sex + origin_race + ethnicity + pancreatic_status + CFTR + fev1 +
+    fvc + a1c_result + corrector_yes_no,
   data = df
 )
 summary(t2, pfootnote = T)
@@ -83,8 +85,9 @@ summary(t2, pfootnote = T)
 
 ```{r results='asis'}
 t3 <- tableby(
-  CFRD ~ redcap_data_access_group + sex + origin_race + ethnicity +
-    pancreatic_status + CFTR + fev1 + fvc + bmi_perc + a1c_result,
+  CFRD ~ redcap_data_access_group + age_visit + height + weight +
+    bmi_perc + sex + origin_race + ethnicity + pancreatic_status + CFTR + fev1 +
+    fvc + a1c_result + corrector_yes_no,
   data = df
 )
 summary(t3, pfootnote = T)
@@ -98,11 +101,11 @@ summary(t3, pfootnote = T)
 r <- roc(CFRD ~ mean_sensor, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gt(data.frame(ci.coords(r, "best",
-  best.policy = "random",
-  ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
-))) %>% fmt_number(decimals = 3)
-gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
+# gt(data.frame(ci.coords(r, "best",
+#   best.policy = "random",
+#   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
+# ))) %>% fmt_number(decimals = 3)
+gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
 ## Percent time spent >140 mg/dL 
@@ -111,11 +114,11 @@ gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 r <- roc(CFRD ~ percent_time_over_140, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gt(data.frame(ci.coords(r, "best",
-  best.policy = "random",
-  ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
-))) %>% fmt_number(decimals = 3)
-gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
+# gt(data.frame(ci.coords(r, "best",
+#   best.policy = "random",
+#   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
+# ))) %>% fmt_number(decimals = 3)
+gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
 ## Percent time spent >180 mg/dL
@@ -124,11 +127,11 @@ gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 r <- roc(CFRD ~ percent_time_over_180, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gt(data.frame(ci.coords(r, "best",
-  best.policy = "random",
-  ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
-))) %>% fmt_number(decimals = 3)
-gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
+# gt(data.frame(ci.coords(r, "best",
+#   best.policy = "random",
+#   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
+# ))) %>% fmt_number(decimals = 3)
+gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
 ## GMI
@@ -137,11 +140,11 @@ gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 r <- roc(CFRD ~ gmi, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gt(data.frame(ci.coords(r, "best",
-  best.policy = "random",
-  ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
-))) %>% fmt_number(decimals = 3)
-gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
+# gt(data.frame(ci.coords(r, "best",
+#   best.policy = "random",
+#   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
+# ))) %>% fmt_number(decimals = 3)
+gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
 ## SD
@@ -150,11 +153,11 @@ gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 r <- roc(CFRD ~ standard_deviation, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gt(data.frame(ci.coords(r, "best",
-  best.policy = "random",
-  ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
-))) %>% fmt_number(decimals = 3)
-gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
+# gt(data.frame(ci.coords(r, "best",
+#   best.policy = "random",
+#   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
+# ))) %>% fmt_number(decimals = 3)
+gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
 ## CV
@@ -163,11 +166,11 @@ gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 r <- roc(CFRD ~ cv, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gt(data.frame(ci.coords(r, "best",
-  best.policy = "random",
-  ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
-))) %>% fmt_number(decimals = 3)
-gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
+# gt(data.frame(ci.coords(r, "best",
+#   best.policy = "random",
+#   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
+# ))) %>% fmt_number(decimals = 3)
+gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
 ## HbA1c
@@ -176,11 +179,11 @@ gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
 r <- roc(CFRD ~ a1c_result, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gt(data.frame(ci.coords(r, "best",
-  best.policy = "random",
-  ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
-))) %>% fmt_number(decimals = 3)
-gt(coords(r, "all", ret = "all")) %>% fmt_number(decimals = 3)
+# gt(data.frame(ci.coords(r, "best",
+#   best.policy = "random",
+#   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
+# ))) %>% fmt_number(decimals = 3)
+gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
 # Pulmonary function comparisons
