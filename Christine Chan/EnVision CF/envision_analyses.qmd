@@ -1,5 +1,5 @@
 ---
-title: "Using CGM to Predict CFRD in the Envision Cohort"
+title: "EnVision CF Analyses"
 author: "Tim Vigers"
 date: "today"
 date-format: long
@@ -17,15 +17,16 @@ editor: source
 
 ```{r setup}
 #| include: false
+library(Hmisc)
 library(tidyverse)
 library(arsenal)
 library(pROC)
 library(gt)
 library(patchwork)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/EnVision CF",
-  "Linux" = "/home/tim/OneDrive/Vigers/CF/Christine Chan/EnVision CF"
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Documents/GitHub",
@@ -36,12 +37,18 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
+# Set seed for bootstrap
 set.seed(1017)
-# Import cleaned dataset
-load("./Data_Clean/envision_analysis_dataset.RData")
-df <- final_df
+# Import data
+# See GitHub/CF/Christine Chan/EnVision CF/clean_envision_data.R
+load("/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF/Data_Clean/envision_analysis_dataset.RData")
+```
+
+# ROC Analyses
+
+```{r}
 # Limit to those with CGM data (based on mean glucose) and OGTT diagnosis
-df <- df %>% filter(!is.na(mean_sensor), !is.na(Diagnosis))
+df <- final_df %>% filter(!is.na(mean_sensor), !is.na(Diagnosis))
 # Convert CV units to match Scully et al.
 df$cv <- df$cv * 100
 # First CGM and OGTT pair only
@@ -50,52 +57,24 @@ df <- df %>%
   slice_min(Date)
 ```
 
-# Participant demographics
+For the following analyses, we used ROC curves to assess various CGM metrics' ability to distinguish between CFRD- and CFRD+ people with CF. Because some people had multiple CGM wears and OGTTs, we decided to use each participant's first CGM and OGTT pair. In the cleaned EnVision dataset we have a total of `r nrow(df)` CGMs from `r length(unique(df$study_id))` unique individuals. Of these CGM wears, `r sum(is.na(df$Diagnosis))` were missing a diagnosis due to missing OGTT timepoints. Those without a diagnosis were excluded from all analyses.
 
-- In the cleaned EnVision dataset we have a total of `r nrow(df)` CGMs from `r length(unique(df$study_id))` unique individuals. Of these CGM wears, `r sum(is.na(df$Diagnosis))` were missing a diagnosis due to missing OGTT timepoints. Those without a diagnosis were excluded from all analyses.
-- BMI percentile was calculated with age = 20 for adults.
-
-## By OGTT categories
-
-### Detailed OGTT category
+## Participant Demographics by CFRD status
 
 ```{r results='asis'}
 t1 <- tableby(
-  Diagnosis ~ redcap_data_access_group + age_visit + height + weight +
-    bmi_perc + sex + origin_race + ethnicity + pancreatic_status + CFTR + fev1 +
-    fvc + a1c_result + corrector_yes_no,
+  CFRD ~ fe(redcap_data_access_group) +
+    kwt(age_visit, "Nmiss", "medianq1q3", "range") +
+    kwt(height, "Nmiss", "medianq1q3", "range") +
+    kwt(weight, "Nmiss", "medianq1q3", "range") + bmi_perc + sex +
+    fe(origin_race) + fe(ethnicity) + fe(pancreatic_status) + fe(CFTR) +
+    corrector_yes_no + fev1 + fvc + a1c_result,
   data = df
 )
 summary(t1, pfootnote = T)
 ```
 
-### General OGTT category
-
-```{r results='asis'}
-t2 <- tableby(
-  Dysglycemia ~ redcap_data_access_group + age_visit + height + weight +
-    bmi_perc + sex + origin_race + ethnicity + pancreatic_status + CFTR + fev1 +
-    fvc + a1c_result + corrector_yes_no,
-  data = df
-)
-summary(t2, pfootnote = T)
-```
-
-### CFRD status
-
-```{r results='asis'}
-t3 <- tableby(
-  CFRD ~ redcap_data_access_group + age_visit + height + weight +
-    bmi_perc + sex + origin_race + ethnicity + pancreatic_status + CFTR + fev1 +
-    fvc + a1c_result + corrector_yes_no,
-  data = df
-)
-summary(t3, pfootnote = T)
-```
-
-# ROC analyses
-
-## Mean sensor glucose 
+## Mean Sensor Glucose 
 
 ```{r}
 r <- roc(CFRD ~ mean_sensor, data = df, quiet = T)
@@ -108,7 +87,7 @@ ci.auc(r)
 gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
-## Percent time spent >140 mg/dL 
+## Percent Time >140 mg/dL 
 
 ```{r}
 r <- roc(CFRD ~ percent_time_over_140, data = df, quiet = T)
@@ -121,7 +100,7 @@ ci.auc(r)
 gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
-## Percent time spent >180 mg/dL
+## Percent Time >180 mg/dL
 
 ```{r}
 r <- roc(CFRD ~ percent_time_over_180, data = df, quiet = T)
@@ -186,32 +165,7 @@ ci.auc(r)
 gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 ```
 
-# Pulmonary function comparisons
-
-## By OGTT categories
-
-### Detailed OGTT category
-
-```{r results='asis'}
-t1 <- tableby(Diagnosis ~ fev1 + fvc, data = df)
-summary(t1, pfootnote = T)
-```
-
-### General OGTT category
-
-```{r results='asis'}
-t2 <- tableby(Dysglycemia ~ fev1 + fvc, data = df)
-summary(t2, pfootnote = T)
-```
-
-### CFRD status
-
-```{r results='asis'}
-t3 <- tableby(CFRD ~ fev1 + fvc, data = df)
-summary(t3, pfootnote = T)
-```
-
-## By CGM category
+## Pulmonary Function Comparisons by CGM
 
 ```{r}
 df$scully_ag <- cut(df$mean_sensor, c(-Inf, 112, Inf))
@@ -306,12 +260,15 @@ tb <- tableby(our_cv ~ fev1 + fvc, data = df)
 summary(tb, pfootnote = T)
 ```
 
-# Figure
+## Figure
 
 In the figure below, red lines indicate the cutoffs identified in Scully et al. and purple lines indicate the cutoffs identified in EnVision.
 
 ```{r}
 #| message: false
+#| warning: false
+#| fig-height: 12
+#| fig-width: 16
 # Dotplot
 box_p1 <- ggplot(
   df,
@@ -383,7 +340,7 @@ box_p5 <- ggplot(
   ggtitle("HbA1c (%)") +
   theme_bw(base_size = 12) +
   theme(
-    legend.position = "none",
+    legend.title = element_blank(),
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(), axis.title.y = element_blank()
   ) +
