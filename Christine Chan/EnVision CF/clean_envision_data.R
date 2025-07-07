@@ -338,6 +338,8 @@ final_df <- final_df %>%
   unite(C.Peptide_120, C.Peptide_120.x, C.Peptide_120.y, na.rm = T) %>%
   unite(C.Peptide_150, C.Peptide_150.x, C.Peptide_150.y, na.rm = T) %>%
   unite(C.Peptide_180, C.Peptide_180.x, C.Peptide_180.y, na.rm = T)
+final_df <- final_df %>%
+  mutate(across(contains("C.Peptide_"), ~ as.numeric(.x)))
 # Add CGM
 final_df <- full_join(final_df, cgm)
 #-------------------------------------------------------------------------------
@@ -483,12 +485,12 @@ final_df$Hypo60 <-
     any(r < 60, na.rm = T)
   })
 final_df$Hypo70 <- factor(final_df$Hypo70,
-  levels = c(T, F),
-  labels = c("Hypoglycemia < 70", "No Hypoglycemia < 70")
+  levels = c(F, T),
+  labels = c("No Hypoglycemia < 70", "Hypoglycemia < 70")
 )
 final_df$Hypo60 <- factor(final_df$Hypo60,
-  levels = c(T, F),
-  labels = c("Hypoglycemia < 60", "No Hypoglycemia < 60")
+  levels = c(F, T),
+  labels = c("No Hypoglycemia < 60", "Hypoglycemia < 60")
 )
 # CFTR groups
 final_df$CFTR <- paste0(final_df$cftr_mutation_1, final_df$cftr_mutation_2)
@@ -512,8 +514,9 @@ final_df$origin_race <- factor(final_df$origin_race,
     "Declined"
   )
 )
+final_df$ethnicity[final_df$ethnicity == 3] <- NA
 final_df$ethnicity <- factor(final_df$ethnicity,
-  levels = 1:3, labels = c("Hispanic/Latino", "Not Hispanic/Latino", "N/A")
+  levels = 1:2, labels = c("Hispanic/Latino", "Not Hispanic/Latino")
 )
 # Pancreatic status
 final_df$pancreatic_status[final_df$pancreatic_status == 3] <- NA
