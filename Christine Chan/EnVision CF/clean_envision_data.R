@@ -3,6 +3,7 @@
 #-------------------------------------------------------------------------------
 # Libraries
 library(tidyverse)
+library(Hmisc)
 library(lubridate)
 library(readxl)
 library(stringi)
@@ -491,10 +492,11 @@ final_df$Hypo60 <- factor(final_df$Hypo60,
 )
 # CFTR groups
 final_df$CFTR <- paste0(final_df$cftr_mutation_1, final_df$cftr_mutation_2)
+final_df$CFTR[final_df$CFTR == "NANA"] <- NA
 final_df$CFTR <- factor(final_df$CFTR,
-  levels = c("11", "12", "22", "NANA"),
+  levels = c("11", "12", "22"),
   labels = c(
-    "F508del homozygous", "F508del heterozygous", "Other/Other", "Unknown"
+    "F508del homozygous", "F508del heterozygous", "Other/Other"
   )
 )
 final_df$cftr_mutation_1 <- NULL
@@ -513,8 +515,19 @@ final_df$origin_race <- factor(final_df$origin_race,
 final_df$ethnicity <- factor(final_df$ethnicity,
   levels = 1:3, labels = c("Hispanic/Latino", "Not Hispanic/Latino", "N/A")
 )
+# Pancreatic status
+final_df$pancreatic_status[final_df$pancreatic_status == 3] <- NA
+final_df$pancreatic_status <- factor(final_df$pancreatic_status,
+  levels = 1:2,
+  labels = c("Sufficient", "Insufficient")
+)
 # Sex
 final_df$sex <- factor(final_df$sex, levels = 1:2, labels = c("Male", "Female"))
+# CFTR modulator status
+final_df$corrector_yes_no <- factor(final_df$corrector_yes_no,
+  levels = 0:1,
+  labels = c("No Modulator", "On Modulator")
+)
 # Final formatting
 final_df$redcap_data_access_group <- gsub("\\d", "", final_df$study_id)
 final_df$redcap_data_access_group <- factor(
@@ -541,9 +554,20 @@ final_df <- final_df %>%
     contains("PP_"), contains("Active.Ghrelin_"), contains("adren_score_"),
     contains("neuro_score_"), everything(), -redcap_event_name
   )
+# Labels
+label(final_df$redcap_data_access_group) <- "Site"
+label(final_df$age_visit) <- "Age (years)"
+label(final_df$height) <- "Height (cm)"
+label(final_df$weight) <- "Weight (kg)"
+label(final_df$bmi_perc) <- "BMI %ile"
+label(final_df$sex) <- "Sex"
+label(final_df$origin_race) <- "Race"
+label(final_df$ethnicity) <- "Ethnicity"
+label(final_df$pancreatic_status) <- "Pancreatic Status"
+label(final_df$CFTR) <- "Genotype"
+label(final_df$fev1) <- "FEV1 % Predicted"
+label(final_df$fvc) <- "FVC % Predicted"
+label(final_df$a1c_result) <- "HbA1c (%)"
+label(final_df$corrector_yes_no) <- "CFTR Modulator Status"
 # Write
-write.csv(final_df,
-  file = "./Christine Chan/EnVision CF/Data_Clean/envision_analysis_dataset.csv",
-  row.names = F, na = ""
-)
 save(final_df, file = "./Christine Chan/EnVision CF/Data_Clean/envision_analysis_dataset.RData")
