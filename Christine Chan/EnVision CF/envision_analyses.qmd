@@ -695,3 +695,8 @@ means %>%
 ```
 
 The table above shows the estimated mean C-peptide at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour C-peptide was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour C-peptide was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
+
+## Matsuda index
+
+The Matsuda index was calculated across the 0, 30, 60, 90, and 120 minute timepoints using the formula: $$\frac{10000}{\sqrt{(\frac{\text{fasting glucose (mg/dL)}}{18} * \text{fasting insulin}) * (\frac{\text{mean glucose (mg/dL)}}{18} * \text{mean insulin})}}$$
+
