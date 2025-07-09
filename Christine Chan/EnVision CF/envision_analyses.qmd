@@ -375,7 +375,7 @@ first_visit_df <- final_df %>%
 # Long data for mixed models
 glmm_df <- final_df %>%
   select(
-    study_id, Hypo60, Hypo70,
+    study_id, Hypo60, Hypo70, ogtt_num,
     all_of(c(
       glucoses, insulins, cpeptides, epinephrines, norepinephrines,
       hypo_surveys
@@ -426,15 +426,17 @@ t2 <- tableby(
 summary(t2, pfootnote = T)
 ```
 
-## Glucose
+## OGTT Measures by Timepoint
+
+### Glucose
 
 Glucose was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable. The results from this model are presented as estimated marginal means (also known as least-squares means) for those with hypoglycemia at some point and those with no hypoglycemia.
 
-### Hypoglycemia <70 mg/dL at Any Point
+#### Hypoglycemia <70 mg/dL at Any Point
 
 ```{r}
 # Fit
-mod <- lmer(Glucose ~ Timepoint * Hypo70 + (1 | study_id),
+mod <- lmer(Glucose ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
   data = glmm_df
 )
 # EM means
@@ -473,11 +475,11 @@ means %>%
 
 The table above shows the estimated mean glucose at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour glucose was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour glucose was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
 
-### Hypoglycemia <60 mg/dL at Any Point
+#### Hypoglycemia <60 mg/dL at Any Point
 
 ```{r}
 # Fit
-mod <- lmer(Glucose ~ Timepoint * Hypo60 + (1 | study_id),
+mod <- lmer(Glucose ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
   data = glmm_df
 )
 # EM means
@@ -516,15 +518,15 @@ means %>%
 
 The table above shows the estimated mean glucose at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour glucose was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour glucose was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
 
-## Insulin
+### Insulin
 
 Insulin was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable. The results from this model are presented as estimated marginal means (also known as least-squares means) for those with hypoglycemia at some point and those with no hypoglycemia.
 
-### Hypoglycemia <70 mg/dL at Any Point
+#### Hypoglycemia <70 mg/dL at Any Point
 
 ```{r}
 # Fit
-mod <- lmer(Insulin ~ Timepoint * Hypo70 + (1 | study_id),
+mod <- lmer(Insulin ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
   data = glmm_df
 )
 # EM means
@@ -563,11 +565,11 @@ means %>%
 
 The table above shows the estimated mean insulin at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour insulin was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour insulin was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
 
-### Hypoglycemia <60 mg/dL at Any Point
+#### Hypoglycemia <60 mg/dL at Any Point
 
 ```{r}
 # Fit
-mod <- lmer(Insulin ~ Timepoint * Hypo60 + (1 | study_id),
+mod <- lmer(Insulin ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
   data = glmm_df
 )
 # EM means
@@ -606,15 +608,15 @@ means %>%
 
 The table above shows the estimated mean insulin at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour insulin was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour insulin was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
 
-## C-peptide
+### C-peptide
 
 C-peptide was modeled using a linear mixed effect model with random intercept for participant and time treated as a categorical variable. The results from this model are presented as estimated marginal means (also known as least-squares means) for those with hypoglycemia at some point and those with no hypoglycemia.
 
-### Hypoglycemia <70 mg/dL at Any Point
+#### Hypoglycemia <70 mg/dL at Any Point
 
 ```{r}
 # Fit
-mod <- lmer(C.Peptide ~ Timepoint * Hypo70 + (1 | study_id),
+mod <- lmer(C.Peptide ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
   data = glmm_df
 )
 # EM means
@@ -653,11 +655,11 @@ means %>%
 
 The table above shows the estimated mean C-peptide at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour C-peptide was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour C-peptide was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
 
-### Hypoglycemia <60 mg/dL at Any Point
+#### Hypoglycemia <60 mg/dL at Any Point
 
 ```{r}
 # Fit
-mod <- lmer(C.Peptide ~ Timepoint * Hypo60 + (1 | study_id),
+mod <- lmer(C.Peptide ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
   data = glmm_df
 )
 # EM means
@@ -696,7 +698,28 @@ means %>%
 
 The table above shows the estimated mean C-peptide at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour C-peptide was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour C-peptide was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
 
-## Matsuda index
+## Whole OGTT Measures
+
+### Matsuda index
 
 The Matsuda index was calculated across the 0, 30, 60, 90, and 120 minute timepoints using the formula: $$\frac{10000}{\sqrt{(\frac{\text{fasting glucose (mg/dL)}}{18} * \text{fasting insulin}) * (\frac{\text{mean glucose (mg/dL)}}{18} * \text{mean insulin})}}$$
 
+#### Hypoglycemia <70 mg/dL at Any Point
+
+```{r}
+# Fit
+mod <- lmer(matsuda ~ Hypo70 + (1 | study_id), data = final_df)
+mod %>% gtsummary::tbl_regression()
+```
+
+The table above shows that the Matsuda index was different by `r round(summary(mod)$coefficients[2,1],2)` on average in the hypoglycemia groups, although this was not statistically significant (p = `r round(summary(mod)$coefficients[2,5],2)`).
+
+#### Hypoglycemia <60 mg/dL at Any Point
+
+```{r}
+# Fit
+mod <- lmer(matsuda ~ Hypo60 + (1 | study_id), data = final_df)
+mod %>% gtsummary::tbl_regression()
+```
+
+The table above shows that the Matsuda index was different by `r round(summary(mod)$coefficients[2,1],2)` on average in the hypoglycemia groups, although this was not statistically significant (p = `r round(summary(mod)$coefficients[2,5],2)`).
