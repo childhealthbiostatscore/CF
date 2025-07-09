@@ -278,7 +278,7 @@ files <- list.files("./Christine Chan/EnVision CF/Data_Clean/hOGTTs",
 ogtts <- lapply(files, function(f) {
   # Import
   d <- read.csv(f,
-    na.strings = c("", "not detectable", "not detecable", "no serum")
+    na.strings = c("", "not detectable", "not detecable", "no serum", "#VALUE!")
   )
   # Get run date
   date <- sub("./Christine Chan/EnVision CF/Data_Clean/hOGTTs/summary_", "", f)
@@ -339,7 +339,10 @@ final_df <- final_df %>%
   unite(C.Peptide_150, C.Peptide_150.x, C.Peptide_150.y, na.rm = T) %>%
   unite(C.Peptide_180, C.Peptide_180.x, C.Peptide_180.y, na.rm = T)
 final_df <- final_df %>%
-  mutate(across(contains("C.Peptide_"), ~ as.numeric(.x)))
+  mutate(across(c(
+    contains("C.Peptide_"), contains("GLP.1.Active_"),
+    contains("GIP_"), contains("Glucagon_")
+  ), ~ as.numeric(.x)))
 # Add CGM
 final_df <- full_join(final_df, cgm)
 #-------------------------------------------------------------------------------
@@ -396,6 +399,7 @@ final_df$iAUC30gluc <- apply(final_df, 1, function(r) {
     return(auc)
   }
 })
+label(final_df$iAUC30gluc) <- "iAUC 30 Minute Glucose"
 final_df$iAUC60gluc <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[glucose[1:4]]) - as.numeric(r[glucose[1]])
   if (is.na(first(y)) | is.na(last(y))) {
@@ -407,6 +411,7 @@ final_df$iAUC60gluc <- apply(final_df, 1, function(r) {
     return(auc)
   }
 })
+label(final_df$iAUC60gluc) <- "iAUC 60 Minute Glucose"
 final_df$iAUC120gluc <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[glucose[1:6]]) - as.numeric(r[glucose[1]])
   if (is.na(first(y)) | is.na(last(y))) {
@@ -418,6 +423,7 @@ final_df$iAUC120gluc <- apply(final_df, 1, function(r) {
     return(auc)
   }
 })
+label(final_df$iAUC120gluc) <- "iAUC 120 Minute Glucose"
 final_df$iAUC180gluc <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[glucose]) - as.numeric(r[glucose[1]])
   if (is.na(first(y)) | is.na(last(y))) {
@@ -429,6 +435,7 @@ final_df$iAUC180gluc <- apply(final_df, 1, function(r) {
     return(auc)
   }
 })
+label(final_df$iAUC180gluc) <- "iAUC 180 Minute Glucose"
 final_df$iAUC30ins <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[insulin[1:3]]) - as.numeric(r[insulin[1]])
   if (is.na(first(y)) | is.na(last(y))) {
@@ -440,6 +447,7 @@ final_df$iAUC30ins <- apply(final_df, 1, function(r) {
     return(auc)
   }
 })
+label(final_df$iAUC30ins) <- "iAUC 30 Minute Insulin"
 final_df$iAUC60ins <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[insulin[1:4]]) - as.numeric(r[insulin[1]])
   if (is.na(first(y)) | is.na(last(y))) {
@@ -451,6 +459,7 @@ final_df$iAUC60ins <- apply(final_df, 1, function(r) {
     return(auc)
   }
 })
+label(final_df$iAUC60ins) <- "iAUC 60 Minute Insulin"
 final_df$iAUC120ins <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[insulin[1:6]]) - as.numeric(r[insulin[1]])
   if (is.na(first(y)) | is.na(last(y))) {
@@ -462,6 +471,7 @@ final_df$iAUC120ins <- apply(final_df, 1, function(r) {
     return(auc)
   }
 })
+label(final_df$iAUC120ins) <- "iAUC 120 Minute Insulin"
 final_df$iAUC180ins <- apply(final_df, 1, function(r) {
   y <- as.numeric(r[insulin]) - as.numeric(r[insulin[1]])
   if (is.na(first(y)) | is.na(last(y))) {
@@ -473,6 +483,10 @@ final_df$iAUC180ins <- apply(final_df, 1, function(r) {
     return(auc)
   }
 })
+label(final_df$iAUC180ins) <- "iAUC 180 Minute Insulin"
+# ODI
+final_df$odi <- final_df$iAUC30ins / final_df$iAUC30gluc
+label(final_df$odi) <- "Oral Disposition Index"
 # HOMA IR
 final_df$homa_ir <- (final_df$Glucose_0 * final_df$Insulin_0) / 405
 # Matsuda
