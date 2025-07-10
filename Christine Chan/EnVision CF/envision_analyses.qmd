@@ -523,11 +523,13 @@ The table above shows the estimated mean glucose at each time point for the two 
 
 ### Insulin
 
+Insulin values were log-transformed to improve model fit.
+
 #### Hypoglycemia <70 mg/dL at Any Point
 
 ```{r}
 # Fit
-mod <- lmer(Insulin ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+mod <- lmer(log(Insulin) ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
   data = glmm_df
 )
 # EM means
@@ -570,7 +572,7 @@ The table above shows the estimated mean insulin at each time point for the two 
 
 ```{r}
 # Fit
-mod <- lmer(Insulin ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+mod <- lmer(log(Insulin) ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
   data = glmm_df
 )
 # EM means
@@ -611,11 +613,13 @@ The table above shows the estimated mean insulin at each time point for the two 
 
 ### C-peptide
 
+C-peptide values were log-transformed to improve model fit.
+
 #### Hypoglycemia <70 mg/dL at Any Point
 
 ```{r}
 # Fit
-mod <- lmer(C.Peptide ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+mod <- lmer(log(C.Peptide) ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
   data = glmm_df
 )
 # EM means
@@ -658,7 +662,7 @@ The table above shows the estimated mean C-peptide at each time point for the tw
 
 ```{r}
 # Fit
-mod <- lmer(C.Peptide ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+mod <- lmer(log(C.Peptide) ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
   data = glmm_df
 )
 # EM means
@@ -787,91 +791,93 @@ The table above shows the estimated mean glucagon at each time point for the two
 
 ### GLP-1
 
-#### Hypoglycemia <70 mg/dL at Any Point
+GLP-1 models are not currently converging, but Tim is working on this.
 
-```{r}
-# Fit
-mod <- lmer(GLP.1.Active ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
-  data = glmm_df
-)
-# EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"),
-  type = "response",
-  pbkrtest.limit = 1e6
-))
-colnames(means) <- c(
-  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
-)
-# Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
-  group = Hypo70
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean GLP-1") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
-```
+<!-- #### Hypoglycemia <70 mg/dL at Any Point -->
 
-The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
+<!-- ```{r} -->
+<!-- # Fit -->
+<!-- mod <- lmer(sqrt(GLP.1.Active) ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num), -->
+<!--   data = glmm_df -->
+<!-- ) -->
+<!-- # EM means -->
+<!-- means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"), -->
+<!--   type = "response", -->
+<!--   pbkrtest.limit = 1e6 -->
+<!-- )) -->
+<!-- colnames(means) <- c( -->
+<!--   "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit" -->
+<!-- ) -->
+<!-- # Plot -->
+<!-- ggplot(means, aes( -->
+<!--   x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70, -->
+<!--   group = Hypo70 -->
+<!-- )) + -->
+<!--   geom_point() + -->
+<!--   geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`), -->
+<!--     width = 3 -->
+<!--   ) + -->
+<!--   geom_line() + -->
+<!--   scale_x_continuous(breaks = timepoints) + -->
+<!--   scale_color_manual(values = c("#66C2A5", "#FC8D62")) + -->
+<!--   ylab("EM Mean GLP-1") + -->
+<!--   xlab("Timepoint") + -->
+<!--   theme_bw(base_size = 14) + -->
+<!--   theme(legend.title = element_blank()) -->
+<!-- ``` -->
 
-```{r}
-means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
-```
+<!-- The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval. -->
 
-The table above shows the estimated mean GLP-1 at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour GLP-1 was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour GLP-1 was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
+<!-- ```{r} -->
+<!-- means %>% -->
+<!--   gt() %>% -->
+<!--   fmt_number(decimals = 2) -->
+<!-- ``` -->
 
-#### Hypoglycemia <60 mg/dL at Any Point
+<!-- The table above shows the estimated mean GLP-1 at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour GLP-1 was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour GLP-1 was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`). -->
 
-```{r}
-# Fit
-mod <- lmer(GLP.1.Active ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
-  data = glmm_df
-)
-# EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"),
-  type = "response",
-  pbkrtest.limit = 1e6
-))
-colnames(means) <- c(
-  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
-)
-# Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
-  group = Hypo60
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean GLP-1") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
-```
+<!-- #### Hypoglycemia <60 mg/dL at Any Point -->
 
-The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
+<!-- ```{r} -->
+<!-- # Fit -->
+<!-- mod <- lmer(GLP.1.Active ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num), -->
+<!--   data = glmm_df -->
+<!-- ) -->
+<!-- # EM means -->
+<!-- means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"), -->
+<!--   type = "response", -->
+<!--   pbkrtest.limit = 1e6 -->
+<!-- )) -->
+<!-- colnames(means) <- c( -->
+<!--   "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit" -->
+<!-- ) -->
+<!-- # Plot -->
+<!-- ggplot(means, aes( -->
+<!--   x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60, -->
+<!--   group = Hypo60 -->
+<!-- )) + -->
+<!--   geom_point() + -->
+<!--   geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`), -->
+<!--     width = 3 -->
+<!--   ) + -->
+<!--   geom_line() + -->
+<!--   scale_x_continuous(breaks = timepoints) + -->
+<!--   scale_color_manual(values = c("#66C2A5", "#FC8D62")) + -->
+<!--   ylab("EM Mean GLP-1") + -->
+<!--   xlab("Timepoint") + -->
+<!--   theme_bw(base_size = 14) + -->
+<!--   theme(legend.title = element_blank()) -->
+<!-- ``` -->
 
-```{r}
-means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
-```
+<!-- The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval. -->
 
-The table above shows the estimated mean GLP-1 at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour GLP-1 was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour GLP-1 was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
+<!-- ```{r} -->
+<!-- means %>% -->
+<!--   gt() %>% -->
+<!--   fmt_number(decimals = 2) -->
+<!-- ``` -->
+
+<!-- The table above shows the estimated mean GLP-1 at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour GLP-1 was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour GLP-1 was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`). -->
 
 ### GIP
 
@@ -963,11 +969,13 @@ The table above shows the estimated mean GIP at each time point for the two grou
 
 ### Epinephrine
 
+Epinephrine values were log-transformed to improve model fit.
+
 #### Hypoglycemia <70 mg/dL at Any Point
 
 ```{r}
 # Fit
-mod <- lmer(Epinephrine ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+mod <- lmer(log(Epinephrine) ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
   data = glmm_df
 )
 # EM means
@@ -1010,7 +1018,7 @@ The table above shows the estimated mean epinephrine at each time point for the 
 
 ```{r}
 # Fit
-mod <- lmer(Epinephrine ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+mod <- lmer(log(Epinephrine) ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
   data = glmm_df
 )
 # EM means
@@ -1051,11 +1059,13 @@ The table above shows the estimated mean epinephrine at each time point for the 
 
 ### Norepinephrine
 
+Norepinephrine values were log-transformed to improve model fit.
+
 #### Hypoglycemia <70 mg/dL at Any Point
 
 ```{r}
 # Fit
-mod <- lmer(Norepinephrine ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+mod <- lmer(log(Norepinephrine) ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
   data = glmm_df
 )
 # EM means
@@ -1098,7 +1108,7 @@ The table above shows the estimated mean norepinephrine at each time point for t
 
 ```{r}
 # Fit
-mod <- lmer(Norepinephrine ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+mod <- lmer(log(Norepinephrine) ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
   data = glmm_df
 )
 # EM means
@@ -1521,11 +1531,13 @@ OGTT summary measures (i.e., measures calculated using multiple OGTT timepoints)
 
 The Matsuda index was calculated across the 0, 30, 60, 90, and 120 minute timepoints using the formula: $$\frac{10000}{\sqrt{(\frac{\text{fasting glucose (mg/dL)}}{18} * \text{fasting insulin}) * (\frac{\text{mean glucose (mg/dL)}}{18} * \text{mean insulin})}}$$
 
+Matsuda index values were log-transformed to improve model fit.
+
 #### Hypoglycemia <70 mg/dL at Any Point
 
 ```{r}
 # Fit
-mod <- lmer(matsuda ~ Hypo70 + (1 | study_id), data = final_df)
+mod <- lmer(log(matsuda) ~ Hypo70 + (1 | study_id), data = final_df)
 mod %>% gtsummary::tbl_regression()
 ```
 
@@ -1535,7 +1547,7 @@ The table above shows that the Matsuda index was different by `r round(summary(m
 
 ```{r}
 # Fit
-mod <- lmer(matsuda ~ Hypo60 + (1 | study_id), data = final_df)
+mod <- lmer(log(matsuda) ~ Hypo60 + (1 | study_id), data = final_df)
 mod %>% gtsummary::tbl_regression()
 ```
 
@@ -1545,11 +1557,13 @@ The table above shows that the Matsuda index was different by `r round(summary(m
 
 HOMA-IR was calculated using the formula: $$\frac{\text{fasting glucose (mg/dL)}*\text{fasting insulin}}{405}$$
 
+HOMA-IR values were log-transformed to improve model fit.
+
 #### Hypoglycemia <70 mg/dL at Any Point
 
 ```{r}
 # Fit
-mod <- lmer(homa_ir ~ Hypo70 + (1 | study_id), data = final_df)
+mod <- lmer(log(homa_ir) ~ Hypo70 + (1 | study_id), data = final_df)
 mod %>% gtsummary::tbl_regression()
 ```
 
@@ -1749,7 +1763,7 @@ ODI was calculated as $\frac{\text{iAUC 30 Minute Insulin}}{\text{iAUC 30 Minute
 
 ```{r}
 # Fit
-mod1 <- lmer(odi ~ Hypo70 + (1 | study_id), data = final_df)
+mod <- lmer(odi ~ Hypo70 + (1 | study_id), data = final_df)
 mod %>% gtsummary::tbl_regression()
 ```
 
