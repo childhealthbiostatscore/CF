@@ -1,6 +1,5 @@
 library(tidyverse)
 library(lubridate)
-library(parallel)
 # Paths
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
@@ -140,16 +139,14 @@ encounter$age_eti_group <- cut(encounter$age_eti_start,
 # Hospitalization or home IVs
 hospitalizations$CareEpi_StartDt <- mdy(hospitalizations$CareEpi_StartDt)
 hospitalizations$CareEpi_EndDt <- mdy(hospitalizations$CareEpi_EndDt)
-cl <- makeForkCluster(detectCores() * (2 / 4))
-hosps <- parApply(cl, hospitalizations, 1, function(r) {
-  which(encounter$eDWID == r["eDWID"] &
-    encounter$encounterdate >= r["CareEpi_StartDt"] &
-    encounter$encounterdate <= r["CareEpi_EndDt"])
-})
-stopCluster(cl)
-hosps <- unique(unlist(hosps))
-encounter$hospitalized <- "No"
-encounter$hospitalized[hosps] <- "Yes"
+hospitalizations <- hospitalizations %>%
+  rowwise() %>%
+  reframe(eDWID,
+    encounterdate = seq(CareEpi_StartDt, CareEpi_EndDt, by = "day")
+  ) %>%
+  mutate(hospitalized = "Yes")
+encounter <- 
+  left_join(encounter, hospitalizations, by = join_by(eDWID, encounterdate))
 # Variables for flowchart
 n_enc_1 <- nrow(encounter)
 n_people_1 <- length(unique(encounter$eDWID))
