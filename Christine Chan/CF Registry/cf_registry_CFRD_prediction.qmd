@@ -22,13 +22,12 @@ editor: source
 library(survival)
 library(nlme)
 library(JM)
-library()
 library(dplyr)
 library(tidyr)
 library(arsenal)
 library(knitr)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry"
 )
 knitr::opts_knit$set(root.dir = home_dir)
@@ -212,12 +211,17 @@ kable(long, caption = "Longitudinal Process", digits = 3)
 kable(event, caption = "Event Process", digits = 3)
 ```
 
+```{r}
+nd <- joint_fit_value$data
+nd$pred <- predict(joint_fit_value, registry[registry$eDWID %in% reg_include, ], type = "Subject",idVar = "eDWID")
+```
+
 # To do
 
 - Check for HbA1c measures after the survival time (not sure if needs to be strictly less than)
-- Set parameterization = "slope" to see if change in HbA1c increases hazard 
+- Set parameterization = "slope" to see if change in HbA1c increases hazard
 - Look into dynamic predictions in JMBayes
-- Could try re-fitting this with a left-censored model 
+- Could try re-fitting this with a left-censored model
   - If it says the same thing, it's probably okay to use the right-censored
   - Could also try using the half interval model Kristen described
   
