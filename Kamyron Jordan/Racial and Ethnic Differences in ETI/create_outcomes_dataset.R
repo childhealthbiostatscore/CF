@@ -103,6 +103,16 @@ encounter$cultureresults <- factor(encounter$cultureresults,
   levels = 1:3,
   labels = c("No growth/sterile culture", "Normal flora", "Microorganisms")
 )
+# Pulmonary exacerbations
+encounter$pe_assessment[encounter$pe_assessment == 5] <- NA
+encounter$PEx <- factor(encounter$pe_assessment,
+  levels = 1:4,
+  labels = c(
+    "Absent", "Mild, moderate, or severe exacerbation",
+    "Mild, moderate, or severe exacerbation",
+    "Mild, moderate, or severe exacerbation"
+  )
+)
 # Merge
 encounter <- left_join(
   encounter,

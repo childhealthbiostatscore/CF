@@ -42,7 +42,7 @@ encounter$age_group <- relevel(encounter$age_group, ref = "[18,30)")
 # Data cleaning
 
 ```{r flowchart}
-ggflowchart(flow_chart,text_size = 3,y_nudge = 0.4,x_nudge = 0.45)
+ggflowchart(flow_chart, text_size = 3, y_nudge = 0.4, x_nudge = 0.45)
 ```
 
 # Table 1
@@ -57,7 +57,7 @@ t1_participant %>%
   tbl_summary(
     by = Race,
     type = list(`Years With Data` ~ "continuous"),
-    statistic = list(c(gli_fev1_ppred_rn,gli_fvc_ppred_rn)~"{mean} [{sd}]"),
+    statistic = list(c(gli_fev1_ppred_rn, gli_fvc_ppred_rn) ~ "{mean} [{sd}]"),
     missing_text = "Missing"
   ) %>%
   add_overall()
@@ -304,63 +304,30 @@ pop_dat %>%
   rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
   gt(caption = "Predicted Values at Various Timepoints") %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.13856555"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.63633"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -397,62 +364,30 @@ pop_dat %>%
   rename(GLI_FEV1_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -492,62 +427,30 @@ pop_dat %>%
   rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -581,62 +484,30 @@ pop_dat %>%
   rename(GLI_FEV1_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -676,62 +547,30 @@ pop_dat %>%
   rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -765,62 +604,30 @@ pop_dat %>%
   rename(GLI_FEV1_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -861,62 +668,30 @@ pop_dat %>%
   rename(gli_fvc_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -950,62 +725,30 @@ pop_dat %>%
   rename(GLI_FVC_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -1045,62 +788,30 @@ pop_dat %>%
   rename(gli_fvc_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -1134,62 +845,30 @@ pop_dat %>%
   rename(GLI_FVC_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -1229,62 +908,30 @@ pop_dat %>%
   rename(gli_fvc_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -1318,62 +965,30 @@ pop_dat %>%
   rename(GLI_FVC_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -1411,62 +1026,30 @@ pop_dat %>%
   rename(gli_fev1fvc_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -1500,62 +1083,30 @@ pop_dat %>%
   rename(GLI_FEV1FVC_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -1593,62 +1144,30 @@ pop_dat %>%
   rename(gli_fev1fvc_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -1682,62 +1201,30 @@ pop_dat %>%
   rename(GLI_FEV1FVC_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -1774,62 +1261,30 @@ pop_dat %>%
   rename(gli_fev1fvc_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -1863,62 +1318,220 @@ pop_dat %>%
   rename(GLI_FEV1FVC_pct_predicted = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
+```
 
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
+## Number of Pulmonary Exacerbations
 
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
+### Full cohort
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  gli_fev1_ppred_rn ~ Years * Race + slope_change_years * Race + age_group +
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
+  data = encounter
 )
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
+# Model plot
+pop_dat <- data.frame(expand.grid(
+  Years = -3:2, Race = unique(encounter$Race), age_group = "[18,30)",
+  Insurance = "Private", prior_modulator = "Yes",
+  isOnEnzymes = "Yes", pseudomonasaeruginosa = "No"
+))
+pop_dat$slope_change_years <- (pop_dat$Years > 0) * pop_dat$Years
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
+  xlab("Years from ETI Start") +
+  ylab("gli_fev1_ppred_rn") +
+  theme_classic()
+# Model summary
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt(caption = "Predicted Values at Various Timepoints") %>%
+  fmt_number(decimals = 3)
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
+)
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
+  fmt_number(decimals = 3)
+```
+
+### Age < 18 at ETI initiation
+
+The following models were not adjusted for age group.
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  gli_fev1_ppred_rn ~ Years * Race + slope_change_years * Race + Insurance +
+    prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
+)
+# Model plot
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
+  xlab("Years from ETI Start") +
+  ylab("gli_fev1_ppred_rn") +
+  theme_classic()
+# Model summary
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
+  fmt_number(decimals = 3)
+```
+
+### Age >= 18 at ETI initiation
+
+The following models were not adjusted for age group.
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  gli_fev1_ppred_rn ~ Years * Race + slope_change_years * Race + Insurance +
+    prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[18, Inf)", ]
+)
+# Model plot
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
+  xlab("Years from ETI Start") +
+  ylab("gli_fev1_ppred_rn") +
+  theme_classic()
+# Model summary
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
+  fmt_number(decimals = 3)
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
+)
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -1957,62 +1570,30 @@ pop_dat %>%
   rename(bmipercentile = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -2048,62 +1629,30 @@ pop_dat %>%
   rename(bmivalue = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -2139,62 +1688,30 @@ pop_dat %>%
   rename(heightpercentile = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -2226,62 +1743,30 @@ pop_dat %>%
   rename(height = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -2320,62 +1805,30 @@ pop_dat %>%
   rename(weightpercentile = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
 
@@ -2400,8 +1853,8 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   ylab("weight") +
   theme_classic()
 # Model summary
-change_mod %>% 
-  gtsummary::tbl_regression(intercept = T)%>%
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
   as_gt() %>%
   fmt_number(decimals = 3)
 # Table of predicted values
@@ -2410,61 +1863,29 @@ pop_dat %>%
   rename(weight = pred, ci.ll = ll, ci.ul = ul) %>%
   gt() %>%
   fmt_number(decimals = 3)
-# Linear hypotheses
-white_vs_black_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` = 1.195465"
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
 )
-white_vs_black_pre <- tidy(summary(white_vs_black_pre))
-white_vs_black_pre$contrast <- "Black vs. White Pre-ETI Slope"
-white_vs_black_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_black_post <- glht(
-  change_mod,
-  "Years + `Years:RaceBlack or African American` + slope_change_years + `RaceBlack or African American:slope_change_years` = 2.738885"
-)
-white_vs_black_post <- tidy(summary(white_vs_black_post))
-white_vs_black_post$contrast <- "Black vs. White Post-ETI Slope"
-white_vs_black_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_hispanic_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` = 1.19547"
-)
-white_vs_hispanic_pre <- tidy(summary(white_vs_hispanic_pre))
-white_vs_hispanic_pre$contrast <- "Hispanic vs. White Pre-ETI Slope"
-white_vs_hispanic_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_hispanic_post <- glht(
-  change_mod,
-  "Years + `Years:RaceHispanic or Latino` + slope_change_years + `RaceHispanic or Latino:slope_change_years` = 2.738885"
-)
-white_vs_hispanic_post <- tidy(summary(white_vs_hispanic_post))
-white_vs_hispanic_post$contrast <- "Hispanic vs. White Post-ETI Slope"
-white_vs_hispanic_post %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-
-white_vs_other_pre <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` = 1.19547"
-)
-white_vs_other_pre <- tidy(summary(white_vs_other_pre))
-white_vs_other_pre$contrast <- "Other vs. White Pre-ETI Slope"
-white_vs_other_pre %>%
-  gt() %>%
-  fmt_number(decimals = 3)
-white_vs_other_post <- glht(
-  change_mod,
-  "Years + `Years:RaceOther` + slope_change_years + `RaceOther:slope_change_years` = 2.738885"
-)
-white_vs_other_post <- tidy(summary(white_vs_other_post))
-white_vs_other_post$contrast <- "Other vs. White Post-ETI Slope"
-white_vs_other_post %>%
-  gt() %>%
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
   fmt_number(decimals = 3)
 ```
