@@ -228,8 +228,8 @@ label(demo$nih_race) <- "Race"
 # Set table options for the document
 mycontrols <-
   tableby.control(
-    numeric.stats = c("N", "Nmiss", "medianq1q3", "range"),
-    cat.stats = c("N", "Nmiss", "countpct"),
+    numeric.stats = c("N", "medianrange"),
+    cat.stats = c("N", "countpct"),
     numeric.test = "kwt"
   )
 # Save
@@ -265,13 +265,15 @@ per_person <- agg_counts %>%
     `Prop. Nights With Data` = sum(!is.na(Coughs)) / n(),
     `Median Coughs per Night` = median(Coughs, na.rm = T),
     `Prop. Nights With Cough` = sum(Coughs > 0, na.rm = T) / n(),
+    `Prop. Nights With 0 Cough` = sum(Coughs == 0, na.rm = T) / n(),
     .groups = "drop"
   )
 # Exclude the people with 0 nights of data
 per_person <- per_person %>% filter(`Nights With Data` != 0)
 t2 <- tableby(
   Diagnosis ~ `Nights` + `Nights With Data` + `Prop. Nights With Data` +
-    `Prop. Nights With Cough` + `Median Coughs per Night`,
+    `Prop. Nights With 0 Cough` + `Prop. Nights With Cough` +
+    `Median Coughs per Night`,
   data = per_person, control = mycontrols
 )
 summary(t2, pfootnote = T)
