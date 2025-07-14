@@ -57,11 +57,25 @@ levels(df$FRS_Category) <- c(
   "Neutral", "Want to be larger", "Want to be smaller"
 )
 levels(df$WeightBody_Adherence) <- c("Agree", "Agree", "Neutral", "Disagree", "Disagree")
+# Raw BMI values from Emma
+df$bmi_raw <- NA
+df$bmi_raw[df$ID == 1] <- 24.21
+df$BMI[df$ID == 1] <- NA
+df$bmi_raw[df$ID == 8] <- 22.33
+df$BMI[df$ID == 8] <- NA
+df$bmi_raw[df$ID == 11] <- 21.1
+df$BMI[df$ID == 11] <- NA
+df$bmi_raw[df$ID == 31] <- 23.64
+df$BMI[df$ID == 31] <- NA
+df$bmi_raw[df$ID == 39] <- 20.73
+df$BMI[df$ID == 39] <- NA
 # Labels
 label(df$FRS_Category) <- "FRS Category"
 label(df$BE_APPEARANCE_MEAN) <- "Mean Body Esteem Scale (Appearance)"
 label(df$BE_ATTRIBUTION_MEAN) <- "Mean Body Esteem Scale (Attribution)"
 label(df$BE_WEIGHT_MEAN) <- "Mean Body Esteem Scale (Weight)"
+label(df$BMI) = "BMI %ile"
+label(df$bmi_raw) = "BMI (kg/m2)"
 ```
 
 # Descriptive analyses
@@ -75,12 +89,12 @@ df %>%
   select(
     PHQ9_Total, PHQ9_category, GAD7_Total, GAD7_category, FRStotal,
     FRS_IdealBody, FRS_ThinkyouLook, FRS_Category, Age, Gender, Race,
-    Ethnicity, InsuranceType, BMI, FEV1
+    Ethnicity, InsuranceType, BMI, bmi_raw,FEV1
   ) %>%
   tbl_summary(
     by = Gender,
     type = list(
-      c("FRStotal", "FRS_IdealBody", "FRS_ThinkyouLook") ~ "continuous2",
+      c("FRStotal", "FRS_IdealBody", "FRS_ThinkyouLook","bmi_raw") ~ "continuous2",
       all_continuous() ~ "continuous2"
     ),
     statistic = list(
@@ -367,9 +381,9 @@ p <- ggcoef_compare(list(
   theme(text = element_text(size = 18))
 p
 # Save
-ggsave("./Emily Muther/General/BodyImage_Trikafta/Reports/forest_plot.png",
-  plot = p, width = 9, height = 6, units = "in"
-)
+# ggsave("./Emily Muther/General/BodyImage_Trikafta/Reports/forest_plot.png",
+#   plot = p, width = 9, height = 6, units = "in"
+# )
 ```
 
 Figure 1 shows the unadjusted odds ratios and confidence intervals for an elevated score on the PHQ9 or GAD7. Filled circles indicate an odds ratio significantly different from 1. Estimates to the left of the vertical bar indicate lower odds of an elevated score.
