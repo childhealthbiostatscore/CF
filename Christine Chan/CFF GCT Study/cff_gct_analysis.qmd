@@ -336,19 +336,32 @@ ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
 # Dotplot
 dotplot <- ggplot(df, aes(x = Diagnosis, y = `GCT 60 min plasma`)) +
   geom_point() +
+  geom_hline(yintercept = 140, linetype = "dashed") +
+  geom_hline(yintercept = 150, linetype = "dashed") +
+  geom_hline(yintercept = 160, linetype = "dashed") +
+  geom_hline(yintercept = 147, linetype = "dashed", size = 1) +
   ylab("GCTpl (mg/dL)") +
-  theme_bw()
+  theme_bw() +
+  scale_y_continuous(breaks = c(100, 140, 147, 150, 160))
+
 dotplot
 dotplot +
   theme(text = element_blank())
 # Additional boxplots/dotplot per Christine and Larry
 plot_df <- df %>%
-  pivot_longer(c(`OGTT 0 min`, `OGTT 60 min`, `OGTT 120 min`, `GCT 60 min plasma`),
+  pivot_longer(
+    c(
+      `OGTT 0 min`, `OGTT 120 min`, `GCT 0 min plasma`, `GCT 60 min plasma`,
+      `GCT 60 min capillary`
+    ),
     names_to = "OGTT Timepoint", values_to = "Glucose"
   )
 plot_df$`OGTT Timepoint` <- factor(plot_df$`OGTT Timepoint`,
-  levels = c("OGTT 0 min", "OGTT 60 min", "OGTT 120 min", "GCT 60 min plasma"),
-  labels = c("Fasting", "OGTT-1hG", "OGTT-2hG", "GCTpl")
+  levels = c(
+    "OGTT 0 min", "OGTT 120 min", "GCT 0 min plasma", "GCT 60 min plasma",
+    "GCT 60 min capillary"
+  ),
+  labels = c("Fasting", "OGTT-2hG", "RPG", "GCTpl", "GCTcap")
 )
 box_p <- ggplot(
   plot_df,
@@ -357,7 +370,7 @@ box_p <- ggplot(
   geom_boxplot() +
   ylab("Glucose (mg/dL)") +
   scale_y_continuous(breaks = c(100, 140, 200, 300)) +
-  scale_fill_manual(values = RColorBrewer::brewer.pal(4, "Set2")) +
+  scale_fill_manual(values = RColorBrewer::brewer.pal(5, "Dark2")) +
   facet_wrap(~Diabetes) +
   theme_bw(base_size = 20) +
   theme(
@@ -370,114 +383,82 @@ ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
   box_p,
   device = "png"
 )
-# GCTpl, RCG, HbA1c, OGTT1hr
+# RPG, GCTpl, RCG, HbA1c, OGTT1hr
 plot_df <- df %>%
   pivot_longer(
     c(
-      `GCT 60 min plasma`, `GCT 0 min capillary`, HbA1c,
-      `OGTT 60 min`
+      `GCT 0 min plasma`, `GCT 60 min plasma`, `GCT 0 min capillary`,
+      `GCT 60 min capillary`, HbA1c
     ),
     names_to = "Measure", values_to = "Value"
   )
-box_p1 <- ggplot(
-  plot_df[plot_df$Measure == "GCT 60 min plasma", ],
-  aes(x = Diabetes, y = Value, fill = Diabetes)
+# Dotplot
+dot_p1 <- ggplot(
+  plot_df[plot_df$Measure == "GCT 0 min plasma", ],
+  aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
-  geom_boxplot() +
-  geom_hline(yintercept = 146.5, linetype = "dashed") +
+  geom_jitter() +
+  geom_hline(yintercept = 91.5, linetype = "dashed", size = 1) +
   ylim(c(50, 300)) +
-  ylab("mg/dL") +
-  ggtitle("GCTpl") +
+  ylab("Glucose (mg/dL)") +
+  ggtitle("RPG") +
   theme_bw(base_size = 15) +
+  scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
   theme(
-    legend.position = "none",
+    legend.position = "none", plot.title = element_text(hjust = 0.5),
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank()
   )
-box_p2 <- ggplot(
-  plot_df[plot_df$Measure == "GCT 0 min capillary", ],
-  aes(x = Diabetes, y = Value, fill = Diabetes)
-) +
-  geom_boxplot() +
-  geom_hline(yintercept = 98.5, linetype = "dashed") +
-  ylim(c(50, 300)) +
-  ggtitle("RCG") +
-  theme_bw(base_size = 15) +
-  theme(
-    legend.position = "none",
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank()
-  )
-box_p3 <- ggplot(
-  plot_df[plot_df$Measure == "HbA1c", ],
-  aes(x = Diabetes, y = Value, fill = Diabetes)
-) +
-  geom_boxplot() +
-  geom_hline(yintercept = 5.45, linetype = "dashed") +
-  ylab("%") +
-  ggtitle("HbA1c") +
-  theme_bw(base_size = 15) +
-  theme(
-    legend.position = "none",
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank()
-  )
-box_p4 <- ggplot(
-  plot_df[plot_df$Measure == "OGTT 60 min", ],
-  aes(x = Diabetes, y = Value, fill = Diabetes)
-) +
-  geom_boxplot() +
-  geom_hline(yintercept = 228.5, linetype = "dashed") +
-  ylim(c(50, 300)) +
-  ggtitle("OGTT 60 min") +
-  theme_bw(base_size = 15) +
-  theme(
-    legend.position = "none",
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank()
-  )
-box_p <- box_p1 + box_p2 + box_p3 + box_p4
-ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot2.png",
-  box_p,
-  device = "png"
-)
-# Dotplot
-box_p1 <- ggplot(
+dot_p2 <- ggplot(
   plot_df[plot_df$Measure == "GCT 60 min plasma", ],
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
   geom_jitter() +
-  geom_hline(yintercept = 146.5, linetype = "dashed", size = 1) +
+  geom_hline(yintercept = 140.5, linetype = "dashed", size = 1) +
   ylim(c(50, 300)) +
   ylab("Glucose (mg/dL)") +
   ggtitle("GCTpl") +
   theme_bw(base_size = 15) +
-  scale_colour_manual(values = RColorBrewer::brewer.pal(3, "Set2")) +
-  theme(
-    legend.position = "none", plot.title = element_text(hjust = 0.5),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank()
-  )
-box_p2 <- ggplot(
-  plot_df[plot_df$Measure == "GCT 0 min capillary", ],
-  aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
-) +
-  geom_jitter() +
-  geom_hline(yintercept = 98.5, linetype = "dashed", size = 1) +
-  ylim(c(50, 300)) +
-  ggtitle("RCG") +
-  theme_bw(base_size = 15) +
-  scale_colour_manual(values = RColorBrewer::brewer.pal(3, "Set2")) +
+  scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
   theme(
     legend.position = "none", plot.title = element_text(hjust = 0.5),
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
     axis.title.y = element_blank()
   )
-box_p3 <- ggplot(
+dot_p3 <- ggplot(
+  plot_df[plot_df$Measure == "GCT 0 min capillary", ],
+  aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
+) +
+  geom_jitter() +
+  geom_hline(yintercept = 97.5, linetype = "dashed", size = 1) +
+  ylim(c(50, 300)) +
+  ggtitle("RCG") +
+  theme_bw(base_size = 15) +
+  scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
+  theme(
+    legend.position = "none", plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+  )
+dot_p4 <- ggplot(
+  plot_df[plot_df$Measure == "GCT 60 min capillary", ],
+  aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
+) +
+  geom_jitter() +
+  geom_hline(yintercept = 161.5, linetype = "dashed", size = 1) +
+  ylim(c(50, 300)) +
+  ggtitle("GCTcap") +
+  theme_bw(base_size = 15) +
+  scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
+  theme(
+    legend.position = "none", plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank()
+  )
+dot_p5 <- ggplot(
   plot_df[plot_df$Measure == "HbA1c", ],
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
@@ -486,30 +467,14 @@ box_p3 <- ggplot(
   ylab("%") +
   ggtitle("HbA1c") +
   theme_bw(base_size = 15) +
-  scale_colour_manual(values = RColorBrewer::brewer.pal(3, "Set2")) +
+  scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
   scale_linetype_manual(values = c("Youden Index" = "dashed")) +
   theme(
     legend.title = element_blank(), plot.title = element_text(hjust = 0.5),
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank()
   )
-box_p4 <- ggplot(
-  plot_df[plot_df$Measure == "OGTT 60 min", ],
-  aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
-) +
-  geom_jitter() +
-  geom_hline(yintercept = 228.5, linetype = "dashed", size = 1) +
-  ylim(c(50, 300)) +
-  ggtitle("OGTT 1hPG") +
-  theme_bw(base_size = 15) +
-  scale_colour_manual(values = RColorBrewer::brewer.pal(3, "Set2")) +
-  theme(
-    legend.position = "none", plot.title = element_text(hjust = 0.5),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank()
-  )
-box_p <- box_p1 + box_p2 + box_p4 + box_p3 + plot_layout(ncol = 4)
+dot_p <- dot_p1 + dot_p2 + dot_p3 + dot_p4 + dot_p5 + plot_layout(ncol = 5)
 ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/dotplot2.png",
   box_p,
   device = "png"
