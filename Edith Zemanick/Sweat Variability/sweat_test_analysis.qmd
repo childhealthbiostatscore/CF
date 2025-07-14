@@ -50,7 +50,7 @@ chco <- chco %>%
   group_by(PatientID) %>%
   filter(Demographics.Available == "TRUE") %>%
   select(
-    PatientID, Name, Genotypes1, Genotypes2, Sex, Age.at.Test.in.Years,
+    PatientID, Name, DOB, Genotypes1, Genotypes2, Sex, Age.at.Test.in.Years,
     Na, K, Cl, Na_Left, Na_Right, K_Left, K_Right, Cl_Left, Cl_Right
   ) %>%
   rename(Age = Age.at.Test.in.Years) %>%
@@ -66,8 +66,8 @@ chco$Na_Right[826] <- 72.4
 chco$Na_Left[826] <- 72.4
 chco$Na_Right[790] <- 21.1
 chco$Na_Left[790] <- 24.1
-# For "LESS THAN 10", replace with half the limit of detection
-chco[chco == "LESS THAN 10"] <- "9"
+# For "LESS THAN 10", replace with missing
+chco[chco == "LESS THAN 10"] <- NA
 chco[, c("Cl", "Cl_Left", "Cl_Right")] <-
   lapply(chco[, c("Cl", "Cl_Left", "Cl_Right")], as.numeric)
 # Import NJH and add diagnoses from Katie
@@ -85,13 +85,14 @@ njh <- njh %>%
   group_by(Patient.ID) %>%
   filter(Demographics.Available == "TRUE") %>%
   select(
-    Patient.ID, Patient.Name, Genotype.1, Genotype.2, Sex, Age.at.test..in.years.,
-    Sweat.sodium, Sweat.potassium, Sweat.chloride, Sweat.sodium.left.arm,
-    Sweat.sodium.right.arm, Sweat.potassium.left.arm, Sweat.potassium.right.arm,
-    Sweat.chloride.left.arm, Sweat.chloride.right.arm, Diagnosis
+    Patient.ID, Patient.Name, Birth.Date, Genotype.1, Genotype.2,
+    Sex, Age.at.test..in.years., Sweat.sodium, Sweat.potassium, Sweat.chloride,
+    Sweat.sodium.left.arm, Sweat.sodium.right.arm, Sweat.potassium.left.arm,
+    Sweat.potassium.right.arm, Sweat.chloride.left.arm,
+    Sweat.chloride.right.arm, Diagnosis
   ) %>%
   rename(
-    Name = Patient.Name, Genotypes1 = Genotype.1,
+    Name = Patient.Name, Genotypes1 = Genotype.1, DOB = Birth.Date,
     Genotypes2 = Genotype.2, Age = Age.at.test..in.years., Na = Sweat.sodium,
     K = Sweat.potassium, Cl = Sweat.chloride, Na_Left = Sweat.sodium.left.arm,
     Na_Right = Sweat.sodium.right.arm, K_Left = Sweat.potassium.left.arm,
@@ -115,9 +116,9 @@ df$Cl_mean <- rowMeans(df[, c("Cl_Left", "Cl_Right")], na.rm = T)
 df$Cl <- coalesce(df$Cl, df$Cl_mean)
 df$K_mean <- rowMeans(df[, c("K_Left", "K_Right")], na.rm = T)
 df$K <- coalesce(df$K, df$K_mean)
-# Change Cl under 10 to 9 per CHEC
-df$Cl[df$Cl < 10] <- 9
-df$Na[df$Na < 10] <- 9
+# Change Cl under 10 to missing
+df$Cl[df$Cl < 10] <- NA
+df$Na[df$Na < 10] <- NA
 # Calculate Na:Cl ratio
 df$`Na:Cl` <- df$Na / df$Cl
 # Use each person's first sweat test with both sodium and chloride
@@ -130,7 +131,9 @@ dups <- df$Name[duplicated(df$Name)]
 df <- df[!df$Name %in% dups, ]
 # Get rid of unnecessary columns, remove those with no diagnosis
 df <- df %>%
-  select(Name, Diagnosis, Genotypes1, Genotypes2, Sex, Age, Na, K, Cl, `Na:Cl`) %>%
+  select(
+    Name, DOB, Diagnosis, Genotypes1, Genotypes2, Sex, Age, Na, K, Cl, `Na:Cl`
+  ) %>%
   filter(!is.na(Diagnosis))
 # Combine CFTR-related disorder and CRMS
 df$Diagnosis <- factor(df$Diagnosis,
