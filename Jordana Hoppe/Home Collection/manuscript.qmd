@@ -32,12 +32,12 @@ library(RColorBrewer)
 library(patchwork)
 library(ggpubr)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Documents/GitHub",
+  "Darwin" = "/Users/tim/Documents/GitHub",
   "Windows" = "C:/Users/Tim/GitHub",
   "Linux" = "/home/timvigers/GitHub"
 )
@@ -50,7 +50,7 @@ source(paste0(github_dir, "/CF/Jordana Hoppe/Home Collection/home_collection_dat
 source(paste0(github_dir, "/CF/Jordana Hoppe/Home Collection/home_collection_surveys.r"))
 # Exclude missing subjects
 data_exclude <- c("009-07", "009-17", "009-25", "009-37")
-survey_exclude <- c(15, 27, 30, 34, 47)
+survey_exclude <- c(6, 15, 27, 30, 34, 47)
 data <- data %>% filter(!subject_id %in% data_exclude)
 survey_data <- survey_data %>% filter(!participant_id %in% survey_exclude)
 # Fix missing labels
