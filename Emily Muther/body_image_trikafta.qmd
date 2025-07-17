@@ -74,8 +74,8 @@ label(df$FRS_Category) <- "FRS Category"
 label(df$BE_APPEARANCE_MEAN) <- "Mean Body Esteem Scale (Appearance)"
 label(df$BE_ATTRIBUTION_MEAN) <- "Mean Body Esteem Scale (Attribution)"
 label(df$BE_WEIGHT_MEAN) <- "Mean Body Esteem Scale (Weight)"
-label(df$BMI) = "BMI %ile"
-label(df$bmi_raw) = "BMI (kg/m2)"
+label(df$BMI) <- "BMI %ile"
+label(df$bmi_raw) <- "BMI (kg/m2)"
 ```
 
 # Descriptive analyses
@@ -89,12 +89,13 @@ df %>%
   select(
     PHQ9_Total, PHQ9_category, GAD7_Total, GAD7_category, FRStotal,
     FRS_IdealBody, FRS_ThinkyouLook, FRS_Category, Age, Gender, Race,
-    Ethnicity, InsuranceType, BMI, bmi_raw,FEV1
+    Ethnicity, InsuranceType, BMI, bmi_raw, FEV1, BE_APPEARANCE_MEAN,
+    BE_ATTRIBUTION_MEAN, BE_WEIGHT_MEAN
   ) %>%
   tbl_summary(
     by = Gender,
     type = list(
-      c("FRStotal", "FRS_IdealBody", "FRS_ThinkyouLook","bmi_raw") ~ "continuous2",
+      c("FRStotal", "FRS_IdealBody", "FRS_ThinkyouLook", "bmi_raw") ~ "continuous2",
       all_continuous() ~ "continuous2"
     ),
     statistic = list(
