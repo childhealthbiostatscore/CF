@@ -103,19 +103,15 @@ encounter$cultureresults <- factor(encounter$cultureresults,
   labels = c("No growth/sterile culture", "Normal flora", "Microorganisms")
 )
 # Pulmonary exacerbations
-encounter$pe_assessment[encounter$pe_assessment == 5] <- NA
-encounter$PEx <- factor(encounter$pe_assessment,
-  levels = 1:4,
-  labels = c(
-    "Absent", "Mild, moderate, or severe exacerbation",
-    "Mild, moderate, or severe exacerbation",
-    "Mild, moderate, or severe exacerbation"
-  )
+encounter$PEx <- factor(encounter$encounterlocation,
+  levels = c("Clinic", "Hospital", "Home IV", "Other", "5", "6"),
+  labels = c("No PEx", "PEx", "PEx", "No PEx", "No PEx", "No PEx")
 )
 # Merge
 encounter <- left_join(
   encounter,
-  demo %>% select(eDWID, Race, Gender, Modulator_trikafta_first_date)
+  demo %>% select(eDWID, Race, Gender, Modulator_trikafta_first_date),
+  by = join_by(eDWID)
 )
 encounter <- left_join(encounter,
   annual %>% select(eDWID, ReviewYear, Insurance, pregnant),
@@ -145,7 +141,7 @@ hospitalizations <- hospitalizations %>%
     encounterdate = seq(CareEpi_StartDt, CareEpi_EndDt, by = "day")
   ) %>%
   mutate(hospitalized = "Yes")
-encounter <- 
+encounter <-
   left_join(encounter, hospitalizations, by = join_by(eDWID, encounterdate))
 # Variables for flowchart
 n_enc_1 <- nrow(encounter)
@@ -160,6 +156,7 @@ n_people_2 <- length(unique(encounter$eDWID))
 hosp <- which(encounter$hospitalized == "Yes" |
   encounter$encounterlocation %in% c("Hospital", "Home IV"))
 n_people_hosp <- length(unique(encounter$eDWID[hosp]))
+encounter_w_hosps <- encounter
 encounter <- encounter[-hosp, ]
 n_enc_3 <- nrow(encounter)
 n_people_3 <- length(unique(encounter$eDWID))
@@ -287,6 +284,6 @@ flow_chart <- tibble(
   )
 )
 # Save
-save(encounter, t1_participant, flow_chart, continuous_outcomes,
+save(encounter, t1_participant, flow_chart, continuous_outcomes, encounter_w_hosps,
   file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/outcomes_dataset.RData"
 )

@@ -1192,194 +1192,267 @@ change_mod_slopes_ci$confint %>%
 
 ## Number of Pulmonary Exacerbations
 
-<!-- ### Full cohort -->
+```{r}
+# Need to do some re-cleaning for the dataset that includes exacerbations
+# Pregnancies
+preg <- which(encounter_w_hosps$pregnant == 1)
+encounter_w_hosps <- encounter_w_hosps[-preg, ]
+# Days from ETI start
+early <- which(encounter_w_hosps$Days < -365.25 * 3)
+late <- which(encounter_w_hosps$Days > 365.25 * 2)
+encounter_w_hosps <- encounter_w_hosps[-early, ]
+encounter_w_hosps <- encounter_w_hosps[-late, ]
+# Lung function cutoffs
+lower <- 10
+upper <- 150
+# Remove impossible lung function values
+low_fev1 <- which(encounter_w_hosps$gli_fev1_ppred_rn < lower)
+high_fev1 <- which(encounter_w_hosps$gli_fev1_ppred_rn > upper)
+encounter_w_hosps$gli_fev1_ppred_rn[low_fev1] <- NA
+encounter_w_hosps$gli_fev1_ppred_rn[high_fev1] <- NA
+low_fvc <- which(encounter_w_hosps$gli_fvc_ppred_rn < lower)
+high_fvc <- which(encounter_w_hosps$gli_fvc_ppred_rn > upper)
+encounter_w_hosps$gli_fvc_ppred_rn[low_fvc] <- NA
+encounter_w_hosps$gli_fvc_ppred_rn[high_fvc] <- NA
+# Get some summary statistics by participant
+t1_participant <- encounter_w_hosps %>%
+  group_by(eDWID) %>%
+  summarise(
+    `Years With Data` = length(unique(reviewyear)),
+    `Number of Encounters` = n(),
+    `Number of Encounters Pre-ETI` = sum(Days <= 0),
+    `Number of Encounters Post-ETI` = sum(Days > 0),
+    Age = last(na.omit(encounterage[Days <= 0])),
+    across(all_of(continuous_outcomes), \(x) last(na.omit(x[Days <= 0]))),
+    Gender = names(sort(table(Gender), decreasing = TRUE))[1],
+    Race = names(sort(table(Race), decreasing = TRUE))[1],
+    Insurance = names(sort(table(Insurance), decreasing = TRUE))[1],
+    .groups = "drop"
+  )
+no_post <-
+  t1_participant$eDWID[t1_participant$`Number of Encounters Post-ETI` == 0]
+no_post_visits <- which(encounter_w_hosps$eDWID %in% no_post)
+encounter_w_hosps <- encounter_w_hosps[-no_post_visits, ]
+# Pre vs. post variable
+encounter_w_hosps$pre_post <- factor(encounter_w_hosps$Days > 0,
+  levels = c(F, T), labels = c("Pre-ETI", "Post-ETI")
+)
+# Prior modulator use
+prior_mods <- encounter_w_hosps %>%
+  select(eDWID, Days, vx661comb, vx445comb, Vx770, Vx809comb) %>%
+  filter(Days < 0) %>%
+  group_by(eDWID) %>%
+  summarise(prior_modulator = any(vx661comb == 1) | any(vx445comb == 1) |
+    any(Vx770 == 1) | any(Vx809comb))
+prior_mods$prior_modulator <-
+  fct_na_value_to_level(factor(prior_mods$prior_modulator), level = "No")
+prior_mods$prior_modulator <- factor(prior_mods$prior_modulator,
+  levels = c(T, "No"),
+  labels = c("Yes", "No")
+)
+encounter_w_hosps <-
+  left_join(encounter_w_hosps, prior_mods, by = join_by(eDWID))
+# On enzymes for pancreatic insufficiency
+encounter_w_hosps$isOnEnzymes <-
+  factor(encounter_w_hosps$isOnEnzymes, levels = 0:1, labels = c("No", "Yes"))
+# Pseudomonas
+encounter_w_hosps$pseudomonasaeruginosa[
+  is.na(encounter_w_hosps$pseudomonasaeruginosa)
+] <- 0
+encounter_w_hosps$pseudomonasaeruginosa <-
+  factor(encounter_w_hosps$pseudomonasaeruginosa,
+    levels = 0:1, labels = c("No", "Yes")
+  )
+```
 
-<!-- ```{r} -->
-<!-- # Fit mixed model with change point -->
-<!-- change_mod <- glmer( -->
-<!--   PEx ~ Years * Race + slope_change_years * Race + age_group + -->
-<!--     Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa + -->
-<!--     (1 | eDWID), -->
-<!--   family = "binomial", -->
-<!--   data = encounter -->
-<!-- ) -->
-<!-- # Model plot -->
-<!-- pop_dat <- data.frame(expand.grid( -->
-<!--   Years = -3:2, Race = unique(encounter$Race), age_group = "[18,30)", -->
-<!--   Insurance = "Private", prior_modulator = "Yes", -->
-<!--   isOnEnzymes = "Yes", pseudomonasaeruginosa = "No" -->
-<!-- )) -->
-<!-- pop_dat$slope_change_years <- (pop_dat$Years > 0) * pop_dat$Years -->
-<!-- pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T) -->
-<!-- pop_dat$pred <- pred$fit -->
-<!-- pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit) -->
-<!-- pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit) -->
-<!-- ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) + -->
-<!--   geom_point() + -->
-<!--   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) + -->
-<!--   geom_line() + -->
-<!--   xlab("Years from ETI Start") + -->
-<!--   ylab("gli_fev1_ppred_rn") + -->
-<!--   theme_classic() -->
-<!-- # Model summary -->
-<!-- change_mod %>% -->
-<!--   gtsummary::tbl_regression(intercept = T) %>% -->
-<!--   as_gt() %>% -->
-<!--   fmt_number(decimals = 3) -->
-<!-- # Table of predicted values -->
-<!-- pop_dat %>% -->
-<!--   select(-slope_change_years) %>% -->
-<!--   rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>% -->
-<!--   gt(caption = "Predicted Values at Various Timepoints") %>% -->
-<!--   fmt_number(decimals = 3) -->
-<!-- # Contrasts -->
-<!-- aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0) -->
-<!-- aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0) -->
-<!-- hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0) -->
-<!-- hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0) -->
-<!-- nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) -->
-<!-- nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) -->
-<!-- other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0) -->
-<!-- other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1) -->
-<!-- contr <- rbind( -->
-<!--   "Black/AA Pre-ETI" = aa_pre, -->
-<!--   "Black/AA Post-ETI" = aa_pre + aa_change, -->
-<!--   "H/L Pre-ETI" = hl_pre, -->
-<!--   "H/L Post-ETI" = hl_pre + hl_change, -->
-<!--   "NHW Pre-ETI" = nhw_pre, -->
-<!--   "NHW Post-ETI" = nhw_pre + nhw_change, -->
-<!--   "Other Pre-ETI" = other_pre, -->
-<!--   "Other Post-ETI" = other_pre + other_change -->
-<!-- ) -->
-<!-- change_mod_slopes <- glht(change_mod, linfct = contr) -->
-<!-- change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha()) -->
-<!-- change_mod_slopes_ci$confint %>% -->
-<!--   as.data.frame() %>% -->
-<!--   gt(caption = "Slopes by Race", rownames_to_stub = T) %>% -->
-<!--   fmt_number(decimals = 3) -->
-<!-- ``` -->
+### Full cohort
 
-<!-- ### Age < 18 at ETI initiation -->
+```{r}
+# Fit mixed model with change point
+pex_mod <- glmer(
+  PEx ~ Days + Race * pre_post + age_group +
+    Insurance + prior_modulator + isOnEnzymes + pseudomonasaeruginosa +
+    (1 | eDWID),
+  family = "binomial",
+  data = encounter_w_hosps
+)
+# Model plot
+pop_dat <- data.frame(expand.grid(
+  Years = -3:2, Race = unique(encounter$Race), age_group = "[18,30)",
+  Insurance = "Private", prior_modulator = "Yes",
+  isOnEnzymes = "Yes", pseudomonasaeruginosa = "No"
+))
+pop_dat$slope_change_years <- (pop_dat$Years > 0) * pop_dat$Years
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
+  xlab("Years from ETI Start") +
+  ylab("gli_fev1_ppred_rn") +
+  theme_classic()
+# Model summary
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt(caption = "Predicted Values at Various Timepoints") %>%
+  fmt_number(decimals = 3)
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
+)
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
+  fmt_number(decimals = 3)
+```
 
-<!-- The following models were not adjusted for age group. -->
+### Age < 18 at ETI initiation
 
-<!-- ```{r} -->
-<!-- # Fit mixed model with change point -->
-<!-- change_mod <- lmer( -->
-<!--   gli_fev1_ppred_rn ~ Years * Race + slope_change_years * Race + Insurance + -->
-<!--     prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID), -->
-<!--   data = encounter[encounter$age_eti_group == "[-Inf,18)", ] -->
-<!-- ) -->
-<!-- # Model plot -->
-<!-- pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T) -->
-<!-- pop_dat$pred <- pred$fit -->
-<!-- pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit) -->
-<!-- pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit) -->
-<!-- ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) + -->
-<!--   geom_point() + -->
-<!--   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) + -->
-<!--   geom_line() + -->
-<!--   xlab("Years from ETI Start") + -->
-<!--   ylab("gli_fev1_ppred_rn") + -->
-<!--   theme_classic() -->
-<!-- # Model summary -->
-<!-- change_mod %>% -->
-<!--   gtsummary::tbl_regression(intercept = T) %>% -->
-<!--   as_gt() %>% -->
-<!--   fmt_number(decimals = 3) -->
-<!-- # Table of predicted values -->
-<!-- pop_dat %>% -->
-<!--   select(-slope_change_years) %>% -->
-<!--   rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>% -->
-<!--   gt() %>% -->
-<!--   fmt_number(decimals = 3) -->
-<!-- # Contrasts -->
-<!-- aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0) -->
-<!-- aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0) -->
-<!-- hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0) -->
-<!-- hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0) -->
-<!-- nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) -->
-<!-- nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) -->
-<!-- other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0) -->
-<!-- other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1) -->
-<!-- contr <- rbind( -->
-<!--   "Black/AA Pre-ETI" = aa_pre, -->
-<!--   "Black/AA Post-ETI" = aa_pre + aa_change, -->
-<!--   "H/L Pre-ETI" = hl_pre, -->
-<!--   "H/L Post-ETI" = hl_pre + hl_change, -->
-<!--   "NHW Pre-ETI" = nhw_pre, -->
-<!--   "NHW Post-ETI" = nhw_pre + nhw_change, -->
-<!--   "Other Pre-ETI" = other_pre, -->
-<!--   "Other Post-ETI" = other_pre + other_change -->
-<!-- ) -->
-<!-- change_mod_slopes <- glht(change_mod, linfct = contr) -->
-<!-- change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha()) -->
-<!-- change_mod_slopes_ci$confint %>% -->
-<!--   as.data.frame() %>% -->
-<!--   gt(caption = "Slopes by Race", rownames_to_stub = T) %>% -->
-<!--   fmt_number(decimals = 3) -->
-<!-- ``` -->
+The following models were not adjusted for age group.
 
-<!-- ### Age >= 18 at ETI initiation -->
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  gli_fev1_ppred_rn ~ Years * Race + slope_change_years * Race + Insurance +
+    prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[-Inf,18)", ]
+)
+# Model plot
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
+  xlab("Years from ETI Start") +
+  ylab("gli_fev1_ppred_rn") +
+  theme_classic()
+# Model summary
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 3)
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
+)
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
+  fmt_number(decimals = 3)
+```
 
-<!-- The following models were not adjusted for age group. -->
+### Age >= 18 at ETI initiation
 
-<!-- ```{r} -->
-<!-- # Fit mixed model with change point -->
-<!-- change_mod <- lmer( -->
-<!--   gli_fev1_ppred_rn ~ Years * Race + slope_change_years * Race + Insurance + -->
-<!--     prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID), -->
-<!--   data = encounter[encounter$age_eti_group == "[18, Inf)", ] -->
-<!-- ) -->
-<!-- # Model plot -->
-<!-- pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T) -->
-<!-- pop_dat$pred <- pred$fit -->
-<!-- pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit) -->
-<!-- pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit) -->
-<!-- ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) + -->
-<!--   geom_point() + -->
-<!--   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) + -->
-<!--   geom_line() + -->
-<!--   xlab("Years from ETI Start") + -->
-<!--   ylab("gli_fev1_ppred_rn") + -->
-<!--   theme_classic() -->
-<!-- # Model summary -->
-<!-- change_mod %>% -->
-<!--   gtsummary::tbl_regression(intercept = T) %>% -->
-<!--   as_gt() %>% -->
-<!--   fmt_number(decimals = 3) -->
-<!-- # Table of predicted values -->
-<!-- pop_dat %>% -->
-<!--   select(-slope_change_years) %>% -->
-<!--   rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>% -->
-<!--   gt() %>% -->
-<!--   fmt_number(decimals = 3) -->
-<!-- # Contrasts -->
-<!-- aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0) -->
-<!-- aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0) -->
-<!-- hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0) -->
-<!-- hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0) -->
-<!-- nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) -->
-<!-- nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) -->
-<!-- other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0) -->
-<!-- other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1) -->
-<!-- contr <- rbind( -->
-<!--   "Black/AA Pre-ETI" = aa_pre, -->
-<!--   "Black/AA Post-ETI" = aa_pre + aa_change, -->
-<!--   "H/L Pre-ETI" = hl_pre, -->
-<!--   "H/L Post-ETI" = hl_pre + hl_change, -->
-<!--   "NHW Pre-ETI" = nhw_pre, -->
-<!--   "NHW Post-ETI" = nhw_pre + nhw_change, -->
-<!--   "Other Pre-ETI" = other_pre, -->
-<!--   "Other Post-ETI" = other_pre + other_change -->
-<!-- ) -->
-<!-- change_mod_slopes <- glht(change_mod, linfct = contr) -->
-<!-- change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha()) -->
-<!-- change_mod_slopes_ci$confint %>% -->
-<!--   as.data.frame() %>% -->
-<!--   gt(caption = "Slopes by Race", rownames_to_stub = T) %>% -->
-<!--   fmt_number(decimals = 3) -->
-<!-- ``` -->
+The following models were not adjusted for age group.
+
+```{r}
+# Fit mixed model with change point
+change_mod <- lmer(
+  gli_fev1_ppred_rn ~ Years * Race + slope_change_years * Race + Insurance +
+    prior_modulator + isOnEnzymes + pseudomonasaeruginosa + (1 | eDWID),
+  data = encounter[encounter$age_eti_group == "[18, Inf)", ]
+)
+# Model plot
+pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
+  xlab("Years from ETI Start") +
+  ylab("gli_fev1_ppred_rn") +
+  theme_classic()
+# Model summary
+change_mod %>%
+  gtsummary::tbl_regression(intercept = T) %>%
+  as_gt() %>%
+  fmt_number(decimals = 3)
+# Table of predicted values
+pop_dat %>%
+  select(-slope_change_years) %>%
+  rename(gli_fev1_ppred_rn = pred, ci.ll = ll, ci.ul = ul) %>%
+  gt() %>%
+  fmt_number(decimals = 3)
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0)
+aa_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0)
+hl_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+nhw_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+other_pre <- c(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0)
+other_change <- c(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+contr <- rbind(
+  "Black/AA Pre-ETI" = aa_pre,
+  "Black/AA Post-ETI" = aa_pre + aa_change,
+  "H/L Pre-ETI" = hl_pre,
+  "H/L Post-ETI" = hl_pre + hl_change,
+  "NHW Pre-ETI" = nhw_pre,
+  "NHW Post-ETI" = nhw_pre + nhw_change,
+  "Other Pre-ETI" = other_pre,
+  "Other Post-ETI" = other_pre + other_change
+)
+change_mod_slopes <- glht(change_mod, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Race", rownames_to_stub = T) %>%
+  fmt_number(decimals = 3)
+```
 
 ## BMI
 
