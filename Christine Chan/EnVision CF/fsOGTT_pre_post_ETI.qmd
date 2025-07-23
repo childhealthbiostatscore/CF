@@ -56,8 +56,9 @@ df$pre_post <-
   factor(df$Date >= df$eti_start, levels = c(F, T), labels = c("Pre", "Post"))
 # Select columns for EnVision per Monique and combine race and ethnicity
 df <- df %>%
+  mutate(gem_id = NA, study = "EnVision CF") %>%
   select(
-    study_id, Date, age_visit, sex, origin_race, ethnicity, CFTR,
+    study_id, gem_id, study, Date, age_visit, sex, origin_race, ethnicity, CFTR,
     pancreatic_status, corrector___4, pre_post, bmi, fev1,
     Diagnosis, Glucose_0:Glucose_180, Insulin_0:Insulin_180,
     C.Peptide_0:C.Peptide_180
@@ -83,24 +84,27 @@ df$race_ethnicity <- factor(df$race_ethnicity,
     "Hispanic", "Other/Multiple", "Other/Multiple", "Other/Multiple", "Hispanic", "White", "White"
   )
 )
-df$pancreatic_status <- factor(df$pancreatic_status, levels = 1:2)
+df$pancreatic_status <- factor(df$pancreatic_status,
+  levels = 1:2,
+  labels = c("Sufficient", "Insufficient")
+)
 df$ETI <- factor(df$ETI, levels = 0:1, labels = c("No", "Yes"))
 # Select the same columns from GEM
 gem <- gem %>%
-  mutate(ETI = 0, pre_post = "Pre") %>%
+  mutate(ETI = 0, pre_post = "Pre", study_id = NA, study = "GEM-CF") %>%
   select(
-    subject_id, date_of_visit, age_at_visit_1, gender, race_ethnicity,
-    cf_genotype, cf_pancreatic, ETI, pre_post, average_bmi, fev1_percent,
-    group_category, lab_ogtt_fasting, min_10_glucose, min_30_glucose,
-    lab_ogtt_1_hour_glucose, min_90_glucose, lab_ogtt_2_hour_glucose,
-    min_150_glucose, min_180_glucose, min_0_insulin, min_10_insulin,
-    min_30_insulin, min_60_insulin, min_90_insulin, min_120_insulin,
-    min_150_insulin, min_180_insulin, min_0_c_peptide, min_10_c_peptide,
-    min_30_c_peptide, min_60_c_peptide, min_90_c_peptide, min_120_c_peptide,
-    min_150_c_peptide, min_180_c_peptide
+    study_id, subject_id, study, date_of_visit, age_at_visit_1, gender,
+    race_ethnicity, cf_genotype, cf_pancreatic, ETI, pre_post, average_bmi,
+    fev1_percent, group_category, lab_ogtt_fasting, min_10_glucose,
+    min_30_glucose, lab_ogtt_1_hour_glucose, min_90_glucose,
+    lab_ogtt_2_hour_glucose, min_150_glucose, min_180_glucose,
+    min_0_insulin, min_10_insulin, min_30_insulin, min_60_insulin,
+    min_90_insulin, min_120_insulin, min_150_insulin, min_180_insulin,
+    min_0_c_peptide, min_10_c_peptide, min_30_c_peptide, min_60_c_peptide,
+    min_90_c_peptide, min_120_c_peptide, min_150_c_peptide, min_180_c_peptide
   ) %>%
   rename(
-    study_id = subject_id, Date = date_of_visit, age_visit = age_at_visit_1,
+    gem_id = subject_id, Date = date_of_visit, age_visit = age_at_visit_1,
     sex = gender, CFTR = cf_genotype, pancreatic_status = cf_pancreatic,
     bmi = average_bmi, fev1 = fev1_percent, Diagnosis = group_category,
     min_0_glucose = lab_ogtt_fasting, min_60_glucose = lab_ogtt_1_hour_glucose,
@@ -160,7 +164,10 @@ gem$CFTR <- factor(gem$CFTR,
     "Other/Other", "Other/Other", "Other/Other", "Other/Other"
   )
 )
-gem$pancreatic_status <- factor(gem$pancreatic_status, levels = 1:2)
+gem$pancreatic_status <- factor(gem$pancreatic_status,
+  levels = 1:2,
+  labels = c("Sufficient", "Insufficient")
+)
 gem$ETI <- factor(gem$ETI, levels = 0:1, labels = c("No", "Yes"))
 gem$Diagnosis <- factor(gem$Diagnosis,
   levels = 1:4,
@@ -170,13 +177,15 @@ df$Diagnosis <- factor(df$Diagnosis,
   levels = c("NGT", "IFG", "IGT", "INDET", "CFRD"),
   labels = c("NGT", "AGT", "AGT", "AGT", "CFRD")
 )
+# IDs
+gem$study_id <- ids$`EnVision ID`[match(gem$gem_id, ids$`GEM ID`)]
+df$gem_id <- ids$`GEM ID`[match(df$study_id, ids$`EnVision ID`)]
 # Limit GEM per Monique's list
-gem <- gem %>% filter(study_id %in% ids$`GEM ID`)
-# Convert to EnVision IDs
-gem$study_id <- ids$`EnVision ID`[match(gem$study_id, ids$`GEM ID`)]
-# Merge, keep only pre/post
-df <- full_join(df, gem) %>% filter(!is.na(pre_post))
+gem <- gem %>% filter(gem_id %in% ids$`GEM ID`)
+# Merge, keep only pre/post, sort by ID and date
+df <- rbind(df, gem) %>% filter(!is.na(pre_post))
 df$pre_post <- factor(df$pre_post, levels = c("Pre", "Post"))
+df <- df %>% arrange(study_id, Date)
 # Write for checking
 write.csv(df,
   file = "./Data_Clean/fsOGTT_pre_post_ETI.csv",
