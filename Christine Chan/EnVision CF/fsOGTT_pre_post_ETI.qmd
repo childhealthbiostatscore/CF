@@ -89,6 +89,11 @@ df$pancreatic_status <- factor(df$pancreatic_status,
   labels = c("Sufficient", "Insufficient")
 )
 df$ETI <- factor(df$ETI, levels = 0:1, labels = c("No", "Yes"))
+# Convert C-peptide level from pmol/L to ng/mL (multiply by 0.003)
+df[, grep("C.Peptide_.*", colnames(df))] <-
+  lapply(df[, grep("C.Peptide_.*", colnames(df))], function(c) {
+    c * 0.003
+  })
 # Select the same columns from GEM
 gem <- gem %>%
   mutate(ETI = 0, pre_post = "Pre", study_id = NA, study = "GEM-CF") %>%
