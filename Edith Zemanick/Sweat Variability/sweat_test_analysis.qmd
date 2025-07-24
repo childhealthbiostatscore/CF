@@ -140,6 +140,23 @@ df$Diagnosis <- factor(df$Diagnosis,
   levels = c("Cystic Fibrosis", "CFTR-related disorder", "CRMS", "Non-CF"),
   labels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "CFTR-RD or CRMS", "Non-CF")
 )
+# Additional changes based on Angela's review
+df$Diagnosis[which(is.na(df$Name))] <- "Cystic Fibrosis"
+df$Diagnosis[400] <- "Cystic Fibrosis"
+df$Na[541] <- 69
+# Angela reviewed a random set of 75 patients and requested the changes below
+# See the "random_pull.csv" document for details
+# Changes done by row number to avoid PHI in GitHub
+df$Cl[1473] <- 103.5
+df$Na[505] <- 42.6
+df$Na[238] <- 73
+df$Na[541] <- 69
+df$Na[747] <- 88.9
+# Remove people per Angela's recommendation and duplicates based on DOB review
+df <- df[-c(
+  78, 79, 183, 257, 259, 270, 314, 342, 691, 719, 724, 737, 812, 903, 1012,
+  1066, 1126, 1151, 1202, 1209, 1222, 1224, 1340, 1428, 1456
+), ]
 # Set table options
 mycontrols <- tableby.control(
   numeric.stats = c("N", "Nmiss", "meansd", "medianq1q3", "range")
@@ -149,44 +166,11 @@ write.csv(df,
   file = "./Data_Cleaned/sweat_variability_analysis_dataset.csv",
   row.names = F, na = ""
 )
-# Additional lists for Angela
-write.csv(
-  df %>%
-    filter(Diagnosis == "Non-CF" & Cl >= 60),
-  file = "./Data_Cleaned/sweat_variability_non_cf_cl_60.csv",
-  row.names = F, na = ""
-)
-write.csv(
-  df %>%
-    filter(Diagnosis == "Cystic Fibrosis" & `Na:Cl` >= 1.2),
-  file = "./Data_Cleaned/sweat_variability_cf_nacl_1_2.csv",
-  row.names = F, na = ""
-)
-write.csv(
-  df %>%
-    filter(Diagnosis == "Non-CF" & `Na:Cl` < 1.2),
-  file = "./Data_Cleaned/sweat_variability_non_cf_nacl_1_2.csv",
-  row.names = F, na = ""
-)
 ```
 
-# Data cleaning steps
+# Full Cohort
 
-- Imported re-identified CHCO data from Elin (5,046 rows and 4,748 unique IDs)
-- Removed rows with `Demographics Available` not equal to `TRUE` and selected each person's earliest test by age.
-  - This resulted in 3,123 rows with 3,084 unique IDs.
-- Merged in the diagnoses from Angela.
-- Values below the limit of detection were replaced with half the limit (e.g. "LESS THAN 10" was replaced with 9). Approximately 5% of the values were below the L.O.D.
-
-- Imported NJH data (1,958 rows with 1,748 unique IDs) and merged in diagnoses from Katie.
-- Removed 1,662 rows with `Demographics Available` not equal to `TRUE` (all of these were `FALSE`)
-  - This resulted in 172 rows with unique IDs.
-- Concatenated the CHCO and NJH data and removed duplicate rows, resulting in 3,178 rows with 3,162 unique IDs.
-- For the remaining people with multiple sweat tests (i.e. tests from both CHCO and NJH), kept only the earliest test (based on age at test). This resulted in 3,169 rows with 3,162 unique IDs.
-- The remaining 7 people with different values for the same test in the CHCO and NJH data were excluded. The final analysis dataset includes 3,155 unique participants, 3,111 of which have a diagnosis.
-- For people with both left and right arm values, the two were averaged.
-
-# Table 1: Participant Demographics by Diagnosis
+## Table 1: Participant Demographics by Diagnosis
 
 ```{r results='asis'}
 summary(tableby(Diagnosis ~ Sex + Age + Na + Cl + `Na:Cl` + K,
@@ -194,9 +178,9 @@ summary(tableby(Diagnosis ~ Sex + Age + Na + Cl + `Na:Cl` + K,
 ))
 ```
 
-# Boxplots
+## Boxplots
 
-## Chloride
+### Chloride
 
 ```{r}
 #| warning: false
@@ -206,7 +190,7 @@ clp <- ggplot(df, aes(x = Diagnosis, y = Cl)) +
 clp
 ```
 
-## Sodium
+### Sodium
 
 ```{r}
 #| warning: false
@@ -216,7 +200,7 @@ nap <- ggplot(df, aes(x = Diagnosis, y = Na)) +
 nap
 ```
 
-## Na:Cl
+### Na:Cl
 
 ```{r}
 #| warning: false
@@ -239,9 +223,9 @@ ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
 ratiop
 ```
 
-# Histograms and Density Plots
+## Histograms and Density Plots
 
-## Chloride
+### Chloride
 
 ```{r}
 #| warning: false
@@ -259,7 +243,7 @@ ggplot(df, aes(x = Cl, fill = Diagnosis)) +
   theme(axis.title.y = element_blank())
 ```
 
-## Sodium
+### Sodium
 
 ```{r}
 #| warning: false
@@ -277,7 +261,7 @@ ggplot(df, aes(x = Na, fill = Diagnosis)) +
   theme(axis.title.y = element_blank())
 ```
 
-## Na:Cl
+### Na:Cl
 
 ```{r}
 #| warning: false
@@ -302,7 +286,7 @@ ggplot(df, aes(x = `Na:Cl`, fill = Diagnosis)) +
   theme(axis.title.y = element_blank())
 ```
 
-# Na:Cl ROC Curves
+## Na:Cl ROC Curves
 
 ```{r}
 # Fit a multiclass ROC
@@ -329,3 +313,187 @@ kable(roc_table, digits = 3)
 ```
 
 - The multiclass AUC for Na:Cl is `r round(as.numeric(auc(mc_roc)),3)`. 
+
+### Individual ROC Curves
+
+```{r}
+plot(roc_list[[2]],
+  print.auc = T, print.thres = T,
+  main = "Cystic Fibrosis vs. Non-CF"
+)
+plot(roc_list[[1]],
+  print.auc = T, print.thres = T,
+  main = "CFTR-RD or CRMS vs. Cystic Fibrosis"
+)
+plot(roc_list[[3]],
+  print.auc = T, print.thres = T,
+  main = "CFTR-RD or CRMS vs. Non-CF"
+)
+```
+
+# Excluding Cl $\leq$ 30
+
+```{r}
+df <- df %>% filter(Cl > 30)
+```
+
+## Table 1: Participant Demographics by Diagnosis
+
+```{r results='asis'}
+summary(tableby(Diagnosis ~ Sex + Age + Na + Cl + `Na:Cl` + K,
+  data = df, control = mycontrols
+))
+```
+
+## Boxplots
+
+### Chloride
+
+```{r}
+#| warning: false
+clp <- ggplot(df, aes(x = Diagnosis, y = Cl)) +
+  geom_boxplot() +
+  theme_bw()
+clp
+```
+
+### Sodium
+
+```{r}
+#| warning: false
+nap <- ggplot(df, aes(x = Diagnosis, y = Na)) +
+  geom_boxplot() +
+  theme_bw()
+nap
+```
+
+### Na:Cl
+
+```{r}
+#| warning: false
+ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_hline(yintercept = 1.25, color = "red") +
+  theme_bw() +
+  ylab("Na:Cl") +
+  xlab("Modulator")
+ratiop
+ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_hline(yintercept = 1.25, color = "red") +
+  ylim(0, 2) +
+  theme_bw() +
+  ylab("Na:Cl") +
+  xlab("Modulator")
+ratiop
+```
+
+## Histograms and Density Plots
+
+### Chloride
+
+```{r}
+#| warning: false
+ggplot(df, aes(x = Cl, fill = Diagnosis)) +
+  geom_histogram(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
+  geom_histogram(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
+  geom_histogram(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+ggplot(df, aes(x = Cl, fill = Diagnosis)) +
+  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+```
+
+### Sodium
+
+```{r}
+#| warning: false
+ggplot(df, aes(x = Na, fill = Diagnosis)) +
+  geom_histogram(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
+  geom_histogram(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
+  geom_histogram(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+ggplot(df, aes(x = Na, fill = Diagnosis)) +
+  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+```
+
+### Na:Cl
+
+```{r}
+#| warning: false
+ggplot(df, aes(x = `Na:Cl`, fill = Diagnosis)) +
+  geom_histogram(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
+  geom_histogram(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
+  geom_histogram(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+ggplot(df, aes(x = `Na:Cl`, fill = Diagnosis)) +
+  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+ggplot(df, aes(x = `Na:Cl`, fill = Diagnosis)) +
+  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
+  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  xlim(0, 2) +
+  theme_bw() +
+  theme(axis.title.y = element_blank())
+```
+
+## Na:Cl ROC Curves
+
+```{r}
+# Fit a multiclass ROC
+mc_roc <- multiclass.roc(df$Diagnosis, df$`Na:Cl`, quiet = T)
+roc_list <- list(
+  "Cystic Fibrosis vs. Non-CF" = mc_roc$rocs[[2]],
+  "CFTR-RD or CRMS vs. Cystic Fibrosis" = mc_roc$rocs[[1]],
+  "CFTR-RD or CRMS vs. Non-CF" = mc_roc$rocs[[3]]
+)
+ggroc(roc_list, legacy.axes = T) +
+  theme_bw() +
+  theme(legend.title = element_blank())
+roc_table <- lapply(roc_list, function(r) {
+  coords(r, "best",
+    best.method = "youden",
+    ret = c(
+      "threshold", "sensitivity", "specificity", "accuracy", "tpr", "fpr",
+      "tnr", "fnr"
+    )
+  )
+})
+roc_table <- do.call(rbind, roc_table)
+kable(roc_table, digits = 3)
+```
+
+- The multiclass AUC for Na:Cl is `r round(as.numeric(auc(mc_roc)),3)`. 
+
+### Individual ROC Curves
+
+```{r}
+plot(roc_list[[2]],
+  print.auc = T, print.thres = T,
+  main = "Cystic Fibrosis vs. Non-CF"
+)
+plot(roc_list[[1]],
+  print.auc = T, print.thres = T,
+  main = "CFTR-RD or CRMS vs. Cystic Fibrosis"
+)
+plot(roc_list[[3]],
+  print.auc = T, print.thres = T,
+  main = "CFTR-RD or CRMS vs. Non-CF"
+)
+```
