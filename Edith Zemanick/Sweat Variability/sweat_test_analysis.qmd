@@ -321,11 +321,11 @@ kable(roc_table, digits = 3)
 ```{r}
 plot(roc_list[[2]],
   print.auc = T, print.thres = T,
-  main = "Cystic Fibrosis vs. Non-CF"
+  main = "Cystic Fibrosis vs. CFTR-RD or CRMS"
 )
 plot(roc_list[[1]],
   print.auc = T, print.thres = T,
-  main = "CFTR-RD or CRMS vs. Cystic Fibrosis"
+  main = "Cystic Fibrosis vs. Non-CF"
 )
 plot(roc_list[[3]],
   print.auc = T, print.thres = T,
@@ -488,11 +488,11 @@ kable(roc_table, digits = 3)
 ```{r}
 plot(roc_list[[2]],
   print.auc = T, print.thres = T,
-  main = "Cystic Fibrosis vs. Non-CF"
+  main = "Cystic Fibrosis vs. CFTR-RD or CRMS"
 )
 plot(roc_list[[1]],
   print.auc = T, print.thres = T,
-  main = "CFTR-RD or CRMS vs. Cystic Fibrosis"
+  main = "Cystic Fibrosis vs. Non-CF"
 )
 plot(roc_list[[3]],
   print.auc = T, print.thres = T,
