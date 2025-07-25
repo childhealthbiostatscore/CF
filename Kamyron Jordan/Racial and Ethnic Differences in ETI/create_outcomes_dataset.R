@@ -102,11 +102,6 @@ encounter$cultureresults <- factor(encounter$cultureresults,
   levels = 1:3,
   labels = c("No growth/sterile culture", "Normal flora", "Microorganisms")
 )
-# Pulmonary exacerbations
-encounter$PEx <- factor(encounter$encounterlocation,
-  levels = c("Clinic", "Hospital", "Home IV", "Other", "5", "6"),
-  labels = c("No PEx", "PEx", "PEx", "No PEx", "No PEx", "No PEx")
-)
 # Merge
 encounter <- left_join(
   encounter,
@@ -143,6 +138,31 @@ hospitalizations <- hospitalizations %>%
   mutate(hospitalized = "Yes")
 encounter <-
   left_join(encounter, hospitalizations, by = join_by(eDWID, encounterdate))
+encounter$hospitalized[is.na(encounter$hospitalized)] <- "No"
+# Make pulmonary exacerbations dataset - models aren't working with
+# encounter-level data so use annualized info. For counting the number of
+# PEx in a year, look for "runs" of hospitalization and/or home IVs.
+pex_data <- encounter %>%
+  mutate(PEx = encounterlocation %in% c("Hospital", "Home IV") | hospitalized == "Yes") %>%
+  group_by(eDWID, reviewyear) %>%
+  summarise(
+    Race = last(Race),
+    age_eti_group = last(age_eti_group),
+    # Were they on ETI at their last visit of the year?
+    ETI = factor(sign(max(Days)),
+      levels = c(-1:1),
+      labels = c("Pre-ETI", "Pre-ETI", "Post-ETI")
+    ),
+    # Count PEx runs
+    num_pex = sum(rle(PEx)$values == "TRUE"),
+    .groups = "drop"
+  )
+pex_data$any_pex <- pex_data$num_pex > 0
+# Show this to Scott and Kam
+check <- encounter %>%
+  mutate(PEx = encounterlocation %in% c("Hospital", "Home IV") | hospitalized == "Yes") %>%
+  select(eDWID, encounterdate, encounterlocation, hospitalized, PEx) %>%
+  filter(eDWID == "900060748")
 # Variables for flowchart
 n_enc_1 <- nrow(encounter)
 n_people_1 <- length(unique(encounter$eDWID))
@@ -156,7 +176,6 @@ n_people_2 <- length(unique(encounter$eDWID))
 hosp <- which(encounter$hospitalized == "Yes" |
   encounter$encounterlocation %in% c("Hospital", "Home IV"))
 n_people_hosp <- length(unique(encounter$eDWID[hosp]))
-encounter_w_hosps <- encounter
 encounter <- encounter[-hosp, ]
 n_enc_3 <- nrow(encounter)
 n_people_3 <- length(unique(encounter$eDWID))
@@ -284,6 +303,6 @@ flow_chart <- tibble(
   )
 )
 # Save
-save(encounter, t1_participant, flow_chart, continuous_outcomes, encounter_w_hosps,
+save(encounter, t1_participant, flow_chart, continuous_outcomes, pex_data,
   file = "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/outcomes_dataset.RData"
 )
