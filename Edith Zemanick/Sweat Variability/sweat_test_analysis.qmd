@@ -116,8 +116,10 @@ df$Cl_mean <- rowMeans(df[, c("Cl_Left", "Cl_Right")], na.rm = T)
 df$Cl <- coalesce(df$Cl, df$Cl_mean)
 df$K_mean <- rowMeans(df[, c("K_Left", "K_Right")], na.rm = T)
 df$K <- coalesce(df$K, df$K_mean)
-# Change Cl under 10 to missing
+# Change Cl under 10 or over 160 to missing
 df$Cl[df$Cl < 10] <- NA
+df$Cl[df$Cl > 160] <- NA
+# Remove Na under 10 as well
 df$Na[df$Na < 10] <- NA
 # Calculate Na:Cl ratio
 df$`Na:Cl` <- df$Na / df$Cl
