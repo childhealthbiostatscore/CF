@@ -158,11 +158,6 @@ pex_data <- encounter %>%
     .groups = "drop"
   )
 pex_data$any_pex <- pex_data$num_pex > 0
-# Show this to Scott and Kam
-check <- encounter %>%
-  mutate(PEx = encounterlocation %in% c("Hospital", "Home IV") | hospitalized == "Yes") %>%
-  select(eDWID, encounterdate, encounterlocation, hospitalized, PEx) %>%
-  filter(eDWID == "900060748")
 # Variables for flowchart
 n_enc_1 <- nrow(encounter)
 n_people_1 <- length(unique(encounter$eDWID))
