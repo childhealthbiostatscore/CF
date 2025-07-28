@@ -381,10 +381,10 @@ fig2 <- ggplot(agg_counts[!is.na(agg_counts$Coughs), ], aes(
   x = Night, y = Coughs, group = factor(sid)
 )) +
   geom_point(alpha = 0.1) +
-  geom_line(alpha = 0.2, aes(linetype = Diagnosis)) +
+  geom_point(data = agg_counts[agg_counts$Sick == "Yes", ], color = "red") +
   geom_smooth(color = "black", aes(group = Diagnosis, linetype = Diagnosis)) +
-  annotate("rect", xmin = 1, xmax = 29, ymin = 1, ymax = 275, alpha = 0.1) +
-  annotate("rect", xmin = 41, xmax = 76, ymin = 1, ymax = 275, alpha = 0.1) +
+  # annotate("rect", xmin = 1, xmax = 29, ymin = 1, ymax = 275, alpha = 0.1) +
+  # annotate("rect", xmin = 41, xmax = 76, ymin = 1, ymax = 275, alpha = 0.1) +
   ylim(c(1, 275)) +
   xlim(c(0, 100)) +
   theme_bw() +
@@ -1071,7 +1071,7 @@ p38_plot <- ggplot(p38, aes(x = Night, y = value)) +
   geom_line() +
   theme_bw() +
   theme(axis.title.y = element_blank()) +
-  facet_wrap(~name, nrow = 3, scales = "free")
+  facet_wrap(~name, nrow = 3, scales = "free_y")
 p38_plot
 ggsave(paste0(home_dir, "/Dissemination/Figures/participant_38.png"),
   plot = p38_plot, width = 9, height = 7, units = "in"
@@ -1108,7 +1108,7 @@ p2_plot <- ggplot(p2, aes(x = Night, y = value)) +
   geom_line() +
   theme_bw() +
   theme(axis.title.y = element_blank()) +
-  facet_wrap(~name, nrow = 3, scales = "free")
+  facet_wrap(~name, nrow = 3, scales = "free_y")
 p2_plot
 ggsave(paste0(home_dir, "/Dissemination/Figures/participant_2.png"),
   plot = p2_plot, width = 9, height = 7, units = "in"
@@ -1141,12 +1141,13 @@ p3 <- p3 %>%
 p3$name <- factor(p3$name,
   levels = c("Coughs", "CFQ-R Children Ages 12-13", "CFQ-R Caregivers 6-13")
 )
+p3$Night <- as.numeric(difftime(ymd(p3$Date), ymd("2024-05-07")))
 p3_plot <- ggplot(p3, aes(x = Night, y = value)) +
   geom_point() +
   geom_line() +
   theme_bw() +
   theme(axis.title.y = element_blank()) +
-  facet_wrap(~name, nrow = 3, scales = "free")
+  facet_wrap(~name, nrow = 3, scales = "free_y")
 p3_plot
 ggsave(paste0(home_dir, "/Dissemination/Figures/participant_3.png"),
   plot = p3_plot, width = 9, height = 7, units = "in"
