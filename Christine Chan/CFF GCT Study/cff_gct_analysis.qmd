@@ -334,19 +334,24 @@ ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
   device = "png"
 )
 # Dotplot
-dotplot <- ggplot(df, aes(x = Diagnosis, y = `GCT 60 min plasma`)) +
+dotplot <- ggplot(df, aes(
+  x = Diagnosis, y = `GCT 60 min plasma`,
+  colour = Diagnosis
+)) +
   geom_point() +
-  geom_hline(yintercept = 140, linetype = "dashed") +
-  geom_hline(yintercept = 150, linetype = "dashed") +
+  geom_hline(yintercept = 130, linetype = "dashed") +
   geom_hline(yintercept = 160, linetype = "dashed") +
   geom_hline(yintercept = 147, linetype = "dashed", size = 1) +
   ylab("GCTpl (mg/dL)") +
   theme_bw() +
-  scale_y_continuous(breaks = c(100, 140, 147, 150, 160))
-
+  scale_y_continuous(breaks = c(100, 130, 147, 160)) +
+  scale_color_manual(values = c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"))
 dotplot
-dotplot +
-  theme(text = element_blank())
+ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/dotplot.png",
+  dotplot,
+  height = 4, width = 6, units = "in", dpi = 600,
+  device = "png"
+)
 # Additional boxplots/dotplot per Christine and Larry
 plot_df <- df %>%
   pivot_longer(
@@ -393,7 +398,7 @@ plot_df <- df %>%
     names_to = "Measure", values_to = "Value"
   )
 # Dotplot
-dot_p1 <- ggplot(
+dot_rpg <- ggplot(
   plot_df[plot_df$Measure == "GCT 0 min plasma", ],
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
@@ -405,11 +410,11 @@ dot_p1 <- ggplot(
   theme_bw(base_size = 15) +
   scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
   theme(
-    legend.position = "none", plot.title = element_text(hjust = 0.5),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank()
+    plot.title = element_text(hjust = 0.5),
+    axis.title.x = element_blank(), axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
   )
-dot_p2 <- ggplot(
+dot_gctpl <- ggplot(
   plot_df[plot_df$Measure == "GCT 60 min plasma", ],
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
@@ -421,12 +426,12 @@ dot_p2 <- ggplot(
   theme_bw(base_size = 15) +
   scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
   theme(
-    legend.position = "none", plot.title = element_text(hjust = 0.5),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank()
+    plot.title = element_text(hjust = 0.5),
+    axis.title.y = element_blank(), axis.text.y = element_blank(),
+    axis.title.x = element_blank(), axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
   )
-dot_p3 <- ggplot(
+dot_rcg <- ggplot(
   plot_df[plot_df$Measure == "GCT 0 min capillary", ],
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
@@ -438,11 +443,11 @@ dot_p3 <- ggplot(
   scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
   theme(
     legend.position = "none", plot.title = element_text(hjust = 0.5),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank()
+    axis.title.y = element_blank(), axis.text.y = element_blank(),
+    axis.title.x = element_blank(), axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
   )
-dot_p4 <- ggplot(
+dot_gctcap <- ggplot(
   plot_df[plot_df$Measure == "GCT 60 min capillary", ],
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
@@ -453,12 +458,13 @@ dot_p4 <- ggplot(
   theme_bw(base_size = 15) +
   scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
   theme(
-    legend.position = "none", plot.title = element_text(hjust = 0.5),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank()
+    plot.title = element_text(hjust = 0.5),
+    axis.title.y = element_blank(), axis.text.y = element_blank(), 
+    axis.ticks.y = element_blank(),
+    axis.title.x = element_blank(), axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
   )
-dot_p5 <- ggplot(
+dot_hba1c <- ggplot(
   plot_df[plot_df$Measure == "HbA1c", ],
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
@@ -471,12 +477,14 @@ dot_p5 <- ggplot(
   scale_linetype_manual(values = c("Youden Index" = "dashed")) +
   theme(
     legend.title = element_blank(), plot.title = element_text(hjust = 0.5),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank()
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(), axis.ticks.x = element_blank()
   )
-dot_p <- dot_p1 + dot_p2 + dot_p3 + dot_p4 + dot_p5 + plot_layout(ncol = 5)
+dot_p <- dot_rpg + dot_rcg + dot_gctpl + dot_gctcap + dot_hba1c + 
+  plot_layout(ncol = 5,guides = 'collect')
 ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/dotplot2.png",
-  box_p,
+  dot_p,
+  height = 9, width = 12, units = "in", dpi = 600,
   device = "png"
 )
 # OGTT 1 hour and GCT 1 hour regression
