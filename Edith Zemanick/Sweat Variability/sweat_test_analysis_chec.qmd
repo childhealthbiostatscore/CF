@@ -49,6 +49,26 @@ chec <- chec %>% filter(!is.na(swsavg), site != "005 Buffalo, NY CC and Peds")
 # Calculate ratios
 chec$pre_ratio <- chec$swhsavgpm / chec$swhcavgpm
 chec$post_ratio <- chec$swsavg / chec$swcavg
+# Factor variable formatting
+chec$race_txt <- factor(chec$race_txt,
+  levels = c(
+    "White", "Black or African American", "American Indian or Alaska Native",
+    "Native Hawaiian or Other Pacific Islander", "More than One Race",
+    "Unknown or Not Reported"
+  )
+)
+chec$modqual <- factor(chec$modqual,
+  levels = c(
+    "Ivacaftor", "Lumacaftor / Ivacaftor",
+    "Tezacaftor / Ivacaftor", "Elexacaftor / Tezacaftor / Ivacaftor"
+  ),
+  labels = c("IVA", "LUM/IVA", "TEZ/IVA", "ELX/TEZ/IVA")
+)
+chec$agecat_txt <- factor(chec$agecat_txt,
+  levels = c(
+    "2-5 years", "6-11 years", "12-17 years", "18-25 years", ">=26 years"
+  )
+)
 # Long dataset for easier plotting and paired analysis
 chec_long <- chec %>%
   rename(
@@ -59,12 +79,15 @@ chec_long <- chec %>%
     names_pattern = "(.*)_(.*)",
     values_to = "count"
   )
-chec_long$pre_post <- factor(chec_long$pre_post, levels = c("pre", "post"))
+chec_long$pre_post <- factor(chec_long$pre_post,
+  levels = c("pre", "post"),
+  labels = c("Pre-Modulator", "Post-Modulator")
+)
 # Set table options
 mycontrols <-
   tableby.control(
-    numeric.stats = c("N", "Nmiss2", "meansd", "range"),
-    cat.stats = c("N", "Nmiss2", "countpct")
+    numeric.stats = c("N", "Nmiss", "meansd", "medianrange"),
+    cat.stats = c("N", "Nmiss", "countpct"), digits = 1
   )
 # Labels
 label(chec_long$cl) <- "Sweat Cl"
@@ -78,9 +101,10 @@ label(chec_long$ratio) <- "Sweat Na:Cl"
 
 ```{r results='asis'}
 t1 <- tableby(
-  modqual ~ sex + kwt(age, "N", "Nmiss2", "medianq1q3") + agecat_txt +
-    race_txt + genotype_group + swcavg + swhcavgpm + swsavg + swhsavgpm,
-  data = chec, cat.test = "fe", simulate.p.value = TRUE
+  modqual ~ sex + kwt(age) + agecat_txt +
+    race_txt + genotype_group + swcavg + swhcavgpm + swsavg + swhsavgpm +
+    pre_ratio + post_ratio,
+  data = chec, cat.test = "fe", simulate.p.value = TRUE, control = mycontrols
 )
 summary(t1, pfootnote = T)
 ```
@@ -91,9 +115,7 @@ summary(t1, pfootnote = T)
 
 ```{r results='asis'}
 pt1 <- paired(
-  pre_post ~
-    signed.rank(cl, "N", "Nmiss2", "medianq1q3", "range") +
-    signed.rank(na, "N", "Nmiss2", "medianq1q3", "range") +
+  pre_post ~ cl + na +
     signed.rank(ratio, "N", "Nmiss2", "medianq1q3", "range"),
   data = chec_long, id = subject,
   control = paired.control(signed.rank.exact = F)
@@ -246,15 +268,17 @@ ggplot(chec_long, aes(x = ratio, fill = pre_post)) +
 # Boxplots
 
 ```{r}
-ggplot(chec_long, aes(y = ratio, x = pre_post, fill = pre_post)) +
+ggplot(chec_long, aes(x = pre_post, y = ratio)) +
   geom_boxplot() +
   geom_signif(
-    comparison = list(c("pre", "post")), test = "wilcox.test",
-    test.args = list(paired = TRUE, exact = FALSE), y_position = 3.5,
-    map_signif_level = function(p) format.pval(p, digits = 3, eps = 0.001)
+    comparison = list(c("Pre-Modulator", "Post-Modulator")),
+    test = "wilcox.test", test.args = list(paired = TRUE, exact = FALSE),
+    y_position = 3.5, map_signif_level = function(p) 
+      format.pval(p, digits = 3, eps = 0.001)
   ) +
   theme_bw() +
-  scale_fill_manual(values = c("#EFB036", "#3B6790")) +
+  theme(legend.title = element_blank(), axis.title.x = element_blank()) +
+  ylab("Na:Cl Ratio") +
   facet_wrap(~modqual)
 ```
 
@@ -321,6 +345,8 @@ ggplot(pre_model_df, aes(y = swhcavgpm, x = pre_ratio)) +
 model_df <- chec_long %>%
   select(subject, cl, na, ratio, pre_post) %>%
   drop_na()
+model_df$cl = model_df$cl / 10
+model_df$na = model_df$na / 10
 # From Amalia
 m1 <- glm(pre_post ~ cl, data = model_df, family = "binomial")
 m2 <- glm(pre_post ~ cl + na, data = model_df, family = "binomial")
@@ -344,7 +370,9 @@ model_df$m4_pred <- factor(predict(m4, type = "response") > 0.5,
 tm <- lmer(cl ~ pre_post * na + (1 | subject), data = model_df)
 ```
 
-I tried fitting Amalia's models with a random effect for participant, but the random effect variance was 0 and the model estimates are the exact same as a regular logistic model. We think that this is because the correlation in responses is accounted for by the design, so the mized effects are not necessary. This is worth thinking about a little bit more, but for now we'll go ahead with the simplified logistic models.
+I tried fitting Amalia's models with a random effect for participant, but the random effect variance was 0 and the model estimates are the exact same as a regular logistic model. We think that this is because the correlation in responses is accounted for by the design, so the mixed effects are not necessary. This is worth thinking about a little bit more, but for now we'll go ahead with the simplified logistic models.
+
+Units in the following models are for a 10 unit change in sweat Na or Cl.
 
 ## Model 1
 
@@ -422,7 +450,7 @@ The main effects suggest that people on LUM/IVA or TEZ/IVA were less likely to h
 
 ```{r results='asis'}
 summary(tableby(post_cl ~ post_ratio + post_ratio_1.2,
-  data = chec[chec$modqual == "Elexacaftor / Tezacaftor / Ivacaftor", ],
+  data = chec[chec$modqual == "ELX/TEZ/IVA", ],
   control = list(
     numeric.stats = c("N", "Nmiss2", "meanCI", "range"),
     cat.stats = c("N", "Nmiss2", "countpct")
@@ -434,7 +462,7 @@ summary(tableby(post_cl ~ post_ratio + post_ratio_1.2,
 
 ```{r}
 sp_pre <- chec_long %>%
-  filter(pre_post == "pre") %>%
+  filter(pre_post == "Pre-Modulator") %>%
   ggplot(., aes(x = ratio, y = cl)) +
   geom_point() +
   geom_hline(yintercept = 60, color = "red") +
@@ -451,7 +479,7 @@ sp_pre
 
 ```{r}
 sp_post <- chec_long %>%
-  filter(pre_post == "post") %>%
+  filter(pre_post == "Post-Modulator") %>%
   ggplot(., aes(x = ratio, y = cl)) +
   geom_point() +
   geom_hline(yintercept = 60, color = "red") +
@@ -470,10 +498,7 @@ sp_post
 plot_df <- chec_long
 plot_df$modqual[plot_df$pre_post == "pre"] <- "Pre-Modulator"
 plot_df$modqual <- factor(plot_df$modqual,
-  levels = c(
-    "Pre-Modulator", "Lumacaftor / Ivacaftor", "Tezacaftor / Ivacaftor",
-    "Ivacaftor", "Elexacaftor / Tezacaftor / Ivacaftor"
-  )
+  levels = c("Pre-Modulator", "IVA", "LUM/IVA", "TEZ/IVA", "ELX/TEZ/IVA")
 )
 boxp <- ggplot(plot_df, aes(x = modqual, y = ratio)) +
   geom_boxplot() +
@@ -483,10 +508,11 @@ boxp <- ggplot(plot_df, aes(x = modqual, y = ratio)) +
 boxp
 ```
 
-## Combined figure
+## Combined figures
 
 ```{r}
 boxp / (sp_pre + sp_post)
+sp_pre + sp_post
 ```
 
 ## Change plot
