@@ -273,8 +273,9 @@ ggplot(chec_long, aes(x = pre_post, y = ratio)) +
   geom_signif(
     comparison = list(c("Pre-Modulator", "Post-Modulator")),
     test = "wilcox.test", test.args = list(paired = TRUE, exact = FALSE),
-    y_position = 3.5, map_signif_level = function(p) 
+    y_position = 3.5, map_signif_level = function(p) {
       format.pval(p, digits = 3, eps = 0.001)
+    }
   ) +
   theme_bw() +
   theme(legend.title = element_blank(), axis.title.x = element_blank()) +
@@ -345,8 +346,8 @@ ggplot(pre_model_df, aes(y = swhcavgpm, x = pre_ratio)) +
 model_df <- chec_long %>%
   select(subject, cl, na, ratio, pre_post) %>%
   drop_na()
-model_df$cl = model_df$cl / 10
-model_df$na = model_df$na / 10
+model_df$cl <- model_df$cl / 10
+model_df$na <- model_df$na / 10
 # From Amalia
 m1 <- glm(pre_post ~ cl, data = model_df, family = "binomial")
 m2 <- glm(pre_post ~ cl + na, data = model_df, family = "binomial")
