@@ -52,8 +52,15 @@ df$eti_start <- ifelse(df$corrector___4 == 1, df$corrector_start_date, NA)
 df <- df %>%
   group_by(study_id) %>%
   fill(eti_start, .direction = "downup")
+# Manually correct a few per Monique
+df$eti_start[df$study_id == "CC0001"] <- "2021-11-24"
+df$eti_start[df$study_id == "CC0023"] <- "2020-01-09"
+df$eti_start[df$study_id == "CC0026"] <- "2020-12-04"
 df$pre_post <-
   factor(df$Date >= df$eti_start, levels = c(F, T), labels = c("Pre", "Post"))
+df$pre_post[df$study_id == "CC0012"] <- "Pre"
+df$pre_post[df$study_id == "CC0017"] <- "Pre"
+df$pre_post[df$study_id == "CC0028"] <- "Pre"
 # Select columns for EnVision per Monique and combine race and ethnicity
 df <- df %>%
   mutate(gem_id = NA, study = "EnVision CF") %>%
