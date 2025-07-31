@@ -315,8 +315,6 @@ data_gs %>%
 
 # Comparison of scores between groups
 
-## Total disease feature score (orange)
-
 ```{r}
 # Import disease state
 outcomes <-
@@ -334,6 +332,11 @@ outcomes <- outcomes %>%
 scores <- rbind(data, data_dups[data_dups$scorer_repeat == 1, ])
 # Add gold standards
 scores <- rbind(scores, data_gs[data_gs$scorer == "GS", ])
+```
+
+## Feature score (orange)
+
+```{r}
 # Calculate the scores for each feature.
 # When calculating the scores, take the majority vote by scan, feature, and
 # location, since that's how they scored it.
@@ -370,4 +373,47 @@ feature_scores %>%
     ),
     statistic = all_continuous() ~ c("{median} ({p25}, {p75})", "{min}, {max}")
   )
+```
+
+## Lobe score (pink)
+
+```{r}
+# Lobe scores similar to above but we'll add over the lobes rather than the
+# features
+lobe_scores <- scores %>%
+  group_by(scan_id, Location, Feature) %>%
+  summarise(Majority = factor(sum(value == "Present"),
+    levels = 0:3, labels = c("Absent", "Absent", "Present", "Present")
+  ), .groups = "drop_last") %>%
+  summarise(Score = sum(Majority == "Present"), .groups = "drop")
+# Add outcome data
+lobe_scores <- left_join(lobe_scores, outcomes,
+  by = join_by(scan_id == cff_registry_id)
+)
+# Summary table
+lobe_scores %>%
+  pivot_wider(names_from = Location, values_from = Score) %>%
+  select(-scan_id) %>%
+  tbl_summary(by = `NTM-PD`, missing_text = "Missing")
+lobe_scores %>%
+  pivot_wider(names_from = Location, values_from = Score) %>%
+  select(-scan_id) %>%
+  tbl_summary(
+    by = `NTM-PD`, missing_text = "Missing",
+    type = list(
+      c("RUL", "RML", "RLL", "LUL", "Ling", "LLL") ~ "continuous2"
+    ),
+    statistic = all_continuous() ~ c("{median} ({p25}, {p75})", "{min}, {max}")
+  )
+```
+
+## Total score (pink)
+
+The way we are currently scoring CT scans, the lobe-wise and feature-wise sums are exactly the same.
+
+```{r}
+# Basically we are adding the two previous dataframes together
+# lobe_scores = lobe_scores %>% filter()
+# feature_scores = feature_scores %>% group_by(scan_id) %>%
+#   summarise(Total = sum(Score))
 ```
