@@ -356,17 +356,15 @@ ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/dotplot.png",
 plot_df <- df %>%
   pivot_longer(
     c(
-      `OGTT 0 min`, `OGTT 120 min`, `GCT 0 min plasma`, `GCT 60 min plasma`,
-      `GCT 60 min capillary`
+      `OGTT 0 min`, `OGTT 120 min`, `GCT 60 min plasma`
     ),
     names_to = "OGTT Timepoint", values_to = "Glucose"
   )
 plot_df$`OGTT Timepoint` <- factor(plot_df$`OGTT Timepoint`,
   levels = c(
-    "OGTT 0 min", "OGTT 120 min", "GCT 0 min plasma", "GCT 60 min plasma",
-    "GCT 60 min capillary"
+    "OGTT 0 min", "OGTT 120 min", "GCT 60 min plasma"
   ),
-  labels = c("Fasting", "OGTT-2hG", "RPG", "GCTpl", "GCTcap")
+  labels = c("Fasting", "OGTT-2hG", "GCTpl")
 )
 box_p <- ggplot(
   plot_df,
@@ -459,7 +457,7 @@ dot_gctcap <- ggplot(
   scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
   theme(
     plot.title = element_text(hjust = 0.5),
-    axis.title.y = element_blank(), axis.text.y = element_blank(), 
+    axis.title.y = element_blank(), axis.text.y = element_blank(),
     axis.ticks.y = element_blank(),
     axis.title.x = element_blank(), axis.text.x = element_blank(),
     axis.ticks.x = element_blank()
@@ -480,8 +478,8 @@ dot_hba1c <- ggplot(
     axis.text.x = element_blank(),
     axis.title.x = element_blank(), axis.ticks.x = element_blank()
   )
-dot_p <- dot_rpg + dot_rcg + dot_gctpl + dot_gctcap + dot_hba1c + 
-  plot_layout(ncol = 5,guides = 'collect')
+dot_p <- dot_rpg + dot_rcg + dot_gctpl + dot_gctcap + dot_hba1c +
+  plot_layout(ncol = 5, guides = "collect")
 ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/dotplot2.png",
   dot_p,
   height = 9, width = 12, units = "in", dpi = 600,
