@@ -21,7 +21,6 @@ library(tidyverse)
 library(redcapAPI)
 library(Hmisc)
 library(knitr)
-library(fastDummies)
 library(lmerTest)
 library(performance)
 # REDCap
@@ -48,7 +47,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 #| message: false
 #| warning: false
 # Import data from REDCap
-data <- exportRecordsTyped(rcon, labels = F)
+data <- exportRecordsTyped(rcon)
 data <- data.frame(lapply(data, as.character))
 data$scan_id <- as.numeric(data$scan_id)
 # Make scorer IDs by initial
@@ -316,23 +315,25 @@ data_gs %>%
 
 # Comparison of scores between groups
 
+## Total disease feature score (orange)
+
 ```{r}
 # Import disease state
-outcomes <- read.csv("./Stacey Martiniano/NTM CT Scoring/Data_Clean/disease.key.csv", na.strings = "")
+outcomes <-
+  read.csv("./Stacey Martiniano/NTM CT Scoring/Data_Clean/disease.key.csv",
+    na.strings = ""
+  )
 outcomes$NTM.PD..Y.N. <- factor(outcomes$NTM.PD..Y.N.,
   levels = c("No", "Yes"), ordered = T
 )
+outcomes <- outcomes %>%
+  select(cff_registry_id, NTM.PD..Y.N.) %>%
+  rename(`NTM-PD` = NTM.PD..Y.N.)
 # For the duplicated scans, just use the first reading and combine with the
 # singletons
 scores <- rbind(data, data_dups[data_dups$scorer_repeat == 1, ])
 # Add gold standards
 scores <- rbind(scores, data_gs[data_gs$scorer == "GS", ])
-# Add outcome info
-scores <- left_join(scores,
-  outcomes %>% select(cff_registry_id, NTM.PD..Y.N.),
-  by = join_by(scan_id == cff_registry_id)
-) %>%
-  rename(`NTM-PD` = NTM.PD..Y.N.)
 # Calculate the scores for each feature.
 # When calculating the scores, take the majority vote by scan, feature, and
 # location, since that's how they scored it.
@@ -340,208 +341,33 @@ scores <- left_join(scores,
 # and one in the RLL, but the majority at each location was "absent," then that
 # scan would have a 0 for atelectasis. In other words, score the locations by
 # majority first, then add the locations together for the feature score.
-feature_scores <- scores %>% group_by(scan_id, Feature, `NTM-PD`)
-```
-
-# Mixed Model Approach
-
-```{r data cleaning 2}
-# Import data
-data <- exportRecordsTyped(rcon, labels = F)
-data <- data.frame(lapply(data, as.character))
-data$scan_id <- as.numeric(data$scan_id)
-# Make scorer IDs by initial
-data$scorer <- paste0(
-  toupper(substr(data$reader_first_name, 1, 1)),
-  toupper(substr(data$reader_last_name, 1, 1))
+feature_scores <- scores %>%
+  group_by(scan_id, Feature, Location) %>%
+  summarise(Majority = factor(sum(value == "Present"),
+    levels = 0:3, labels = c("Absent", "Absent", "Present", "Present")
+  ), .groups = "drop_last") %>%
+  summarise(Score = sum(Majority == "Present"), .groups = "drop")
+# Add outcome data
+feature_scores <- left_join(feature_scores, outcomes,
+  by = join_by(scan_id == cff_registry_id)
 )
-data$scorer[data$scorer == "GG"] <- "GS"
-# Deidentify readers
-old <- c("AF", "DL", "JW")
-new <- c("A", "B", "C")
-data$scorer[data$scorer %in% old] <- new[match(data$scorer, old, nomatch = 0)]
-# Revert duplicate IDs back to original to match with gold standard
-training <- read.csv("./Stacey Martiniano/NTM CT Scoring/Data_Clean/training.key.csv")
-dups <- read.csv("./Stacey Martiniano/NTM CT Scoring/Data_Clean/duplicated.key.csv")
-training$Training_id <- as.numeric(sub("T00", "", training$Training_id))
-# Change duplicates to OG IDs
-old <- dups$duplicated_ssid..dates.shifted..17.days.
-new <- dups$original_ssid
-data$scan_id[data$scan_id %in% old] <- new[na.omit(match(data$scan_id, old))]
-# Change training IDs to OG IDs
-old <- training$Training_id
-new <- training$Cffid.Scoring.Set
-data$scan_id[data$scan_id %in% old] <- new[na.omit(match(data$scan_id, old))]
-# Convert to long
-data <- data %>%
-  select(
-    scan_id, scorer, scoresheet_timestamp,
-    bronchiectasis_rul:atelectasis___6
-  ) %>%
-  arrange(scan_id, scorer, scoresheet_timestamp) %>%
-  group_by(scan_id, scorer) %>%
-  mutate(scorer_repeat = row_number()) %>%
-  select(-scoresheet_timestamp) %>%
-  pivot_longer(bronchiectasis_rul:atelectasis___6,
-    names_to = c("feature", "location"),
-    names_pattern = "(.*)_(.*)$"
-  ) %>%
-  mutate(
-    feature = gsub("__", "", feature),
-    feature = str_to_title(gsub("_", " ", feature))
+# Summary table
+feature_scores %>%
+  pivot_wider(names_from = Feature, values_from = Score) %>%
+  select(-scan_id) %>%
+  tbl_summary(by = `NTM-PD`, missing_text = "Missing")
+feature_scores %>%
+  pivot_wider(names_from = Feature, values_from = Score) %>%
+  select(-scan_id) %>%
+  tbl_summary(
+    by = `NTM-PD`, missing_text = "Missing",
+    type = list(
+      c(
+        "Atelectasis", "Bronchiectasis", , "Cavity", "Consolidation", "Cyst",
+        "Ground Glass", "Mucoid Impaction", "Nodule", "Tree In Bud",
+        "Tree In Bud OR Nodule"
+      ) ~ "continuous2"
+    ),
+    statistic = all_continuous() ~ c("{median} ({p25}, {p75})", "{min}, {max}")
   )
-data$location <- factor(data$location,
-  levels = c(
-    "1", "2", "3", "4", "5", "6", "ling", "lll",
-    "lul", "rll", "rml", "rul"
-  ),
-  labels = c(
-    "RUL", "RML", "RLL", "LUL", "Ling", "LLL",
-    "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
-  )
-)
-# Format values
-data$value <- factor(data$value,
-  levels = c(
-    "Absent", "Checked", "Cylindric", "Cystic", "Unchecked", "Varicose"
-  ),
-  labels = c("Absent", "Present", "Present", "Present", "Absent", "Present")
-)
-data$value <- as.numeric(data$value) - 1
-# Separate out gold standards and duplicates
-data_dups <- data %>% filter(scan_id %in% dups$original_ssid)
-data_gs <- data %>% filter(scan_id %in% training$Cffid.Scoring.Set)
-data <- data %>%
-  filter(!scan_id %in% c(dups$original_ssid, training$Cffid.Scoring.Set))
-# Second readings only for comparison to GS
-data_gs <- data_gs %>%
-  group_by(scan_id, scorer, feature, location) %>%
-  slice_max(scorer_repeat)
-# Dummy variables for scorer, organize columns
-data <- data %>%
-  dummy_cols(select_columns = "scorer") %>%
-  select(scan_id, feature, location, scorer, scorer_A, scorer_B, scorer_C, value)
-```
-
-## Data setup
-
-```{r}
-DT::datatable(data)
-```
-
-## Model
-
-- Readers $r=1,2,3$
-- Scans $s=1,2,...,S$
-- Features $f=1,2,...,F$
-- Lobes $l=1,2,...,6$
-- Outcome $y_{rsfl}$ is binary
-- Model notation: $$y_{rsf=1}=\alpha+\beta X_l + b_1+b_2+b_3+\epsilon_{rs}$$
-
-### Bronchiectasis
-
-```{r}
-#| code-fold: show
-df <- data %>% filter(feature == "Bronchiectasis")
-model <- glmer(value ~ location + (1 | scorer),
-  family = "binomial", data = df
-)
-summary(model)
-icc(model)
-```
-
-### Mucoid Impaction
-
-```{r}
-#| code-fold: show
-df <- data %>% filter(feature == "Mucoid Impaction")
-model <- glmer(value ~ location + (1 | scorer),
-  family = "binomial", data = df
-)
-summary(model)
-icc(model)
-```
-
-### Cyst
-
-```{r}
-#| code-fold: show
-df <- data %>% filter(feature == "Cyst")
-model <- glmer(value ~ location + (1 | scorer),
-  family = "binomial", data = df
-)
-summary(model)
-icc(model)
-```
-
-### Cavity
-
-```{r}
-#| code-fold: show
-df <- data %>% filter(feature == "Cavity")
-model <- glmer(value ~ location + (1 | scorer),
-  family = "binomial", data = df
-)
-summary(model)
-icc(model)
-```
-
-### Consolidation
-
-```{r}
-#| code-fold: show
-df <- data %>% filter(feature == "Consolidation")
-model <- glmer(value ~ location + (1 | scorer),
-  family = "binomial", data = df
-)
-summary(model)
-icc(model)
-```
-
-### Ground Glass
-
-```{r}
-#| code-fold: show
-df <- data %>% filter(feature == "Ground Glass")
-model <- glmer(value ~ location + (1 | scorer),
-  family = "binomial", data = df
-)
-summary(model)
-icc(model)
-```
-
-### Nodule
-
-```{r}
-#| code-fold: show
-df <- data %>% filter(feature == "Nodule")
-model <- glmer(value ~ location + (1 | scorer),
-  family = "binomial", data = df
-)
-summary(model)
-icc(model)
-```
-
-### Tree In Bud
-
-```{r}
-#| code-fold: show
-df <- data %>% filter(feature == "Tree In Bud")
-model <- glmer(value ~ location + (1 | scorer),
-  family = "binomial", data = df
-)
-summary(model)
-icc(model)
-```
-
-### Atelectasis
-
-```{r}
-#| code-fold: show
-df <- data %>% filter(feature == "Atelectasis")
-model <- glmer(value ~ location + (1 | scorer),
-  family = "binomial", data = df
-)
-summary(model)
-icc(model)
 ```
