@@ -25,20 +25,20 @@ library(lmerTest)
 library(performance)
 # REDCap
 unlockREDCap(c(rcon = "NTM CT Scoring"),
-  keyring = "API_KEYs",
-  envir = globalenv(),
-  url = "https://redcap.ucdenver.edu/api/"
+    keyring = "API_KEYs",
+    envir = globalenv(),
+    url = "https://redcap.ucdenver.edu/api/"
 )
 # Home directory
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/tim/OneDrive/Vigers/CF"
+    "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+    "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+    "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Documents/GitHub",
-  "Windows" = "C:/Users/Tim/Documents/GitHub",
-  "Linux" = "/home/tim/Documents/GitHub"
+    "Darwin" = "/Users/tim/Documents/GitHub",
+    "Windows" = "C:/Users/Tim/Documents/GitHub",
+    "Linux" = "/home/tim/Documents/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -52,8 +52,8 @@ data <- data.frame(lapply(data, as.character))
 data$scan_id <- as.numeric(data$scan_id)
 # Make scorer IDs by initial
 data$scorer <- paste0(
-  toupper(substr(data$reader_first_name, 1, 1)),
-  toupper(substr(data$reader_last_name, 1, 1))
+    toupper(substr(data$reader_first_name, 1, 1)),
+    toupper(substr(data$reader_last_name, 1, 1))
 )
 data$scorer[data$scorer == "GG"] <- "GS"
 # Deidentify readers
@@ -74,59 +74,59 @@ new <- training$Cffid.Scoring.Set
 data$scan_id[data$scan_id %in% old] <- new[na.omit(match(data$scan_id, old))]
 # Convert to long
 data <- data %>%
-  select(
-    scan_id, scorer, scoresheet_timestamp,
-    bronchiectasis_rul:atelectasis___6
-  ) %>%
-  arrange(scan_id, scorer, scoresheet_timestamp) %>%
-  group_by(scan_id, scorer) %>%
-  mutate(scorer_repeat = row_number()) %>%
-  select(-scoresheet_timestamp) %>%
-  pivot_longer(bronchiectasis_rul:atelectasis___6,
-    names_to = c("Feature", "Location"),
-    names_pattern = "(.*)_(.*)$"
-  ) %>%
-  mutate(
-    Feature = gsub("__", "", Feature),
-    Feature = str_to_title(gsub("_", " ", Feature))
-  )
+    select(
+        scan_id, scorer, scoresheet_timestamp,
+        bronchiectasis_rul:atelectasis___6
+    ) %>%
+    arrange(scan_id, scorer, scoresheet_timestamp) %>%
+    group_by(scan_id, scorer) %>%
+    mutate(scorer_repeat = row_number()) %>%
+    select(-scoresheet_timestamp) %>%
+    pivot_longer(bronchiectasis_rul:atelectasis___6,
+        names_to = c("Feature", "Location"),
+        names_pattern = "(.*)_(.*)$"
+    ) %>%
+    mutate(
+        Feature = gsub("__", "", Feature),
+        Feature = str_to_title(gsub("_", " ", Feature))
+    )
 data$Location <- factor(data$Location,
-  levels = c(
-    "1", "2", "3", "4", "5", "6", "ling", "lll",
-    "lul", "rll", "rml", "rul"
-  ),
-  labels = c(
-    "RUL", "RML", "RLL", "LUL", "Ling", "LLL",
-    "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
-  )
+    levels = c(
+        "1", "2", "3", "4", "5", "6", "ling", "lll",
+        "lul", "rll", "rml", "rul"
+    ),
+    labels = c(
+        "RUL", "RML", "RLL", "LUL", "Ling", "LLL",
+        "Ling", "LLL", "LUL", "RLL", "RML", "RUL"
+    )
 )
 # Add tree in bud OR nodule variable
 data <- data %>%
-  pivot_wider(names_from = Feature) %>%
-  mutate(
-    `Tree In Bud OR Nodule` =
-      factor(Nodule == "Checked" | `Tree In Bud` == "Checked",
-        levels = c(F, T), labels = c("Unchecked", "Checked")
-      )
-  ) %>%
-  pivot_longer(Bronchiectasis:last_col(), names_to = "Feature")
+    pivot_wider(names_from = Feature) %>%
+    mutate(
+        `Tree In Bud OR Nodule` =
+            factor(Nodule == "Checked" | `Tree In Bud` == "Checked",
+                levels = c(F, T), labels = c("Unchecked", "Checked")
+            )
+    ) %>%
+    pivot_longer(Bronchiectasis:last_col(), names_to = "Feature")
 # Format values
 data$value <- factor(data$value,
-  levels = c(
-    "Absent", "Checked", "Cylindric", "Cystic", "Unchecked", "Varicose"
-  ),
-  labels = c("Absent", "Present", "Present", "Present", "Absent", "Present"),
-  ordered = T
+    levels = c(
+        "Absent", "Checked", "Cylindric", "Cystic", "Unchecked", "Varicose"
+    ),
+    labels = c("Absent", "Present", "Present", "Present", "Absent", "Present"),
+    ordered = T
 )
 # Separate out gold standards and duplicates
 data_dups <- data %>% filter(scan_id %in% dups$original_ssid)
 data_gs <- data %>% filter(scan_id %in% training$Cffid.Scoring.Set)
 data <- data %>%
-  filter(!scan_id %in% c(dups$original_ssid, training$Cffid.Scoring.Set))
+    filter(!scan_id %in% c(dups$original_ssid, training$Cffid.Scoring.Set))
 # Second readings only for comparison to GS
 data_gs <- data_gs %>%
-  group_by(scan_id, scorer, Feature, Location) %>%
-  slice_max(scorer_repeat)
+    group_by(scan_id, scorer, Feature, Location) %>%
+    slice_max(scorer_repeat)
 ```
 
 # Proportion of agreement
@@ -137,13 +137,13 @@ data_gs <- data_gs %>%
 #| message: false
 # Find scans with disagreement on certain features, so Stacey can discuss them with radiologists
 t <- data %>%
-  group_by(scan_id, Feature, scorer) %>%
-  summarise(v = max(value, na.rm = T)) %>%
-  summarise(a = sum(v == "Present")) %>%
-  filter(
-    Feature %in% c("Atelectasis", "Cavity", "Consolidation", "Ground Glass", "Nodule"),
-    a == 2
-  )
+    group_by(scan_id, Feature, scorer) %>%
+    summarise(v = max(value, na.rm = T)) %>%
+    summarise(a = sum(v == "Present")) %>%
+    filter(
+        Feature %in% c("Atelectasis", "Cavity", "Consolidation", "Ground Glass", "Nodule"),
+        a == 2
+    )
 ```
 
 ### By Feature
@@ -151,21 +151,21 @@ t <- data %>%
 ```{r}
 #| message: false
 data %>%
-  group_by(Feature, scan_id, scorer) %>%
-  summarise(v = max(value, na.rm = T)) %>%
-  summarise(a = sum(v == "Present")) %>%
-  summarise(
-    `Agreed Feature Was Present` = sum(a == 3),
-    `Agreed Feature Was Absent` = sum(a == 0),
-    agreed = sum(a == 0 | a == 3),
-    disagreed = sum(a == 1 | a == 2),
-    proportion = round(agreed / (agreed + disagreed), 3)
-  ) %>%
-  rename(
-    `Total Agreed` = agreed, `Total Disagreed` = disagreed,
-    `Proportion Agreed` = proportion
-  ) %>%
-  kable()
+    group_by(Feature, scan_id, scorer) %>%
+    summarise(v = max(value, na.rm = T)) %>%
+    summarise(a = sum(v == "Present")) %>%
+    summarise(
+        `Agreed Feature Was Present` = sum(a == 3),
+        `Agreed Feature Was Absent` = sum(a == 0),
+        agreed = sum(a == 0 | a == 3),
+        disagreed = sum(a == 1 | a == 2),
+        proportion = round(agreed / (agreed + disagreed), 3)
+    ) %>%
+    rename(
+        `Total Agreed` = agreed, `Total Disagreed` = disagreed,
+        `Proportion Agreed` = proportion
+    ) %>%
+    kable()
 ```
 
 ### Feature by lobe
@@ -173,20 +173,20 @@ data %>%
 ```{r}
 #| message: false
 data %>%
-  group_by(Feature, Location, scan_id) %>%
-  summarise(a = factor(sum(value == "Present", na.rm = T))) %>%
-  summarise(
-    `Agreed Feature Was Present` = sum(a == 3),
-    `Agreed Feature Was Absent` = sum(a == 0),
-    agreed = sum(a == 0 | a == 3),
-    disagreed = sum(a == 1 | a == 2),
-    proportion = round(agreed / (agreed + disagreed), 3)
-  ) %>%
-  rename(
-    `Total Agreed` = agreed, `Total Disagreed` = disagreed,
-    `Proportion Agreed` = proportion
-  ) %>%
-  kable()
+    group_by(Feature, Location, scan_id) %>%
+    summarise(a = factor(sum(value == "Present", na.rm = T))) %>%
+    summarise(
+        `Agreed Feature Was Present` = sum(a == 3),
+        `Agreed Feature Was Absent` = sum(a == 0),
+        agreed = sum(a == 0 | a == 3),
+        disagreed = sum(a == 1 | a == 2),
+        proportion = round(agreed / (agreed + disagreed), 3)
+    ) %>%
+    rename(
+        `Total Agreed` = agreed, `Total Disagreed` = disagreed,
+        `Proportion Agreed` = proportion
+    ) %>%
+    kable()
 ```
 
 ## Duplicates
@@ -196,25 +196,25 @@ data %>%
 ```{r}
 #| message: false
 data_dups %>%
-  group_by(Feature, scorer, scan_id, scorer_repeat) %>%
-  summarise(v = max(value, na.rm = T)) %>%
-  summarise(
-    `Agreed Feature Was Present` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] &
-      v[scorer_repeat == 1] == "Present"),
-    `Agreed Feature Was Absent` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] &
-      v[scorer_repeat == 1] == "Absent"),
-    agreed = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2]),
-    disagreed = sum(v[scorer_repeat == 1] != v[scorer_repeat == 2]),
-    proportion = round(agreed / (agreed + disagreed), 3)
-  ) %>%
-  summarise(across(`Agreed Feature Was Present`:disagreed, ~ sum(.x, na.rm = T)),
-    proportion = mean(proportion)
-  ) %>%
-  rename(
-    `Total Agreed` = agreed, `Total Disagreed` = disagreed,
-    `Proportion Agreed` = proportion
-  ) %>%
-  kable()
+    group_by(Feature, scorer, scan_id, scorer_repeat) %>%
+    summarise(v = max(value, na.rm = T)) %>%
+    summarise(
+        `Agreed Feature Was Present` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] &
+            v[scorer_repeat == 1] == "Present"),
+        `Agreed Feature Was Absent` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] &
+            v[scorer_repeat == 1] == "Absent"),
+        agreed = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2]),
+        disagreed = sum(v[scorer_repeat == 1] != v[scorer_repeat == 2]),
+        proportion = round(agreed / (agreed + disagreed), 3)
+    ) %>%
+    summarise(across(`Agreed Feature Was Present`:disagreed, ~ sum(.x, na.rm = T)),
+        proportion = mean(proportion)
+    ) %>%
+    rename(
+        `Total Agreed` = agreed, `Total Disagreed` = disagreed,
+        `Proportion Agreed` = proportion
+    ) %>%
+    kable()
 ```
 
 ### Feature by lobe
@@ -223,25 +223,25 @@ data_dups %>%
 #| message: false
 #| warning: false
 data_dups %>%
-  group_by(Feature, Location, scorer, scan_id, scorer_repeat) %>%
-  summarise(v = max(value, na.rm = T)) %>%
-  summarise(
-    `Agreed Feature Was Present` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] &
-      v[scorer_repeat == 1] == "Present"),
-    `Agreed Feature Was Absent` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] &
-      v[scorer_repeat == 1] == "Absent"),
-    agreed = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2]),
-    disagreed = sum(v[scorer_repeat == 1] != v[scorer_repeat == 2]),
-    proportion = round(agreed / (agreed + disagreed), 3)
-  ) %>%
-  summarise(across(`Agreed Feature Was Present`:disagreed, ~ sum(.x, na.rm = T)),
-    proportion = mean(proportion)
-  ) %>%
-  rename(
-    `Total Agreed` = agreed, `Total Disagreed` = disagreed,
-    `Proportion Agreed` = proportion
-  ) %>%
-  kable()
+    group_by(Feature, Location, scorer, scan_id, scorer_repeat) %>%
+    summarise(v = max(value, na.rm = T)) %>%
+    summarise(
+        `Agreed Feature Was Present` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] &
+            v[scorer_repeat == 1] == "Present"),
+        `Agreed Feature Was Absent` = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2] &
+            v[scorer_repeat == 1] == "Absent"),
+        agreed = sum(v[scorer_repeat == 1] == v[scorer_repeat == 2]),
+        disagreed = sum(v[scorer_repeat == 1] != v[scorer_repeat == 2]),
+        proportion = round(agreed / (agreed + disagreed), 3)
+    ) %>%
+    summarise(across(`Agreed Feature Was Present`:disagreed, ~ sum(.x, na.rm = T)),
+        proportion = mean(proportion)
+    ) %>%
+    rename(
+        `Total Agreed` = agreed, `Total Disagreed` = disagreed,
+        `Proportion Agreed` = proportion
+    ) %>%
+    kable()
 ```
 
 
@@ -252,31 +252,31 @@ data_dups %>%
 ```{r}
 #| message: false
 data_gs %>%
-  group_by(Feature, scan_id, scorer) %>%
-  summarise(v = max(value, na.rm = T)) %>%
-  summarise(
-    ap = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"] == "Present",
-    aa = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"] == "Absent",
-    pa = v[scorer == "A"] == v[scorer == "GS"],
-    bp = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"] == "Present",
-    ba = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"] == "Absent",
-    pb = v[scorer == "B"] == v[scorer == "GS"],
-    cp = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"] == "Present",
-    ca = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"] == "Absent",
-    pc = v[scorer == "C"] == v[scorer == "GS"]
-  ) %>%
-  summarise(
-    `A Agreed Feature Was Present` = sum(ap, na.rm = T),
-    `A Agreed Feature Was Absent` = sum(aa, na.rm = T),
-    `Prop. A Agreed` = mean(pa, na.rm = T),
-    `B Agreed Feature Was Present` = sum(bp, na.rm = T),
-    `B Agreed Feature Was Absent` = sum(ba, na.rm = T),
-    `Prop. B Agreed` = mean(pb, na.rm = T),
-    `C Agreed Feature Was Present` = sum(cp, na.rm = T),
-    `C Agreed Feature Was Absent` = sum(ca, na.rm = T),
-    `Prop. C Agreed` = mean(pc, na.rm = T)
-  ) %>%
-  kable()
+    group_by(Feature, scan_id, scorer) %>%
+    summarise(v = max(value, na.rm = T)) %>%
+    summarise(
+        ap = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"] == "Present",
+        aa = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"] == "Absent",
+        pa = v[scorer == "A"] == v[scorer == "GS"],
+        bp = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"] == "Present",
+        ba = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"] == "Absent",
+        pb = v[scorer == "B"] == v[scorer == "GS"],
+        cp = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"] == "Present",
+        ca = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"] == "Absent",
+        pc = v[scorer == "C"] == v[scorer == "GS"]
+    ) %>%
+    summarise(
+        `A Agreed Feature Was Present` = sum(ap, na.rm = T),
+        `A Agreed Feature Was Absent` = sum(aa, na.rm = T),
+        `Prop. A Agreed` = mean(pa, na.rm = T),
+        `B Agreed Feature Was Present` = sum(bp, na.rm = T),
+        `B Agreed Feature Was Absent` = sum(ba, na.rm = T),
+        `Prop. B Agreed` = mean(pb, na.rm = T),
+        `C Agreed Feature Was Present` = sum(cp, na.rm = T),
+        `C Agreed Feature Was Absent` = sum(ca, na.rm = T),
+        `Prop. C Agreed` = mean(pc, na.rm = T)
+    ) %>%
+    kable()
 ```
 
 ### Feature by lobe
@@ -286,31 +286,31 @@ Missing values were ignored in creating the table below. So if a scorer marked a
 ```{r}
 #| message: false
 data_gs %>%
-  group_by(Feature, Location, scan_id) %>%
-  rename(v = value) %>%
-  summarise(
-    ap = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"] == "Present",
-    aa = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"] == "Absent",
-    pa = v[scorer == "A"] == v[scorer == "GS"],
-    bp = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"] == "Present",
-    ba = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"] == "Absent",
-    pb = v[scorer == "B"] == v[scorer == "GS"],
-    cp = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"] == "Present",
-    ca = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"] == "Absent",
-    pc = v[scorer == "C"] == v[scorer == "GS"]
-  ) %>%
-  summarise(
-    `A Agreed Feature Was Present` = sum(ap, na.rm = T),
-    `A Agreed Feature Was Absent` = sum(aa, na.rm = T),
-    `Prop. A Agreed` = mean(pa, na.rm = T),
-    `B Agreed Feature Was Present` = sum(bp, na.rm = T),
-    `B Agreed Feature Was Absent` = sum(ba, na.rm = T),
-    `Prop. B Agreed` = mean(pb, na.rm = T),
-    `C Agreed Feature Was Present` = sum(cp, na.rm = T),
-    `C Agreed Feature Was Absent` = sum(ca, na.rm = T),
-    `Prop. C Agreed` = mean(pc, na.rm = T)
-  ) %>%
-  kable()
+    group_by(Feature, Location, scan_id) %>%
+    rename(v = value) %>%
+    summarise(
+        ap = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"] == "Present",
+        aa = v[scorer == "A"] == v[scorer == "GS"] & v[scorer == "A"] == "Absent",
+        pa = v[scorer == "A"] == v[scorer == "GS"],
+        bp = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"] == "Present",
+        ba = v[scorer == "B"] == v[scorer == "GS"] & v[scorer == "B"] == "Absent",
+        pb = v[scorer == "B"] == v[scorer == "GS"],
+        cp = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"] == "Present",
+        ca = v[scorer == "C"] == v[scorer == "GS"] & v[scorer == "C"] == "Absent",
+        pc = v[scorer == "C"] == v[scorer == "GS"]
+    ) %>%
+    summarise(
+        `A Agreed Feature Was Present` = sum(ap, na.rm = T),
+        `A Agreed Feature Was Absent` = sum(aa, na.rm = T),
+        `Prop. A Agreed` = mean(pa, na.rm = T),
+        `B Agreed Feature Was Present` = sum(bp, na.rm = T),
+        `B Agreed Feature Was Absent` = sum(ba, na.rm = T),
+        `Prop. B Agreed` = mean(pb, na.rm = T),
+        `C Agreed Feature Was Present` = sum(cp, na.rm = T),
+        `C Agreed Feature Was Absent` = sum(ca, na.rm = T),
+        `Prop. C Agreed` = mean(pc, na.rm = T)
+    ) %>%
+    kable()
 ```
 
 # Comparison of scores between groups
@@ -318,15 +318,15 @@ data_gs %>%
 ```{r}
 # Import disease state
 outcomes <-
-  read.csv("./Stacey Martiniano/NTM CT Scoring/Data_Clean/disease.key.csv",
-    na.strings = ""
-  )
+    read.csv("./Stacey Martiniano/NTM CT Scoring/Data_Clean/disease.key.csv",
+        na.strings = ""
+    )
 outcomes$NTM.PD..Y.N. <- factor(outcomes$NTM.PD..Y.N.,
-  levels = c("No", "Yes"), ordered = T
+    levels = c("No", "Yes"), ordered = T
 )
 outcomes <- outcomes %>%
-  select(cff_registry_id, NTM.PD..Y.N.) %>%
-  rename(`NTM-PD` = NTM.PD..Y.N.)
+    select(cff_registry_id, NTM.PD..Y.N.) %>%
+    rename(`NTM-PD` = NTM.PD..Y.N.)
 # For the duplicated scans, just use the first reading and combine with the
 # singletons
 scores <- rbind(data, data_dups[data_dups$scorer_repeat == 1, ])
@@ -345,34 +345,34 @@ scores <- rbind(scores, data_gs[data_gs$scorer == "GS", ])
 # scan would have a 0 for atelectasis. In other words, score the locations by
 # majority first, then add the locations together for the feature score.
 feature_scores <- scores %>%
-  group_by(scan_id, Feature, Location) %>%
-  summarise(Majority = factor(sum(value == "Present"),
-    levels = 0:3, labels = c("Absent", "Absent", "Present", "Present")
-  ), .groups = "drop_last") %>%
-  summarise(Score = sum(Majority == "Present"), .groups = "drop")
+    group_by(scan_id, Feature, Location) %>%
+    summarise(Majority = factor(sum(value == "Present"),
+        levels = 0:3, labels = c("Absent", "Absent", "Present", "Present")
+    ), .groups = "drop_last") %>%
+    summarise(Score = sum(Majority == "Present"), .groups = "drop")
 # Add outcome data
 feature_scores <- left_join(feature_scores, outcomes,
-  by = join_by(scan_id == cff_registry_id)
+    by = join_by(scan_id == cff_registry_id)
 )
 # Summary table
 feature_scores %>%
-  pivot_wider(names_from = Feature, values_from = Score) %>%
-  select(-scan_id) %>%
-  tbl_summary(by = `NTM-PD`, missing_text = "Missing")
+    pivot_wider(names_from = Feature, values_from = Score) %>%
+    select(-scan_id) %>%
+    tbl_summary(by = `NTM-PD`, missing_text = "Missing")
 feature_scores %>%
-  pivot_wider(names_from = Feature, values_from = Score) %>%
-  select(-scan_id) %>%
-  tbl_summary(
-    by = `NTM-PD`, missing_text = "Missing",
-    type = list(
-      c(
-        "Atelectasis", "Bronchiectasis", , "Cavity", "Consolidation", "Cyst",
-        "Ground Glass", "Mucoid Impaction", "Nodule", "Tree In Bud",
-        "Tree In Bud OR Nodule"
-      ) ~ "continuous2"
-    ),
-    statistic = all_continuous() ~ c("{median} ({p25}, {p75})", "{min}, {max}")
-  )
+    pivot_wider(names_from = Feature, values_from = Score) %>%
+    select(-scan_id) %>%
+    tbl_summary(
+        by = `NTM-PD`, missing_text = "Missing",
+        type = list(
+            c(
+                "Atelectasis", "Bronchiectasis", , "Cavity", "Consolidation", "Cyst",
+                "Ground Glass", "Mucoid Impaction", "Nodule", "Tree In Bud",
+                "Tree In Bud OR Nodule"
+            ) ~ "continuous2"
+        ),
+        statistic = all_continuous() ~ c("{median} ({p25}, {p75})", "{min}, {max}")
+    )
 ```
 
 ## Lobe score (pink)
@@ -381,30 +381,30 @@ feature_scores %>%
 # Lobe scores similar to above but we'll add over the lobes rather than the
 # features
 lobe_scores <- scores %>%
-  group_by(scan_id, Location, Feature) %>%
-  summarise(Majority = factor(sum(value == "Present"),
-    levels = 0:3, labels = c("Absent", "Absent", "Present", "Present")
-  ), .groups = "drop_last") %>%
-  summarise(Score = sum(Majority == "Present"), .groups = "drop")
+    group_by(scan_id, Location, Feature) %>%
+    summarise(Majority = factor(sum(value == "Present"),
+        levels = 0:3, labels = c("Absent", "Absent", "Present", "Present")
+    ), .groups = "drop_last") %>%
+    summarise(Score = sum(Majority == "Present"), .groups = "drop")
 # Add outcome data
 lobe_scores <- left_join(lobe_scores, outcomes,
-  by = join_by(scan_id == cff_registry_id)
+    by = join_by(scan_id == cff_registry_id)
 )
 # Summary table
 lobe_scores %>%
-  pivot_wider(names_from = Location, values_from = Score) %>%
-  select(-scan_id) %>%
-  tbl_summary(by = `NTM-PD`, missing_text = "Missing")
+    pivot_wider(names_from = Location, values_from = Score) %>%
+    select(-scan_id) %>%
+    tbl_summary(by = `NTM-PD`, missing_text = "Missing")
 lobe_scores %>%
-  pivot_wider(names_from = Location, values_from = Score) %>%
-  select(-scan_id) %>%
-  tbl_summary(
-    by = `NTM-PD`, missing_text = "Missing",
-    type = list(
-      c("RUL", "RML", "RLL", "LUL", "Ling", "LLL") ~ "continuous2"
-    ),
-    statistic = all_continuous() ~ c("{median} ({p25}, {p75})", "{min}, {max}")
-  )
+    pivot_wider(names_from = Location, values_from = Score) %>%
+    select(-scan_id) %>%
+    tbl_summary(
+        by = `NTM-PD`, missing_text = "Missing",
+        type = list(
+            c("RUL", "RML", "RLL", "LUL", "Ling", "LLL") ~ "continuous2"
+        ),
+        statistic = all_continuous() ~ c("{median} ({p25}, {p75})", "{min}, {max}")
+    )
 ```
 
 ## Total score (pink)
