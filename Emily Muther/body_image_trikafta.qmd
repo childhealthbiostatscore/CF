@@ -90,12 +90,16 @@ df %>%
     PHQ9_Total, PHQ9_category, GAD7_Total, GAD7_category, FRStotal,
     FRS_IdealBody, FRS_ThinkyouLook, FRS_Category, Age, Gender, Race,
     Ethnicity, InsuranceType, BMI, bmi_raw, FEV1, BE_APPEARANCE_MEAN,
-    BE_ATTRIBUTION_MEAN, BE_WEIGHT_MEAN
+    BE_ATTRIBUTION_MEAN, BE_WEIGHT_MEAN, contains("Adherence")
+  ) %>%
+  mutate(
+    PercentAdherence = as.numeric(sub("%", "", as.character(PercentAdherence))),
+    over80 = PercentAdherence >= 80
   ) %>%
   tbl_summary(
     by = Gender,
     type = list(
-      c("FRStotal", "FRS_IdealBody", "FRS_ThinkyouLook", "bmi_raw") ~ "continuous2",
+      c("FRStotal", "FRS_IdealBody", "FRS_ThinkyouLook", "bmi_raw", "PercentAdherence") ~ "continuous2",
       all_continuous() ~ "continuous2"
     ),
     statistic = list(
