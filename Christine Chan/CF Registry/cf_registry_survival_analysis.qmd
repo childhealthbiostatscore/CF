@@ -40,8 +40,8 @@ home_dir <- switch(Sys.info()["sysname"],
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry"
 )
 github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Documents/GitHub",
-  "Linux" = "/home/timvigers/Documents/GitHub"
+  "Darwin" = "/Users/tim/Documents/GitHub",
+  "Linux" = "/home/tim/Documents/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -176,7 +176,7 @@ annual$age_group <- cut(annual$Age_YrEnd,
 # Bugs
 bugs <- c(
   "A_pseudomonasaeruginosa", "A_fungalyeast1",
-  "A_pulmonarycomplications1", "A_mycocultureresults3"
+  "A_pulmonarycomplications1", "A_mycocultureresults3", "A_cultureresults3"
 )
 # Yes/No variables
 yn_vars <- c(
@@ -265,6 +265,7 @@ label(annual[, which(colnames(annual) %in% names(labels))]) <-
 # Per reviewer, out of X individuals with a diagnosis of CFRD, X number had an
 # OGTT (and X had an A1c, but no OGTT) that year or the year prior.
 # This is super slow but idc idc
+first_cfrd=head(first_cfrd,100)
 t <- apply(first_cfrd, 1, function(r) {
   id <- as.numeric(r["eDWID"])
   year <- as.numeric(r["first_cfrd"])
@@ -290,6 +291,24 @@ t <- apply(first_cfrd, 1, function(r) {
     return("neither")
   }
 })
+first_cfrd$a1c_ogtt <- t
+cfrd_only <- left_join(first_cfrd, annual |> remove_labels(),
+  by = join_by(eDWID, first_cfrd == ReviewYear)
+)
+cfrd_only$a1c_ogtt <- factor(cfrd_only$a1c_ogtt,
+  levels = c("both", "ogtt", "a1c", "neither"),
+  labels = c("OGTT", "OGTT", "HbA1c Only", "Neither")
+)
+cfrd_only %>%
+  select(
+    a1c_ogtt, Age_YrEnd, A_weight, A_height, A_bmivalue, A_bmipercentile,
+    A_FEV1_pct_predicted, A_FVC_pct_predicted, Race, Hispanicrace, MutClass,
+    A_hgba1c, A_ogttfast_bloodglucose, A_twohour_bloodglucose, A_IsOnEnzymes,
+    liver_disease, A_cultureresults3
+  ) %>%
+  tbl_summary(by = a1c_ogtt, missing_text = "Missing") %>%
+  add_overall() %>%
+  add_p(test=list(all_continuous() ~ "oneway.test"))
 ```
 
 Registry fields included in our liver disease yes/no variable were:
@@ -608,7 +627,7 @@ fig1c <- ggplot(
   theme_bw() +
   ylab("Per 1,000 Person-Years") +
   ggtitle("Prevalence of CFRD")
-fig1 <- fig1a + fig1b + fig1c + plot_layout(guides = "collect")+
+fig1 <- fig1a + fig1b + fig1c + plot_layout(guides = "collect") +
   plot_annotation(title = "US Cystic Fibrosis Foundation Patient Registry Trends in Screening, Incidence, and Prevalence of Cystic Fibrosis Related Diabetes from 2003-2018")
 fig1
 ggsave("./Dissemination/Figures/graphical_abstract.png",
@@ -632,7 +651,7 @@ annual <- as.data.frame(annual)
 annual$tstart <- as.numeric(annual$tstart) - as.numeric(og)
 annual$tstop <- as.numeric(annual$tstop) - as.numeric(og)
 # Write cleaned data
-save(annual,file = "./Data_Clean/survival_dataset.RData")
+save(annual, file = "./Data_Clean/survival_dataset.RData")
 # Formula for base model
 xvars <- c(
   "age_group", "Gender", "Race", "Hispanicrace", "bmi_cat", "MutClass",
@@ -688,7 +707,7 @@ annual %>%
 ```
 
 ```{r results='asis'}
-f_vx770 <- update(f, . ~ . + A_Vx770-A_corticosteroids1-NumPulmExacerbation-age_group)
+f_vx770 <- update(f, . ~ . + A_Vx770 - A_corticosteroids1 - NumPulmExacerbation - age_group)
 vx770_cox_res <- coxph(f_vx770,
   data = annual[annual$ReviewYear >= 2011, ],
   cluster = eDWID
@@ -714,7 +733,7 @@ annual %>%
 ```
 
 ```{r}
-f_vx809comb <- update(f, . ~ . + A_VX809comb-A_corticosteroids1-NumPulmExacerbation-age_group-Hispanicrace)
+f_vx809comb <- update(f, . ~ . + A_VX809comb - A_corticosteroids1 - NumPulmExacerbation - age_group - Hispanicrace)
 vx809comb_cox_res <- coxph(f_vx809comb,
   data = annual[annual$ReviewYear >= 2015, ],
   cluster = eDWID
@@ -833,5 +852,4 @@ comb_plot
 ggsave("./Dissemination/Figures/time_combined_forest.png",
   plot = comb_plot, width = 12, height = 9, units = "in", dpi = 900
 )
-
 ```
