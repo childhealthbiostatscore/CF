@@ -41,8 +41,14 @@ knitr::opts_knit$set(root.dir = home_dir)
 
 ```{r data cleaning}
 # Import CHEC data
-chec <- read.csv("./Data_Raw/CHEC sweat sodium and chloride.csv",
+chec <- read.csv("./Data_Raw/CHEC sweat sodium and chloride 2024-04-19.csv",
   na.strings = c("", "NA")
+)
+ethnicity <- read.csv("./Data_Raw/CHEC sweat sodium and chloride 2025-07-30.csv",
+  na.strings = c("", "NA")
+)
+chec <- left_join(chec, ethnicity %>% select(subject, crfethnicity_txt),
+  by = join_by(subject)
 )
 # Only include people with either a pre-modulator or post-modulator sodium
 chec <- chec %>% filter(!is.na(swsavg), site != "005 Buffalo, NY CC and Peds")
@@ -56,6 +62,9 @@ chec$race_txt <- factor(chec$race_txt,
     "Native Hawaiian or Other Pacific Islander", "More than One Race",
     "Unknown or Not Reported"
   )
+)
+chec$crfethnicity_txt <- factor(chec$crfethnicity_txt,
+  levels = c("Not Hispanic or Latino", "Hispanic or Latino")
 )
 chec$modqual <- factor(chec$modqual,
   levels = c(
@@ -102,14 +111,12 @@ label(chec_long$ratio) <- "Sweat Na:Cl"
 ```{r results='asis'}
 t1 <- tableby(
   modqual ~ sex + kwt(age) + agecat_txt +
-    race_txt + genotype_group + swcavg + swhcavgpm + swsavg + swhsavgpm +
-    pre_ratio + post_ratio,
+    race_txt + crfethnicity_txt + genotype_group + swcavg + swhcavgpm + swsavg +
+    swhsavgpm + pre_ratio + post_ratio,
   data = chec, cat.test = "fe", simulate.p.value = TRUE, control = mycontrols
 )
 summary(t1, pfootnote = T)
 ```
-
-- I think that we currently don't have ethnicity data.
 
 ## Table 2: Change in sweat electrolytes
 
