@@ -261,11 +261,12 @@ label(annual[, which(colnames(annual) %in% names(labels))]) <-
 #     (is.na(A_VX809comb) | A_VX809comb == "No"))
 ```
 
+# Diagnosis comparisons for HbA1c registry paper
+
 ```{r}
 # Per reviewer, out of X individuals with a diagnosis of CFRD, X number had an
 # OGTT (and X had an A1c, but no OGTT) that year or the year prior.
 # This is super slow but idc idc
-first_cfrd=head(first_cfrd,100)
 t <- apply(first_cfrd, 1, function(r) {
   id <- as.numeric(r["eDWID"])
   year <- as.numeric(r["first_cfrd"])
@@ -292,7 +293,7 @@ t <- apply(first_cfrd, 1, function(r) {
   }
 })
 first_cfrd$a1c_ogtt <- t
-cfrd_only <- left_join(first_cfrd, annual |> remove_labels(),
+cfrd_only <- left_join(first_cfrd, annual %>% remove_labels(),
   by = join_by(eDWID, first_cfrd == ReviewYear)
 )
 cfrd_only$a1c_ogtt <- factor(cfrd_only$a1c_ogtt,
@@ -306,9 +307,29 @@ cfrd_only %>%
     A_hgba1c, A_ogttfast_bloodglucose, A_twohour_bloodglucose, A_IsOnEnzymes,
     liver_disease, A_cultureresults3
   ) %>%
-  tbl_summary(by = a1c_ogtt, missing_text = "Missing") %>%
+  tbl_summary(
+    by = a1c_ogtt, missing_text = "Missing",
+    statistic = list(all_continuous() ~ "{mean} ({sd})")
+  ) %>%
   add_overall() %>%
-  add_p(test=list(all_continuous() ~ "oneway.test"))
+  add_p(test = list(all_continuous() ~ "oneway.test")) %>%
+  modify_caption("**All Groups**")
+cfrd_only %>%
+  filter(a1c_ogtt %in% c("OGTT", "HbA1c Only")) %>%
+  mutate(a1c_ogtt = droplevels(a1c_ogtt)) %>%
+  select(
+    a1c_ogtt, Age_YrEnd, A_weight, A_height, A_bmivalue, A_bmipercentile,
+    A_FEV1_pct_predicted, A_FVC_pct_predicted, Race, Hispanicrace, MutClass,
+    A_hgba1c, A_ogttfast_bloodglucose, A_twohour_bloodglucose, A_IsOnEnzymes,
+    liver_disease, A_cultureresults3
+  ) %>%
+  tbl_summary(
+    by = a1c_ogtt, missing_text = "Missing",
+    statistic = list(all_continuous() ~ "{mean} ({sd})")
+  ) %>%
+  add_overall() %>%
+  add_p(test = list(all_continuous() ~ "oneway.test")) %>%
+  modify_caption("**OGTT vs. HbA1c Only**")
 ```
 
 Registry fields included in our liver disease yes/no variable were:
@@ -508,31 +529,31 @@ ogtts$OGTTs <- factor(ogtts$OGTTs,
 age <- ogtts %>%
   select(`Age Group`, OGTTs) %>%
   tbl_summary(by = `Age Group`) %>%
-  add_ci() %>%
+  # add_ci() %>%
   add_p() %>%
   print()
 gender <- ogtts %>%
   select(Gender, OGTTs) %>%
   tbl_summary(by = Gender) %>%
-  add_ci() %>%
+  # add_ci() %>%
   add_p() %>%
   print()
 muts <- ogtts %>%
   select(MutClass, OGTTs) %>%
   tbl_summary(by = MutClass) %>%
-  add_ci() %>%
+  # add_ci() %>%
   add_p() %>%
   print()
 race <- ogtts %>%
   select(Race, OGTTs) %>%
   tbl_summary(by = Race) %>%
-  add_ci() %>%
+  # add_ci() %>%
   add_p() %>%
   print()
 eth <- ogtts %>%
   select(Hispanicrace, OGTTs) %>%
   tbl_summary(by = Hispanicrace) %>%
-  add_ci() %>%
+  # add_ci() %>%
   add_p() %>%
   print()
 ```
