@@ -34,12 +34,12 @@ library(ggpubr)
 home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF"
+  "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Documents/GitHub",
   "Windows" = "C:/Users/Tim/GitHub",
-  "Linux" = "/home/timvigers/GitHub"
+  "Linux" = "/home/tim/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -48,11 +48,9 @@ knitr::opts_knit$set(root.dir = home_dir)
 # Use REDCap import
 source(paste0(github_dir, "/CF/Jordana Hoppe/Home Collection/home_collection_data.r"))
 source(paste0(github_dir, "/CF/Jordana Hoppe/Home Collection/home_collection_surveys.r"))
-# Exclude missing subjects
+# List subjects to exclude
 data_exclude <- c("009-07", "009-17", "009-25", "009-37")
 survey_exclude <- c(6, 15, 27, 30, 34, 47)
-data <- data %>% filter(!subject_id %in% data_exclude)
-survey_data <- survey_data %>% filter(!participant_id %in% survey_exclude)
 # Fix missing labels
 labels <- label(data)[which(label(data) != "")]
 labels[paste0(names(labels), ".factor")] <- as.character(labels)
@@ -77,21 +75,21 @@ data$clinic_cx_no_growth.factor <- apply(data, 1, function(r) {
 })
 data$clinic_cx_no_growth.factor <- factor(data$clinic_cx_no_growth.factor,
   levels = 0:2,
-  labels = c("No Growth", "Some Growth", "Some Growth")
+  labels = c("No Growth", "Any Growth", "Any Growth")
 )
 data$res_cx_no_growth.factor <- apply(data, 1, function(r) {
   sum(as.numeric(r[grep("res_cx_results___\\d$", names(r))]), na.rm = T)
 })
 data$res_cx_no_growth.factor <- factor(data$res_cx_no_growth.factor,
   levels = 0:2,
-  labels = c("No Growth", "Some Growth", "Some Growth")
+  labels = c("No Growth", "Any Growth", "Any Growth")
 )
 data$home_cx_no_growth.factor <- apply(data, 1, function(r) {
   sum(as.numeric(r[grep("home_cx_results___\\d$", names(r))]), na.rm = T)
 })
 data$home_cx_no_growth.factor <- factor(data$home_cx_no_growth.factor,
   levels = 0:2,
-  labels = c("No Growth", "Some Growth", "Some Growth")
+  labels = c("No Growth", "Any Growth", "Any Growth")
 )
 # Additional labels for tables
 labels["race"] <- "Race"
@@ -105,6 +103,19 @@ data$Genotype <- factor(data$Genotype,
   levels = c("TRUE/TRUE", "TRUE/FALSE", "FALSE/FALSE"),
   labels = c("F508del/F508del", "F508del/Other", "Other/Other")
 )
+# Times from home collection
+data$days_to_home_received <-
+  as.numeric(difftime(as.Date(data$home_cx_date_received), as.Date(data$home_cx_date),
+    units = "days"
+  ))
+label(data$days_to_home_received) <-
+  "Days from Home Collection to Home Collection Received"
+data$days_to_home_collection <-
+  as.numeric(difftime(as.Date(data$home_cx_date), as.Date(data$clinic_date),
+    units = "days"
+  ))
+label(data$days_to_home_collection) <-
+  "Days from Clinic Collection to Home Collection"
 ```
 
 # Summary Tables
@@ -117,7 +128,9 @@ data$Genotype <- factor(data$Genotype,
 data %>%
   select(
     age, pt_sex.factor, race, ethnicity.factor, mutation1.factor,
-    mutation2.factor, Genotype, rural_location.factor, fev1_pp, fvc_pp
+    mutation2.factor, Genotype, rural_location.factor, cftr_modulator.factor,
+    fev1_pp, fvc_pp, days_to_home_received, days_to_home_collection,
+    cx_past_results___1.factor:cx_past_results___11.factor
   ) %>%
   mutate(
     mutation1.factor = droplevels(mutation1.factor),
@@ -125,12 +138,18 @@ data %>%
   ) %>%
   tbl_summary(
     label = labels, missing_text = "Missing",
-    statistic = list(all_continuous() ~ "{mean} ({sd})")
+    type = list(c(days_to_home_received, days_to_home_collection) ~
+      "continuous2"),
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})",
+      c(days_to_home_received, days_to_home_collection) ~
+        "{median} [{p25}, {p75}]"
+    )
   ) %>%
   as_kable_extra()
+data <- data %>% filter(!subject_id %in% data_exclude)
+survey_data <- survey_data %>% filter(!participant_id %in% survey_exclude)
 ```
-
-It appears that the two participants who were previously marked as unknown race are now considered more than one race.
 
 ## Table 2: Survey Results
 
@@ -213,8 +232,6 @@ agreement <- function(result_pattern, df = data) {
   d[d == "NA"] <- NA
   d[d == "Unchecked"] <- "Absent"
   d[d == "Checked"] <- "Present"
-  d[d == "No Growth"] <- "Absent"
-  d[d == "Some Growth"] <- "Present"
   fk <- kappam.fleiss(d)
   cat("\n")
   cat("### Agreement between all three methods")
@@ -259,17 +276,23 @@ agreement <- function(result_pattern, df = data) {
     mutate(
       "Immediate vs. Delayed" = case_when(
         Immediate == "Present" & Delayed == "Present" ~ "Both Present",
+        Immediate == "Any Growth" & Delayed == "Any Growth" ~ "Any Growth on Both",
         Immediate == "Absent" & Delayed == "Absent" ~ "Both Absent",
+        Immediate == "No Growth" & Delayed == "No Growth" ~ "No Growth on Either",
         .default = "Disagreed"
       ),
       "Immediate vs. Home" = case_when(
         Immediate == "Present" & Home == "Present" ~ "Both Present",
+        Immediate == "Any Growth" & Home == "Any Growth" ~ "Any Growth on Both",
         Immediate == "Absent" & Home == "Absent" ~ "Both Absent",
+        Immediate == "No Growth" & Home == "No Growth" ~ "No Growth on Either",
         .default = "Disagreed"
       ),
       "Delayed vs. Home" = case_when(
         Delayed == "Present" & Home == "Present" ~ "Both Present",
+        Delayed == "Any Growth" & Home == "Any Growth" ~ "Any Growth on Both",
         Delayed == "Absent" & Home == "Absent" ~ "Both Absent",
+        Delayed == "No Growth" & Home == "No Growth" ~ "No Growth on Either",
         .default = "Disagreed"
       ),
     ) %>%
@@ -523,6 +546,12 @@ yn <- c(
 # Label
 labels <- as.character(label(survey_data)[sub("\\.factor", "", colnames(survey_data))])
 names(labels) <- colnames(survey_data)
+# Why didn't people prefer home collection? (for reviewer response)
+no_home_collection <- survey_data %>%
+  filter(q6.factor == "No") %>%
+  select(participant_id, q6, q6b___1:q6b___4, q6b_spec)
+colnames(no_home_collection) <- label(no_home_collection)
+kable(no_home_collection)
 ```
 
 ## Plots
@@ -570,7 +599,7 @@ benefits_df <- benefits_df %>%
 p_benefits <- ggplot(benefits_df, aes(y = reorder(name, prop), x = prop)) +
   geom_bar(stat = "identity", fill = "#5AB4AC") +
   geom_text(aes(label = scales::percent(prop, accuracy = 1)), position = position_stack(vjust = 0.5)) +
-  ggtitle("Benefits") +
+  ggtitle("Perceived Benefits") +
   scale_x_continuous(
     breaks = c(0, 0.25, 0.5, 0.75, 1),
     labels = scales::percent(c(0, 0.25, 0.5, 0.75, 1))
@@ -592,7 +621,7 @@ barriers_df <- barriers_df %>%
 p_barriers <- ggplot(barriers_df, aes(y = reorder(name, prop), x = prop)) +
   geom_bar(stat = "identity", fill = "#D8B365") +
   geom_text(aes(label = scales::percent(prop, accuracy = 1)), position = position_stack(vjust = 0.5)) +
-  ggtitle("Barriers") +
+  ggtitle("Perceived Barriers") +
   scale_x_continuous(
     breaks = c(0, 0.05, 0.1, 0.15),
     labels = scales::percent(c(0, 0.05, 0.1, 0.15))
@@ -612,7 +641,8 @@ df3 <- survey_data %>%
   select(all_of(levels3)) %>%
   rename(any_of(setNames(names(labels), labels)))
 p3 <- gglikert(as_tibble(df3), add_totals = F) +
-  scale_fill_manual(values = c("#5AB4AC", "#F5F5F5", "#D8B365"))
+  scale_fill_manual(values = c("#7895B2", "#AEBDCA", "#E8DFCA")) +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
 p3
 ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/q2.png",
   plot = p3,
@@ -625,7 +655,8 @@ df5 <- survey_data %>%
   select(all_of(levels5)) %>%
   rename(any_of(setNames(names(labels), labels)))
 p5 <- gglikert(df5) +
-  scale_fill_manual(values = c("#018571", "#80CDC1", "#F5F5F5", "#DFC27D", "#A6611A"))
+  scale_fill_manual(values = c("#018571", "#80CDC1", "#F5F5F5", "#DFC27D", "#A6611A")) +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
 p5
 ggsave("Jordana Hoppe/Home Collection/Dissemination/Figures/difficulty.png",
   plot = p5,
