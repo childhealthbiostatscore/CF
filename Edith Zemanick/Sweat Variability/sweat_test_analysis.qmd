@@ -13,9 +13,6 @@ format:
     self-contained: true
     fig-cap-location: top
     page-layout: full
-    theme:
-      light: flatly
-      dark: darkly
 editor: source
 ---
 
@@ -33,6 +30,12 @@ home_dir <- switch(Sys.info()["sysname"],
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Edith Zemanick/Sweat Variability",
   "Linux" = "/home/tim/OneDrive/Vigers/CF/Edith Zemanick/Sweat Variability"
 )
+github_dir <- switch(Sys.info()["sysname"],
+  "Darwin" = "/Users/tim/Documents/GitHub",
+  "Windows" = "C:/Users/Tim/Documents/GitHub",
+  "Linux" = "/home/tim/Documents/GitHub"
+)
+source(paste0(github_dir, "/CF/genotype_class_severity.R"))
 knitr::opts_knit$set(root.dir = home_dir)
 ```
 
@@ -159,6 +162,49 @@ df <- df[-c(
   78, 79, 183, 257, 259, 270, 314, 342, 691, 719, 724, 737, 812, 903, 1012,
   1066, 1126, 1151, 1202, 1209, 1222, 1224, 1340, 1428, 1456
 ), ]
+# Get genotype severity
+## By severity
+df$geno_risk_1 <- cf_genotype_class_severity(df$Genotypes1)
+df$geno_risk_2 <- cf_genotype_class_severity(df$Genotypes2)
+df$geno_risk_1[df$Diagnosis == "Non-CF"] <- "Not CF"
+df$geno_risk_2[df$Diagnosis == "Non-CF"] <- "Not CF"
+df$geno_risk <- paste(df$geno_risk_1, df$geno_risk_2, sep = "/")
+df$geno_risk <- factor(df$geno_risk,
+  levels = c(
+    "Mild/Mild", "Mild/Severe", "Mild/Unknown", "Severe/Mild", "Severe/Severe",
+    "Severe/Unknown", "Unknown/Severe", "Unknown/Unknown", "Not CF/Not CF"
+  ),
+  labels = c("M/M", "M/S", "M/U", "M/S", "S/S", "S/U", "S/U", "U", "Not CF")
+)
+## By function
+df$geno1_class <- cf_genotype_class_severity(df$Genotypes1, out = "class")
+df$geno1_class[grep("508", df$Genotypes1)] <- "F508del"
+df$geno1_class <- replace(df$geno1_class, df$geno1_class %in% c("I", "II", "III"), "MF")
+df$geno1_class <- replace(df$geno1_class, df$geno1_class %in% c("IV", "V"), "RF")
+df$geno2_class <- cf_genotype_class_severity(df$Genotypes2, out = "class")
+df$geno2_class[grep("508", df$Genotypes2)] <- "F508del"
+df$geno2_class <- replace(df$geno2_class, df$geno2_class %in% c("I", "II", "III"), "MF")
+df$geno2_class <- replace(df$geno2_class, df$geno2_class %in% c("IV", "V"), "RF")
+df$geno1_class[df$Diagnosis == "Non-CF"] <- "Not CF"
+df$geno2_class[df$Diagnosis == "Non-CF"] <- "Not CF"
+df$geno_class <- paste(df$geno1_class, df$geno2_class, sep = "/")
+df$geno_class <- factor(df$geno_class,
+  levels = c(
+    "F508del/F508del", "F508del/MF", "F508del/RF", "F508del/Unknown",
+    "MF/F508del", "MF/MF", "MF/RF", "MF/Unknown", "RF/F508del", "RF/MF",
+    "RF/Unknown", "Unknown/F508del", "Unknown/MF", "Unknown/Unknown",
+    "Not CF/Not CF"
+  ),
+  labels = c(
+    "MF/MF", "MF/MF", "MF/RF", "MF/U", "MF/MF", "MF/MF", "MF/RF", "MF/U",
+    "MF/RF", "MF/RF", "RF/U", "MF/U", "MF/U", "U", "Not CF"
+  )
+)
+# Organize columns
+df <- df %>%
+  select(Name:Genotypes2, geno_risk, geno_class, everything()) %>%
+  select(-geno_risk_1, -geno_risk_2, -geno1_class, -geno2_class) %>%
+  rename(`Genotype Risk` = geno_risk, `Genotype Class` = geno_class)
 # Set table options
 mycontrols <- tableby.control(
   numeric.stats = c("N", "Nmiss", "meansd", "medianq1q3", "range")
@@ -180,9 +226,31 @@ summary(tableby(Diagnosis ~ Sex + Age + Na + Cl + `Na:Cl` + K,
 ))
 ```
 
+## Table 2: Participant Demographics by Genotype Class
+
+In the table below "MF" stands for minimal function, "RF" for residual function, and "U" indicates unknown.
+
+```{r results='asis'}
+summary(tableby(`Genotype Class` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
+  data = df, control = mycontrols
+))
+```
+
+## Table 3: Participant Demographics by Genotype Risk
+
+In the table below "M" stands for mild, "S" for severe, and "U" indicates unknown.
+
+```{r results='asis'}
+summary(tableby(`Genotype Risk` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
+  data = df, control = mycontrols
+))
+```
+
 ## Boxplots
 
 ### Chloride
+
+#### By diagnosis
 
 ```{r}
 #| warning: false
@@ -192,7 +260,29 @@ clp <- ggplot(df, aes(x = Diagnosis, y = Cl)) +
 clp
 ```
 
+#### By genotype class
+
+```{r}
+#| warning: false
+clp <- ggplot(df, aes(x = `Genotype Class`, y = Cl)) +
+  geom_boxplot() +
+  theme_bw()
+clp
+```
+
+#### By genotype risk
+
+```{r}
+#| warning: false
+clp <- ggplot(df, aes(x = `Genotype Risk`, y = Cl)) +
+  geom_boxplot() +
+  theme_bw()
+clp
+```
+
 ### Sodium
+
+#### By diagnosis
 
 ```{r}
 #| warning: false
@@ -202,7 +292,29 @@ nap <- ggplot(df, aes(x = Diagnosis, y = Na)) +
 nap
 ```
 
+#### By genotype class
+
+```{r}
+#| warning: false
+nap <- ggplot(df, aes(x = `Genotype Class`, y = Na)) +
+  geom_boxplot() +
+  theme_bw()
+nap
+```
+
+#### By genotype risk
+
+```{r}
+#| warning: false
+nap <- ggplot(df, aes(x = `Genotype Risk`, y = Na)) +
+  geom_boxplot() +
+  theme_bw()
+nap
+```
+
 ### Na:Cl
+
+#### By diagnosis
 
 ```{r}
 #| warning: false
@@ -225,67 +337,50 @@ ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
 ratiop
 ```
 
-## Histograms and Density Plots
-
-### Chloride
+#### By genotype class
 
 ```{r}
 #| warning: false
-ggplot(df, aes(x = Cl, fill = Diagnosis)) +
-  geom_histogram(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
-  geom_histogram(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
-  geom_histogram(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+ratiop <- ggplot(df, aes(x = `Genotype Class`, y = `Na:Cl`)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_hline(yintercept = 1.25, color = "red") +
   theme_bw() +
-  theme(axis.title.y = element_blank())
-ggplot(df, aes(x = Cl, fill = Diagnosis)) +
-  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  ylab("Na:Cl") +
+  xlab("Modulator")
+ratiop
+ratiop <- ggplot(df, aes(x = `Genotype Class`, y = `Na:Cl`)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_hline(yintercept = 1.25, color = "red") +
+  ylim(0, 2) +
   theme_bw() +
-  theme(axis.title.y = element_blank())
+  ylab("Na:Cl") +
+  xlab("Modulator")
+ratiop
 ```
 
-### Sodium
+#### By genotype risk
 
 ```{r}
 #| warning: false
-ggplot(df, aes(x = Na, fill = Diagnosis)) +
-  geom_histogram(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
-  geom_histogram(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
-  geom_histogram(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+ratiop <- ggplot(df, aes(x = `Genotype Risk`, y = `Na:Cl`)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_hline(yintercept = 1.25, color = "red") +
   theme_bw() +
-  theme(axis.title.y = element_blank())
-ggplot(df, aes(x = Na, fill = Diagnosis)) +
-  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  ylab("Na:Cl") +
+  xlab("Modulator")
+ratiop
+ratiop <- ggplot(df, aes(x = `Genotype Risk`, y = `Na:Cl`)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_hline(yintercept = 1.25, color = "red") +
+  ylim(0, 2) +
   theme_bw() +
-  theme(axis.title.y = element_blank())
-```
-
-### Na:Cl
-
-```{r}
-#| warning: false
-ggplot(df, aes(x = `Na:Cl`, fill = Diagnosis)) +
-  geom_histogram(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
-  geom_histogram(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
-  geom_histogram(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
-  theme_bw() +
-  theme(axis.title.y = element_blank())
-ggplot(df, aes(x = `Na:Cl`, fill = Diagnosis)) +
-  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
-  theme_bw() +
-  theme(axis.title.y = element_blank())
-ggplot(df, aes(x = `Na:Cl`, fill = Diagnosis)) +
-  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
-  xlim(0, 2) +
-  theme_bw() +
-  theme(axis.title.y = element_blank())
+  ylab("Na:Cl") +
+  xlab("Modulator")
+ratiop
 ```
 
 ## Na:Cl ROC Curves
@@ -347,9 +442,31 @@ summary(tableby(Diagnosis ~ Sex + Age + Na + Cl + `Na:Cl` + K,
 ))
 ```
 
+## Table 2: Participant Demographics by Genotype Class
+
+In the table below "MF" stands for minimal function, "RF" for residual function, and "U" indicates unknown.
+
+```{r results='asis'}
+summary(tableby(`Genotype Class` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
+  data = df, control = mycontrols
+))
+```
+
+## Table 3: Participant Demographics by Genotype Risk
+
+In the table below "M" stands for mild, "S" for severe, and "U" indicates unknown.
+
+```{r results='asis'}
+summary(tableby(`Genotype Risk` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
+  data = df, control = mycontrols
+))
+```
+
 ## Boxplots
 
 ### Chloride
+
+#### By diagnosis
 
 ```{r}
 #| warning: false
@@ -359,7 +476,29 @@ clp <- ggplot(df, aes(x = Diagnosis, y = Cl)) +
 clp
 ```
 
+#### By genotype class
+
+```{r}
+#| warning: false
+clp <- ggplot(df, aes(x = `Genotype Class`, y = Cl)) +
+  geom_boxplot() +
+  theme_bw()
+clp
+```
+
+#### By genotype risk
+
+```{r}
+#| warning: false
+clp <- ggplot(df, aes(x = `Genotype Risk`, y = Cl)) +
+  geom_boxplot() +
+  theme_bw()
+clp
+```
+
 ### Sodium
+
+#### By diagnosis
 
 ```{r}
 #| warning: false
@@ -369,7 +508,29 @@ nap <- ggplot(df, aes(x = Diagnosis, y = Na)) +
 nap
 ```
 
+#### By genotype class
+
+```{r}
+#| warning: false
+nap <- ggplot(df, aes(x = `Genotype Class`, y = Na)) +
+  geom_boxplot() +
+  theme_bw()
+nap
+```
+
+#### By genotype risk
+
+```{r}
+#| warning: false
+nap <- ggplot(df, aes(x = `Genotype Risk`, y = Na)) +
+  geom_boxplot() +
+  theme_bw()
+nap
+```
+
 ### Na:Cl
+
+#### By diagnosis
 
 ```{r}
 #| warning: false
@@ -392,67 +553,50 @@ ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
 ratiop
 ```
 
-## Histograms and Density Plots
-
-### Chloride
+#### By genotype class
 
 ```{r}
 #| warning: false
-ggplot(df, aes(x = Cl, fill = Diagnosis)) +
-  geom_histogram(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
-  geom_histogram(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
-  geom_histogram(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+ratiop <- ggplot(df, aes(x = `Genotype Class`, y = `Na:Cl`)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_hline(yintercept = 1.25, color = "red") +
   theme_bw() +
-  theme(axis.title.y = element_blank())
-ggplot(df, aes(x = Cl, fill = Diagnosis)) +
-  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  ylab("Na:Cl") +
+  xlab("Modulator")
+ratiop
+ratiop <- ggplot(df, aes(x = `Genotype Class`, y = `Na:Cl`)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_hline(yintercept = 1.25, color = "red") +
+  ylim(0, 2) +
   theme_bw() +
-  theme(axis.title.y = element_blank())
+  ylab("Na:Cl") +
+  xlab("Modulator")
+ratiop
 ```
 
-### Sodium
+#### By genotype risk
 
 ```{r}
 #| warning: false
-ggplot(df, aes(x = Na, fill = Diagnosis)) +
-  geom_histogram(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
-  geom_histogram(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
-  geom_histogram(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+ratiop <- ggplot(df, aes(x = `Genotype Risk`, y = `Na:Cl`)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_hline(yintercept = 1.25, color = "red") +
   theme_bw() +
-  theme(axis.title.y = element_blank())
-ggplot(df, aes(x = Na, fill = Diagnosis)) +
-  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
+  ylab("Na:Cl") +
+  xlab("Modulator")
+ratiop
+ratiop <- ggplot(df, aes(x = `Genotype Risk`, y = `Na:Cl`)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, color = "red") +
+  geom_hline(yintercept = 1.25, color = "red") +
+  ylim(0, 2) +
   theme_bw() +
-  theme(axis.title.y = element_blank())
-```
-
-### Na:Cl
-
-```{r}
-#| warning: false
-ggplot(df, aes(x = `Na:Cl`, fill = Diagnosis)) +
-  geom_histogram(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
-  geom_histogram(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
-  geom_histogram(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
-  theme_bw() +
-  theme(axis.title.y = element_blank())
-ggplot(df, aes(x = `Na:Cl`, fill = Diagnosis)) +
-  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
-  theme_bw() +
-  theme(axis.title.y = element_blank())
-ggplot(df, aes(x = `Na:Cl`, fill = Diagnosis)) +
-  geom_density(data = subset(df, Diagnosis == "Non-CF"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "CFTR-RD or CRMS"), alpha = 0.2) +
-  geom_density(data = subset(df, Diagnosis == "Cystic Fibrosis"), alpha = 0.2) +
-  xlim(0, 2) +
-  theme_bw() +
-  theme(axis.title.y = element_blank())
+  ylab("Na:Cl") +
+  xlab("Modulator")
+ratiop
 ```
 
 ## Na:Cl ROC Curves
