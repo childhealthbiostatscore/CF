@@ -108,6 +108,7 @@ data$days_to_home_received <-
   as.numeric(difftime(as.Date(data$home_cx_date_received), as.Date(data$home_cx_date),
     units = "days"
   ))
+data$days_to_home_received[data$subject_id == "009-49"] <- NA
 label(data$days_to_home_received) <-
   "Days from Home Collection to Home Collection Received"
 data$days_to_home_collection <-
