@@ -66,6 +66,7 @@ chco <- chco %>%
         Genotypes2,
         Sex,
         Age.at.Test.in.Years,
+        Method,
         Na,
         K,
         Cl,
@@ -118,6 +119,7 @@ njh <- njh %>%
         Genotype.2,
         Sex,
         Age.at.test..in.years.,
+        Test.Method,
         Sweat.sodium,
         Sweat.potassium,
         Sweat.chloride,
@@ -135,6 +137,7 @@ njh <- njh %>%
         DOB = Birth.Date,
         Genotypes2 = Genotype.2,
         Age = Age.at.test..in.years.,
+        Method = Test.Method,
         Na = Sweat.sodium,
         K = Sweat.potassium,
         Cl = Sweat.chloride,
@@ -149,7 +152,12 @@ njh <- njh %>%
 njh$Patient.ID <- NULL
 # Row bind, fill diagnosis, then remove dupes
 df <- rbind(chco, njh)
+method <- df %>%
+    select(Name, Age, Method, Na, Cl) %>%
+    distinct() %>%
+    drop_na()
 df <- df %>%
+    select(-Method) %>%
     group_by(Name) %>%
     fill(Diagnosis) %>%
     distinct() %>%
@@ -266,81 +274,36 @@ df$geno_risk <- factor(
         "Unknown/Unknown",
         "Not CF/Not CF"
     ),
-    labels = c("M/M", "M/S", "M/U", "M/S", "S/S", "S/U", "S/U", "U", "Not CF")
-)
-## By function
-df$geno1_class <- cf_genotype_class_severity(df$Genotypes1, out = "class")
-df$geno1_class[grep("508", df$Genotypes1)] <- "F508del"
-df$geno1_class <- replace(
-    df$geno1_class,
-    df$geno1_class %in% c("I", "II", "III"),
-    "MF"
-)
-df$geno1_class <- replace(
-    df$geno1_class,
-    df$geno1_class %in% c("IV", "V"),
-    "RF"
-)
-df$geno2_class <- cf_genotype_class_severity(df$Genotypes2, out = "class")
-df$geno2_class[grep("508", df$Genotypes2)] <- "F508del"
-df$geno2_class <- replace(
-    df$geno2_class,
-    df$geno2_class %in% c("I", "II", "III"),
-    "MF"
-)
-df$geno2_class <- replace(
-    df$geno2_class,
-    df$geno2_class %in% c("IV", "V"),
-    "RF"
-)
-df$geno1_class[df$Diagnosis == "Non-CF"] <- "Not CF"
-df$geno2_class[df$Diagnosis == "Non-CF"] <- "Not CF"
-df$geno_class <- paste(df$geno1_class, df$geno2_class, sep = "/")
-df$geno_class <- factor(
-    df$geno_class,
-    levels = c(
-        "F508del/F508del",
-        "F508del/MF",
-        "F508del/RF",
-        "F508del/Unknown",
-        "MF/F508del",
-        "MF/MF",
-        "MF/RF",
-        "MF/Unknown",
-        "RF/F508del",
-        "RF/MF",
-        "RF/Unknown",
-        "Unknown/F508del",
-        "Unknown/MF",
-        "Unknown/Unknown",
-        "Not CF/Not CF"
-    ),
     labels = c(
-        "MF/MF",
-        "MF/MF",
-        "MF/RF",
-        "MF/U",
-        "MF/MF",
-        "MF/MF",
-        "MF/RF",
-        "MF/U",
-        "MF/RF",
-        "MF/RF",
-        "RF/U",
-        "MF/U",
-        "MF/U",
-        "U",
+        "Mild",
+        "Mild",
+        "Unknown",
+        "Mild",
+        "Severe",
+        "Unknown",
+        "Unknown",
+        "Unknown",
         "Not CF"
     )
 )
-# Organize columns
+# Create a categorical column for Cl
+df$`Cl Group` <- cut(
+    df$Cl,
+    breaks = c(-Inf, 30, 60, Inf),
+    right = F,
+    labels = c("< 30", "30-59", ">= 60")
+)
+# Add method back in
+df <- left_join(df, method)
+# Organize columns, remove age over 50 (there shouldn't be any age < 2 days)
 df <- df %>%
-    select(Name:Genotypes2, geno_risk, geno_class, everything()) %>%
-    select(-geno_risk_1, -geno_risk_2, -geno1_class, -geno2_class) %>%
-    rename(`Genotype Risk` = geno_risk, `Genotype Class` = geno_class)
+    select(Name:Genotypes2, geno_risk, everything()) %>%
+    select(-geno_risk_1, -geno_risk_2) %>%
+    rename(`Genotype Risk` = geno_risk) %>%
+    filter(Age < 50)
 # Set table options
 mycontrols <- tableby.control(
-    numeric.stats = c("N", "Nmiss", "meansd", "medianq1q3", "range")
+    numeric.stats = c("N", "Nmiss", "meansd", "medianq1q3", "iqr", "range")
 )
 # Save this for Angela et al. to check
 write.csv(
@@ -356,35 +319,60 @@ write.csv(
 ## Table 1: Participant Demographics by Diagnosis
 
 ```{r results='asis'}
-summary(tableby(
-    Diagnosis ~ Sex + Age + Na + Cl + `Na:Cl` + K,
-    data = df,
-    control = mycontrols
-))
+summary(
+    tableby(
+        Diagnosis ~
+            Method +
+                Sex +
+                Age +
+                fe(`Genotype Risk`) +
+                fe(`Cl Group`) +
+                Cl +
+                Na +
+                `Na:Cl` +
+                K,
+        data = df,
+        simulate.p.value = T,
+        control = mycontrols
+    ),
+    pfootnote = T
+)
 ```
 
-## Table 2: Participant Demographics by Genotype Class
-
-In the table below "MF" stands for minimal function, "RF" for residual function, and "U" indicates unknown.
+## Table 2: Participant Demographics by Genotype Risk
 
 ```{r results='asis'}
-summary(tableby(
-    `Genotype Class` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
-    data = df,
-    control = mycontrols
-))
+summary(
+    tableby(
+        `Genotype Risk` ~
+            Sex +
+                Age +
+                fe(`Cl Group`) +
+                Cl +
+                Na +
+                `Na:Cl` +
+                K,
+        data = df[
+            df$`Genotype Risk` != "Unknown" & df$Diagnosis == "Cystic Fibrosis",
+        ],
+        simulate.p.value = T,
+        control = mycontrols
+    ),
+    pfootnote = T
+)
 ```
 
-## Table 3: Participant Demographics by Genotype Risk
-
-In the table below "M" stands for mild, "S" for severe, and "U" indicates unknown.
+## Table 3: Participant Demographics by Chloride Group
 
 ```{r results='asis'}
-summary(tableby(
-    `Genotype Risk` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
-    data = df,
-    control = mycontrols
-))
+summary(
+    tableby(
+        `Cl Group` ~ Sex + Age + Cl + Na + `Na:Cl` + K,
+        data = df,
+        control = mycontrols
+    ),
+    pfootnote = T
+)
 ```
 
 ## Boxplots
@@ -396,16 +384,6 @@ summary(tableby(
 ```{r}
 #| warning: false
 clp <- ggplot(df, aes(x = Diagnosis, y = Cl)) +
-    geom_boxplot() +
-    theme_bw()
-clp
-```
-
-#### By genotype class
-
-```{r}
-#| warning: false
-clp <- ggplot(df, aes(x = `Genotype Class`, y = Cl)) +
     geom_boxplot() +
     theme_bw()
 clp
@@ -428,16 +406,6 @@ clp
 ```{r}
 #| warning: false
 nap <- ggplot(df, aes(x = Diagnosis, y = Na)) +
-    geom_boxplot() +
-    theme_bw()
-nap
-```
-
-#### By genotype class
-
-```{r}
-#| warning: false
-nap <- ggplot(df, aes(x = `Genotype Class`, y = Na)) +
     geom_boxplot() +
     theme_bw()
 nap
@@ -468,29 +436,6 @@ ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
     xlab("Modulator")
 ratiop
 ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
-    geom_boxplot() +
-    geom_hline(yintercept = 1, color = "red") +
-    geom_hline(yintercept = 1.25, color = "red") +
-    ylim(0, 2) +
-    theme_bw() +
-    ylab("Na:Cl") +
-    xlab("Modulator")
-ratiop
-```
-
-#### By genotype class
-
-```{r}
-#| warning: false
-ratiop <- ggplot(df, aes(x = `Genotype Class`, y = `Na:Cl`)) +
-    geom_boxplot() +
-    geom_hline(yintercept = 1, color = "red") +
-    geom_hline(yintercept = 1.25, color = "red") +
-    theme_bw() +
-    ylab("Na:Cl") +
-    xlab("Modulator")
-ratiop
-ratiop <- ggplot(df, aes(x = `Genotype Class`, y = `Na:Cl`)) +
     geom_boxplot() +
     geom_hline(yintercept = 1, color = "red") +
     geom_hline(yintercept = 1.25, color = "red") +
@@ -592,35 +537,60 @@ df <- df %>% filter(Cl > 30)
 ## Table 1: Participant Demographics by Diagnosis
 
 ```{r results='asis'}
-summary(tableby(
-    Diagnosis ~ Sex + Age + Na + Cl + `Na:Cl` + K,
-    data = df,
-    control = mycontrols
-))
+summary(
+    tableby(
+        Diagnosis ~
+            Method +
+                Sex +
+                Age +
+                fe(`Genotype Risk`) +
+                fe(`Cl Group`) +
+                Cl +
+                Na +
+                `Na:Cl` +
+                K,
+        data = df,
+        simulate.p.value = T,
+        control = mycontrols
+    ),
+    pfootnote = T
+)
 ```
 
-## Table 2: Participant Demographics by Genotype Class
-
-In the table below "MF" stands for minimal function, "RF" for residual function, and "U" indicates unknown.
+## Table 2: Participant Demographics by Genotype Risk
 
 ```{r results='asis'}
-summary(tableby(
-    `Genotype Class` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
-    data = df,
-    control = mycontrols
-))
+summary(
+    tableby(
+        `Genotype Risk` ~
+            Sex +
+                Age +
+                fe(`Cl Group`) +
+                Cl +
+                Na +
+                `Na:Cl` +
+                K,
+        data = df[
+            df$`Genotype Risk` != "Unknown" & df$Diagnosis == "Cystic Fibrosis",
+        ],
+        simulate.p.value = T,
+        control = mycontrols
+    ),
+    pfootnote = T
+)
 ```
 
-## Table 3: Participant Demographics by Genotype Risk
-
-In the table below "M" stands for mild, "S" for severe, and "U" indicates unknown.
+## Table 3: Participant Demographics by Chloride Group
 
 ```{r results='asis'}
-summary(tableby(
-    `Genotype Risk` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
-    data = df,
-    control = mycontrols
-))
+summary(
+    tableby(
+        `Cl Group` ~ Sex + Age + Cl + Na + `Na:Cl` + K,
+        data = df,
+        control = mycontrols
+    ),
+    pfootnote = T
+)
 ```
 
 ## Boxplots
@@ -632,16 +602,6 @@ summary(tableby(
 ```{r}
 #| warning: false
 clp <- ggplot(df, aes(x = Diagnosis, y = Cl)) +
-    geom_boxplot() +
-    theme_bw()
-clp
-```
-
-#### By genotype class
-
-```{r}
-#| warning: false
-clp <- ggplot(df, aes(x = `Genotype Class`, y = Cl)) +
     geom_boxplot() +
     theme_bw()
 clp
@@ -664,16 +624,6 @@ clp
 ```{r}
 #| warning: false
 nap <- ggplot(df, aes(x = Diagnosis, y = Na)) +
-    geom_boxplot() +
-    theme_bw()
-nap
-```
-
-#### By genotype class
-
-```{r}
-#| warning: false
-nap <- ggplot(df, aes(x = `Genotype Class`, y = Na)) +
     geom_boxplot() +
     theme_bw()
 nap
@@ -704,29 +654,6 @@ ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
     xlab("Modulator")
 ratiop
 ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
-    geom_boxplot() +
-    geom_hline(yintercept = 1, color = "red") +
-    geom_hline(yintercept = 1.25, color = "red") +
-    ylim(0, 2) +
-    theme_bw() +
-    ylab("Na:Cl") +
-    xlab("Modulator")
-ratiop
-```
-
-#### By genotype class
-
-```{r}
-#| warning: false
-ratiop <- ggplot(df, aes(x = `Genotype Class`, y = `Na:Cl`)) +
-    geom_boxplot() +
-    geom_hline(yintercept = 1, color = "red") +
-    geom_hline(yintercept = 1.25, color = "red") +
-    theme_bw() +
-    ylab("Na:Cl") +
-    xlab("Modulator")
-ratiop
-ratiop <- ggplot(df, aes(x = `Genotype Class`, y = `Na:Cl`)) +
     geom_boxplot() +
     geom_hline(yintercept = 1, color = "red") +
     geom_hline(yintercept = 1.25, color = "red") +
