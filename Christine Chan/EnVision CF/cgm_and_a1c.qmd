@@ -17,21 +17,24 @@ editor: source
 
 ```{r setup}
 #| include: false
+library(keyring)
 library(tidyverse)
 library(redcapAPI)
 library(gtsummary)
 library(labelled)
 library(ggpmisc)
 library(blandr)
-home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/tim/OneDrive/Vigers/CF"
+home_dir <- switch(
+    Sys.info()["sysname"],
+    "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+    "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+    "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
-github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Documents/GitHub",
-  "Windows" = "C:/Users/Tim/Documents/GitHub",
-  "Linux" = "/home/tim/Documents/GitHub"
+github_dir <- switch(
+    Sys.info()["sysname"],
+    "Darwin" = "/Users/tim/Documents/GitHub",
+    "Windows" = "C:/Users/Tim/Documents/GitHub",
+    "Linux" = "/home/tim/Documents/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -39,47 +42,71 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```{r data cleaning}
 #| include: false
 # Import from REDCap
-unlockREDCap(c(rcon = "EnVision CF HbA1c and CGM"),
-  keyring = "API_KEYs",
-  envir = 1,
-  url = "https://redcap.ahc.umn.edu/redcap/api/"
+token <- key_get("envision_cf_hba1c_cgm")
+rcon <- redcapConnection(
+    url = "https://redcap.ahc.umn.edu/redcap/api/",
+    token = token
 )
 df <- exportRecordsTyped(rcon)
 # Start building analysis dataset
 df <- df %>%
-  # Format columns
-  mutate(
-    # Numeric
-    across(c(age, bmi, cfrd_diagnosis_age, average_sensor_glucose), ~
-      as.numeric(.)),
-    across(c(hb_a1c_value, gmi), ~
-      as.numeric(sub("%", "", .))),
-    # Categorical
-    combined_race = factor(race,
-      levels = c(
-        "White", "Black or African American", "Asian", "More Than One Race",
-        "Unknown / Not Reported"
-      ),
-      labels = c(
-        "White", "Black or African American", "Other/Unknown", "Other/Unknown",
-        "Other/Unknown"
-      )
+    # Format columns
+    mutate(
+        # Numeric
+        across(
+            c(age, bmi, cfrd_diagnosis_age, average_sensor_glucose),
+            ~ as.numeric(.)
+        ),
+        across(c(hb_a1c_value, gmi), ~ as.numeric(sub("%", "", .))),
+        # Categorical
+        combined_race = factor(
+            race,
+            levels = c(
+                "White",
+                "Black or African American",
+                "Asian",
+                "More Than One Race",
+                "Unknown / Not Reported"
+            ),
+            labels = c(
+                "White",
+                "Black or African American",
+                "Other/Unknown",
+                "Other/Unknown",
+                "Other/Unknown"
+            )
+        )
+    ) %>%
+    # Drop unnecessary columns
+    select(
+        subject_id,
+        age,
+        cfrd_diagnosis_age,
+        bmi,
+        combined_race,
+        sex,
+        pi,
+        cftr_modulator_use,
+        type_of_modulator,
+        type_of_cgm,
+        hb_a1c_value,
+        gmi,
+        average_sensor_glucose
+    ) %>%
+    # Labels
+    set_variable_labels(
+        age = "Age (years)",
+        cfrd_diagnosis_age = "Age at CFRD Diagnosis (years)",
+        bmi = "BMI (kg/m2)",
+        combined_race = "Race",
+        sex = "Sex at Birth",
+        type_of_modulator = "Type of Modulator",
+        hb_a1c_value = "HbA1c (%)",
+        gmi = "GMI (%)",
+        average_sensor_glucose = "Mean Sensor Glucose (mg/dL)",
+        cftr_modulator_use = "CFTR Modulator",
+        pi = "Pancreatic Insufficiency"
     )
-  ) %>%
-  # Drop unnecessary columns
-  select(
-    subject_id, age, cfrd_diagnosis_age, bmi, combined_race, sex, pi,
-    cftr_modulator_use, type_of_modulator, type_of_cgm, hb_a1c_value, gmi,
-    average_sensor_glucose
-  ) %>%
-  # Labels
-  set_variable_labels(
-    age = "Age (years)", cfrd_diagnosis_age = "Age at CFRD Diagnosis (years)",
-    bmi = "BMI (kg/m2)", combined_race = "Race", sex = "Sex at Birth",
-    type_of_modulator = "Type of Modulator", hb_a1c_value = "HbA1c (%)",
-    gmi = "GMI (%)", average_sensor_glucose = "Mean Sensor Glucose (mg/dL)",
-    cftr_modulator_use = "CFTR Modulator", pi = "Pancreatic Insufficiency"
-  )
 ```
 
 # Participant Characteristics
@@ -88,41 +115,37 @@ df <- df %>%
 #| label: tbl-1
 #| tbl-cap: Table 1
 df %>%
-  select(-subject_id) %>%
-  tbl_summary(
-    missing_text = "Missing",
-    type = all_continuous() ~ "continuous2",
-    statistic = list(
-      all_continuous() ~ c("{median} [{p25}, {p75}]", "{min} - {max}"),
-      average_sensor_glucose ~ c("{mean} ({sd})", "{min} - {max}")
-    ),
-  )
+    select(-subject_id) %>%
+    tbl_summary(
+        missing_text = "Missing",
+        type = all_continuous() ~ "continuous2",
+        statistic = list(
+            all_continuous() ~ c("{median} [{p25}, {p75}]", "{min} - {max}"),
+            average_sensor_glucose ~ c("{mean} ({sd})", "{min} - {max}")
+        ),
+    )
 ```
 
 # GMI and HbA1c
 
 ```{r}
 #| warning: false
-ggplot(df, aes(x = hb_a1c_value, y = gmi)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = F) +
-  stat_poly_line() +
-  stat_poly_eq(use_label(c("eq", "R2", "p", "n")))
+ggplot(df, aes(x = gmi, y = hb_a1c_value)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = F) +
+    stat_poly_line() +
+    stat_poly_eq(use_label(c("eq", "R2", "p", "n")))
 
-blandr.draw(df$hb_a1c_value, df$gmi, ciDisplay = F, annotate = T)
+blandr.draw(df$gmi, df$hb_a1c_value, ciDisplay = F, annotate = T)
 ```
 
-# GMI and HbA1c
+# Mean sensor glucose and HbA1c
 
 ```{r}
 #| warning: false
-ggplot(df, aes(x = hb_a1c_value, y = average_sensor_glucose)) +
-  geom_point() +
-  geom_smooth(method = "lm", se = F) +
-  stat_poly_line() +
-  stat_poly_eq(use_label(c("eq", "R2", "p", "n")))
-
-blandr.draw(df$hb_a1c_value, df$average_sensor_glucose,
-  ciDisplay = F, annotate = T
-)
+ggplot(df, aes(x = average_sensor_glucose, y = hb_a1c_value)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = F) +
+    stat_poly_line() +
+    stat_poly_eq(use_label(c("eq", "R2", "p", "n")))
 ```
