@@ -44,9 +44,11 @@ gem <- read.csv(
   na.strings = ""
 )
 # ID linking from Monique
-ids <- read_excel("./Data_Raw/ETI participant IDs_TV.xlsx")
+ids <- read.csv("./Data_Clean/TV_ETI logitudinal patient list.csv", na.strings = "")
+ids <- ids %>%
+  select(EnVision.ID, GEM.ID) %>%
+  rename(`EnVision ID` = EnVision.ID, `GEM ID` = GEM.ID)
 ids <- ids[!is.na(ids$`GEM ID`), ]
-ids$`EnVision ID` <- sub("-2", "", ids$`EnVision ID`)
 # Get pre-/post-ETI
 df$eti_start <- ifelse(df$corrector___4 == 1, df$corrector_start_date, NA)
 df <- df %>%
@@ -54,8 +56,11 @@ df <- df %>%
   fill(eti_start, .direction = "downup")
 # Manually correct a few per Monique
 df$eti_start[df$study_id == "CC0001"] <- "2021-11-24"
+df$eti_start[df$study_id == "CC0010"] <- "2023-01-16"
+df$eti_start[df$study_id == "CC0022"] <- "2019-12-06"
 df$eti_start[df$study_id == "CC0023"] <- "2020-01-09"
 df$eti_start[df$study_id == "CC0026"] <- "2020-12-04"
+df$eti_start[df$study_id == "CC0059"] <- "2021-06-23"
 df$pre_post <-
   factor(df$Date >= df$eti_start, levels = c(F, T), labels = c("Pre", "Post"))
 df$pre_post[df$study_id == "CC0012"] <- "Pre"
@@ -198,60 +203,10 @@ gem <- gem %>% filter(gem_id %in% ids$`GEM ID`)
 df <- rbind(df, gem) %>% filter(!is.na(pre_post))
 df$pre_post <- factor(df$pre_post, levels = c("Pre", "Post"))
 df <- df %>% arrange(study_id, Date)
+# Calculate ODI, etc.
 # Write for checking
 write.csv(df,
   file = "./Data_Clean/fsOGTT_pre_post_ETI.csv",
   row.names = F, na = ""
 )
-```
-
-# Plot
-
-```{r}
-df %>%
-  group_by(study_id) %>%
-  count(pre_post) %>%
-  ggplot(., aes(y = study_id, x = n)) +
-  geom_point() +
-  theme_bw() +
-  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) +
-  facet_wrap(~pre_post)
-```
-
-- Adjust models for age
-- Paneled figure with results for glucose, c-peptide, and insulin
-- Look at acute insulin response (change in 30 minute c peptide)/(change in 30 minute glucose)
-  - Can also do across the whole time period and can use insulin in the numerator also
-- See Teams folder document for detailed plan
-
-# Glucose
-
-```{r}
-# Make a long DF for models
-long_df <- df %>% pivot_longer(Glucose_0:Glucose_180,
-  names_to = c(".value", "timepoint"),
-  names_pattern = "(.*)_(.*)",
-  values_to = "Glucose"
-)
-long_df$timepoint <- factor(long_df$timepoint,
-  levels = c("0", "10", "30", "60", "90", "120", "150", "180")
-)
-mod1 <- lmer(
-  Glucose ~ timepoint * pre_post + age_visit + (1 | study_id),
-  data = long_df
-)
-mod1 %>% tbl_regression(.)
-means <- data.frame(emmeans(mod1, ~ timepoint + pre_post))
-knitr::kable(means)
-ggplot(means, aes(
-  x = as.numeric(as.character(timepoint)), y = emmean,
-  color = pre_post, group = pre_post
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 1) +
-  geom_line() +
-  theme_bw() +
-  xlab("Timepoint") +
-  ylab("Glucose (mg/dL)") +
-  scale_x_continuous(breaks = c(0, 10, 30, 60, 90, 120, 150, 180))
 ```
