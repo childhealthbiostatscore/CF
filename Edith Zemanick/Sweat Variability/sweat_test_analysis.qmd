@@ -25,12 +25,14 @@ library(readxl)
 library(tidyverse)
 library(arsenal)
 library(pROC)
-home_dir <- switch(Sys.info()["sysname"],
+home_dir <- switch(
+    Sys.info()["sysname"],
     "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability",
     "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Edith Zemanick/Sweat Variability",
     "Linux" = "/home/tim/OneDrive/Vigers/CF/Edith Zemanick/Sweat Variability"
 )
-github_dir <- switch(Sys.info()["sysname"],
+github_dir <- switch(
+    Sys.info()["sysname"],
     "Darwin" = "/Users/tim/Documents/GitHub",
     "Windows" = "C:/Users/Tim/Documents/GitHub",
     "Linux" = "/home/tim/Documents/GitHub"
@@ -42,10 +44,14 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```{r data cleaning}
 #| message: false
 # Import CHCO, filter out those with no demo data, rename columns, etc.
-chco <- read.csv("./Data_Cleaned/chco_reidentified.csv",
+chco <- read.csv(
+    "./Data_Cleaned/chco_reidentified.csv",
     na.strings = c(
-        "", "Test not performed", "Insufficient quant.",
-        "repeat sweat chloride testing", "Please reorder testing and re",
+        "",
+        "Test not performed",
+        "Insufficient quant.",
+        "repeat sweat chloride testing",
+        "Please reorder testing and re",
         "The received specimen cannot"
     )
 )
@@ -53,8 +59,22 @@ chco <- chco %>%
     group_by(PatientID) %>%
     filter(Demographics.Available == "TRUE") %>%
     select(
-        PatientID, Name, DOB, Genotypes1, Genotypes2, Sex, Age.at.Test.in.Years,
-        Na, K, Cl, Na_Left, Na_Right, K_Left, K_Right, Cl_Left, Cl_Right
+        PatientID,
+        Name,
+        DOB,
+        Genotypes1,
+        Genotypes2,
+        Sex,
+        Age.at.Test.in.Years,
+        Na,
+        K,
+        Cl,
+        Na_Left,
+        Na_Right,
+        K_Left,
+        K_Right,
+        Cl_Left,
+        Cl_Right
     ) %>%
     rename(Age = Age.at.Test.in.Years) %>%
     mutate(Name = tolower(gsub("[[:punct:] ]+", "", Name)))
@@ -74,9 +94,12 @@ chco[chco == "LESS THAN 10"] <- NA
 chco[, c("Cl", "Cl_Left", "Cl_Right")] <-
     lapply(chco[, c("Cl", "Cl_Left", "Cl_Right")], as.numeric)
 # Import NJH and add diagnoses from Katie
-njh <- read.csv("./Data_Cleaned/njh_full_list.csv",
+njh <- read.csv(
+    "./Data_Cleaned/njh_full_list.csv",
     na.strings = c(
-        "", "Test not performed", "Insufficient quant.",
+        "",
+        "Test not performed",
+        "Insufficient quant.",
         "repeat sweat chloride testing"
     )
 )
@@ -88,18 +111,38 @@ njh <- njh %>%
     group_by(Patient.ID) %>%
     filter(Demographics.Available == "TRUE") %>%
     select(
-        Patient.ID, Patient.Name, Birth.Date, Genotype.1, Genotype.2,
-        Sex, Age.at.test..in.years., Sweat.sodium, Sweat.potassium, Sweat.chloride,
-        Sweat.sodium.left.arm, Sweat.sodium.right.arm, Sweat.potassium.left.arm,
-        Sweat.potassium.right.arm, Sweat.chloride.left.arm,
-        Sweat.chloride.right.arm, Diagnosis
+        Patient.ID,
+        Patient.Name,
+        Birth.Date,
+        Genotype.1,
+        Genotype.2,
+        Sex,
+        Age.at.test..in.years.,
+        Sweat.sodium,
+        Sweat.potassium,
+        Sweat.chloride,
+        Sweat.sodium.left.arm,
+        Sweat.sodium.right.arm,
+        Sweat.potassium.left.arm,
+        Sweat.potassium.right.arm,
+        Sweat.chloride.left.arm,
+        Sweat.chloride.right.arm,
+        Diagnosis
     ) %>%
     rename(
-        Name = Patient.Name, Genotypes1 = Genotype.1, DOB = Birth.Date,
-        Genotypes2 = Genotype.2, Age = Age.at.test..in.years., Na = Sweat.sodium,
-        K = Sweat.potassium, Cl = Sweat.chloride, Na_Left = Sweat.sodium.left.arm,
-        Na_Right = Sweat.sodium.right.arm, K_Left = Sweat.potassium.left.arm,
-        K_Right = Sweat.potassium.right.arm, Cl_Left = Sweat.chloride.left.arm,
+        Name = Patient.Name,
+        Genotypes1 = Genotype.1,
+        DOB = Birth.Date,
+        Genotypes2 = Genotype.2,
+        Age = Age.at.test..in.years.,
+        Na = Sweat.sodium,
+        K = Sweat.potassium,
+        Cl = Sweat.chloride,
+        Na_Left = Sweat.sodium.left.arm,
+        Na_Right = Sweat.sodium.right.arm,
+        K_Left = Sweat.potassium.left.arm,
+        K_Right = Sweat.potassium.right.arm,
+        Cl_Left = Sweat.chloride.left.arm,
         Cl_Right = Sweat.chloride.right.arm
     ) %>%
     mutate(Name = tolower(gsub("[[:punct:] ]+", "", Name)))
@@ -137,13 +180,29 @@ df <- df[!df$Name %in% dups, ]
 # Get rid of unnecessary columns, remove those with no diagnosis
 df <- df %>%
     select(
-        Name, DOB, Diagnosis, Genotypes1, Genotypes2, Sex, Age, Na, K, Cl, `Na:Cl`
+        Name,
+        DOB,
+        Diagnosis,
+        Genotypes1,
+        Genotypes2,
+        Sex,
+        Age,
+        Na,
+        K,
+        Cl,
+        `Na:Cl`
     ) %>%
     filter(!is.na(Diagnosis))
 # Combine CFTR-related disorder and CRMS
-df$Diagnosis <- factor(df$Diagnosis,
+df$Diagnosis <- factor(
+    df$Diagnosis,
     levels = c("Cystic Fibrosis", "CFTR-related disorder", "CRMS", "Non-CF"),
-    labels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "CFTR-RD or CRMS", "Non-CF")
+    labels = c(
+        "Cystic Fibrosis",
+        "CFTR-RD or CRMS",
+        "CFTR-RD or CRMS",
+        "Non-CF"
+    )
 )
 # Additional changes based on Angela's review
 df$Diagnosis[which(is.na(df$Name))] <- "Cystic Fibrosis"
@@ -158,10 +217,35 @@ df$Na[238] <- 73
 df$Na[541] <- 69
 df$Na[747] <- 88.9
 # Remove people per Angela's recommendation and duplicates based on DOB review
-df <- df[-c(
-    78, 79, 183, 257, 259, 270, 314, 342, 691, 719, 724, 737, 812, 903, 1012,
-    1066, 1126, 1151, 1202, 1209, 1222, 1224, 1340, 1428, 1456
-), ]
+df <- df[
+    -c(
+        78,
+        79,
+        183,
+        257,
+        259,
+        270,
+        314,
+        342,
+        691,
+        719,
+        724,
+        737,
+        812,
+        903,
+        1012,
+        1066,
+        1126,
+        1151,
+        1202,
+        1209,
+        1222,
+        1224,
+        1340,
+        1428,
+        1456
+    ),
+]
 # Get genotype severity
 ## By severity
 df$geno_risk_1 <- cf_genotype_class_severity(df$Genotypes1)
@@ -169,35 +253,84 @@ df$geno_risk_2 <- cf_genotype_class_severity(df$Genotypes2)
 df$geno_risk_1[df$Diagnosis == "Non-CF"] <- "Not CF"
 df$geno_risk_2[df$Diagnosis == "Non-CF"] <- "Not CF"
 df$geno_risk <- paste(df$geno_risk_1, df$geno_risk_2, sep = "/")
-df$geno_risk <- factor(df$geno_risk,
+df$geno_risk <- factor(
+    df$geno_risk,
     levels = c(
-        "Mild/Mild", "Mild/Severe", "Mild/Unknown", "Severe/Mild", "Severe/Severe",
-        "Severe/Unknown", "Unknown/Severe", "Unknown/Unknown", "Not CF/Not CF"
+        "Mild/Mild",
+        "Mild/Severe",
+        "Mild/Unknown",
+        "Severe/Mild",
+        "Severe/Severe",
+        "Severe/Unknown",
+        "Unknown/Severe",
+        "Unknown/Unknown",
+        "Not CF/Not CF"
     ),
     labels = c("M/M", "M/S", "M/U", "M/S", "S/S", "S/U", "S/U", "U", "Not CF")
 )
 ## By function
 df$geno1_class <- cf_genotype_class_severity(df$Genotypes1, out = "class")
 df$geno1_class[grep("508", df$Genotypes1)] <- "F508del"
-df$geno1_class <- replace(df$geno1_class, df$geno1_class %in% c("I", "II", "III"), "MF")
-df$geno1_class <- replace(df$geno1_class, df$geno1_class %in% c("IV", "V"), "RF")
+df$geno1_class <- replace(
+    df$geno1_class,
+    df$geno1_class %in% c("I", "II", "III"),
+    "MF"
+)
+df$geno1_class <- replace(
+    df$geno1_class,
+    df$geno1_class %in% c("IV", "V"),
+    "RF"
+)
 df$geno2_class <- cf_genotype_class_severity(df$Genotypes2, out = "class")
 df$geno2_class[grep("508", df$Genotypes2)] <- "F508del"
-df$geno2_class <- replace(df$geno2_class, df$geno2_class %in% c("I", "II", "III"), "MF")
-df$geno2_class <- replace(df$geno2_class, df$geno2_class %in% c("IV", "V"), "RF")
+df$geno2_class <- replace(
+    df$geno2_class,
+    df$geno2_class %in% c("I", "II", "III"),
+    "MF"
+)
+df$geno2_class <- replace(
+    df$geno2_class,
+    df$geno2_class %in% c("IV", "V"),
+    "RF"
+)
 df$geno1_class[df$Diagnosis == "Non-CF"] <- "Not CF"
 df$geno2_class[df$Diagnosis == "Non-CF"] <- "Not CF"
 df$geno_class <- paste(df$geno1_class, df$geno2_class, sep = "/")
-df$geno_class <- factor(df$geno_class,
+df$geno_class <- factor(
+    df$geno_class,
     levels = c(
-        "F508del/F508del", "F508del/MF", "F508del/RF", "F508del/Unknown",
-        "MF/F508del", "MF/MF", "MF/RF", "MF/Unknown", "RF/F508del", "RF/MF",
-        "RF/Unknown", "Unknown/F508del", "Unknown/MF", "Unknown/Unknown",
+        "F508del/F508del",
+        "F508del/MF",
+        "F508del/RF",
+        "F508del/Unknown",
+        "MF/F508del",
+        "MF/MF",
+        "MF/RF",
+        "MF/Unknown",
+        "RF/F508del",
+        "RF/MF",
+        "RF/Unknown",
+        "Unknown/F508del",
+        "Unknown/MF",
+        "Unknown/Unknown",
         "Not CF/Not CF"
     ),
     labels = c(
-        "MF/MF", "MF/MF", "MF/RF", "MF/U", "MF/MF", "MF/MF", "MF/RF", "MF/U",
-        "MF/RF", "MF/RF", "RF/U", "MF/U", "MF/U", "U", "Not CF"
+        "MF/MF",
+        "MF/MF",
+        "MF/RF",
+        "MF/U",
+        "MF/MF",
+        "MF/MF",
+        "MF/RF",
+        "MF/U",
+        "MF/RF",
+        "MF/RF",
+        "RF/U",
+        "MF/U",
+        "MF/U",
+        "U",
+        "Not CF"
     )
 )
 # Organize columns
@@ -210,9 +343,11 @@ mycontrols <- tableby.control(
     numeric.stats = c("N", "Nmiss", "meansd", "medianq1q3", "range")
 )
 # Save this for Angela et al. to check
-write.csv(df,
+write.csv(
+    df,
     file = "./Data_Cleaned/sweat_variability_analysis_dataset.csv",
-    row.names = F, na = ""
+    row.names = F,
+    na = ""
 )
 ```
 
@@ -221,8 +356,10 @@ write.csv(df,
 ## Table 1: Participant Demographics by Diagnosis
 
 ```{r results='asis'}
-summary(tableby(Diagnosis ~ Sex + Age + Na + Cl + `Na:Cl` + K,
-    data = df, control = mycontrols
+summary(tableby(
+    Diagnosis ~ Sex + Age + Na + Cl + `Na:Cl` + K,
+    data = df,
+    control = mycontrols
 ))
 ```
 
@@ -231,8 +368,10 @@ summary(tableby(Diagnosis ~ Sex + Age + Na + Cl + `Na:Cl` + K,
 In the table below "MF" stands for minimal function, "RF" for residual function, and "U" indicates unknown.
 
 ```{r results='asis'}
-summary(tableby(`Genotype Class` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
-    data = df, control = mycontrols
+summary(tableby(
+    `Genotype Class` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
+    data = df,
+    control = mycontrols
 ))
 ```
 
@@ -241,8 +380,10 @@ summary(tableby(`Genotype Class` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
 In the table below "M" stands for mild, "S" for severe, and "U" indicates unknown.
 
 ```{r results='asis'}
-summary(tableby(`Genotype Risk` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
-    data = df, control = mycontrols
+summary(tableby(
+    `Genotype Risk` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
+    data = df,
+    control = mycontrols
 ))
 ```
 
@@ -397,11 +538,19 @@ ggroc(roc_list, legacy.axes = T) +
     theme_bw() +
     theme(legend.title = element_blank())
 roc_table <- lapply(roc_list, function(r) {
-    coords(r, "best",
+    coords(
+        r,
+        "best",
         best.method = "youden",
         ret = c(
-            "threshold", "sensitivity", "specificity", "accuracy", "tpr", "fpr",
-            "tnr", "fnr"
+            "threshold",
+            "sensitivity",
+            "specificity",
+            "accuracy",
+            "tpr",
+            "fpr",
+            "tnr",
+            "fnr"
         )
     )
 })
@@ -414,16 +563,22 @@ kable(roc_table, digits = 3)
 ### Individual ROC Curves
 
 ```{r}
-plot(roc_list[[2]],
-    print.auc = T, print.thres = T,
+plot(
+    roc_list[[2]],
+    print.auc = T,
+    print.thres = T,
     main = "Cystic Fibrosis vs. CFTR-RD or CRMS"
 )
-plot(roc_list[[1]],
-    print.auc = T, print.thres = T,
+plot(
+    roc_list[[1]],
+    print.auc = T,
+    print.thres = T,
     main = "Cystic Fibrosis vs. Non-CF"
 )
-plot(roc_list[[3]],
-    print.auc = T, print.thres = T,
+plot(
+    roc_list[[3]],
+    print.auc = T,
+    print.thres = T,
     main = "CFTR-RD or CRMS vs. Non-CF"
 )
 ```
@@ -437,8 +592,10 @@ df <- df %>% filter(Cl > 30)
 ## Table 1: Participant Demographics by Diagnosis
 
 ```{r results='asis'}
-summary(tableby(Diagnosis ~ Sex + Age + Na + Cl + `Na:Cl` + K,
-    data = df, control = mycontrols
+summary(tableby(
+    Diagnosis ~ Sex + Age + Na + Cl + `Na:Cl` + K,
+    data = df,
+    control = mycontrols
 ))
 ```
 
@@ -447,8 +604,10 @@ summary(tableby(Diagnosis ~ Sex + Age + Na + Cl + `Na:Cl` + K,
 In the table below "MF" stands for minimal function, "RF" for residual function, and "U" indicates unknown.
 
 ```{r results='asis'}
-summary(tableby(`Genotype Class` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
-    data = df, control = mycontrols
+summary(tableby(
+    `Genotype Class` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
+    data = df,
+    control = mycontrols
 ))
 ```
 
@@ -457,8 +616,10 @@ summary(tableby(`Genotype Class` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
 In the table below "M" stands for mild, "S" for severe, and "U" indicates unknown.
 
 ```{r results='asis'}
-summary(tableby(`Genotype Risk` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
-    data = df, control = mycontrols
+summary(tableby(
+    `Genotype Risk` ~ Sex + Age + Na + Cl + `Na:Cl` + K,
+    data = df,
+    control = mycontrols
 ))
 ```
 
@@ -613,11 +774,19 @@ ggroc(roc_list, legacy.axes = T) +
     theme_bw() +
     theme(legend.title = element_blank())
 roc_table <- lapply(roc_list, function(r) {
-    coords(r, "best",
+    coords(
+        r,
+        "best",
         best.method = "youden",
         ret = c(
-            "threshold", "sensitivity", "specificity", "accuracy", "tpr", "fpr",
-            "tnr", "fnr"
+            "threshold",
+            "sensitivity",
+            "specificity",
+            "accuracy",
+            "tpr",
+            "fpr",
+            "tnr",
+            "fnr"
         )
     )
 })
@@ -630,16 +799,22 @@ kable(roc_table, digits = 3)
 ### Individual ROC Curves
 
 ```{r}
-plot(roc_list[[2]],
-    print.auc = T, print.thres = T,
+plot(
+    roc_list[[2]],
+    print.auc = T,
+    print.thres = T,
     main = "Cystic Fibrosis vs. CFTR-RD or CRMS"
 )
-plot(roc_list[[1]],
-    print.auc = T, print.thres = T,
+plot(
+    roc_list[[1]],
+    print.auc = T,
+    print.thres = T,
     main = "Cystic Fibrosis vs. Non-CF"
 )
-plot(roc_list[[3]],
-    print.auc = T, print.thres = T,
+plot(
+    roc_list[[3]],
+    print.auc = T,
+    print.thres = T,
     main = "CFTR-RD or CRMS vs. Non-CF"
 )
 ```
