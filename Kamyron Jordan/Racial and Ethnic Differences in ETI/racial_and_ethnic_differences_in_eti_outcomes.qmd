@@ -137,8 +137,8 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
   geom_line() +
   xlab("Years from ETI Start") +
-  ylab("gli_fev1_ppred_rn") +
-  theme_classic()
+  ylab("FEV1 % Predicted") +
+  theme_classic(base_size = 15)
 # Model summary
 change_mod %>%
   gtsummary::tbl_regression(intercept = T) %>%
@@ -1272,8 +1272,8 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
   geom_line() +
   xlab("Years from ETI Start") +
-  ylab("bmipercentile") +
-  theme_classic()
+  ylab("BMI Percentile") +
+  theme_classic(base_size = 15)
 # Model summary
 change_mod %>%
   gtsummary::tbl_regression(intercept = T) %>%
@@ -1331,8 +1331,8 @@ ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
   geom_line() +
   xlab("Years from ETI Start") +
-  ylab("bmivalue") +
-  theme_classic()
+  ylab("BMI (kg/m2)") +
+  theme_classic(base_size = 15)
 # Model summary
 change_mod %>%
   gtsummary::tbl_regression(intercept = T) %>%
