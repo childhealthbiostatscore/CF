@@ -25,14 +25,12 @@ library(readxl)
 library(tidyverse)
 library(arsenal)
 library(pROC)
-home_dir <- switch(
-    Sys.info()["sysname"],
+home_dir <- switch(Sys.info()["sysname"],
     "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability",
     "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Edith Zemanick/Sweat Variability",
     "Linux" = "/home/tim/OneDrive/Vigers/CF/Edith Zemanick/Sweat Variability"
 )
-github_dir <- switch(
-    Sys.info()["sysname"],
+github_dir <- switch(Sys.info()["sysname"],
     "Darwin" = "/Users/tim/Documents/GitHub",
     "Windows" = "C:/Users/Tim/Documents/GitHub",
     "Linux" = "/home/tim/Documents/GitHub"
@@ -294,13 +292,14 @@ df$`Cl Group` <- cut(
     labels = c("< 30", "30-59", ">= 60")
 )
 # Add method back in
-df <- left_join(df, method)
+df <- left_join(df, method) %>% arrange(Name, desc(Method))
 # Organize columns, remove age over 50 (there shouldn't be any age < 2 days)
 df <- df %>%
     select(Name:Genotypes2, geno_risk, everything()) %>%
     select(-geno_risk_1, -geno_risk_2) %>%
     rename(`Genotype Risk` = geno_risk) %>%
     filter(Age < 50)
+df <- df[-which(duplicated(df$Name)), ]
 # Set table options
 mycontrols <- tableby.control(
     numeric.stats = c("N", "Nmiss", "meansd", "medianq1q3", "iqr", "range")
@@ -314,6 +313,16 @@ write.csv(
 )
 ```
 
+# Data Cleaning
+
+- Started with 5,046 sweat tests with 4,646 unique individuals.
+- 1,551 did not have demographics available.
+- 399 with Cl < 10 and 1 with Cl > 160
+- 156 with Na < 10
+- 19 over age 50 and 3 under age 2 days
+- 43 with insufficient quantity 
+- 25 on modulators
+
 # Full Cohort
 
 ## Table 1: Participant Demographics by Diagnosis
@@ -323,14 +332,14 @@ summary(
     tableby(
         Diagnosis ~
             Method +
-                Sex +
-                Age +
-                fe(`Genotype Risk`) +
-                fe(`Cl Group`) +
-                Cl +
-                Na +
-                `Na:Cl` +
-                K,
+            Sex +
+            Age +
+            fe(`Genotype Risk`) +
+            fe(`Cl Group`) +
+            Cl +
+            Na +
+            `Na:Cl` +
+            K,
         data = df,
         simulate.p.value = T,
         control = mycontrols
@@ -346,12 +355,12 @@ summary(
     tableby(
         `Genotype Risk` ~
             Sex +
-                Age +
-                fe(`Cl Group`) +
-                Cl +
-                Na +
-                `Na:Cl` +
-                K,
+            Age +
+            fe(`Cl Group`) +
+            Cl +
+            Na +
+            `Na:Cl` +
+            K,
         data = df[
             df$`Genotype Risk` != "Unknown" & df$Diagnosis == "Cystic Fibrosis",
         ],
@@ -471,6 +480,8 @@ ratiop
 
 ## Na:Cl ROC Curves
 
+### By Diagnosis
+
 ```{r}
 # Fit a multiclass ROC
 mc_roc <- multiclass.roc(df$Diagnosis, df$`Na:Cl`, quiet = T)
@@ -505,7 +516,7 @@ kable(roc_table, digits = 3)
 
 - The multiclass AUC for Na:Cl is `r round(as.numeric(auc(mc_roc)),3)`. 
 
-### Individual ROC Curves
+#### Individual ROC Curves
 
 ```{r}
 plot(
@@ -526,6 +537,39 @@ plot(
     print.thres = T,
     main = "CFTR-RD or CRMS vs. Non-CF"
 )
+```
+
+### By genotype risk
+
+```{r}
+# Fit a multiclass ROC
+gr_roc <- roc(
+    `Genotype Risk` ~ `Na:Cl`,
+    data = df,
+    levels = c("Mild", "Severe"),
+    quiet = T
+)
+plot(
+    gr_roc,
+    print.auc = T,
+    print.thres = T,
+    main = "Mild vs. Severe Genotype"
+)
+kable(coords(
+    gr_roc,
+    "best",
+    best.method = "youden",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "accuracy",
+        "tpr",
+        "fpr",
+        "tnr",
+        "fnr"
+    )
+))
 ```
 
 # Excluding Cl $\leq$ 30
@@ -541,14 +585,14 @@ summary(
     tableby(
         Diagnosis ~
             Method +
-                Sex +
-                Age +
-                fe(`Genotype Risk`) +
-                fe(`Cl Group`) +
-                Cl +
-                Na +
-                `Na:Cl` +
-                K,
+            Sex +
+            Age +
+            fe(`Genotype Risk`) +
+            fe(`Cl Group`) +
+            Cl +
+            Na +
+            `Na:Cl` +
+            K,
         data = df,
         simulate.p.value = T,
         control = mycontrols
@@ -564,12 +608,12 @@ summary(
     tableby(
         `Genotype Risk` ~
             Sex +
-                Age +
-                fe(`Cl Group`) +
-                Cl +
-                Na +
-                `Na:Cl` +
-                K,
+            Age +
+            fe(`Cl Group`) +
+            Cl +
+            Na +
+            `Na:Cl` +
+            K,
         data = df[
             df$`Genotype Risk` != "Unknown" & df$Diagnosis == "Cystic Fibrosis",
         ],
@@ -689,6 +733,8 @@ ratiop
 
 ## Na:Cl ROC Curves
 
+### By Diagnosis
+
 ```{r}
 # Fit a multiclass ROC
 mc_roc <- multiclass.roc(df$Diagnosis, df$`Na:Cl`, quiet = T)
@@ -723,7 +769,7 @@ kable(roc_table, digits = 3)
 
 - The multiclass AUC for Na:Cl is `r round(as.numeric(auc(mc_roc)),3)`. 
 
-### Individual ROC Curves
+#### Individual ROC Curves
 
 ```{r}
 plot(
@@ -744,4 +790,37 @@ plot(
     print.thres = T,
     main = "CFTR-RD or CRMS vs. Non-CF"
 )
+```
+
+### By genotype risk
+
+```{r}
+# Fit a multiclass ROC
+gr_roc <- roc(
+    `Genotype Risk` ~ `Na:Cl`,
+    data = df,
+    levels = c("Mild", "Severe"),
+    quiet = T
+)
+plot(
+    gr_roc,
+    print.auc = T,
+    print.thres = T,
+    main = "Mild vs. Severe Genotype"
+)
+kable(coords(
+    gr_roc,
+    "best",
+    best.method = "youden",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "accuracy",
+        "tpr",
+        "fpr",
+        "tnr",
+        "fnr"
+    )
+))
 ```
