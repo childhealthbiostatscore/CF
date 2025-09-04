@@ -20,16 +20,18 @@ editor: source
 
 ```{r setup}
 #| include: false
+library(keyring)
 library(redcapAPI)
 library(tidyverse)
 library(gt)
 library(gtsummary)
 library(caret)
+library(epiR)
 library(eulerr)
 library(ggpubr)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Jordana Hoppe/SSwAB-IT",
-  "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Jordana Hoppe/SSwAB-IT"
+    "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Jordana Hoppe/SSwAB-IT",
+    "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Jordana Hoppe/SSwAB-IT"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -37,129 +39,172 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```{r data cleaning}
 #| include: false
 # Import from REDCap
-unlockREDCap(c(rcon = "SSwAB-IT (New)"),
-  keyring = "API_KEYs",
-  envir = 1,
-  url = "https://redcap.ucdenver.edu/api/"
+token <- key_get("SSwAB-IT (New)")
+rcon <- redcapConnection(
+    token = token,
+    url = "https://redcap.ucdenver.edu/api/"
 )
 exportBulkRecords(list(db = rcon), envir = 1)
 # Exclude
 exclude <- c("01-030_W", "01-038_W", "02-0038", "02-0039", "04-001")
 # Combine collection results
 df <- full_join(db_cos_collection_results, db_sos_collection_results)
-df <- full_join(df,
-  db_selfobtained_sample[, c("record_id", "who_collected_the_sos")],
-  by = join_by(record_id)
+df <- full_join(
+    df,
+    db_selfobtained_sample[, c("record_id", "who_collected_the_sos")],
+    by = join_by(record_id)
 )
 # Add dates to demographics
-db_demographics <- left_join(db_demographics,
-  db_clinic_obtained_values %>% select(record_id, cos_collection_date, ppfev1),
-  by = join_by(record_id)
+db_demographics <- left_join(
+    db_demographics,
+    db_clinic_obtained_values %>%
+        select(record_id, cos_collection_date, ppfev1),
+    by = join_by(record_id)
 )
 db_demographics$age_at_cos <-
-  as.numeric(difftime(db_demographics$cos_collection_date,
-    db_demographics$dob,
-    units = "days"
-  )) / 365.25
+    as.numeric(difftime(
+        db_demographics$cos_collection_date,
+        db_demographics$dob,
+        units = "days"
+    )) /
+        365.25
 # 1-5, 6-11, 12-17 and 18+ years
-db_demographics$age_group <- cut(db_demographics$age_at_cos,
-  c(-Inf, 6, 12, 18, Inf),
-  right = F
+db_demographics$age_group <- cut(
+    db_demographics$age_at_cos,
+    c(-Inf, 6, 12, 18, Inf),
+    right = F
 )
 # Format
 df <- df %>%
-  select(
-    record_id, who_collected_cos, who_collected_the_sos,
-    staphylococcus_aureus_cos:other_result_cos,
-    staphylococcus_aureus_sos:other_result_sos
-  ) %>%
-  filter(!record_id %in% exclude)
+    select(
+        record_id,
+        who_collected_cos,
+        who_collected_the_sos,
+        staphylococcus_aureus_cos:other_result_cos,
+        staphylococcus_aureus_sos:other_result_sos
+    ) %>%
+    filter(!record_id %in% exclude)
 # Remove empty demographics rows
 db_demographics <- db_demographics %>%
-  filter(
-    redcap_event_name == "Clinic Visit (Arm 1: Eligible)",
-    !record_id %in% exclude
-  )
+    filter(
+        redcap_event_name == "Clinic Visit (Arm 1: Eligible)",
+        !record_id %in% exclude
+    )
 # Excluded participants
 db_medications <- db_medications %>% filter(!record_id %in% exclude)
 # Fix chronic oral antibiotics
 db_medications$chronic_oral_antibiotic[
-  db_medications$other_chronic_oral_antibiotic == "Azithromycin"
+    db_medications$other_chronic_oral_antibiotic == "Azithromycin"
 ] <- "No"
 # Combine race and ethnicity columns
 races <- c(
-  "American Indian or Alaskan Native", "Asian", "Hawaiian or Pacific Islander",
-  "Black or African American", "White", "Unknown", "Other"
+    "American Indian or Alaskan Native",
+    "Asian",
+    "Hawaiian or Pacific Islander",
+    "Black or African American",
+    "White",
+    "Unknown",
+    "Other"
 )
 ethnicities <- c("Hispanic", "Non-Hispanic", "Unknown/Not Reported")
 db_demographics$Race <- apply(db_demographics, 1, function(r) {
-  w <- which(r[grep("race", names(r))] == "Checked")
-  if (length(w) == 1) {
-    return(races[w])
-  } else if (length(w) > 1) {
-    return("Multiple Races")
-  } else if (length(w) == 0) {
-    return(NA)
-  }
+    w <- which(r[grep("race", names(r))] == "Checked")
+    if (length(w) == 1) {
+        return(races[w])
+    } else if (length(w) > 1) {
+        return("Multiple Races")
+    } else if (length(w) == 0) {
+        return(NA)
+    }
 })
-db_demographics$Race <- factor(db_demographics$Race,
-  levels = c(
-    "White", "Other", "Multiple Races", "American Indian or Alaskan Native"
-  )
+db_demographics$Race <- factor(
+    db_demographics$Race,
+    levels = c(
+        "White",
+        "Other",
+        "Multiple Races",
+        "American Indian or Alaskan Native"
+    )
 )
 db_demographics$Ethnicity <- apply(db_demographics, 1, function(r) {
-  w <- which(r[grep("ethnicity", names(r))] == "Checked")
-  if (length(w) == 1) {
-    return(ethnicities[w])
-  } else if (length(w) > 1) {
-    return(paste(ethnicities[w], sep = "/"))
-  } else if (length(w) == 0) {
-    return(NA)
-  }
+    w <- which(r[grep("ethnicity", names(r))] == "Checked")
+    if (length(w) == 1) {
+        return(ethnicities[w])
+    } else if (length(w) > 1) {
+        return(paste(ethnicities[w], sep = "/"))
+    } else if (length(w) == 0) {
+        return(NA)
+    }
 })
-db_demographics$Ethnicity <- factor(db_demographics$Ethnicity,
-  levels = c("Non-Hispanic", "Hispanic", "Unknown/Not Reported")
+db_demographics$Ethnicity <- factor(
+    db_demographics$Ethnicity,
+    levels = c("Non-Hispanic", "Hispanic", "Unknown/Not Reported")
 )
 # Drop empty levels
 db_demographics <- droplevels(db_demographics)
 # Add groups to other dataframes
-db_medications <- left_join(db_medications,
-  db_demographics %>% select(record_id, group),
-  by = join_by(record_id)
+db_medications <- left_join(
+    db_medications,
+    db_demographics %>% select(record_id, group),
+    by = join_by(record_id)
 )
-db_clinic_obtained_values <- left_join(db_clinic_obtained_values,
-  db_demographics %>% select(record_id, group),
-  by = join_by(record_id)
+db_clinic_obtained_values <- left_join(
+    db_clinic_obtained_values,
+    db_demographics %>% select(record_id, group),
+    by = join_by(record_id)
 )
 # Bug list
 bugs <- c(
-  "staphylococcus_aureus", "haemophilus_influenza", "pseudomonas_aeruginosa",
-  "pseudomonas_non_aero", "s_maltophilia", "burkholderia", "aspergillus", "ntm",
-  "other"
+    "staphylococcus_aureus",
+    "haemophilus_influenza",
+    "pseudomonas_aeruginosa",
+    "pseudomonas_non_aero",
+    "s_maltophilia",
+    "burkholderia",
+    "aspergillus",
+    "ntm",
+    "other"
 )
 bug_names <- c(
-  "S. aureus", "H. influenza", "P. aeruginosa", "Pseudomonas non-aeruginosa",
-  "S. maltophilia", "Burkholderia", "Aspergillus", "NTM", "Other"
+    "S. aureus",
+    "H. influenza",
+    "P. aeruginosa",
+    "Pseudomonas non-aeruginosa",
+    "S. maltophilia",
+    "Burkholderia",
+    "Aspergillus",
+    "NTM",
+    "Other"
 )
 # Convert yes/no to positive/negative
-df[, paste0(bugs, "_cos")] <- lapply(df[, paste0(bugs, "_cos")], factor,
-  levels = c("No", "Yes"), labels = c("Negative", "Positive")
+df[, paste0(bugs, "_cos")] <- lapply(
+    df[, paste0(bugs, "_cos")],
+    factor,
+    levels = c("No", "Yes"),
+    labels = c("Negative", "Positive")
 )
-df[, paste0(bugs, "_sos")] <- lapply(df[, paste0(bugs, "_sos")], factor,
-  levels = c("No", "Yes"), labels = c("Negative", "Positive")
+df[, paste0(bugs, "_sos")] <- lapply(
+    df[, paste0(bugs, "_sos")],
+    factor,
+    levels = c("No", "Yes"),
+    labels = c("Negative", "Positive")
 )
 # Create overall columns (any bug detected in sample)
 df$overall_cos <- apply(df, 1, function(r) {
-  any(r[paste0(bugs, "_cos")] == "Positive")
+    any(r[paste0(bugs, "_cos")] == "Positive")
 })
-df$overall_cos <- factor(df$overall_cos,
-  levels = c(F, T), labels = c("Negative", "Positive")
+df$overall_cos <- factor(
+    df$overall_cos,
+    levels = c(F, T),
+    labels = c("Negative", "Positive")
 )
 df$overall_sos <- apply(df, 1, function(r) {
-  any(r[paste0(bugs, "_sos")] == "Positive")
+    any(r[paste0(bugs, "_sos")] == "Positive")
 })
-df$overall_sos <- factor(df$overall_sos,
-  levels = c(F, T), labels = c("Negative", "Positive")
+df$overall_sos <- factor(
+    df$overall_sos,
+    levels = c(F, T),
+    labels = c("Negative", "Positive")
 )
 # Add overall to list
 bugs <- c("overall", bugs)
@@ -167,8 +212,10 @@ bug_names <- c("Across all bugs", bug_names)
 bug_list <- as.list(bug_names)
 names(bug_list) <- bugs
 # Add groups to dataframe
-df <- left_join(df, db_demographics %>% select(record_id, group, age_group),
-  by = join_by(record_id)
+df <- left_join(
+    df,
+    db_demographics %>% select(record_id, group, age_group),
+    by = join_by(record_id)
 )
 df <- left_join(df, db_medications, by = join_by(record_id, group))
 # Feasibility
@@ -178,9 +225,9 @@ df$who_collected_cos <- droplevels(df$who_collected_cos)
 # Shorter group labels for cleaner tables
 levels(df$group) <- c("COS/SOS/IP", "COS/SOS/DP", "SOS/COS/IP", "SOS/COS/DP")
 levels(db_demographics$group) <-
-  c("COS/SOS/IP", "COS/SOS/DP", "SOS/COS/IP", "SOS/COS/DP")
+    c("COS/SOS/IP", "COS/SOS/DP", "SOS/COS/IP", "SOS/COS/DP")
 levels(db_medications$group) <-
-  c("COS/SOS/IP", "COS/SOS/DP", "SOS/COS/IP", "SOS/COS/DP")
+    c("COS/SOS/IP", "COS/SOS/DP", "SOS/COS/IP", "SOS/COS/DP")
 ```
 
 # Data cleaning
@@ -193,82 +240,90 @@ Participants 01-030_W, 01-038_W, 02-0038, 02-0039, and 04-001 were excluded from
 
 ```{r}
 db_demographics %>%
-  select(group, age_at_cos, age_group, ppfev1, sex, Race, Ethnicity) %>%
-  tbl_summary(
-    by = group, missing_text = "Missing",
-    statistic = all_continuous() ~ c("{median} ({min}, {max})"),
-    label = list(
-      "sex" = "Sex", "age_at_cos" = "Age at COS", "age_group" = "Age Group"
-    )
-  ) %>%
-  add_overall() %>%
-  add_p(
-    test = list(c("Race", "Ethnicity") ~ "fisher.test"),
-    test.args = age_group ~ list(workspace = 2e9)
-  ) %>%
-  separate_p_footnotes() %>%
-  modify_footnote(everything() ~ NA) %>%
-  as_gt()
+    select(group, age_at_cos, age_group, ppfev1, sex, Race, Ethnicity) %>%
+    tbl_summary(
+        by = group,
+        missing_text = "Missing",
+        statistic = all_continuous() ~ c("{median} ({p25}, {p75})"),
+        label = list(
+            "sex" = "Sex",
+            "age_at_cos" = "Age at COS",
+            "age_group" = "Age Group"
+        )
+    ) %>%
+    add_overall() %>%
+    add_p(
+        test = list(c("Race", "Ethnicity") ~ "fisher.test"),
+        test.args = age_group ~ list(workspace = 2e9)
+    ) %>%
+    separate_p_footnotes() %>%
+    as_gt()
 ```
 
 ## By age group
 
 ```{r}
 db_demographics %>%
-  mutate(age_group = cut(age_at_cos, c(-Inf, 18, Inf), right = F)) %>%
-  select(group, age_group, ppfev1, sex, Race, Ethnicity) %>%
-  tbl_summary(
-    by = age_group, missing_text = "Missing",
-    statistic = all_continuous() ~ c("{median} ({min}, {max})"),
-    label = list(
-      "sex" = "Sex", "age_at_cos" = "Age at COS"
-    )
-  ) %>%
-  add_overall() %>%
-  add_p(
-    test = list(c("Race", "Ethnicity") ~ "fisher.test")
-  ) %>%
-  separate_p_footnotes() %>%
-  as_gt()
+    mutate(age_group = cut(age_at_cos, c(-Inf, 18, Inf), right = F)) %>%
+    select(group, age_group, ppfev1, sex, Race, Ethnicity) %>%
+    tbl_summary(
+        by = age_group,
+        missing_text = "Missing",
+        statistic = all_continuous() ~ c("{median} ({p25}, {p75})"),
+        label = list(
+            "sex" = "Sex",
+            "age_at_cos" = "Age at COS"
+        )
+    ) %>%
+    add_overall() %>%
+    add_p(
+        test = list(c("Race", "Ethnicity") ~ "fisher.test")
+    ) %>%
+    separate_p_footnotes() %>%
+    as_gt()
 
 db_demographics %>%
-  mutate(age_group = cut(age_at_cos, c(-Inf, 18, Inf), right = F)) %>%
-  select(age_group, ppfev1) %>%
-  drop_na() %>%
-  ggplot(., aes(x = ppfev1)) +
-  geom_histogram() +
-  facet_wrap(~age_group)
+    mutate(age_group = cut(age_at_cos, c(-Inf, 18, Inf), right = F)) %>%
+    select(age_group, ppfev1) %>%
+    drop_na() %>%
+    ggplot(., aes(x = ppfev1)) +
+    geom_histogram() +
+    facet_wrap(~age_group)
 ```
 
 # Medications
 
 ```{r}
 db_medications %>%
-  select(group, azithromycin:please_specify_mucolytic) %>%
-  select(
-    -inhaled_colisitin_status, -inhaled_vancomycin_status,
-    -other_inhaled_status, -please_specify_mucolytic
-  ) %>%
-  tbl_summary(by = group, missing_text = "Missing") %>%
-  add_overall() %>%
-  add_p() %>%
-  separate_p_footnotes() %>%
-  modify_footnote(everything() ~ NA) %>%
-  as_gt()
+    select(group, azithromycin:please_specify_mucolytic) %>%
+    select(
+        -inhaled_colisitin_status,
+        -inhaled_vancomycin_status,
+        -other_inhaled_status,
+        -please_specify_mucolytic
+    ) %>%
+    tbl_summary(by = group, missing_text = "Missing") %>%
+    add_overall() %>%
+    add_p() %>%
+    separate_p_footnotes() %>%
+    modify_footnote(everything() ~ NA) %>%
+    as_gt()
 ```
 
 # Acceptability and feasibility
 
 ```{r}
 db_feasibility %>%
-  select(
-    previous_home_sample:if_no_why_not___4, -barrier_other,
-    -barriers___5, -if_no_why_not___4
-  ) %>%
-  tbl_summary(
-    missing_text = "Missing",
-    type = all_dichotomous() ~ "categorical"
-  )
+    select(
+        previous_home_sample:if_no_why_not___4,
+        -barrier_other,
+        -barriers___5,
+        -if_no_why_not___4
+    ) %>%
+    tbl_summary(
+        missing_text = "Missing",
+        type = all_dichotomous() ~ "categorical"
+    )
 ```
 
 # Agreement
@@ -287,118 +342,155 @@ For these agreement analyses, we reported accuracy metrics that include all samp
 
 ```{r}
 agreement <- function(bug, data = df) {
-  cos <- paste0(bug, "_cos")
-  sos <- paste0(bug, "_sos")
-  d <- data[, c(cos, sos)]
-  colnames(d) <- c("COS", "SOS")
-  d <- d[complete.cases(d), ]
-  # Agreement metrics
-  c <- confusionMatrix(d$SOS,
-    reference = d$COS,
-    positive = "Positive", mode = "everything",
-    dnn = c("SOS", "COS")
-  )
-  # Print
-  cat("\n")
-  cat("\n")
-  cat("####", "2x2 Table")
-  cat("\n")
-  cat("\n")
-  d %>%
-    tbl_cross(percent = "cell") %>%
-    print()
-  cat("\n")
-  cat("\n")
-  cat("####", "2x2 Table (With CIs)")
-  cat("\n")
-  cat("\n")
-  d %>%
-    tbl_summary(by = COS, percent = "cell") %>%
-    add_ci(method = list(all_categorical() ~ "wald")) %>%
-    print()
-  cat("\n")
-  cat("\n")
-  cat("Overall accuracy (both negative/negative and positive/positive) was ",
-    scales::percent(c$overall["Accuracy"], accuracy = 0.1), " (95% CI: ",
-    scales::percent(c$overall["AccuracyLower"], accuracy = 0.1), " - ",
-    scales::percent(c$overall["AccuracyUpper"], accuracy = 0.1), ").",
-    sep = ""
-  )
-  cat("\n")
-  cat("\n")
-  cat("Kappa was ", round(c$overall["Kappa"], 3), ".", sep = "")
-  cat("\n")
-  cat("\n")
-  cat("#### Euler diagram of negative results")
-  cat("\n")
-  cat("\n")
-  print(plot(euler(d == "Negative"), quantities = list(cex = 3)))
-  cat("\n")
-  cat("\n")
-  cat("#### Euler diagram of positive results")
-  cat("\n")
-  cat("\n")
-  print(plot(euler(d == "Positive"), quantities = list(cex = 3)))
-  cat("\n")
-  cat("\n")
+    cos <- paste0(bug, "_cos")
+    sos <- paste0(bug, "_sos")
+    d <- data[, c(cos, sos)]
+    colnames(d) <- c("COS", "SOS")
+    d <- d[complete.cases(d), ]
+    # Agreement metrics
+    c <- confusionMatrix(
+        d$SOS,
+        reference = d$COS,
+        positive = "Positive",
+        mode = "everything",
+        dnn = c("SOS", "COS")
+    )
+    pabak <- epi.kappa(table(d$COS, d$SOS))
+    # Print
+    cat("\n")
+    cat("\n")
+    cat("####", "2x2 Table")
+    cat("\n")
+    cat("\n")
+    d %>%
+        tbl_cross(percent = "cell") %>%
+        print()
+    cat("\n")
+    cat("\n")
+    cat("####", "2x2 Table (With CIs)")
+    cat("\n")
+    cat("\n")
+    d %>%
+        tbl_summary(by = COS, percent = "cell") %>%
+        add_ci(method = list(all_categorical() ~ "wald")) %>%
+        print()
+    cat("\n")
+    cat("\n")
+    cat(
+        "Overall accuracy (both negative/negative and positive/positive) was ",
+        scales::percent(c$overall["Accuracy"], accuracy = 0.1),
+        " (95% CI: ",
+        scales::percent(c$overall["AccuracyLower"], accuracy = 0.1),
+        " - ",
+        scales::percent(c$overall["AccuracyUpper"], accuracy = 0.1),
+        ").",
+        sep = ""
+    )
+    cat("\n")
+    cat("\n")
+    cat(
+        "Kappa was ",
+        round(pabak$kappa$est, 3),
+        " (95% CI: ",
+        round(pabak$kappa$lower, 3),
+        " - ",
+        round(pabak$kappa$upper, 3),
+        ")",
+        ".",
+        sep = ""
+    )
+    cat("\n")
+    cat("\n")
+    cat(
+        "Prevalence and Bias Adjusted Kappa (PABAK) was ",
+        round(pabak$pabak$est, 3),
+        " (95% CI: ",
+        round(pabak$pabak$lower, 3),
+        " - ",
+        round(pabak$pabak$upper, 3),
+        ")",
+        ".",
+        sep = ""
+    )
+    cat("\n")
+    cat("\n")
+    cat("#### Euler diagram of negative results")
+    cat("\n")
+    cat("\n")
+    print(plot(euler(d == "Negative"), quantities = list(cex = 3)))
+    cat("\n")
+    cat("\n")
+    cat("#### Euler diagram of positive results")
+    cat("\n")
+    cat("\n")
+    print(plot(euler(d == "Positive"), quantities = list(cex = 3)))
+    cat("\n")
+    cat("\n")
 }
 agreement_test <- function(bug, group = "group", data = df) {
-  # Prepare data
-  cos <- paste0(bug, "_cos")
-  sos <- paste0(bug, "_sos")
-  d <- data[, c(cos, sos, group)]
-  d <- d[complete.cases(d), ]
-  colnames(d) <- c("COS", "SOS", "Group")
-  # Agreement and detailed agreement
-  d$agree <- d$COS == d$SOS
-  d$detailed_agree <- paste0("COS ", d$COS, "/", "SOS ", d$SOS)
-  d$detailed_agree <- factor(d$detailed_agree,
-    levels = c(
-      "COS Negative/SOS Negative", "COS Negative/SOS Positive",
-      "COS Positive/SOS Negative", "COS Positive/SOS Positive"
-    ),
-    labels = c("COS-/SOS-", "COS-/SOS+", "COS+/SOS-", "COS+/SOS+")
-  )
-  # Print
-  cat("\n")
-  cat("\n")
-  d %>%
-    select(agree, detailed_agree, Group) %>%
-    tbl_summary(by = Group, missing_text = "Missing", label = list(
-      agree ~ "Agree (+/+ and -/-)",
-      detailed_agree ~ "Detailed Agreement"
-    )) %>%
-    add_overall() %>%
-    add_p(test.args = all_tests("fisher.test") ~ list(workspace = 2e9)) %>%
-    separate_p_footnotes() %>%
-    modify_footnote(everything() ~ NA) %>%
-    print()
-  cat("\n")
-  cat("\n")
+    # Prepare data
+    cos <- paste0(bug, "_cos")
+    sos <- paste0(bug, "_sos")
+    d <- data[, c(cos, sos, group)]
+    d <- d[complete.cases(d), ]
+    colnames(d) <- c("COS", "SOS", "Group")
+    # Agreement and detailed agreement
+    d$agree <- d$COS == d$SOS
+    d$detailed_agree <- paste0("COS ", d$COS, "/", "SOS ", d$SOS)
+    d$detailed_agree <- factor(
+        d$detailed_agree,
+        levels = c(
+            "COS Negative/SOS Negative",
+            "COS Negative/SOS Positive",
+            "COS Positive/SOS Negative",
+            "COS Positive/SOS Positive"
+        ),
+        labels = c("COS-/SOS-", "COS-/SOS+", "COS+/SOS-", "COS+/SOS+")
+    )
+    # Print
+    cat("\n")
+    cat("\n")
+    d %>%
+        select(agree, detailed_agree, Group) %>%
+        tbl_summary(
+            by = Group,
+            missing_text = "Missing",
+            label = list(
+                agree ~ "Agree (+/+ and -/-)",
+                detailed_agree ~ "Detailed Agreement"
+            )
+        ) %>%
+        add_overall() %>%
+        add_p(test.args = all_tests("fisher.test") ~ list(workspace = 2e9)) %>%
+        separate_p_footnotes() %>%
+        modify_footnote(everything() ~ NA) %>%
+        print()
+    cat("\n")
+    cat("\n")
 }
 ```
 
 ```{r results='asis'}
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
-  print(b)
-  cat("\n")
-  cat("\n")
-  cat("##", as.character(bug_list[b]))
-  cat("\n")
-  cat("\n")
-  cat("###", "Overall agreement")
-  cat("\n")
-  cat("\n")
-  agreement(b)
-  cat("\n")
-  cat("\n")
-  cat("###", "Agreement by group")
-  cat("\n")
-  cat("\n")
-  agreement_test(b)
-  cat("\n")
-  cat("\n")
+    print(b)
+    cat("\n")
+    cat("\n")
+    cat("##", as.character(bug_list[b]))
+    cat("\n")
+    cat("\n")
+    cat("###", "Overall agreement")
+    cat("\n")
+    cat("\n")
+    agreement(b)
+    cat("\n")
+    cat("\n")
+    cat("###", "Agreement by group")
+    cat("\n")
+    cat("\n")
+    agreement_test(b)
+    cat("\n")
+    cat("\n")
 }))
 ```
 
@@ -409,17 +501,17 @@ invisible(lapply(names(bug_list), function(b) {
 ```{r results='asis'}
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
-  cat("\n")
-  cat("\n")
-  cat("###", as.character(bug_list[b]))
-  cat("\n")
-  cat("\n")
-  cat("####", "Agreement by age group")
-  cat("\n")
-  cat("\n")
-  agreement_test(b, group = "age_group")
-  cat("\n")
-  cat("\n")
+    cat("\n")
+    cat("\n")
+    cat("###", as.character(bug_list[b]))
+    cat("\n")
+    cat("\n")
+    cat("####", "Agreement by age group")
+    cat("\n")
+    cat("\n")
+    agreement_test(b, group = "age_group")
+    cat("\n")
+    cat("\n")
 }))
 ```
 
@@ -428,17 +520,17 @@ invisible(lapply(names(bug_list), function(b) {
 ```{r results='asis'}
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
-  cat("\n")
-  cat("\n")
-  cat("###", as.character(bug_list[b]))
-  cat("\n")
-  cat("\n")
-  cat("####", "Agreement by gender assigned at birth")
-  cat("\n")
-  cat("\n")
-  agreement_test(b, group = "age_group")
-  cat("\n")
-  cat("\n")
+    cat("\n")
+    cat("\n")
+    cat("###", as.character(bug_list[b]))
+    cat("\n")
+    cat("\n")
+    cat("####", "Agreement by gender assigned at birth")
+    cat("\n")
+    cat("\n")
+    agreement_test(b, group = "age_group")
+    cat("\n")
+    cat("\n")
 }))
 ```
 
@@ -447,17 +539,17 @@ invisible(lapply(names(bug_list), function(b) {
 ```{r results='asis'}
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
-  cat("\n")
-  cat("\n")
-  cat("###", as.character(bug_list[b]))
-  cat("\n")
-  cat("\n")
-  cat("####", "Agreement by Azithromycin status")
-  cat("\n")
-  cat("\n")
-  agreement_test(b, group = "azithromycin")
-  cat("\n")
-  cat("\n")
+    cat("\n")
+    cat("\n")
+    cat("###", as.character(bug_list[b]))
+    cat("\n")
+    cat("\n")
+    cat("####", "Agreement by Azithromycin status")
+    cat("\n")
+    cat("\n")
+    agreement_test(b, group = "azithromycin")
+    cat("\n")
+    cat("\n")
 }))
 ```
 
@@ -466,17 +558,17 @@ invisible(lapply(names(bug_list), function(b) {
 ```{r results='asis'}
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
-  cat("\n")
-  cat("\n")
-  cat("###", as.character(bug_list[b]))
-  cat("\n")
-  cat("\n")
-  cat("####", "Agreement by inhaled Tobramycin status")
-  cat("\n")
-  cat("\n")
-  agreement_test(b, group = "inhaled_tobramycin")
-  cat("\n")
-  cat("\n")
+    cat("\n")
+    cat("\n")
+    cat("###", as.character(bug_list[b]))
+    cat("\n")
+    cat("\n")
+    cat("####", "Agreement by inhaled Tobramycin status")
+    cat("\n")
+    cat("\n")
+    agreement_test(b, group = "inhaled_tobramycin")
+    cat("\n")
+    cat("\n")
 }))
 ```
 
@@ -485,17 +577,17 @@ invisible(lapply(names(bug_list), function(b) {
 ```{r results='asis'}
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
-  cat("\n")
-  cat("\n")
-  cat("###", as.character(bug_list[b]))
-  cat("\n")
-  cat("\n")
-  cat("####", "Agreement by inhaled Aztreonam status")
-  cat("\n")
-  cat("\n")
-  agreement_test(b, group = "inhaled_aztreonam")
-  cat("\n")
-  cat("\n")
+    cat("\n")
+    cat("\n")
+    cat("###", as.character(bug_list[b]))
+    cat("\n")
+    cat("\n")
+    cat("####", "Agreement by inhaled Aztreonam status")
+    cat("\n")
+    cat("\n")
+    agreement_test(b, group = "inhaled_aztreonam")
+    cat("\n")
+    cat("\n")
 }))
 ```
 
@@ -504,17 +596,17 @@ invisible(lapply(names(bug_list), function(b) {
 ```{r results='asis'}
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
-  cat("\n")
-  cat("\n")
-  cat("###", as.character(bug_list[b]))
-  cat("\n")
-  cat("\n")
-  cat("####", "Agreement by inhaled Colisitin status")
-  cat("\n")
-  cat("\n")
-  agreement_test(b, group = "inhaled_colisitin")
-  cat("\n")
-  cat("\n")
+    cat("\n")
+    cat("\n")
+    cat("###", as.character(bug_list[b]))
+    cat("\n")
+    cat("\n")
+    cat("####", "Agreement by inhaled Colisitin status")
+    cat("\n")
+    cat("\n")
+    agreement_test(b, group = "inhaled_colisitin")
+    cat("\n")
+    cat("\n")
 }))
 ```
 
@@ -523,17 +615,17 @@ invisible(lapply(names(bug_list), function(b) {
 ```{r results='asis'}
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
-  cat("\n")
-  cat("\n")
-  cat("###", as.character(bug_list[b]))
-  cat("\n")
-  cat("\n")
-  cat("####", "Agreement by inhaled Vancomycin status")
-  cat("\n")
-  cat("\n")
-  agreement_test(b, group = "inhaled_vancomycin")
-  cat("\n")
-  cat("\n")
+    cat("\n")
+    cat("\n")
+    cat("###", as.character(bug_list[b]))
+    cat("\n")
+    cat("\n")
+    cat("####", "Agreement by inhaled Vancomycin status")
+    cat("\n")
+    cat("\n")
+    agreement_test(b, group = "inhaled_vancomycin")
+    cat("\n")
+    cat("\n")
 }))
 ```
 
@@ -542,17 +634,17 @@ invisible(lapply(names(bug_list), function(b) {
 ```{r results='asis'}
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
-  cat("\n")
-  cat("\n")
-  cat("###", as.character(bug_list[b]))
-  cat("\n")
-  cat("\n")
-  cat("####", "Agreement by other inhaled antibiotics status")
-  cat("\n")
-  cat("\n")
-  agreement_test(b, group = "other_inhaled_antibiotics")
-  cat("\n")
-  cat("\n")
+    cat("\n")
+    cat("\n")
+    cat("###", as.character(bug_list[b]))
+    cat("\n")
+    cat("\n")
+    cat("####", "Agreement by other inhaled antibiotics status")
+    cat("\n")
+    cat("\n")
+    agreement_test(b, group = "other_inhaled_antibiotics")
+    cat("\n")
+    cat("\n")
 }))
 ```
 
@@ -561,17 +653,17 @@ invisible(lapply(names(bug_list), function(b) {
 ```{r results='asis'}
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
-  cat("\n")
-  cat("\n")
-  cat("###", as.character(bug_list[b]))
-  cat("\n")
-  cat("\n")
-  cat("####", "Agreement by chronic oral antibiotic status")
-  cat("\n")
-  cat("\n")
-  agreement_test(b, group = "chronic_oral_antibiotic")
-  cat("\n")
-  cat("\n")
+    cat("\n")
+    cat("\n")
+    cat("###", as.character(bug_list[b]))
+    cat("\n")
+    cat("\n")
+    cat("####", "Agreement by chronic oral antibiotic status")
+    cat("\n")
+    cat("\n")
+    agreement_test(b, group = "chronic_oral_antibiotic")
+    cat("\n")
+    cat("\n")
 }))
 ```
 
@@ -580,17 +672,17 @@ invisible(lapply(names(bug_list), function(b) {
 ```{r results='asis'}
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
-  cat("\n")
-  cat("\n")
-  cat("###", as.character(bug_list[b]))
-  cat("\n")
-  cat("\n")
-  cat("####", "Agreement by CFTR modulator status")
-  cat("\n")
-  cat("\n")
-  agreement_test(b, group = "cftr_modulator")
-  cat("\n")
-  cat("\n")
+    cat("\n")
+    cat("\n")
+    cat("###", as.character(bug_list[b]))
+    cat("\n")
+    cat("\n")
+    cat("####", "Agreement by CFTR modulator status")
+    cat("\n")
+    cat("\n")
+    agreement_test(b, group = "cftr_modulator")
+    cat("\n")
+    cat("\n")
 }))
 ```
 
@@ -599,17 +691,17 @@ invisible(lapply(names(bug_list), function(b) {
 ```{r results='asis'}
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
-  cat("\n")
-  cat("\n")
-  cat("###", as.character(bug_list[b]))
-  cat("\n")
-  cat("\n")
-  cat("####", "Agreement by who collected the COS")
-  cat("\n")
-  cat("\n")
-  agreement_test(b, group = "who_collected_cos")
-  cat("\n")
-  cat("\n")
+    cat("\n")
+    cat("\n")
+    cat("###", as.character(bug_list[b]))
+    cat("\n")
+    cat("\n")
+    cat("####", "Agreement by who collected the COS")
+    cat("\n")
+    cat("\n")
+    agreement_test(b, group = "who_collected_cos")
+    cat("\n")
+    cat("\n")
 }))
 ```
 
@@ -618,17 +710,17 @@ invisible(lapply(names(bug_list), function(b) {
 ```{r results='asis'}
 #| message: false
 invisible(lapply(names(bug_list), function(b) {
-  cat("\n")
-  cat("\n")
-  cat("###", as.character(bug_list[b]))
-  cat("\n")
-  cat("\n")
-  cat("####", "Agreement by who collected the SOS")
-  cat("\n")
-  cat("\n")
-  agreement_test(b, group = "who_collected_the_sos")
-  cat("\n")
-  cat("\n")
+    cat("\n")
+    cat("\n")
+    cat("###", as.character(bug_list[b]))
+    cat("\n")
+    cat("\n")
+    cat("####", "Agreement by who collected the SOS")
+    cat("\n")
+    cat("\n")
+    agreement_test(b, group = "who_collected_the_sos")
+    cat("\n")
+    cat("\n")
 }))
 ```
 
@@ -641,60 +733,84 @@ colnames(d_overall) <- c("COS", "SOS")
 d_overall <- d_overall[complete.cases(d_overall), ]
 a1 <- plot(euler(d_overall == "Positive"), quantities = list(cex = 3))
 a2 <-
-  ggplot(as.data.frame(table(d_overall$COS, d_overall$SOS)), aes(Var1, Var2)) +
-  geom_tile(color = "white", fill = "#1E88E5") +
-  geom_text(
-    aes(label = paste0(Freq, "\n(", round(Freq / sum(Freq), 3) * 100, "%)")),
-    color = "white"
-  ) +
-  xlab("COS") +
-  ylab("SOS") +
-  theme_bw() +
-  theme(text = element_text(size = 15))
+    ggplot(
+        as.data.frame(table(d_overall$COS, d_overall$SOS)),
+        aes(Var1, Var2)
+    ) +
+    geom_tile(color = "white", fill = "#1E88E5") +
+    geom_text(
+        aes(
+            label = paste0(Freq, "\n(", round(Freq / sum(Freq), 3) * 100, "%)")
+        ),
+        color = "white"
+    ) +
+    xlab("COS") +
+    ylab("SOS") +
+    theme_bw() +
+    theme(text = element_text(size = 15))
 # MRSA
 d_MSSA <- df[, c("staphylococcus_aureus_cos", "staphylococcus_aureus_sos")]
 colnames(d_MSSA) <- c("COS", "SOS")
 d_MSSA <- d_MSSA[complete.cases(d_MSSA), ]
 b1 <- plot(euler(d_MSSA == "Positive"), quantities = list(cex = 3))
 b2 <-
-  ggplot(as.data.frame(table(d_MSSA$COS, d_MSSA$SOS)), aes(Var1, Var2)) +
-  geom_tile(color = "white", fill = "#1E88E5") +
-  geom_text(aes(label = paste0(Freq, "\n(", round(Freq / sum(Freq), 3) * 100, "%)")),
-    color = "white"
-  ) +
-  xlab("COS") +
-  ylab("SOS") +
-  theme_bw() +
-  theme(text = element_text(size = 15))
+    ggplot(as.data.frame(table(d_MSSA$COS, d_MSSA$SOS)), aes(Var1, Var2)) +
+    geom_tile(color = "white", fill = "#1E88E5") +
+    geom_text(
+        aes(
+            label = paste0(Freq, "\n(", round(Freq / sum(Freq), 3) * 100, "%)")
+        ),
+        color = "white"
+    ) +
+    xlab("COS") +
+    ylab("SOS") +
+    theme_bw() +
+    theme(text = element_text(size = 15))
 p1 <- ggarrange(a1, a2, b1, b2, nrow = 2, ncol = 2) +
-  bgcolor("White")
-ggsave("./Dissemination/Figures/fig.png",
-  plot = p1, width = 9, height = 6, units = "in"
+    bgcolor("White")
+ggsave(
+    "./Dissemination/Figures/fig.png",
+    plot = p1,
+    width = 9,
+    height = 6,
+    units = "in"
 )
-a1 <- plot(euler(d_overall == "Positive"),
-  quantities = list(cex = 3),
-  main = "Any CF Pathogen"
+a1 <- plot(
+    euler(d_overall == "Positive"),
+    quantities = list(cex = 3),
+    main = "Any CF Pathogen"
 )
-b1 <- plot(euler(d_MSSA == "Positive"),
-  quantities = list(cex = 3),
-  main = "MSSA"
+b1 <- plot(
+    euler(d_MSSA == "Positive"),
+    quantities = list(cex = 3),
+    main = "MSSA"
 )
 p2 <- ggarrange(a1, b1, nrow = 1, ncol = 2) +
-  bgcolor("White")
-ggsave("./Dissemination/Figures/euler_bw.png",
-  plot = p2, width = 9, height = 6, units = "in"
+    bgcolor("White")
+ggsave(
+    "./Dissemination/Figures/euler_bw.png",
+    plot = p2,
+    width = 9,
+    height = 6,
+    units = "in"
 )
-a1 <- plot(venn(d_overall == "Positive"),
-  quantities = list(cex = 3),
-  main = "Any CF Pathogen"
+a1 <- plot(
+    venn(d_overall == "Positive"),
+    quantities = list(cex = 3),
+    main = "Any CF Pathogen"
 )
-b1 <- plot(venn(d_MSSA == "Positive"),
-  quantities = list(cex = 3),
-  main = "MSSA"
+b1 <- plot(
+    venn(d_MSSA == "Positive"),
+    quantities = list(cex = 3),
+    main = "MSSA"
 )
 p3 <- ggarrange(a1, b1, nrow = 1, ncol = 2) +
-  bgcolor("White")
-ggsave("./Dissemination/Figures/venn_bw.png",
-  plot = p3, width = 9, height = 6, units = "in"
+    bgcolor("White")
+ggsave(
+    "./Dissemination/Figures/venn_bw.png",
+    plot = p3,
+    width = 9,
+    height = 6,
+    units = "in"
 )
 ```
