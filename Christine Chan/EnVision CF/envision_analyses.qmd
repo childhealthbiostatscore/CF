@@ -25,15 +25,16 @@ library(gt)
 library(patchwork)
 library(lmerTest)
 library(emmeans)
+library(plotly)
 home_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/tim/OneDrive/Vigers/CF"
+    "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+    "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
+    "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
 github_dir <- switch(Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Documents/GitHub",
-  "Windows" = "C:/Users/Tim/Documents/GitHub",
-  "Linux" = "/home/tim/Documents/GitHub"
+    "Darwin" = "/Users/tim/Documents/GitHub",
+    "Windows" = "C:/Users/Tim/Documents/GitHub",
+    "Linux" = "/home/tim/Documents/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -43,35 +44,76 @@ knitr::opts_knit$set(root.dir = home_dir)
 set.seed(1017)
 # Import data
 # See GitHub/CF/Christine Chan/EnVision CF/clean_envision_data.R
-load("/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF/Data_Clean/envision_analysis_dataset.RData")
+load(
+    "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF/Data_Clean/envision_analysis_dataset.RData"
+)
 ```
 
 # ROC Analyses
 
 ```{r}
 # Limit to those with CGM data (based on mean glucose) and OGTT diagnosis
-df <- final_df %>% filter(!is.na(mean_sensor), !is.na(Diagnosis))
+# Remove CC0083 per Christine (weird CGM)
+df <- final_df %>%
+    filter(!is.na(mean_sensor), !is.na(Diagnosis), study_id != "CC0083")
+# Change specific diagnoses per Christine
+df$Diagnosis[df$study_id == "WU0019"] <- c("NGT", "NGT")
+df$Diagnosis[df$study_id == "IA0080"] <- "IGT"
 # Convert CV units to match Scully et al.
 df$cv <- df$cv * 100
 # First CGM and OGTT pair only
-df <- df %>%
-  group_by(study_id) %>%
-  slice_min(Date)
+# df <- df %>%
+#     group_by(study_id) %>%
+#     slice_min(Date)
 ```
 
 For the following analyses, we used ROC curves to assess various CGM metrics' ability to distinguish between CFRD- and CFRD+ people with CF. Because some people had multiple CGM wears and OGTTs, we decided to use each participant's first CGM and OGTT pair. In the cleaned EnVision dataset we have a total of `r nrow(df)` CGMs from `r length(unique(df$study_id))` unique individuals. Of these CGM wears, `r sum(is.na(df$Diagnosis))` were missing a diagnosis due to missing OGTT timepoints. Those without a diagnosis were excluded from all analyses.
+
+## Participant Demographics by Diagnosis
+
+```{r results='asis'}
+t1 <- tableby(
+    Dysglycemia ~
+        fe(redcap_data_access_group) +
+        kwt(age_visit, "Nmiss", "medianq1q3", "range") +
+        kwt(height, "Nmiss", "medianq1q3", "range") +
+        kwt(weight, "Nmiss", "medianq1q3", "range") +
+        bmi_perc +
+        sex +
+        fe(origin_race) +
+        fe(ethnicity) +
+        fe(pancreatic_status) +
+        fe(CFTR) +
+        corrector_yes_no +
+        fev1 +
+        fvc +
+        a1c_result,
+    data = df,
+    simulate.p.value = TRUE
+)
+summary(t1, pfootnote = T)
+```
 
 ## Participant Demographics by CFRD status
 
 ```{r results='asis'}
 t1 <- tableby(
-  CFRD ~ fe(redcap_data_access_group) +
-    kwt(age_visit, "Nmiss", "medianq1q3", "range") +
-    kwt(height, "Nmiss", "medianq1q3", "range") +
-    kwt(weight, "Nmiss", "medianq1q3", "range") + bmi_perc + sex +
-    fe(origin_race) + fe(ethnicity) + fe(pancreatic_status) + fe(CFTR) +
-    corrector_yes_no + fev1 + fvc + a1c_result,
-  data = df
+    CFRD ~
+        fe(redcap_data_access_group) +
+        kwt(age_visit, "Nmiss", "medianq1q3", "range") +
+        kwt(height, "Nmiss", "medianq1q3", "range") +
+        kwt(weight, "Nmiss", "medianq1q3", "range") +
+        bmi_perc +
+        sex +
+        fe(origin_race) +
+        fe(ethnicity) +
+        fe(pancreatic_status) +
+        fe(CFTR) +
+        corrector_yes_no +
+        fev1 +
+        fvc +
+        a1c_result,
+    data = df
 )
 summary(t1, pfootnote = T)
 ```
@@ -82,11 +124,23 @@ summary(t1, pfootnote = T)
 r <- roc(CFRD ~ mean_sensor, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-# gt(data.frame(ci.coords(r, "best",
-#   best.policy = "random",
-#   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
-# ))) %>% fmt_number(decimals = 3)
 gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(c(
+        "thresh",
+        "sensitivity",
+        "specificity",
+        "fp",
+        "tp",
+        "fn",
+        "tn",
+        "npv",
+        "ppv"
+    ))
+))) %>%
+    fmt_number(decimals = 3)
 ```
 
 ## Percent Time >140 mg/dL 
@@ -95,11 +149,23 @@ gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 r <- roc(CFRD ~ percent_time_over_140, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-# gt(data.frame(ci.coords(r, "best",
-#   best.policy = "random",
-#   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
-# ))) %>% fmt_number(decimals = 3)
 gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(c(
+        "thresh",
+        "sensitivity",
+        "specificity",
+        "fp",
+        "tp",
+        "fn",
+        "tn",
+        "npv",
+        "ppv"
+    ))
+))) %>%
+    fmt_number(decimals = 3)
 ```
 
 ## Percent Time >180 mg/dL
@@ -108,11 +174,23 @@ gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 r <- roc(CFRD ~ percent_time_over_180, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-# gt(data.frame(ci.coords(r, "best",
-#   best.policy = "random",
-#   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
-# ))) %>% fmt_number(decimals = 3)
 gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(c(
+        "thresh",
+        "sensitivity",
+        "specificity",
+        "fp",
+        "tp",
+        "fn",
+        "tn",
+        "npv",
+        "ppv"
+    ))
+))) %>%
+    fmt_number(decimals = 3)
 ```
 
 ## GMI
@@ -121,11 +199,23 @@ gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 r <- roc(CFRD ~ gmi, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-# gt(data.frame(ci.coords(r, "best",
-#   best.policy = "random",
-#   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
-# ))) %>% fmt_number(decimals = 3)
 gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(c(
+        "thresh",
+        "sensitivity",
+        "specificity",
+        "fp",
+        "tp",
+        "fn",
+        "tn",
+        "npv",
+        "ppv"
+    ))
+))) %>%
+    fmt_number(decimals = 3)
 ```
 
 ## SD
@@ -134,11 +224,23 @@ gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 r <- roc(CFRD ~ standard_deviation, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-# gt(data.frame(ci.coords(r, "best",
-#   best.policy = "random",
-#   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
-# ))) %>% fmt_number(decimals = 3)
 gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(c(
+        "thresh",
+        "sensitivity",
+        "specificity",
+        "fp",
+        "tp",
+        "fn",
+        "tn",
+        "npv",
+        "ppv"
+    ))
+))) %>%
+    fmt_number(decimals = 3)
 ```
 
 ## CV
@@ -147,11 +249,23 @@ gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 r <- roc(CFRD ~ cv, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-# gt(data.frame(ci.coords(r, "best",
-#   best.policy = "random",
-#   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
-# ))) %>% fmt_number(decimals = 3)
 gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(c(
+        "thresh",
+        "sensitivity",
+        "specificity",
+        "fp",
+        "tp",
+        "fn",
+        "tn",
+        "npv",
+        "ppv"
+    ))
+))) %>%
+    fmt_number(decimals = 3)
 ```
 
 ## HbA1c
@@ -160,11 +274,23 @@ gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
 r <- roc(CFRD ~ a1c_result, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-# gt(data.frame(ci.coords(r, "best",
-#   best.policy = "random",
-#   ret = c(c("sensitivity", "specificity", "fp", "tp", "fn", "tn"))
-# ))) %>% fmt_number(decimals = 3)
 gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(c(
+        "thresh",
+        "sensitivity",
+        "specificity",
+        "fp",
+        "tp",
+        "fn",
+        "tn",
+        "npv",
+        "ppv"
+    ))
+))) %>%
+    fmt_number(decimals = 3)
 ```
 
 ## Pulmonary Function Comparisons by CGM
@@ -273,82 +399,97 @@ In the figure below, red lines indicate the cutoffs identified in Scully et al. 
 #| fig-width: 16
 # Dotplot
 box_p1 <- ggplot(
-  df,
-  aes(x = Dysglycemia, y = percent_time_over_140, colour = Dysglycemia)
+    df,
+    aes(
+        x = Dysglycemia,
+        y = percent_time_over_140,
+        colour = Dysglycemia,
+        text = study_id
+    )
 ) +
-  geom_jitter() +
-  geom_hline(yintercept = 17.5, color = "red") +
-  geom_hline(yintercept = 11.3, color = "purple") +
-  ggtitle("% Time Over 140 (mg/dL)") +
-  theme_bw(base_size = 12) +
-  theme(
-    legend.position = "none",
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank(), axis.title.y = element_blank()
-  ) +
-  scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
+    geom_jitter() +
+    geom_hline(yintercept = 17.5, color = "red") +
+    geom_hline(yintercept = 11.3, color = "purple") +
+    ggtitle("% Time Over 140 (mg/dL)") +
+    theme_bw(base_size = 12) +
+    theme(
+        legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()
+    ) +
+    scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
 box_p2 <- ggplot(
-  df,
-  aes(x = Dysglycemia, y = percent_time_over_180, colour = Dysglycemia)
+    df,
+    aes(x = Dysglycemia, y = percent_time_over_180, colour = Dysglycemia)
 ) +
-  geom_jitter() +
-  geom_hline(yintercept = 3.4, color = "red") +
-  geom_hline(yintercept = 3.1, color = "purple") +
-  ggtitle("% Time Over 180 (mg/dL)") +
-  theme_bw(base_size = 12) +
-  theme(
-    legend.position = "none",
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank(), axis.title.y = element_blank()
-  ) +
-  scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
+    geom_jitter() +
+    geom_hline(yintercept = 3.4, color = "red") +
+    geom_hline(yintercept = 3.1, color = "purple") +
+    ggtitle("% Time Over 180 (mg/dL)") +
+    theme_bw(base_size = 12) +
+    theme(
+        legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()
+    ) +
+    scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
 box_p3 <- ggplot(
-  df,
-  aes(x = Dysglycemia, y = mean_sensor, colour = Dysglycemia)
+    df,
+    aes(x = Dysglycemia, y = mean_sensor, colour = Dysglycemia)
 ) +
-  geom_jitter() +
-  geom_hline(yintercept = 112, color = "red") +
-  geom_hline(yintercept = 101, color = "purple") +
-  ggtitle("Mean glucose (mg/dL)") +
-  theme_bw(base_size = 12) +
-  theme(
-    legend.position = "none",
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank(), axis.title.y = element_blank()
-  ) +
-  scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
+    geom_jitter() +
+    geom_hline(yintercept = 112, color = "red") +
+    geom_hline(yintercept = 101, color = "purple") +
+    ggtitle("Mean glucose (mg/dL)") +
+    theme_bw(base_size = 12) +
+    theme(
+        legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()
+    ) +
+    scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
 box_p4 <- ggplot(
-  df,
-  aes(x = Dysglycemia, y = cv, colour = Dysglycemia)
+    df,
+    aes(x = Dysglycemia, y = cv, colour = Dysglycemia)
 ) +
-  geom_jitter() +
-  geom_hline(yintercept = 30.6, color = "red") +
-  geom_hline(yintercept = 27.7, color = "purple") +
-  ggtitle("Coefficient of Variation (%)") +
-  theme_bw(base_size = 12) +
-  theme(
-    legend.position = "none",
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank(), axis.title.y = element_blank()
-  ) +
-  scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
+    geom_jitter() +
+    geom_hline(yintercept = 30.6, color = "red") +
+    geom_hline(yintercept = 27.7, color = "purple") +
+    ggtitle("Coefficient of Variation (%)") +
+    theme_bw(base_size = 12) +
+    theme(
+        legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()
+    ) +
+    scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
 box_p5 <- ggplot(
-  df,
-  aes(x = Dysglycemia, y = a1c_result, colour = Dysglycemia)
+    df,
+    aes(x = Dysglycemia, y = a1c_result, colour = Dysglycemia)
 ) +
-  geom_jitter() +
-  geom_hline(yintercept = 5.8, color = "red") +
-  geom_hline(yintercept = 5.75, color = "purple") +
-  ggtitle("HbA1c (%)") +
-  theme_bw(base_size = 12) +
-  theme(
-    legend.title = element_blank(),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank(), axis.title.y = element_blank()
-  ) +
-  scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
+    geom_jitter() +
+    geom_hline(yintercept = 5.8, color = "red") +
+    geom_hline(yintercept = 5.75, color = "purple") +
+    ggtitle("HbA1c (%)") +
+    theme_bw(base_size = 12) +
+    theme(
+        legend.title = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank()
+    ) +
+    scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
 box_p <- box_p1 + box_p2 + box_p4 + box_p3 + box_p5 + plot_layout(ncol = 5)
 box_p
+ggplotly(box_p1, tooltip = c("text"))
+ggplotly(box_p2, tooltip = c("text"))
+ggplotly(box_p4, tooltip = c("text"))
+ggplotly(box_p3, tooltip = c("text"))
+ggplotly(box_p5, tooltip = c("text"))
 ```
 
 # Hypoglycemia Comparisons
@@ -372,26 +513,43 @@ num_symptoms_survey <- paste0("num_symptoms_", limited_timepoints)
 hypo_surveys <- c(adren_survey, neuro_survey, total_survey, num_symptoms_survey)
 # First visit dataframe
 first_visit_df <- final_df %>%
-  group_by(study_id) %>%
-  filter(row_number() == 1) %>%
-  ungroup()
+    group_by(study_id) %>%
+    filter(row_number() == 1) %>%
+    ungroup()
 # Long data for mixed models
 glmm_df <- final_df %>%
-  select(
-    study_id, Hypo60, Hypo70, ogtt_num,
-    all_of(c(
-      glucoses, insulins, cpeptides, glucagons, glp1s, gips, epinephrines,
-      norepinephrines, hypo_surveys
-    ))
-  ) %>%
-  pivot_longer(
-    all_of(c(
-      glucoses, insulins, cpeptides, glucagons, glp1s, gips, epinephrines,
-      norepinephrines, hypo_surveys
-    )),
-    names_to = c(".value", "Timepoint"),
-    names_pattern = "(.*)_([0-9]{1,3})"
-  )
+    select(
+        study_id,
+        Hypo60,
+        Hypo70,
+        ogtt_num,
+        all_of(c(
+            glucoses,
+            insulins,
+            cpeptides,
+            glucagons,
+            glp1s,
+            gips,
+            epinephrines,
+            norepinephrines,
+            hypo_surveys
+        ))
+    ) %>%
+    pivot_longer(
+        all_of(c(
+            glucoses,
+            insulins,
+            cpeptides,
+            glucagons,
+            glp1s,
+            gips,
+            epinephrines,
+            norepinephrines,
+            hypo_surveys
+        )),
+        names_to = c(".value", "Timepoint"),
+        names_pattern = "(.*)_([0-9]{1,3})"
+    )
 glmm_df$Timepoint <- factor(glmm_df$Timepoint, levels = timepoints)
 ```
 
@@ -401,14 +559,24 @@ glmm_df$Timepoint <- factor(glmm_df$Timepoint, levels = timepoints)
 
 ```{r results='asis'}
 t1 <- tableby(
-  Hypo70 ~
-    fe(Diagnosis) + redcap_data_access_group +
-    kwt(age_visit, "Nmiss", "medianq1q3", "range") +
-    kwt(height, "Nmiss", "medianq1q3", "range") +
-    kwt(weight, "Nmiss", "medianq1q3", "range") + bmi_perc + sex +
-    fe(origin_race) + fe(ethnicity) + fe(pancreatic_status) + fe(CFTR) +
-    corrector_yes_no + fev1 + fvc + a1c_result,
-  data = first_visit_df, control = tableby.control(simulate.p.value = T)
+    Hypo70 ~
+        fe(Diagnosis) +
+        redcap_data_access_group +
+        kwt(age_visit, "Nmiss", "medianq1q3", "range") +
+        kwt(height, "Nmiss", "medianq1q3", "range") +
+        kwt(weight, "Nmiss", "medianq1q3", "range") +
+        bmi_perc +
+        sex +
+        fe(origin_race) +
+        fe(ethnicity) +
+        fe(pancreatic_status) +
+        fe(CFTR) +
+        corrector_yes_no +
+        fev1 +
+        fvc +
+        a1c_result,
+    data = first_visit_df,
+    control = tableby.control(simulate.p.value = T)
 )
 summary(t1, pfootnote = T)
 ```
@@ -417,14 +585,24 @@ summary(t1, pfootnote = T)
 
 ```{r results='asis'}
 t2 <- tableby(
-  Hypo60 ~
-    fe(Diagnosis) + redcap_data_access_group +
-    kwt(age_visit, "Nmiss", "medianq1q3", "range") +
-    kwt(height, "Nmiss", "medianq1q3", "range") +
-    kwt(weight, "Nmiss", "medianq1q3", "range") + bmi_perc + sex +
-    fe(origin_race) + fe(ethnicity) + fe(pancreatic_status) + fe(CFTR) +
-    corrector_yes_no + fev1 + fvc + a1c_result,
-  data = first_visit_df, control = tableby.control(simulate.p.value = T)
+    Hypo60 ~
+        fe(Diagnosis) +
+        redcap_data_access_group +
+        kwt(age_visit, "Nmiss", "medianq1q3", "range") +
+        kwt(height, "Nmiss", "medianq1q3", "range") +
+        kwt(weight, "Nmiss", "medianq1q3", "range") +
+        bmi_perc +
+        sex +
+        fe(origin_race) +
+        fe(ethnicity) +
+        fe(pancreatic_status) +
+        fe(CFTR) +
+        corrector_yes_no +
+        fev1 +
+        fvc +
+        a1c_result,
+    data = first_visit_df,
+    control = tableby.control(simulate.p.value = T)
 )
 summary(t2, pfootnote = T)
 ```
@@ -439,41 +617,56 @@ Glucose, insulin, C-peptide, glucagon, epinephrine, and norepinephrine were mode
 
 ```{r}
 # Fit
-mod <- lmer(Glucose ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
-  data = glmm_df
+mod <- lmer(
+    Glucose ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+    data = glmm_df
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo70"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo70",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
-  group = Hypo70
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean Glucose") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo70,
+        group = Hypo70
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean Glucose") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean glucose at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour glucose was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour glucose was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -482,41 +675,56 @@ The table above shows the estimated mean glucose at each time point for the two 
 
 ```{r}
 # Fit
-mod <- lmer(Glucose ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
-  data = glmm_df
+mod <- lmer(
+    Glucose ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+    data = glmm_df
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo60"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo60",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
-  group = Hypo60
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean Glucose") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo60,
+        group = Hypo60
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean Glucose") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean glucose at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour glucose was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour glucose was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -529,41 +737,56 @@ Insulin values were log-transformed to improve model fit.
 
 ```{r}
 # Fit
-mod <- lmer(log(Insulin) ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
-  data = glmm_df
+mod <- lmer(
+    log(Insulin) ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+    data = glmm_df
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo70"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo70",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
-  group = Hypo70
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean Insulin") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo70,
+        group = Hypo70
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean Insulin") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean insulin at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour insulin was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour insulin was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -572,41 +795,56 @@ The table above shows the estimated mean insulin at each time point for the two 
 
 ```{r}
 # Fit
-mod <- lmer(log(Insulin) ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
-  data = glmm_df
+mod <- lmer(
+    log(Insulin) ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+    data = glmm_df
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo60"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo60",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
-  group = Hypo60
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean Insulin") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo60,
+        group = Hypo60
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean Insulin") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean insulin at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour insulin was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour insulin was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -619,41 +857,56 @@ C-peptide values were log-transformed to improve model fit.
 
 ```{r}
 # Fit
-mod <- lmer(log(C.Peptide) ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
-  data = glmm_df
+mod <- lmer(
+    log(C.Peptide) ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+    data = glmm_df
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo70"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo70",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
-  group = Hypo70
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean C-peptide") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo70,
+        group = Hypo70
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean C-peptide") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean C-peptide at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour C-peptide was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour C-peptide was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -662,41 +915,56 @@ The table above shows the estimated mean C-peptide at each time point for the tw
 
 ```{r}
 # Fit
-mod <- lmer(log(C.Peptide) ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
-  data = glmm_df
+mod <- lmer(
+    log(C.Peptide) ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+    data = glmm_df
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo60"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo60",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
-  group = Hypo60
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean C-peptide") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo60,
+        group = Hypo60
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean C-peptide") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean C-peptide at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour C-peptide was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour C-peptide was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -707,41 +975,56 @@ The table above shows the estimated mean C-peptide at each time point for the tw
 
 ```{r}
 # Fit
-mod <- lmer(Glucagon ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
-  data = glmm_df
+mod <- lmer(
+    Glucagon ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+    data = glmm_df
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo70"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo70",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
-  group = Hypo70
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean Glucagon") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo70,
+        group = Hypo70
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean Glucagon") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean glucagon at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour glucagon was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour glucagon was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -750,41 +1033,56 @@ The table above shows the estimated mean glucagon at each time point for the two
 
 ```{r}
 # Fit
-mod <- lmer(Glucagon ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
-  data = glmm_df
+mod <- lmer(
+    Glucagon ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+    data = glmm_df
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo60"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo60",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
-  group = Hypo60
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean Glucagon") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo60,
+        group = Hypo60
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean Glucagon") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean glucagon at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour glucagon was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour glucagon was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -795,41 +1093,56 @@ The table above shows the estimated mean glucagon at each time point for the two
 
 ```{r}
 # Fit
-mod <- lmer(GIP ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
-  data = glmm_df
+mod <- lmer(
+    GIP ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+    data = glmm_df
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo70"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo70",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
-  group = Hypo70
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean GIP") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo70,
+        group = Hypo70
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean GIP") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean GIP at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour GIP was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour GIP was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -838,41 +1151,56 @@ The table above shows the estimated mean GIP at each time point for the two grou
 
 ```{r}
 # Fit
-mod <- lmer(GIP ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
-  data = glmm_df
+mod <- lmer(
+    GIP ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+    data = glmm_df
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo60"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo60",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
-  group = Hypo60
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean GIP") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo60,
+        group = Hypo60
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean GIP") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean GIP at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour GIP was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour GIP was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -885,41 +1213,56 @@ Epinephrine values were log-transformed to improve model fit.
 
 ```{r}
 # Fit
-mod <- lmer(log(Epinephrine) ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
-  data = glmm_df
+mod <- lmer(
+    log(Epinephrine) ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+    data = glmm_df
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo70"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo70",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
-  group = Hypo70
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean Epinephrine") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo70,
+        group = Hypo70
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean Epinephrine") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean epinephrine at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour epinephrine was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour epinephrine was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -928,41 +1271,56 @@ The table above shows the estimated mean epinephrine at each time point for the 
 
 ```{r}
 # Fit
-mod <- lmer(log(Epinephrine) ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
-  data = glmm_df
+mod <- lmer(
+    log(Epinephrine) ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+    data = glmm_df
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo60"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo60",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
-  group = Hypo60
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean Epinephrine") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo60,
+        group = Hypo60
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean Epinephrine") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean epinephrine at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour epinephrine was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour epinephrine was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -975,41 +1333,56 @@ Norepinephrine values were log-transformed to improve model fit.
 
 ```{r}
 # Fit
-mod <- lmer(log(Norepinephrine) ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
-  data = glmm_df
+mod <- lmer(
+    log(Norepinephrine) ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+    data = glmm_df
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo70"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo70",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
-  group = Hypo70
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean Norepinephrine") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo70,
+        group = Hypo70
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean Norepinephrine") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean norepinephrine at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour norepinephrine was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour norepinephrine was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -1018,41 +1391,56 @@ The table above shows the estimated mean norepinephrine at each time point for t
 
 ```{r}
 # Fit
-mod <- lmer(log(Norepinephrine) ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
-  data = glmm_df
+mod <- lmer(
+    log(Norepinephrine) ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+    data = glmm_df
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo60"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo60",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
-  group = Hypo60
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean Norepinephrine") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo60,
+        group = Hypo60
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean Norepinephrine") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean norepinephrine at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour norepinephrine was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour norepinephrine was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -1066,42 +1454,58 @@ The `adren_score` variable was modeled using a mixed effect Poisson model with r
 ```{r}
 # Fit
 # Poisson model better than NB by AIC and BIC
-mod <- glmer(adren_score ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
-  data = glmm_df, family = "poisson",
-  control = glmerControl(optimizer = "bobyqa")
+mod <- glmer(
+    adren_score ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+    data = glmm_df,
+    family = "poisson",
+    control = glmerControl(optimizer = "bobyqa")
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo70"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo70",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
-  group = Hypo70
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean adren_score") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo70,
+        group = Hypo70
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean adren_score") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean norepinephrine at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour norepinephrine was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour norepinephrine was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -1111,42 +1515,58 @@ The table above shows the estimated mean norepinephrine at each time point for t
 ```{r}
 # Fit
 # Poisson model better than NB by AIC and BIC
-mod <- glmer(adren_score ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
-  data = glmm_df, family = "poisson",
-  control = glmerControl(optimizer = "bobyqa")
+mod <- glmer(
+    adren_score ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+    data = glmm_df,
+    family = "poisson",
+    control = glmerControl(optimizer = "bobyqa")
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo60"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo60",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
-  group = Hypo60
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean adren_score") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo60,
+        group = Hypo60
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean adren_score") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean norepinephrine at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour norepinephrine was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour norepinephrine was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -1160,42 +1580,58 @@ The `neuro_score` variable was modeled using a mixed effect Poisson model with r
 ```{r}
 # Fit
 # Poisson model better than NB by AIC and BIC
-mod <- glmer(neuro_score ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
-  data = glmm_df, family = "poisson",
-  control = glmerControl(optimizer = "bobyqa")
+mod <- glmer(
+    neuro_score ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+    data = glmm_df,
+    family = "poisson",
+    control = glmerControl(optimizer = "bobyqa")
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo70"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo70",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
-  group = Hypo70
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean neuro_score") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo70,
+        group = Hypo70
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean neuro_score") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean norepinephrine at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour norepinephrine was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour norepinephrine was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -1205,42 +1641,58 @@ The table above shows the estimated mean norepinephrine at each time point for t
 ```{r}
 # Fit
 # Poisson model better than NB by AIC and BIC
-mod <- glmer(neuro_score ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
-  data = glmm_df, family = "poisson",
-  control = glmerControl(optimizer = "bobyqa")
+mod <- glmer(
+    neuro_score ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+    data = glmm_df,
+    family = "poisson",
+    control = glmerControl(optimizer = "bobyqa")
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo60"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo60",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
-  group = Hypo60
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean neuro_score") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo60,
+        group = Hypo60
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean neuro_score") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean norepinephrine at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour norepinephrine was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour norepinephrine was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -1254,42 +1706,58 @@ The `total_score` variable was modeled using a mixed effect Poisson model with r
 ```{r}
 # Fit
 # Poisson model better than NB by AIC and BIC
-mod <- glmer(total_score ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
-  data = glmm_df, family = "poisson",
-  control = glmerControl(optimizer = "bobyqa")
+mod <- glmer(
+    total_score ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+    data = glmm_df,
+    family = "poisson",
+    control = glmerControl(optimizer = "bobyqa")
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo70"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo70",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
-  group = Hypo70
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean total_score") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo70,
+        group = Hypo70
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean total_score") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean norepinephrine at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour norepinephrine was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour norepinephrine was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -1299,42 +1767,58 @@ The table above shows the estimated mean norepinephrine at each time point for t
 ```{r}
 # Fit
 # Poisson model better than NB by AIC and BIC
-mod <- glmer(total_score ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
-  data = glmm_df, family = "poisson",
-  control = glmerControl(optimizer = "bobyqa")
+mod <- glmer(
+    total_score ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+    data = glmm_df,
+    family = "poisson",
+    control = glmerControl(optimizer = "bobyqa")
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo60"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo60",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
-  group = Hypo60
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean total_score") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo60,
+        group = Hypo60
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean total_score") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean norepinephrine at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour norepinephrine was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour norepinephrine was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -1348,42 +1832,58 @@ The `num_symptoms` variable was modeled using a mixed effect Poisson model with 
 ```{r}
 # Fit
 # Poisson model better than NB by AIC and BIC
-mod <- glmer(num_symptoms ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
-  data = glmm_df, family = "poisson",
-  control = glmerControl(optimizer = "bobyqa")
+mod <- glmer(
+    num_symptoms ~ Timepoint * Hypo70 + (1 | study_id / ogtt_num),
+    data = glmm_df,
+    family = "poisson",
+    control = glmerControl(optimizer = "bobyqa")
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo70"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo70"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo70", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo70",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo70,
-  group = Hypo70
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean num_symptoms") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo70,
+        group = Hypo70
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean num_symptoms") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean norepinephrine at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour norepinephrine was `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="No Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour norepinephrine was `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo70=="Hypoglycemia < 70" & means$Timepoint=="120","CI Upper Limit"],2)`).
@@ -1393,42 +1893,58 @@ The table above shows the estimated mean norepinephrine at each time point for t
 ```{r}
 # Fit
 # Poisson model better than NB by AIC and BIC
-mod <- glmer(num_symptoms ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
-  data = glmm_df, family = "poisson",
-  control = glmerControl(optimizer = "bobyqa")
+mod <- glmer(
+    num_symptoms ~ Timepoint * Hypo60 + (1 | study_id / ogtt_num),
+    data = glmm_df,
+    family = "poisson",
+    control = glmerControl(optimizer = "bobyqa")
 )
 # EM means
-means <- data.frame(emmeans(mod, c("Timepoint", "Hypo60"),
-  type = "response",
-  pbkrtest.limit = 1e6
+means <- data.frame(emmeans(
+    mod,
+    c("Timepoint", "Hypo60"),
+    type = "response",
+    pbkrtest.limit = 1e6
 ))
 colnames(means) <- c(
-  "Timepoint", "Hypo60", "Mean", "SE", "df", "CI Lower Limit", "CI Upper Limit"
+    "Timepoint",
+    "Hypo60",
+    "Mean",
+    "SE",
+    "df",
+    "CI Lower Limit",
+    "CI Upper Limit"
 )
 # Plot
-ggplot(means, aes(
-  x = as.numeric(as.character(Timepoint)), y = Mean, colour = Hypo60,
-  group = Hypo60
-)) +
-  geom_point() +
-  geom_errorbar(aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
-    width = 3
-  ) +
-  geom_line() +
-  scale_x_continuous(breaks = timepoints) +
-  scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
-  ylab("EM Mean num_symptoms") +
-  xlab("Timepoint") +
-  theme_bw(base_size = 14) +
-  theme(legend.title = element_blank())
+ggplot(
+    means,
+    aes(
+        x = as.numeric(as.character(Timepoint)),
+        y = Mean,
+        colour = Hypo60,
+        group = Hypo60
+    )
+) +
+    geom_point() +
+    geom_errorbar(
+        aes(ymin = `CI Lower Limit`, ymax = `CI Upper Limit`),
+        width = 3
+    ) +
+    geom_line() +
+    scale_x_continuous(breaks = timepoints) +
+    scale_color_manual(values = c("#66C2A5", "#FC8D62")) +
+    ylab("EM Mean num_symptoms") +
+    xlab("Timepoint") +
+    theme_bw(base_size = 14) +
+    theme(legend.title = element_blank())
 ```
 
 The plot above shows the estimated mean at each time point. Error bars indicate the 95% confidence interval.
 
 ```{r}
 means %>%
-  gt() %>%
-  fmt_number(decimals = 2)
+    gt() %>%
+    fmt_number(decimals = 2)
 ```
 
 The table above shows the estimated mean norepinephrine at each time point for the two groups. For example, for those with no hypoglycemia the mean two hour norepinephrine was `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="No Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`) and for those with hypoglycemia at some point the mean two hour norepinephrine was `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","Mean"],2)` (95% CI: `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Lower Limit"],2)` - `r round(means[means$Hypo60=="Hypoglycemia < 60" & means$Timepoint=="120","CI Upper Limit"],2)`).

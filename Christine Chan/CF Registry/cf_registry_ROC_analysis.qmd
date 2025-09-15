@@ -26,14 +26,12 @@ library(gtsummary)
 library(gt)
 library(pROC)
 library(ggrepel)
-home_dir <- switch(
-    Sys.info()["sysname"],
+home_dir <- switch(Sys.info()["sysname"],
     "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
     "Windows" = "C:/Users/tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry",
     "Linux" = "/home/tim/OneDrive/Vigers/CF/Christine Chan/CF Registry"
 )
-github_dir <- switch(
-    Sys.info()["sysname"],
+github_dir <- switch(Sys.info()["sysname"],
     "Darwin" = "/Users/timvigers/GitHub",
     "Windows" = "C:/Users/Tim/GitHub",
     "Linux" = "/home/tim/GitHub"
@@ -43,6 +41,7 @@ set.seed(1017)
 ```
 
 ```{r data cleaning}
+setwd(home_dir)
 # Import data
 encounter <- read.csv(
     "./Data_Raw/CFF19_encountersMerged_Del1.csv",
@@ -110,6 +109,49 @@ annual <- read.csv(
     na.strings = c("", "N/A")
 )
 annual <- annual %>% rename(reviewyear = ReviewYear)
+annual <- left_join(annual, demo %>% select(eDWID, Gender), by = join_by(eDWID))
+# Get BMI group_by
+annual$bmi_cat <- apply(annual, 1, function(r) {
+    age <- as.numeric(r["Age_YrEnd"])
+    gender <- as.character(r["Gender"])
+    bmi <- as.numeric(r["A_bmivalue"])
+    bmi_perc <- as.numeric(r["A_bmipercentile"])
+    if (age <= 20) {
+        return(cut(
+            bmi_perc,
+            c(-Inf, 10, 50, 85, Inf),
+            right = F,
+            labels = c("Undernourished", "At Risk", "Target/Goal", "Overweight")
+        ))
+    } else if (age > 20) {
+        if (gender == "M") {
+            return(cut(
+                bmi,
+                c(-Inf, 18.5, 23, 25, Inf),
+                right = F,
+                labels = c(
+                    "Undernourished",
+                    "At Risk",
+                    "Target/Goal",
+                    "Overweight"
+                )
+            ))
+        } else if (gender == "F") {
+            return(cut(
+                bmi,
+                c(-Inf, 18.5, 22, 25, Inf),
+                right = F,
+                labels = c(
+                    "Undernourished",
+                    "At Risk",
+                    "Target/Goal",
+                    "Overweight"
+                )
+            ))
+        }
+    }
+})
+annual$bmi_cat <- relevel(annual$bmi_cat, ref = "Target/Goal")
 # Merge
 encounter <- left_join(
     encounter,
@@ -118,7 +160,16 @@ encounter <- left_join(
 )
 encounter <- left_join(
     encounter,
-    annual %>% select(eDWID, reviewyear, Age_YrEnd),
+    annual %>%
+        select(
+            eDWID,
+            reviewyear,
+            Age_YrEnd,
+            A_IsOnEnzymes,
+            bmi_cat,
+            A_FEV1_pct_predicted,
+            A_FVC_pct_predicted
+        ),
     by = join_by(eDWID, reviewyear)
 )
 # Limit to those with two hour OGTT and HbA1c at the same encounter
@@ -134,15 +185,25 @@ roc_df <- encounter %>%
         Gender,
         F508,
         MutClass,
-        twohour_bloodglucose,
-        hgba1c
+        A_IsOnEnzymes,
+        Vx770,
+        Vx809comb,
+        height,
+        weight,
+        bmivalue,
+        bmipercentile,
+        bmi_cat,
+        A_FEV1_pct_predicted,
+        A_FVC_pct_predicted,
+        hgba1c,
+        fast_bloodglucose,
+        twohour_bloodglucose
     ) %>%
     filter(
         reviewyear >= 2010,
         Age_YrEnd >= 10,
         hgba1c >= 3.5 & hgba1c <= 15
     ) %>%
-    drop_na() %>%
     group_by(eDWID) %>%
     filter(row_number() == n()) %>%
     ungroup() %>%
@@ -218,22 +279,18 @@ roc_plot <- function(roc_obj) {
 
 ```{r}
 roc_df %>%
-    select(
-        reviewyear,
-        hgba1c,
-        Age_YrEnd,
-        `Age Group`,
-        `OGTT 2-hour`,
-        Race,
-        Hispanicrace,
-        Gender,
-        F508,
-        MutClass
-    ) %>%
+    select(-eDWID) %>%
     tbl_summary(
         by = `OGTT 2-hour`,
         missing_text = "Missing",
-        type = list(reviewyear ~ "categorical"),
+        type = list(
+            reviewyear ~ "categorical",
+            all_continuous() ~ "continuous2"
+        ),
+        statistic = list(
+            all_continuous() ~
+                c("{mean} ({sd})", "{median} ({p25}, {p75})", "{min}, {max}")
+        ),
         label = list(
             hgba1c = "HbA1c",
             Hispanicrace = "Hispanic",
