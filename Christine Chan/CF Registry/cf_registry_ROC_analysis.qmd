@@ -26,12 +26,14 @@ library(gtsummary)
 library(gt)
 library(pROC)
 library(ggrepel)
-home_dir <- switch(Sys.info()["sysname"],
+home_dir <- switch(
+    Sys.info()["sysname"],
     "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
     "Windows" = "C:/Users/tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry",
     "Linux" = "/home/tim/OneDrive/Vigers/CF/Christine Chan/CF Registry"
 )
-github_dir <- switch(Sys.info()["sysname"],
+github_dir <- switch(
+    Sys.info()["sysname"],
     "Darwin" = "/Users/timvigers/GitHub",
     "Windows" = "C:/Users/Tim/GitHub",
     "Linux" = "/home/tim/GitHub"
@@ -172,6 +174,19 @@ encounter <- left_join(
         ),
     by = join_by(eDWID, reviewyear)
 )
+# Format CFTR modulator variables
+encounter$Vx770[is.na(encounter$Vx770)] <- 0
+encounter$Vx770 <- factor(
+    encounter$Vx770,
+    levels = 0:1,
+    labels = c("No", "Yes")
+)
+encounter$Vx809comb[is.na(encounter$Vx809comb)] <- 0
+encounter$Vx809comb <- factor(
+    encounter$Vx809comb,
+    levels = 0:1,
+    labels = c("No", "Yes")
+)
 # Limit to those with two hour OGTT and HbA1c at the same encounter
 # Also remove years before 2010 and those under age 10
 roc_df <- encounter %>%
@@ -204,6 +219,18 @@ roc_df <- encounter %>%
         Age_YrEnd >= 10,
         hgba1c >= 3.5 & hgba1c <= 15
     ) %>%
+    drop_na(
+        eDWID,
+        reviewyear,
+        Age_YrEnd,
+        Race,
+        Hispanicrace,
+        Gender,
+        F508,
+        MutClass,
+        twohour_bloodglucose,
+        hgba1c
+    ) %>%
     group_by(eDWID) %>%
     filter(row_number() == n()) %>%
     ungroup() %>%
@@ -215,19 +242,6 @@ roc_df <- encounter %>%
         ),
         `Age Group` = cut(Age_YrEnd, breaks = c(10, 18, 30, Inf), right = F)
     )
-# Metrics to report
-metrics <- c(
-    "thresh",
-    "specificity",
-    "sensitivity",
-    "accuracy",
-    "tn",
-    "tp",
-    "fn",
-    "fp",
-    "npv",
-    "ppv"
-)
 ```
 
 ```{r}
@@ -287,6 +301,104 @@ roc_df %>%
             reviewyear ~ "categorical",
             all_continuous() ~ "continuous2"
         ),
+        statistic = list(
+            all_continuous() ~
+                c("{mean} ({sd})", "{median} ({p25}, {p75})", "{min}, {max}")
+        ),
+        label = list(
+            hgba1c = "HbA1c",
+            Hispanicrace = "Hispanic",
+            MutClass = "Mutation Class",
+            reviewyear = "Year",
+            Age_YrEnd = "Age at Year End"
+        )
+    ) %>%
+    add_overall() %>%
+    add_p(
+        test = list(reviewyear = "fisher.test"),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
+    ) %>%
+    separate_p_footnotes() %>%
+    as_gt()
+```
+
+### Pairwise comparisons
+
+#### <140 vs. [140,200)
+
+```{r}
+roc_df %>%
+    select(`OGTT 2-hour`, Gender, MutClass, hgba1c) %>%
+    filter(`OGTT 2-hour` != ">=200") %>%
+    mutate(`OGTT 2-hour` = droplevels(`OGTT 2-hour`)) %>%
+    tbl_summary(
+        by = `OGTT 2-hour`,
+        missing_text = "Missing",
+        type = list(all_continuous() ~ "continuous2"),
+        statistic = list(
+            all_continuous() ~
+                c("{mean} ({sd})", "{median} ({p25}, {p75})", "{min}, {max}")
+        ),
+        label = list(
+            hgba1c = "HbA1c",
+            Hispanicrace = "Hispanic",
+            MutClass = "Mutation Class",
+            reviewyear = "Year",
+            Age_YrEnd = "Age at Year End"
+        )
+    ) %>%
+    add_overall() %>%
+    add_p(
+        test = list(reviewyear = "fisher.test"),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
+    ) %>%
+    separate_p_footnotes() %>%
+    as_gt()
+```
+
+#### [140,200) vs. >=200    
+
+```{r}
+roc_df %>%
+    select(`OGTT 2-hour`, Gender, MutClass, hgba1c) %>%
+    filter(`OGTT 2-hour` != "<140") %>%
+    mutate(`OGTT 2-hour` = droplevels(`OGTT 2-hour`)) %>%
+    tbl_summary(
+        by = `OGTT 2-hour`,
+        missing_text = "Missing",
+        type = list(all_continuous() ~ "continuous2"),
+        statistic = list(
+            all_continuous() ~
+                c("{mean} ({sd})", "{median} ({p25}, {p75})", "{min}, {max}")
+        ),
+        label = list(
+            hgba1c = "HbA1c",
+            Hispanicrace = "Hispanic",
+            MutClass = "Mutation Class",
+            reviewyear = "Year",
+            Age_YrEnd = "Age at Year End"
+        )
+    ) %>%
+    add_overall() %>%
+    add_p(
+        test = list(reviewyear = "fisher.test"),
+        test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
+    ) %>%
+    separate_p_footnotes() %>%
+    as_gt()
+```
+
+#### <140 vs. >=200
+
+```{r}
+roc_df %>%
+    select(`OGTT 2-hour`, Gender, MutClass, hgba1c) %>%
+    filter(`OGTT 2-hour` != "[140,200)") %>%
+    mutate(`OGTT 2-hour` = droplevels(`OGTT 2-hour`)) %>%
+    tbl_summary(
+        by = `OGTT 2-hour`,
+        missing_text = "Missing",
+        type = list(all_continuous() ~ "continuous2"),
         statistic = list(
             all_continuous() ~
                 c("{mean} ({sd})", "{median} ({p25}, {p75})", "{min}, {max}")
@@ -412,7 +524,22 @@ agt_cfrd$ogtt <- droplevels(agt_cfrd$`OGTT 2-hour`)
 r <- roc(ogtt ~ hgba1c, data = ngt_agt)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 #### AGT vs. CFRD
@@ -422,7 +549,22 @@ gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(ogtt ~ hgba1c, data = agt_cfrd)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ### Peds vs. Adults
@@ -441,7 +583,22 @@ peds_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd < 18)
 r <- roc(ogtt ~ hgba1c, data = peds_ngt_agt)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### AGT vs. CFRD
@@ -451,7 +608,22 @@ gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(ogtt ~ hgba1c, data = peds_agt_cfrd)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 #### Adults
@@ -468,7 +640,22 @@ adult_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd >= 18)
 r <- roc(ogtt ~ hgba1c, data = adult_ngt_agt)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### AGT vs. CFRD
@@ -478,7 +665,22 @@ gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(ogtt ~ hgba1c, data = adult_agt_cfrd)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ### By race
@@ -497,7 +699,22 @@ white_agt_cfrd <- agt_cfrd %>% filter(Race == "White")
 r <- roc(ogtt ~ hgba1c, data = white_ngt_agt)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### AGT vs. CFRD
@@ -507,7 +724,22 @@ gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(ogtt ~ hgba1c, data = white_agt_cfrd)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 #### Black or African American
@@ -524,7 +756,22 @@ black_agt_cfrd <- agt_cfrd %>% filter(Race == "Black or African American")
 r <- roc(ogtt ~ hgba1c, data = black_ngt_agt)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### AGT vs. CFRD
@@ -539,7 +786,22 @@ gt(data.frame(coords(r, "best"))) %>%
     fmt_number(n_sigfig = 3)
 gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
     fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 #### More than one race
@@ -556,7 +818,22 @@ more_agt_cfrd <- agt_cfrd %>% filter(Race == "More than one race")
 r <- roc(ogtt ~ hgba1c, data = more_ngt_agt)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### AGT vs. CFRD
@@ -566,7 +843,22 @@ gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(ogtt ~ hgba1c, data = more_agt_cfrd)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 #### Other race
@@ -588,7 +880,22 @@ gt(data.frame(coords(r, "best"))) %>%
     fmt_number(n_sigfig = 3)
 gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
     fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### AGT vs. CFRD
@@ -603,7 +910,22 @@ gt(data.frame(coords(r, "best"))) %>%
     fmt_number(n_sigfig = 3)
 gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
     fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ### By ethnicity
@@ -622,7 +944,22 @@ hispanic_agt_cfrd <- agt_cfrd %>% filter(Hispanicrace == "No")
 r <- roc(ogtt ~ hgba1c, data = hispanic_ngt_agt)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### AGT vs. CFRD
@@ -632,7 +969,22 @@ gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(ogtt ~ hgba1c, data = hispanic_agt_cfrd)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 #### Non-Hispanic
@@ -651,7 +1003,22 @@ non_hispanic_agt_cfrd <-
 r <- roc(ogtt ~ hgba1c, data = non_hispanic_ngt_agt)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### AGT vs. CFRD
@@ -666,7 +1033,22 @@ gt(data.frame(coords(r, "best"))) %>%
     fmt_number(n_sigfig = 3)
 gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
     fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ## Two hour OGTT >= 140 or >= 200
@@ -687,7 +1069,22 @@ roc_df$cfrd <- as.numeric(roc_df$twohour_bloodglucose >= 200)
 r <- roc(agt ~ hgba1c, data = roc_df)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 #### $\geq$ 200
@@ -697,7 +1094,22 @@ gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(cfrd ~ hgba1c, data = roc_df)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ### Peds vs. Adults
@@ -715,7 +1127,22 @@ peds_roc <- roc_df %>% filter(Age_YrEnd < 18)
 r <- roc(agt ~ hgba1c, data = peds_roc)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### $\geq$ 200
@@ -725,7 +1152,22 @@ gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(cfrd ~ hgba1c, data = peds_roc)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 #### Adults
@@ -741,7 +1183,22 @@ adult_roc <- roc_df %>% filter(Age_YrEnd >= 18)
 r <- roc(agt ~ hgba1c, data = adult_roc)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### $\geq$ 200
@@ -751,7 +1208,22 @@ gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(cfrd ~ hgba1c, data = adult_roc)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ### By race
@@ -769,7 +1241,22 @@ white_roc <- roc_df %>% filter(Race == "White")
 r <- roc(agt ~ hgba1c, data = white_roc)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### $\geq$ 200
@@ -779,7 +1266,22 @@ gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(cfrd ~ hgba1c, data = white_roc)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 #### Black or African American
@@ -795,7 +1297,22 @@ black_roc <- roc_df %>% filter(Race == "Black or African American")
 r <- roc(agt ~ hgba1c, data = black_roc)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### $\geq$ 200
@@ -808,7 +1325,22 @@ r <- roc(cfrd ~ hgba1c, data = black_roc)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
     fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 #### More than one race
@@ -824,7 +1356,22 @@ more_roc <- roc_df %>% filter(Race == "More than one race")
 r <- roc(agt ~ hgba1c, data = more_roc)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### $\geq$ 200
@@ -834,7 +1381,22 @@ gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(cfrd ~ hgba1c, data = more_roc)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 #### Other race
@@ -855,7 +1417,22 @@ gt(data.frame(coords(r, "best"))) %>%
     fmt_number(n_sigfig = 3)
 gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
     fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### $\geq$ 200
@@ -868,7 +1445,22 @@ gt(data.frame(coords(r, "best"))) %>%
     fmt_number(n_sigfig = 3)
 gt(data.frame(ci.coords(r, "best"))) %>%
     fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ### By ethnicity
@@ -886,7 +1478,22 @@ hispanic_roc <- roc_df %>% filter(Hispanicrace == "Yes")
 r <- roc(agt ~ hgba1c, data = hispanic_roc)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### $\geq$ 200
@@ -896,7 +1503,22 @@ gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(cfrd ~ hgba1c, hispanic_roc)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 #### Non-Hispanic
@@ -912,7 +1534,22 @@ non_hispanic_roc <- roc_df %>% filter(Hispanicrace == "No")
 r <- roc(agt ~ hgba1c, data = non_hispanic_roc)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
 ```
 
 ##### $\geq$ 200
@@ -922,5 +1559,59 @@ gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
 r <- roc(cfrd ~ hgba1c, data = non_hispanic_roc)
 roc_plot(r)
 gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
-gt(data.frame(coords(r, "all", ret = "all"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(
+    r,
+    "all",
+    ret = c(
+        "threshold",
+        "sensitivity",
+        "specificity",
+        "tpr",
+        "tnr",
+        "fpr",
+        "fnr",
+        "npv",
+        "ppv"
+    )
+))) %>%
+    fmt_number(n_sigfig = 3)
+```
+
+# FEV1 over time plot
+
+```{r}
+plot_df <- annual %>%
+    filter(
+        !is.na(cfrd_status_annual),
+        Age_YrEnd >= 10,
+        !cfrd_status_annual %in% c(4, 5)
+    ) %>%
+    group_by(eDWID) %>%
+    mutate(
+        Diagnosis = max(cfrd_status_annual),
+        `Years to CFRD or Last Visit` = case_when(
+            Diagnosis == 3 ~
+                Age_YrEnd -
+                    first(Age_YrEnd[cfrd_status_annual == 3]),
+            .default = Age_YrEnd - max(Age_YrEnd, na.rm = T)
+        )
+    )
+plot_df$Diagnosis <- factor(
+    plot_df$Diagnosis,
+    levels = 1:3,
+    labels = c("NGT", "AGT", "CFRD")
+)
+ggplot(
+    plot_df,
+    aes(
+        y = A_FEV1_pct_predicted,
+        x = `Years to CFRD or Last Visit`,
+        color = Diagnosis,
+        group = Diagnosis
+    )
+) +
+    xlim(c(-10, 10)) +
+    geom_point(alpha = 0.1, shape = ".") +
+    geom_smooth(formula = y ~ s(x, bs = "cr")) +
+    theme_bw()
 ```
