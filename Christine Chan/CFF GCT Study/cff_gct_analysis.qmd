@@ -1,8 +1,8 @@
 ---
 title: "CFF GCT Study"
 author: "Tim Vigers"
-date: "today"
-date-format: long
+date: "now"
+date-format: "MMMM D, YYYY [at] hh:mm a"
 format:
   html:
     toc: true
@@ -36,12 +36,14 @@ library(rpart.plot)
 library(rms)
 library(patchwork)
 library(ggflowchart)
-home_dir <- switch(Sys.info()["sysname"],
+home_dir <- switch(
+  Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
   "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
-github_dir <- switch(Sys.info()["sysname"],
+github_dir <- switch(
+  Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Documents/GitHub",
   "Windows" = "C:/Users/Tim/Documents/GitHub",
   "Linux" = "/home/tim/Documents/GitHub"
@@ -52,7 +54,8 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```{r data cleaning}
 #| warning: false
 # Import from REDCap
-df <- read.csv("./Christine Chan/CFF GCT Study/Data_Raw/CysticFibrosisScreen_DATA_LABELS_2024-04-19_1740.csv",
+df <- read.csv(
+  "./Christine Chan/CFF GCT Study/Data_Raw/CysticFibrosisScreen_DATA_LABELS_2024-04-19_1740.csv",
   na.strings = ""
 )
 # Create standardized study ID
@@ -62,19 +65,25 @@ df$Plasma.Glucose <- as.numeric(df$Plasma.Glucose)
 df$X1.hour.Plasma.Glucose.Value <- as.numeric(df$X1.hour.Plasma.Glucose.Value)
 # Combine race and ethnicity columns
 races <- c(
-  "White", "Black/African American", "American Indian/Alaska Native",
-  "Asian Non-Indian", "Asian Indian", "Native Hawaiian/Other Pacific Islander"
+  "White",
+  "Black/African American",
+  "American Indian/Alaska Native",
+  "Asian Non-Indian",
+  "Asian Indian",
+  "Native Hawaiian/Other Pacific Islander"
 )
 ethnicities <- c("Hispanic/Latino", "Not Hispanic/Latino", "N/A")
 df$Race <- apply(
-  df[, grep("Ethnic.Origin.Race", colnames(df))], 1,
+  df[, grep("Ethnic.Origin.Race", colnames(df))],
+  1,
   function(r) {
     paste0(races[which(r == "Checked")], collapse = "/")
   }
 )
 df$Race <- factor(df$Race, levels = races)
 df$Ethnicity <- apply(
-  df[, grep("Ethnicity", colnames(df))], 1,
+  df[, grep("Ethnicity", colnames(df))],
+  1,
   function(r) {
     paste0(ethnicities[which(r == "Checked")], collapse = "/")
   }
@@ -98,50 +107,74 @@ df <- df %>%
     "HbA1c" = Hemoglobin.A1c..,
     "Age" = Age.at.enrollment..years.,
     "Pancreatic insufficient" = Pancreatic.exocrine.insufficient,
-    "Weight (kg)" = Body.weight..kg., "Height (cm)" = Height..cm.,
+    "Weight (kg)" = Body.weight..kg.,
+    "Height (cm)" = Height..cm.,
     "Highest FEV1pp" = Highest.FEV1..last.12.months....FEV1.highest....,
-    "Second Highest FEV1pp" =
-      Second.Highest.FEV1..12.months....FEV1.2nd.highest....,
-    "Average of Highest FEV1pp" =
-      Average.of.the.two.highest.FEV1.s...Average.FEV1.......,
+    "Second Highest FEV1pp" = Second.Highest.FEV1..12.months....FEV1.2nd.highest....,
+    "Average of Highest FEV1pp" = Average.of.the.two.highest.FEV1.s...Average.FEV1.......,
   ) %>%
   mutate(
-    "Type 2 diabetes in the family - Father" =
-      factor(Type.2.diabetes.in.the.family...Father),
-    "Type 2 diabetes in the family - Mother" =
-      factor(Type.2.diabetes.in.the.family...Mother),
+    "Type 2 diabetes in the family - Father" = factor(
+      Type.2.diabetes.in.the.family...Father
+    ),
+    "Type 2 diabetes in the family - Mother" = factor(
+      Type.2.diabetes.in.the.family...Mother
+    ),
     "Brothers (number with diabetes)" = factor(Brothers..number.with.diabetes.),
     "Sisters (number with diabetes)" = factor(Sisters..number.with.diabetes.),
-    "Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)" =
-      Number.of.other.relatives.with.diabetes..aunts..uncles..cousins..grandparents.
+    "Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)" = Number.of.other.relatives.with.diabetes..aunts..uncles..cousins..grandparents.
   ) %>%
   select(
-    ID, HbA1c, Age, `Weight (kg)`, `Height (cm)`, BMI,
-    Gender, Race, Ethnicity, `Pancreatic insufficient`,
+    ID,
+    HbA1c,
+    Age,
+    `Weight (kg)`,
+    `Height (cm)`,
+    BMI,
+    Gender,
+    Race,
+    Ethnicity,
+    `Pancreatic insufficient`,
     `Type 2 diabetes in the family - Father`:`Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)`,
-    `Highest FEV1pp`, `Second Highest FEV1pp`, `Average of Highest FEV1pp`,
-    contains("GCT"), contains("OGTT "), "OGTT.Date.Time",
+    `Highest FEV1pp`,
+    `Second Highest FEV1pp`,
+    `Average of Highest FEV1pp`,
+    contains("GCT"),
+    contains("OGTT "),
+    "OGTT.Date.Time",
     "Study.visit.PFTs.Date."
   )
 # Remove C044
 df <- df %>% filter(ID != "C044")
 # Height, weight, BMI percentiles
-df$`Height %ile` <- sds(df$`Height (cm)`,
+df$`Height %ile` <- sds(
+  df$`Height (cm)`,
   age = ifelse(df$Age > 20, 20, df$Age),
-  item = "height2_20", ref = cdc.ref, type = "perc",
-  male = "Male", female = "Female",
+  item = "height2_20",
+  ref = cdc.ref,
+  type = "perc",
+  male = "Male",
+  female = "Female",
   sex = as.character(df$Gender)
 )
-df$`Weight %ile` <- sds(df$`Weight (kg)`,
+df$`Weight %ile` <- sds(
+  df$`Weight (kg)`,
   age = ifelse(df$Age > 20, 20, df$Age),
-  item = "weight2_20", ref = cdc.ref, type = "perc",
-  male = "Male", female = "Female",
+  item = "weight2_20",
+  ref = cdc.ref,
+  type = "perc",
+  male = "Male",
+  female = "Female",
   sex = as.character(df$Gender)
 )
-df$`BMI %ile` <- sds(df$BMI,
+df$`BMI %ile` <- sds(
+  df$BMI,
   age = ifelse(df$Age > 20, 20, df$Age),
-  item = "bmi", ref = cdc.ref, type = "perc",
-  male = "Male", female = "Female",
+  item = "bmi",
+  ref = cdc.ref,
+  type = "perc",
+  male = "Male",
+  female = "Female",
   sex = as.character(df$Gender)
 )
 df$`BMI Value (Adults Only)` <- df$BMI
@@ -166,28 +199,35 @@ df$Diagnosis[df$`OGTT 120 min` >= 140] <- "IGT"
 df$Diagnosis[df$`OGTT 120 min` >= 200] <- "CFRD"
 df[which(rowSums(is.na(df[, grep("OGTT", colnames(df))])) == 3), "Diagnosis"] <-
   NA
-df$Diagnosis <- factor(df$Diagnosis,
+df$Diagnosis <- factor(
+  df$Diagnosis,
   levels = c("NGT", "IFG", "INDET", "IGT", "CFRD")
 )
-df$Dysglycemia <- factor(df$Diagnosis,
+df$Dysglycemia <- factor(
+  df$Diagnosis,
   levels = c("NGT", "IFG", "INDET", "IGT", "CFRD"),
   labels = c("NGT", "AGT", "AGT", "AGT", "AGT")
 )
-df$Diabetes <- factor(df$Diagnosis,
+df$Diabetes <- factor(
+  df$Diagnosis,
   levels = c("NGT", "IFG", "INDET", "IGT", "CFRD"),
   labels = c("NGT", "Pre-CFRD", "Pre-CFRD", "Pre-CFRD", "CFRD")
 )
-df$CFRD <- factor(df$`OGTT 120 min` >= 200,
+df$CFRD <- factor(
+  df$`OGTT 120 min` >= 200,
   levels = c(F, T),
   labels = c("No", "Yes")
 )
 # Has OGTT vs. does not
 df$`Got OGTT and GCT?` <- apply(
-  df[, c("OGTT 120 min", "GCT 60 min plasma")], 1, function(r) {
+  df[, c("OGTT 120 min", "GCT 60 min plasma")],
+  1,
+  function(r) {
     !any(is.na(r))
   }
 )
-df$`Got OGTT and GCT?` <- factor(df$`Got OGTT and GCT?`,
+df$`Got OGTT and GCT?` <- factor(
+  df$`Got OGTT and GCT?`,
   levels = c(T, F),
   labels = c(
     "Have GCT 1 Hour Plasma and OGTT 2 Hour",
@@ -205,9 +245,11 @@ mycontrols <-
     cat.stats = c("N", "Nmiss2", "countpct")
   )
 # Write for Christine to check
-write.csv(df,
+write.csv(
+  df,
   file = "./Christine Chan/CFF GCT Study/Data_Clean/gct_analysis_data.csv",
-  row.names = F, na = ""
+  row.names = F,
+  na = ""
 )
 ```
 
@@ -220,18 +262,29 @@ write.csv(df,
 #| tbl-cap: Participant characteristics by OGTT status
 #| message: false
 # Basic table formula
-f <- ~ HbA1c + kwt(Age, "N", "Nmiss2", "medianq1q3", "range") +
-  kwt(`Weight (kg)`, "N", "Nmiss2", "medianq1q3", "range") + `Height (cm)` +
-  kwt(BMI, "N", "Nmiss2", "medianq1q3", "range") + Gender + fe(Race) +
-  fe(Ethnicity) + fe(`Pancreatic insufficient`) +
+f <- ~ HbA1c +
+  kwt(Age, "N", "Nmiss2", "medianq1q3", "range") +
+  kwt(`Weight (kg)`, "N", "Nmiss2", "medianq1q3", "range") +
+  `Height (cm)` +
+  kwt(BMI, "N", "Nmiss2", "medianq1q3", "range") +
+  Gender +
+  fe(Race) +
+  fe(Ethnicity) +
+  fe(`Pancreatic insufficient`) +
   fe(`Type 2 diabetes in the family - Father`) +
   fe(`Type 2 diabetes in the family - Mother`) +
-  fe(`Brothers (number with diabetes)`) + fe(`Sisters (number with diabetes)`) +
+  fe(`Brothers (number with diabetes)`) +
+  fe(`Sisters (number with diabetes)`) +
   kwt(
     `Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)`,
-    "N", "Nmiss2", "medianq1q3", "range"
+    "N",
+    "Nmiss2",
+    "medianq1q3",
+    "range"
   ) +
-  `Highest FEV1pp` + `Second Highest FEV1pp` + `Average of Highest FEV1pp` +
+  `Highest FEV1pp` +
+  `Second Highest FEV1pp` +
+  `Average of Highest FEV1pp` +
   kwt(`GCT 0 min plasma`, "N", "Nmiss2", "medianq1q3", "range") +
   kwt(`GCT 0 min capillary`, "N", "Nmiss2", "medianq1q3", "range") +
   kwt(`GCT 60 min plasma`, "N", "Nmiss2", "medianq1q3", "range") +
@@ -246,11 +299,19 @@ f <- ~ HbA1c + kwt(Age, "N", "Nmiss2", "medianq1q3", "range") +
   kwt(`Days From OGTT to GCT`, "N", "Nmiss2", "medianq1q3", "range") +
   kwt(
     `Days From OGTT to GCT (Absolute Value)`,
-    "N", "Nmiss2", "medianq1q3", "range"
+    "N",
+    "Nmiss2",
+    "medianq1q3",
+    "range"
   ) +
-  fe(Diagnosis) + fe(Dysglycemia) + fe(Diabetes) + fe(CFRD)
-t1a <- tableby(update(f, `Got OGTT and GCT?` ~ . - `Got OGTT and GCT?`),
-  data = df, control = mycontrols
+  fe(Diagnosis) +
+  fe(Dysglycemia) +
+  fe(Diabetes) +
+  fe(CFRD)
+t1a <- tableby(
+  update(f, `Got OGTT and GCT?` ~ . - `Got OGTT and GCT?`),
+  data = df,
+  control = mycontrols
 )
 summary(t1a, pfootnote = T, digits = 2)
 # Limit to 189 after this
@@ -265,8 +326,10 @@ df <- df %>%
 #| label: table1b
 #| tbl-cap: Participant characteristics by CFRD status
 #| message: false
-t1b <- tableby(update(f, Diabetes ~ . - Diabetes),
-  data = df, control = mycontrols
+t1b <- tableby(
+  update(f, Diabetes ~ . - Diabetes),
+  data = df,
+  control = mycontrols
 )
 summary(t1b, pfootnote = T, digits = 2)
 ```
@@ -275,7 +338,9 @@ summary(t1b, pfootnote = T, digits = 2)
 
 ```{r}
 pairwise.t.test(df$`Average of Highest FEV1pp`, df$Diabetes)
-pairwise.fisher.test(df$`Pancreatic insufficient`, df$Diabetes,
+pairwise.fisher.test(
+  df$`Pancreatic insufficient`,
+  df$Diabetes,
   p.adjust.method = "holm"
 )
 pairwise.t.test(df$HbA1c, df$Diabetes)
@@ -293,8 +358,10 @@ pairwise.wilcox.test(df$`Days From OGTT to GCT`, df$Diabetes)
 #| label: table1c
 #| tbl-cap: Participant characteristics by dysglycemia
 #| message: false
-t1c <- tableby(update(f, Dysglycemia ~ . - Dysglycemia),
-  data = df, control = mycontrols
+t1c <- tableby(
+  update(f, Dysglycemia ~ . - Dysglycemia),
+  data = df,
+  control = mycontrols
 )
 summary(t1c, pfootnote = T, digits = 2)
 ```
@@ -306,10 +373,13 @@ summary(t1c, pfootnote = T, digits = 2)
 # The code below is a total mess because Larry keeps sending requests -
 # clean up later
 plot_df <- df %>%
-  pivot_longer(c(`OGTT 0 min`, `OGTT 60 min`, `OGTT 120 min`),
-    names_to = "OGTT Timepoint", values_to = "Glucose"
+  pivot_longer(
+    c(`OGTT 0 min`, `OGTT 60 min`, `OGTT 120 min`),
+    names_to = "OGTT Timepoint",
+    values_to = "Glucose"
   )
-plot_df$`OGTT Timepoint` <- factor(plot_df$`OGTT Timepoint`,
+plot_df$`OGTT Timepoint` <- factor(
+  plot_df$`OGTT Timepoint`,
   levels = c("OGTT 0 min", "OGTT 60 min", "OGTT 120 min"),
   labels = c("Fasting", "OGTT-1hG", "OGTT-2hG")
 )
@@ -329,40 +399,56 @@ box_p <- ggplot(
     axis.title.x = element_blank()
   )
 box_p
-ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
+ggsave(
+  "./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
   box_p,
   device = "png"
 )
 # Dotplot
-dotplot <- ggplot(df, aes(
-  x = Diagnosis, y = `GCT 60 min plasma`,
-  colour = Diagnosis
-)) +
-  geom_point() +
+dotplot <- ggplot(
+  df,
+  aes(
+    x = Diagnosis,
+    y = `GCT 60 min plasma`
+  )
+) +
+  geom_jitter(width = 0.2) +
   geom_hline(yintercept = 130, linetype = "dashed") +
   geom_hline(yintercept = 160, linetype = "dashed") +
   geom_hline(yintercept = 147, linetype = "dashed", size = 1) +
   ylab("GCTpl (mg/dL)") +
   theme_bw() +
   scale_y_continuous(breaks = c(100, 130, 147, 160)) +
-  scale_color_manual(values = c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"))
+  scale_color_manual(
+    values = c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51")
+  )
 dotplot
-ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/dotplot.png",
+ggsave(
+  "./Christine Chan/CFF GCT Study/Dissemination/Figures/dotplot.png",
   dotplot,
-  height = 4, width = 6, units = "in", dpi = 600,
+  height = 4,
+  width = 6,
+  units = "in",
+  dpi = 600,
   device = "png"
 )
 # Additional boxplots/dotplot per Christine and Larry
 plot_df <- df %>%
   pivot_longer(
     c(
-      `OGTT 0 min`, `OGTT 120 min`, `GCT 60 min plasma`
+      `OGTT 0 min`,
+      `OGTT 120 min`,
+      `GCT 60 min plasma`
     ),
-    names_to = "OGTT Timepoint", values_to = "Glucose"
+    names_to = "OGTT Timepoint",
+    values_to = "Glucose"
   )
-plot_df$`OGTT Timepoint` <- factor(plot_df$`OGTT Timepoint`,
+plot_df$`OGTT Timepoint` <- factor(
+  plot_df$`OGTT Timepoint`,
   levels = c(
-    "OGTT 0 min", "OGTT 120 min", "GCT 60 min plasma"
+    "OGTT 0 min",
+    "OGTT 120 min",
+    "GCT 60 min plasma"
   ),
   labels = c("Fasting", "OGTT-2hG", "GCTpl")
 )
@@ -382,7 +468,8 @@ box_p <- ggplot(
     axis.title.x = element_blank()
   )
 box_p
-ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
+ggsave(
+  "./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
   box_p,
   device = "png"
 )
@@ -390,10 +477,14 @@ ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
 plot_df <- df %>%
   pivot_longer(
     c(
-      `GCT 0 min plasma`, `GCT 60 min plasma`, `GCT 0 min capillary`,
-      `GCT 60 min capillary`, HbA1c
+      `GCT 0 min plasma`,
+      `GCT 60 min plasma`,
+      `GCT 0 min capillary`,
+      `GCT 60 min capillary`,
+      HbA1c
     ),
-    names_to = "Measure", values_to = "Value"
+    names_to = "Measure",
+    values_to = "Value"
   )
 # Dotplot
 dot_rpg <- ggplot(
@@ -409,7 +500,8 @@ dot_rpg <- ggplot(
   scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
   theme(
     plot.title = element_text(hjust = 0.5),
-    axis.title.x = element_blank(), axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
     axis.ticks.x = element_blank()
   )
 dot_gctpl <- ggplot(
@@ -425,8 +517,10 @@ dot_gctpl <- ggplot(
   scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
   theme(
     plot.title = element_text(hjust = 0.5),
-    axis.title.y = element_blank(), axis.text.y = element_blank(),
-    axis.title.x = element_blank(), axis.text.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
     axis.ticks.x = element_blank()
   )
 dot_rcg <- ggplot(
@@ -440,9 +534,12 @@ dot_rcg <- ggplot(
   theme_bw(base_size = 15) +
   scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
   theme(
-    legend.position = "none", plot.title = element_text(hjust = 0.5),
-    axis.title.y = element_blank(), axis.text.y = element_blank(),
-    axis.title.x = element_blank(), axis.text.x = element_blank(),
+    legend.position = "none",
+    plot.title = element_text(hjust = 0.5),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
     axis.ticks.x = element_blank()
   )
 dot_gctcap <- ggplot(
@@ -457,9 +554,11 @@ dot_gctcap <- ggplot(
   scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
   theme(
     plot.title = element_text(hjust = 0.5),
-    axis.title.y = element_blank(), axis.text.y = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
     axis.ticks.y = element_blank(),
-    axis.title.x = element_blank(), axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
     axis.ticks.x = element_blank()
   )
 dot_hba1c <- ggplot(
@@ -474,30 +573,43 @@ dot_hba1c <- ggplot(
   scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
   scale_linetype_manual(values = c("Youden Index" = "dashed")) +
   theme(
-    legend.title = element_blank(), plot.title = element_text(hjust = 0.5),
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5),
     axis.text.x = element_blank(),
-    axis.title.x = element_blank(), axis.ticks.x = element_blank()
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
   )
-dot_p <- dot_rpg + dot_rcg + dot_gctpl + dot_gctcap + dot_hba1c +
+dot_p <- dot_rpg +
+  dot_rcg +
+  dot_gctpl +
+  dot_gctcap +
+  dot_hba1c +
   plot_layout(ncol = 5, guides = "collect")
-ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/dotplot2.png",
+ggsave(
+  "./Christine Chan/CFF GCT Study/Dissemination/Figures/dotplot2.png",
   dot_p,
-  height = 9, width = 12, units = "in", dpi = 600,
+  height = 9,
+  width = 12,
+  units = "in",
+  dpi = 600,
   device = "png"
 )
 # OGTT 1 hour and GCT 1 hour regression
 scatter_p <- ggplot(df, aes(x = `GCT 60 min plasma`, y = `OGTT 60 min`)) +
   geom_point() +
   stat_poly_line() +
-  stat_poly_eq(use_label(c("eq", "R2")),
+  stat_poly_eq(
+    use_label(c("eq", "R2")),
     size = 5,
-    label.y = "bottom", label.x = "right"
+    label.y = "bottom",
+    label.x = "right"
   ) +
   ylab("OGTT-1hG ") +
   xlab("GCTpl") +
   theme_bw(base_size = 20)
 scatter_p
-ggsave("./Christine Chan/CFF GCT Study/Dissemination/Figures/scatterplot.png",
+ggsave(
+  "./Christine Chan/CFF GCT Study/Dissemination/Figures/scatterplot.png",
   scatter_p,
   device = "png"
 )
@@ -524,13 +636,29 @@ rcg_roc <- roc(Dysglycemia ~ `GCT 0 min capillary`, data = df)
 a1c_roc <- roc(Dysglycemia ~ HbA1c, data = df)
 roc_table <-
   lapply(
-    list(gctpl_roc, gctcap_roc, ogtt0_roc, ogtt1_roc, rpg_roc, rcg_roc, a1c_roc),
+    list(
+      gctpl_roc,
+      gctcap_roc,
+      ogtt0_roc,
+      ogtt1_roc,
+      rpg_roc,
+      rcg_roc,
+      a1c_roc
+    ),
     function(roc) {
       coords(roc, "best", ret = "all")
     }
   )
 roc_table <- do.call(rbind, roc_table)
-rownames(roc_table) <- c("GCTpl", "GCTcap", "OGTT 0 min", "OGTT 1 hr", "RPG", "RCG", "A1c")
+rownames(roc_table) <- c(
+  "GCTpl",
+  "GCTcap",
+  "OGTT 0 min",
+  "OGTT 1 hr",
+  "RPG",
+  "RCG",
+  "A1c"
+)
 gt(roc_table, rownames_to_stub = T) %>% fmt_number(decimals = 3)
 ```
 
@@ -552,8 +680,10 @@ invisible(lapply(
 ```{r}
 gt(data.frame(coords(gctpl_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(gctpl_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(gctpl_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/GCTpl_dysglycemia.csv"
 )
 ```
@@ -563,8 +693,10 @@ write.csv(coords(gctpl_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(gctcap_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(gctcap_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(gctcap_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/GCTcap_dysglycemia.csv"
 )
 ```
@@ -574,8 +706,10 @@ write.csv(coords(gctcap_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(ogtt0_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(ogtt0_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(ogtt0_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/OGTT_0_dysglycemia.csv"
 )
 ```
@@ -585,8 +719,10 @@ write.csv(coords(ogtt0_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(ogtt1_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(ogtt1_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(ogtt1_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/OGTT_1_dysglycemia.csv"
 )
 ```
@@ -596,8 +732,10 @@ write.csv(coords(ogtt1_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(rpg_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(rpg_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(rpg_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/RPG_dysglycemia.csv"
 )
 ```
@@ -607,8 +745,10 @@ write.csv(coords(rpg_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(rcg_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(rcg_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(rcg_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/RCG_dysglycemia.csv"
 )
 ```
@@ -618,8 +758,10 @@ write.csv(coords(rcg_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(a1c_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(a1c_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(a1c_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/A1c_dysglycemia.csv"
 )
 ```
@@ -630,15 +772,18 @@ write.csv(coords(a1c_roc, "all", ret = "all"),
 #| label: tbl-roc-cutoffs
 #| tbl-cap: Sensitivity and specificity (95% bootstrap confidence intervals) to measure the performance of the glucose challenge test plasma glucose (GCTpl) to predict dysglycemia at different thresholds
 #| message: false
-gctpl_140 <- as.data.frame(ci.coords(gctpl_roc,
+gctpl_140 <- as.data.frame(ci.coords(
+  gctpl_roc,
   x = 140,
   ret = c("sensitivity", "specificity")
 ))
-gctpl_150 <- as.data.frame(ci.coords(gctpl_roc,
+gctpl_150 <- as.data.frame(ci.coords(
+  gctpl_roc,
   x = 150,
   ret = c("sensitivity", "specificity")
 ))
-gctpl_160 <- as.data.frame(ci.coords(gctpl_roc,
+gctpl_160 <- as.data.frame(ci.coords(
+  gctpl_roc,
   x = 160,
   ret = c("sensitivity", "specificity")
 ))
@@ -682,13 +827,29 @@ rcg_roc <- roc(CFRD ~ `GCT 0 min capillary`, data = df)
 a1c_roc <- roc(CFRD ~ HbA1c, data = df)
 roc_table <-
   lapply(
-    list(gctpl_roc, gctcap_roc, ogtt0_roc, ogtt1_roc, rpg_roc, rcg_roc, a1c_roc),
+    list(
+      gctpl_roc,
+      gctcap_roc,
+      ogtt0_roc,
+      ogtt1_roc,
+      rpg_roc,
+      rcg_roc,
+      a1c_roc
+    ),
     function(roc) {
       coords(roc, "best", ret = "all")
     }
   )
 roc_table <- do.call(rbind, roc_table)
-rownames(roc_table) <- c("GCTpl", "GCTcap", "OGTT 0 min", "OGTT 1 hr", "RPG", "RCG", "A1c")
+rownames(roc_table) <- c(
+  "GCTpl",
+  "GCTcap",
+  "OGTT 0 min",
+  "OGTT 1 hr",
+  "RPG",
+  "RCG",
+  "A1c"
+)
 gt(roc_table, rownames_to_stub = T) %>% fmt_number(decimals = 3)
 ```
 
@@ -710,8 +871,10 @@ invisible(lapply(
 ```{r}
 gt(data.frame(coords(gctpl_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(gctpl_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(gctpl_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/GCTpl_CFRD.csv"
 )
 ```
@@ -721,8 +884,10 @@ write.csv(coords(gctpl_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(gctcap_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(gctcap_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(gctcap_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/GCTcap_CFRD.csv"
 )
 ```
@@ -732,8 +897,10 @@ write.csv(coords(gctcap_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(ogtt0_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(ogtt0_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(ogtt0_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/OGTT_0_CFRD.csv"
 )
 ```
@@ -743,8 +910,10 @@ write.csv(coords(ogtt0_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(ogtt1_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(ogtt1_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(ogtt1_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/OGTT_1_CFRD.csv"
 )
 ```
@@ -754,8 +923,10 @@ write.csv(coords(ogtt1_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(rpg_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(rpg_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(rpg_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/RPG_CFRD.csv"
 )
 ```
@@ -765,8 +936,10 @@ write.csv(coords(rpg_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(rcg_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(rcg_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(rcg_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/RCG_CFRD.csv"
 )
 ```
@@ -776,8 +949,10 @@ write.csv(coords(rcg_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(a1c_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(a1c_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(a1c_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/A1c_CFRD.csv"
 )
 ```
@@ -787,7 +962,8 @@ write.csv(coords(a1c_roc, "all", ret = "all"),
 CFRD + INDET was defined as a one hour OGTT $\geq$ 200 mg/dL OR two hour OGTT $\geq$ 200 mg/dL.
 
 ```{r}
-df$CFRD_INDET <- factor(df$Diagnosis,
+df$CFRD_INDET <- factor(
+  df$Diagnosis,
   levels = c("NGT", "IFG", "INDET", "IGT", "CFRD"),
   labels = c("No", "No", "Yes", "No", "Yes")
 )
@@ -808,13 +984,29 @@ rcg_roc <- roc(CFRD_INDET ~ `GCT 0 min capillary`, data = df)
 a1c_roc <- roc(CFRD_INDET ~ HbA1c, data = df)
 roc_table <-
   lapply(
-    list(gctpl_roc, gctcap_roc, ogtt0_roc, ogtt1_roc, rpg_roc, rcg_roc, a1c_roc),
+    list(
+      gctpl_roc,
+      gctcap_roc,
+      ogtt0_roc,
+      ogtt1_roc,
+      rpg_roc,
+      rcg_roc,
+      a1c_roc
+    ),
     function(roc) {
       coords(roc, "best", ret = "all")
     }
   )
 roc_table <- do.call(rbind, roc_table)
-rownames(roc_table) <- c("GCTpl", "GCTcap", "OGTT 0 min", "OGTT 1 hr", "RPG", "RCG", "A1c")
+rownames(roc_table) <- c(
+  "GCTpl",
+  "GCTcap",
+  "OGTT 0 min",
+  "OGTT 1 hr",
+  "RPG",
+  "RCG",
+  "A1c"
+)
 gt(roc_table, rownames_to_stub = T) %>% fmt_number(decimals = 3)
 ```
 
@@ -836,8 +1028,10 @@ invisible(lapply(
 ```{r}
 gt(data.frame(coords(gctpl_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(gctpl_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(gctpl_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/GCTpl_CFRD_INDET.csv"
 )
 ```
@@ -847,8 +1041,10 @@ write.csv(coords(gctpl_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(gctcap_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(gctcap_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(gctcap_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/GCTcap_CFRD_INDET.csv"
 )
 ```
@@ -858,8 +1054,10 @@ write.csv(coords(gctcap_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(ogtt0_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(ogtt0_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(ogtt0_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/OGTT_0_CFRD_INDET.csv"
 )
 ```
@@ -869,8 +1067,10 @@ write.csv(coords(ogtt0_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(ogtt1_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(ogtt1_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(ogtt1_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/OGTT_1_CFRD_INDET.csv"
 )
 ```
@@ -880,8 +1080,10 @@ write.csv(coords(ogtt1_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(rpg_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(rpg_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(rpg_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/RPG_CFRD_INDET.csv"
 )
 ```
@@ -891,8 +1093,10 @@ write.csv(coords(rpg_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(rcg_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(rcg_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(rcg_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/RCG_CFRD_INDET.csv"
 )
 ```
@@ -902,8 +1106,10 @@ write.csv(coords(rcg_roc, "all", ret = "all"),
 ```{r}
 gt(data.frame(coords(a1c_roc, "all", ret = "all"))) %>%
   fmt_number(n_sigfig = 4)
-write.csv(coords(a1c_roc, "all", ret = "all"),
-  row.names = F, na = "",
+write.csv(
+  coords(a1c_roc, "all", ret = "all"),
+  row.names = F,
+  na = "",
   file = "./Christine Chan/CFF GCT Study/Reports/Tables/A1c_CFRD_INDET.csv"
 )
 ```
