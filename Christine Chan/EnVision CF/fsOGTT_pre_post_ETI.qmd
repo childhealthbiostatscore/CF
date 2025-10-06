@@ -44,7 +44,10 @@ gem <- read.csv(
     na.strings = ""
 )
 # ID linking from Monique
-ids <- read.csv("./Data_Clean/TV_ETI logitudinal patient list.csv", na.strings = "")
+ids <- read.csv(
+    "./Data_Clean/TV_ETI logitudinal patient list.csv",
+    na.strings = ""
+)
 ids <- ids %>%
     select(EnVision.ID, GEM.ID) %>%
     rename(`EnVision ID` = EnVision.ID, `GEM ID` = GEM.ID)
@@ -70,14 +73,29 @@ df$pre_post[df$study_id == "CC0028"] <- "Pre"
 df <- df %>%
     mutate(gem_id = NA, study = "EnVision CF") %>%
     select(
-        study_id, gem_id, study, Date, age_visit, sex, origin_race, ethnicity, CFTR,
-        pancreatic_status, corrector___4, pre_post, bmi, fev1,
-        Diagnosis, Glucose_0:Glucose_180, Insulin_0:Insulin_180,
+        study_id,
+        gem_id,
+        study,
+        Date,
+        age_visit,
+        sex,
+        origin_race,
+        ethnicity,
+        CFTR,
+        pancreatic_status,
+        corrector___4,
+        pre_post,
+        bmi,
+        fev1,
+        Diagnosis,
+        Glucose_0:Glucose_180,
+        Insulin_0:Insulin_180,
         C.Peptide_0:C.Peptide_180
     ) %>%
     unite(race_ethnicity, c(origin_race, ethnicity)) %>%
     rename(ETI = corrector___4)
-df$race_ethnicity <- factor(df$race_ethnicity,
+df$race_ethnicity <- factor(
+    df$race_ethnicity,
     levels = c(
         "American Indian or Alaska Native (N. S. & Central America)_Hispanic/Latino",
         "American Indian or Alaska Native (N. S. & Central America)_Not Hispanic/Latino",
@@ -92,11 +110,21 @@ df$race_ethnicity <- factor(df$race_ethnicity,
         "White (Europe, Middle East, North Africa)_Not Hispanic/Latino"
     ),
     labels = c(
-        "Hispanic", "Native American", "Black/African American", "Black/African American",
-        "Hispanic", "Other/Multiple", "Other/Multiple", "Other/Multiple", "Hispanic", "White", "White"
+        "Hispanic",
+        "Native American",
+        "Black/African American",
+        "Black/African American",
+        "Hispanic",
+        "Other/Multiple",
+        "Other/Multiple",
+        "Other/Multiple",
+        "Hispanic",
+        "White",
+        "White"
     )
 )
-df$pancreatic_status <- factor(df$pancreatic_status,
+df$pancreatic_status <- factor(
+    df$pancreatic_status,
     levels = 1:2,
     labels = c("Sufficient", "Insufficient")
 )
@@ -110,87 +138,199 @@ df[, grep("C.Peptide_.*", colnames(df))] <-
 gem <- gem %>%
     mutate(ETI = 0, pre_post = "Pre", study_id = NA, study = "GEM-CF") %>%
     select(
-        study_id, subject_id, study, date_of_visit, age_at_visit_1, gender,
-        race_ethnicity, cf_genotype, cf_pancreatic, ETI, pre_post, average_bmi,
-        fev1_percent, group_category, lab_ogtt_fasting, min_10_glucose,
-        min_30_glucose, lab_ogtt_1_hour_glucose, min_90_glucose,
-        lab_ogtt_2_hour_glucose, min_150_glucose, min_180_glucose,
-        min_0_insulin, min_10_insulin, min_30_insulin, min_60_insulin,
-        min_90_insulin, min_120_insulin, min_150_insulin, min_180_insulin,
-        min_0_c_peptide, min_10_c_peptide, min_30_c_peptide, min_60_c_peptide,
-        min_90_c_peptide, min_120_c_peptide, min_150_c_peptide, min_180_c_peptide
+        study_id,
+        subject_id,
+        study,
+        date_of_visit,
+        age_at_visit_1,
+        gender,
+        race_ethnicity,
+        cf_genotype,
+        cf_pancreatic,
+        ETI,
+        pre_post,
+        average_bmi,
+        fev1_percent,
+        group_category,
+        lab_ogtt_fasting,
+        min_10_glucose,
+        min_30_glucose,
+        lab_ogtt_1_hour_glucose,
+        min_90_glucose,
+        lab_ogtt_2_hour_glucose,
+        min_150_glucose,
+        min_180_glucose,
+        min_0_insulin,
+        min_10_insulin,
+        min_30_insulin,
+        min_60_insulin,
+        min_90_insulin,
+        min_120_insulin,
+        min_150_insulin,
+        min_180_insulin,
+        min_0_c_peptide,
+        min_10_c_peptide,
+        min_30_c_peptide,
+        min_60_c_peptide,
+        min_90_c_peptide,
+        min_120_c_peptide,
+        min_150_c_peptide,
+        min_180_c_peptide
     ) %>%
     rename(
-        gem_id = subject_id, Date = date_of_visit, age_visit = age_at_visit_1,
-        sex = gender, CFTR = cf_genotype, pancreatic_status = cf_pancreatic,
-        bmi = average_bmi, fev1 = fev1_percent, Diagnosis = group_category,
-        min_0_glucose = lab_ogtt_fasting, min_60_glucose = lab_ogtt_1_hour_glucose,
+        gem_id = subject_id,
+        Date = date_of_visit,
+        age_visit = age_at_visit_1,
+        sex = gender,
+        CFTR = cf_genotype,
+        pancreatic_status = cf_pancreatic,
+        bmi = average_bmi,
+        fev1 = fev1_percent,
+        Diagnosis = group_category,
+        min_0_glucose = lab_ogtt_fasting,
+        min_60_glucose = lab_ogtt_1_hour_glucose,
         min_120_glucose = lab_ogtt_2_hour_glucose
     ) %>%
     rename_with(
-        ~ paste0("Glucose_", parse_number(.)), min_0_glucose:min_180_glucose
+        ~ paste0("Glucose_", parse_number(.)),
+        min_0_glucose:min_180_glucose
     ) %>%
     rename_with(
-        ~ paste0("Insulin_", parse_number(.)), min_0_insulin:min_180_insulin
+        ~ paste0("Insulin_", parse_number(.)),
+        min_0_insulin:min_180_insulin
     ) %>%
     rename_with(
-        ~ paste0("C.Peptide_", parse_number(.)), min_0_c_peptide:min_180_c_peptide
+        ~ paste0("C.Peptide_", parse_number(.)),
+        min_0_c_peptide:min_180_c_peptide
     )
 # GEM factors
 gem$sex <- factor(gem$sex, levels = 1:2, labels = c("Male", "Female"))
-gem$race_ethnicity <- factor(gem$race_ethnicity,
+gem$race_ethnicity <- factor(
+    gem$race_ethnicity,
     levels = 1:6,
     labels = c(
-        "White", "Black/African American", "Asian", "Native American",
-        "Hispanic", "Other/Multiple"
+        "White",
+        "Black/African American",
+        "Asian",
+        "Native American",
+        "Hispanic",
+        "Other/Multiple"
     )
 )
-gem$CFTR <- factor(gem$CFTR,
+gem$CFTR <- factor(
+    gem$CFTR,
     levels = c(
-        "2184delA/M1101K", "2585delT/G551D", "3849+10kb C>T/F508del",
-        "508del/508del", "F508del/1078delA", "f508DEL/1154INStc",
-        "F508del/1154insTC", "F508del/1811 + 1634A > G", "F508del/1811+1634>G",
-        "F508del/2183delAA->G", "F508del/2183delAA>G", "F508del/2184insA",
-        "F508del/2711delT", "F508del/2789+5G>A", "F508del/27895GA",
-        "F508del/3659delC", "F508del/3849+10kbC>T", "F508del/394delTT",
-        "F508del/5492F", "F508del/A561E", "F508del/E60X",
-        "f508del/F508del", "F508del/F508del", "F508del/G542X",
-        "F508del/G551D", "F508del/N1303K", "F508del/Q98R",
-        "F508del/R1162X", "F508del/R117H 9T", "F508del/R117H 9T/5T",
-        "F508del/R553X", "F508del/R709X", "F508del/S492F",
-        "F508del/W1282X", "F5o8del/F508del", "G542X/1078delT",
-        "G542X/W1089X", "G551D/W846X", "I507del/G551D",
-        "N1303K/1154insTC", "N1303K/2789 + 5G > A", "N1303K/2789+5G>A",
-        "R117H 5t/G576A and R668C on exon 13", "R117H5t/G576A and R668C on exon 13",
-        "V520F/3791delC", "W1089X/S492F", "W1090X/S492F"
+        "2184delA/M1101K",
+        "2585delT/G551D",
+        "3849+10kb C>T/F508del",
+        "508del/508del",
+        "F508del/1078delA",
+        "f508DEL/1154INStc",
+        "F508del/1154insTC",
+        "F508del/1811 + 1634A > G",
+        "F508del/1811+1634>G",
+        "F508del/2183delAA->G",
+        "F508del/2183delAA>G",
+        "F508del/2184insA",
+        "F508del/2711delT",
+        "F508del/2789+5G>A",
+        "F508del/27895GA",
+        "F508del/3659delC",
+        "F508del/3849+10kbC>T",
+        "F508del/394delTT",
+        "F508del/5492F",
+        "F508del/A561E",
+        "F508del/E60X",
+        "f508del/F508del",
+        "F508del/F508del",
+        "F508del/G542X",
+        "F508del/G551D",
+        "F508del/N1303K",
+        "F508del/Q98R",
+        "F508del/R1162X",
+        "F508del/R117H 9T",
+        "F508del/R117H 9T/5T",
+        "F508del/R553X",
+        "F508del/R709X",
+        "F508del/S492F",
+        "F508del/W1282X",
+        "F5o8del/F508del",
+        "G542X/1078delT",
+        "G542X/W1089X",
+        "G551D/W846X",
+        "I507del/G551D",
+        "N1303K/1154insTC",
+        "N1303K/2789 + 5G > A",
+        "N1303K/2789+5G>A",
+        "R117H 5t/G576A and R668C on exon 13",
+        "R117H5t/G576A and R668C on exon 13",
+        "V520F/3791delC",
+        "W1089X/S492F",
+        "W1090X/S492F"
     ),
     labels = c(
-        "Other/Other", "Other/Other", "Other/Other", "F508del homozygous",
-        "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
-        "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
-        "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
-        "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
-        "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
-        "F508del heterozygous", "F508del heterozygous", "F508del homozygous",
-        "F508del homozygous", "F508del heterozygous", "F508del heterozygous",
-        "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
-        "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
-        "F508del heterozygous", "F508del heterozygous", "F508del heterozygous",
-        "F508del homozygous", "Other/Other", "Other/Other", "Other/Other",
-        "Other/Other", "Other/Other", "Other/Other", "Other/Other", "Other/Other",
-        "Other/Other", "Other/Other", "Other/Other", "Other/Other"
+        "Other/Other",
+        "Other/Other",
+        "Other/Other",
+        "F508del homozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del homozygous",
+        "F508del homozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del heterozygous",
+        "F508del homozygous",
+        "Other/Other",
+        "Other/Other",
+        "Other/Other",
+        "Other/Other",
+        "Other/Other",
+        "Other/Other",
+        "Other/Other",
+        "Other/Other",
+        "Other/Other",
+        "Other/Other",
+        "Other/Other",
+        "Other/Other"
     )
 )
-gem$pancreatic_status <- factor(gem$pancreatic_status,
+gem$pancreatic_status <- factor(
+    gem$pancreatic_status,
     levels = 1:2,
     labels = c("Sufficient", "Insufficient")
 )
 gem$ETI <- factor(gem$ETI, levels = 0:1, labels = c("No", "Yes"))
-gem$Diagnosis <- factor(gem$Diagnosis,
+gem$Diagnosis <- factor(
+    gem$Diagnosis,
     levels = 1:4,
     labels = c("Healthy Control", "NGT", "AGT", "CFRD")
 )
-df$Diagnosis <- factor(df$Diagnosis,
+df$Diagnosis <- factor(
+    df$Diagnosis,
     levels = c("NGT", "IFG", "IGT", "INDET", "CFRD"),
     labels = c("NGT", "AGT", "AGT", "AGT", "CFRD")
 )
@@ -205,8 +345,10 @@ df$pre_post <- factor(df$pre_post, levels = c("Pre", "Post"))
 df <- df %>% arrange(study_id, Date)
 # Calculate ODI, etc.
 # Write for checking
-write.csv(df,
+write.csv(
+    df,
     file = "./Data_Clean/fsOGTT_pre_post_ETI.csv",
-    row.names = F, na = ""
+    row.names = F,
+    na = ""
 )
 ```
