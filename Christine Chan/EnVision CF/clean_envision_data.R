@@ -652,21 +652,23 @@ final_df$iAUC180ins <- apply(final_df, 1, function(r) {
 label(final_df$iAUC180ins) <- "iAUC 180 Minute Insulin"
 # ODI
 final_df$odi <- final_df$iAUC30ins / final_df$iAUC30gluc
-label(final_df$odi) <- "Oral Disposition Index"
+label(final_df$odi) <- "Oral Disposition Index (Insulin)"
 # HOMA IR
 final_df$homa_ir <- (final_df$Glucose_0 * final_df$Insulin_0) / 405
 # Matsuda
 final_df$matsuda <- 10000 /
-  (((final_df$Glucose_0 / 18) * final_df$Insulin_0) *
-    ((rowMeans(
-      final_df[, paste0("Glucose_", c(0, 30, 60, 90, 120))],
-      na.rm = T
-    ) /
-      18) *
-      rowMeans(
-        final_df[, paste0("Insulin_", c(0, 30, 60, 90, 120))],
+  sqrt(
+    ((final_df$Glucose_0 / 18) * final_df$Insulin_0) *
+      ((rowMeans(
+        final_df[, paste0("Glucose_", c(0, 30, 60, 90, 120))],
         na.rm = T
-      )))
+      ) /
+        18) *
+        rowMeans(
+          final_df[, paste0("Insulin_", c(0, 30, 60, 90, 120))],
+          na.rm = T
+        ))
+  )
 # Check for hypoglycemia
 final_df$Hypo70 <-
   apply(final_df[, glucose], 1, function(r) {

@@ -1,41 +1,18 @@
----
-title: "fsOGTT Pre- and Post-ETI"
-author: "Tim Vigers"
-date: "today"
-date-format: long
-format:
-  html:
-    toc: true
-    toc-depth: 5
-    toc-float: true
-    code-fold: true
-    self-contained: true
-    fig-cap-location: top
-    page-layout: full
-editor: source
----
-
-```{r setup}
-#| include: false
 library(tidyverse)
 library(readxl)
-library(lmerTest)
-library(performance)
-library(gtsummary)
-library(emmeans)
-home_dir <- switch(Sys.info()["sysname"],
+library(Hmisc)
+library(pracma)
+home_dir <- switch(
+    Sys.info()["sysname"],
     "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF",
     "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Christine Chan/EnVision CF"
 )
-github_dir <- switch(Sys.info()["sysname"],
+github_dir <- switch(
+    Sys.info()["sysname"],
     "Darwin" = "/Users/timvigers/Documents/GitHub",
     "Linux" = "/home/timvigers/Documents/GitHub"
 )
-knitr::opts_knit$set(root.dir = home_dir)
-```
-
-```{r data cleaning}
-#| message: false
+setwd(home_dir)
 # Import cleaned EnVision data
 df <- read.csv("./Data_Clean/envision_analysis_dataset.csv", na.strings = "")
 # Import GEM data
@@ -84,6 +61,7 @@ df <- df %>%
         CFTR,
         pancreatic_status,
         corrector___4,
+        eti_start,
         pre_post,
         bmi,
         fev1,
@@ -135,6 +113,7 @@ df[, grep("C.Peptide_.*", colnames(df))] <-
         c * 0.003
     })
 # Select the same columns from GEM
+gem$eti_start = NA
 gem <- gem %>%
     mutate(ETI = 0, pre_post = "Pre", study_id = NA, study = "GEM-CF") %>%
     select(
@@ -148,6 +127,7 @@ gem <- gem %>%
         cf_genotype,
         cf_pancreatic,
         ETI,
+        eti_start,
         pre_post,
         average_bmi,
         fev1_percent,
@@ -343,7 +323,140 @@ gem <- gem %>% filter(gem_id %in% ids$`GEM ID`)
 df <- rbind(df, gem) %>% filter(!is.na(pre_post))
 df$pre_post <- factor(df$pre_post, levels = c("Pre", "Post"))
 df <- df %>% arrange(study_id, Date)
+# Columns
+glucose <- paste0("Glucose_", c(0, 10, 30, 60, 90, 120, 150, 180))
+insulin <- paste0("Insulin_", c(0, 10, 30, 60, 90, 120, 150, 180))
+# iAUCs
+df$iAUC30gluc <- apply(df, 1, function(r) {
+    y <- as.numeric(r[glucose[1:3]]) - as.numeric(r[glucose[1]])
+    if (is.na(first(y)) | is.na(last(y))) {
+        return(NA)
+    } else {
+        x <- c(0, 10, 30)[!is.na(y)]
+        y <- y[!is.na(y)]
+        auc <- trapz(x, y)
+        return(auc)
+    }
+})
+label(df$iAUC30gluc) <- "iAUC 30 Minute Glucose"
+df$iAUC60gluc <- apply(df, 1, function(r) {
+    y <- as.numeric(r[glucose[1:4]]) - as.numeric(r[glucose[1]])
+    if (is.na(first(y)) | is.na(last(y))) {
+        return(NA)
+    } else {
+        x <- c(0, 10, 30, 60)[!is.na(y)]
+        y <- y[!is.na(y)]
+        auc <- trapz(x, y)
+        return(auc)
+    }
+})
+label(df$iAUC60gluc) <- "iAUC 60 Minute Glucose"
+df$iAUC120gluc <- apply(df, 1, function(r) {
+    y <- as.numeric(r[glucose[1:6]]) - as.numeric(r[glucose[1]])
+    if (is.na(first(y)) | is.na(last(y))) {
+        return(NA)
+    } else {
+        x <- c(0, 10, 30, 60, 90, 120)[!is.na(y)]
+        y <- y[!is.na(y)]
+        auc <- trapz(x, y)
+        return(auc)
+    }
+})
+label(df$iAUC120gluc) <- "iAUC 120 Minute Glucose"
+df$iAUC180gluc <- apply(df, 1, function(r) {
+    y <- as.numeric(r[glucose]) - as.numeric(r[glucose[1]])
+    if (is.na(first(y)) | is.na(last(y))) {
+        return(NA)
+    } else {
+        x <- c(0, 10, 30, 60, 90, 120, 150, 180)[!is.na(y)]
+        y <- y[!is.na(y)]
+        auc <- trapz(x, y)
+        return(auc)
+    }
+})
+label(df$iAUC180gluc) <- "iAUC 180 Minute Glucose"
+df$iAUC30ins <- apply(df, 1, function(r) {
+    y <- as.numeric(r[insulin[1:3]]) - as.numeric(r[insulin[1]])
+    if (is.na(first(y)) | is.na(last(y))) {
+        return(NA)
+    } else {
+        x <- c(0, 10, 30)[!is.na(y)]
+        y <- y[!is.na(y)]
+        auc <- trapz(x, y)
+        return(auc)
+    }
+})
+label(df$iAUC30ins) <- "iAUC 30 Minute Insulin"
+df$iAUC60ins <- apply(df, 1, function(r) {
+    y <- as.numeric(r[insulin[1:4]]) - as.numeric(r[insulin[1]])
+    if (is.na(first(y)) | is.na(last(y))) {
+        return(NA)
+    } else {
+        x <- c(0, 10, 30, 60)[!is.na(y)]
+        y <- y[!is.na(y)]
+        auc <- trapz(x, y)
+        return(auc)
+    }
+})
+label(df$iAUC60ins) <- "iAUC 60 Minute Insulin"
+df$iAUC120ins <- apply(df, 1, function(r) {
+    y <- as.numeric(r[insulin[1:6]]) - as.numeric(r[insulin[1]])
+    if (is.na(first(y)) | is.na(last(y))) {
+        return(NA)
+    } else {
+        x <- c(0, 10, 30, 60, 90, 120)[!is.na(y)]
+        y <- y[!is.na(y)]
+        auc <- trapz(x, y)
+        return(auc)
+    }
+})
+label(df$iAUC120ins) <- "iAUC 120 Minute Insulin"
+df$iAUC180ins <- apply(df, 1, function(r) {
+    y <- as.numeric(r[insulin]) - as.numeric(r[insulin[1]])
+    if (is.na(first(y)) | is.na(last(y))) {
+        return(NA)
+    } else {
+        x <- c(0, 10, 30, 60, 90, 120, 150, 180)[!is.na(y)]
+        y <- y[!is.na(y)]
+        auc <- trapz(x, y)
+        return(auc)
+    }
+})
+label(df$iAUC180ins) <- "iAUC 180 Minute Insulin"
 # Calculate ODI, etc.
+df$iAUC30ins_over_gluc <- df$iAUC30ins / df$iAUC30gluc
+label(df$iAUC30ins_over_gluc) <- "iAUC30ins/iAUC30gluc"
+# HOMA IR
+df$homa_ir <- (df$Glucose_0 * df$Insulin_0) / 405
+# Matsuda
+df$matsuda <- 10000 /
+    sqrt(
+        ((df$Glucose_0 / 18) * df$Insulin_0) *
+            ((rowMeans(
+                df[, paste0("Glucose_", c(0, 30, 60, 90, 120))],
+                na.rm = T
+            ) /
+                18) *
+                rowMeans(
+                    df[, paste0("Insulin_", c(0, 30, 60, 90, 120))],
+                    na.rm = T
+                ))
+    )
+# Fill ETI start date
+df <- df %>%
+    group_by(study_id) %>%
+    # Fill ETI start date
+    fill(eti_start, .direction = "downup") %>%
+    # Calculate time from ETI start and create spline variable for knot at 0
+    mutate(
+        days_from_eti_start = as.numeric(difftime(
+            Date,
+            eti_start,
+            units = "days"
+        )),
+        slope_change = (days_from_eti_start > 0) * days_from_eti_start
+    )
+label(df$days_from_eti_start) <- "Days From ETI Start"
 # Write for checking
 write.csv(
     df,
@@ -351,4 +464,3 @@ write.csv(
     row.names = F,
     na = ""
 )
-```

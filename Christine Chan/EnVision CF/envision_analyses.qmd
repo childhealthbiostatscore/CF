@@ -59,6 +59,10 @@ df <- final_df %>%
 # Change specific diagnoses per Christine
 df$Diagnosis[df$study_id == "WU0019"] <- c("NGT", "NGT")
 df$Diagnosis[df$study_id == "IA0080"] <- "IGT"
+df$Dysglycemia[df$study_id == "WU0019"] <- c("NGT", "NGT")
+df$Dysglycemia[df$study_id == "IA0080"] <- "AGT"
+df$CFRD[df$study_id == "WU0019"] <- c("CFRD-", "CFRD-")
+df$CFRD[df$study_id == "IA0080"] <- "CFRD-"
 # Convert CV units to match Scully et al.
 df$cv <- df$cv * 100
 # First CGM and OGTT pair only
@@ -421,7 +425,12 @@ box_p1 <- ggplot(
     scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
 box_p2 <- ggplot(
     df,
-    aes(x = Dysglycemia, y = percent_time_over_180, colour = Dysglycemia)
+    aes(
+        x = Dysglycemia,
+        y = percent_time_over_180,
+        colour = Dysglycemia,
+        text = study_id
+    )
 ) +
     geom_jitter() +
     geom_hline(yintercept = 3.4, color = "red") +
@@ -437,7 +446,7 @@ box_p2 <- ggplot(
     scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
 box_p3 <- ggplot(
     df,
-    aes(x = Dysglycemia, y = mean_sensor, colour = Dysglycemia)
+    aes(x = Dysglycemia, y = mean_sensor, colour = Dysglycemia, text = study_id)
 ) +
     geom_jitter() +
     geom_hline(yintercept = 112, color = "red") +
@@ -453,7 +462,7 @@ box_p3 <- ggplot(
     scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
 box_p4 <- ggplot(
     df,
-    aes(x = Dysglycemia, y = cv, colour = Dysglycemia)
+    aes(x = Dysglycemia, y = cv, colour = Dysglycemia, text = study_id)
 ) +
     geom_jitter() +
     geom_hline(yintercept = 30.6, color = "red") +
@@ -469,7 +478,7 @@ box_p4 <- ggplot(
     scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
 box_p5 <- ggplot(
     df,
-    aes(x = Dysglycemia, y = a1c_result, colour = Dysglycemia)
+    aes(x = Dysglycemia, y = a1c_result, colour = Dysglycemia, text = study_id)
 ) +
     geom_jitter() +
     geom_hline(yintercept = 5.8, color = "red") +
@@ -487,8 +496,8 @@ box_p <- box_p1 + box_p2 + box_p4 + box_p3 + box_p5 + plot_layout(ncol = 5)
 box_p
 ggplotly(box_p1, tooltip = c("text"))
 ggplotly(box_p2, tooltip = c("text"))
-ggplotly(box_p4, tooltip = c("text"))
 ggplotly(box_p3, tooltip = c("text"))
+ggplotly(box_p4, tooltip = c("text"))
 ggplotly(box_p5, tooltip = c("text"))
 ```
 
