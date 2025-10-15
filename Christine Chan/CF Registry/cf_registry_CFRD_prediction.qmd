@@ -19,13 +19,14 @@ editor: source
 
 ```{r setup}
 #| include: false
+library(tidyverse)
 library(survival)
 library(nlme)
 library(JM)
-library(dplyr)
-library(tidyr)
 library(arsenal)
 library(knitr)
+library(ggforestplot)
+library(patchwork)
 home_dir <- switch(
   Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
@@ -103,7 +104,7 @@ demo$F508 <- factor(
 # Merge
 annual <- left_join(
   annual,
-  demo %>% select(eDWID, Race, Hispanicrace, Gender, F508, MutClass),
+  demo %>% dplyr::select(eDWID, Race, Hispanicrace, Gender, F508, MutClass),
   by = join_by(eDWID)
 )
 # Assume that missing data for CFRD means "CFRD-" (some of these will get filled in
@@ -177,7 +178,7 @@ predictors <- c(
 # Make datasets
 registry <- annual %>%
   filter(Age_YrEnd <= cfrd_registry_age) %>%
-  select(
+  dplyr::select(
     eDWID,
     ReviewYear,
     Age_YrEnd,
@@ -191,7 +192,13 @@ surv_reg <- annual %>%
   filter(Age_YrEnd <= cfrd_registry_age) %>%
   group_by(eDWID) %>%
   slice_max(row_number()) %>%
-  select(eDWID, ReviewYear, Age_YrEnd, all_of(predictors), cfrd_registry) %>%
+  dplyr::select(
+    eDWID,
+    ReviewYear,
+    Age_YrEnd,
+    all_of(predictors),
+    cfrd_registry
+  ) %>%
   drop_na() %>%
   distinct()
 reg_include <- intersect(registry$eDWID, surv_reg$eDWID)
@@ -264,16 +271,76 @@ event$p.value <- format.pval(event$p.value, eps = 0.001, digits = 3)
 # summary(joint_fit_both)
 kable(long, caption = "Longitudinal Process", digits = 3)
 kable(event, caption = "Event Process", digits = 3)
-```
 
-```{r}
-nd <- joint_fit_value$data
-nd$pred <- predict(
-  joint_fit_value,
-  registry[registry$eDWID %in% reg_include, ],
-  type = "Subject",
-  idVar = "eDWID"
+# Plots
+plot_df = lme_fit_a1c$data
+plot_df$pred = predict(lme_fit_a1c)
+p1 = ggplot(plot_df, aes(x = Age_YrEnd, y = pred)) +
+  geom_point(alpha = 0.1, shape = ".") +
+  geom_abline(intercept = 5.61, slope = 0.005895, color = "#3BA3BD") +
+  ylab("HbA1c (%)") +
+  xlab("Age (years)") +
+  ylim(c(2.5, 15)) +
+  ggtitle("Longitudinal Process") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+
+fp_df = data.frame(s$`CoefTable-Event`) %>%
+  rownames_to_column() %>%
+  filter(!rowname %in% c("(Intercept)", "log(shape)")) %>%
+  rename(estimate = "Value", term = "rowname") %>%
+  mutate(
+    conf.low = estimate - (1.96 * Std.Err),
+    conf.high = estimate + (1.96 * Std.Err)
+  )
+fp_df$term = factor(
+  fp_df$term,
+  levels = c(
+    "GenderF",
+    "RaceBlack or African American",
+    "RaceOther race",
+    "RaceMore than one race",
+    "HispanicraceNo",
+    "A_IsOnEnzymesNo",
+    "NumPulmExacerbation1",
+    "NumPulmExacerbation2",
+    "NumPulmExacerbation>=3",
+    "A_FEV1_pct_predicted",
+    "bmi",
+    "Assoct"
+  ),
+  labels = c(
+    "Female",
+    "Black or African American",
+    "Other race",
+    "More than one race",
+    "Hispanic",
+    "Pancreatic sufficient",
+    "1 PEx in past year",
+    "2 PEx in past year",
+    ">= 3 PEx in past year",
+    "FEV1 % predicted",
+    "BMI",
+    "Association Parameter*"
+  )
 )
+fp_df$term = as.character(fp_df$term)
+fp_df$variable = fp_df$p.value <= 0.05
+fp_df$estimate = exp(fp_df$estimate)
+fp_df$conf.low = exp(fp_df$conf.low)
+fp_df$conf.high = exp(fp_df$conf.high)
+p2 = forestplot(
+  df = fp_df,
+  name = term,
+  estimate = estimate,
+  se = Std.Err,
+  xlab = "Hazard ratio for CFRD",
+  title = "Event Process",
+  colour = variable
+) +
+  scale_color_manual(values = c("black", "#3BA3BD")) +
+  theme(legend.position = "none")
+p1 + p2
 ```
 
 # To do
