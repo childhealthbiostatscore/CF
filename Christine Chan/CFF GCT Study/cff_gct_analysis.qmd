@@ -492,7 +492,7 @@ dot_rpg <- ggplot(
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
   geom_jitter() +
-  geom_hline(yintercept = 91.5, linetype = "dashed", size = 1) +
+  geom_hline(yintercept = 94, linetype = "dashed", size = 1) +
   ylim(c(50, 300)) +
   ylab("Glucose (mg/dL)") +
   ggtitle("RPG") +
@@ -509,7 +509,7 @@ dot_gctpl <- ggplot(
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
   geom_jitter() +
-  geom_hline(yintercept = 140.5, linetype = "dashed", size = 1) +
+  geom_hline(yintercept = 147, linetype = "dashed", size = 1) +
   ylim(c(50, 300)) +
   ylab("Glucose (mg/dL)") +
   ggtitle("GCTpl") +
@@ -528,7 +528,7 @@ dot_rcg <- ggplot(
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
   geom_jitter() +
-  geom_hline(yintercept = 97.5, linetype = "dashed", size = 1) +
+  geom_hline(yintercept = 99, linetype = "dashed", size = 1) +
   ylim(c(50, 300)) +
   ggtitle("RCG") +
   theme_bw(base_size = 15) +
@@ -547,7 +547,7 @@ dot_gctcap <- ggplot(
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
   geom_jitter() +
-  geom_hline(yintercept = 161.5, linetype = "dashed", size = 1) +
+  geom_hline(yintercept = 201, linetype = "dashed", size = 1) +
   ylim(c(50, 300)) +
   ggtitle("GCTcap") +
   theme_bw(base_size = 15) +
@@ -566,7 +566,7 @@ dot_hba1c <- ggplot(
   aes(x = Diabetes, y = Value, fill = Diabetes, colour = Diabetes)
 ) +
   geom_jitter(show.legend = F) +
-  geom_hline(aes(yintercept = 5.45, linetype = "Youden Index"), size = 1) +
+  geom_hline(aes(yintercept = 5.5, linetype = "Youden Index"), size = 1) +
   ylab("%") +
   ggtitle("HbA1c") +
   theme_bw(base_size = 15) +
