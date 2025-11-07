@@ -1,0 +1,280 @@
+---
+title: "fsOGTT Pre- and Post-ETI"
+author: "Tim Vigers"
+date: "today"
+date-format: long
+format:
+  html:
+    toc: true
+    toc-depth: 5
+    toc-float: true
+    code-fold: true
+    self-contained: true
+    fig-cap-location: top
+    page-layout: full
+editor: source
+---
+
+```{r setup}
+#| include: false
+library(tidyverse)
+library(gtsummary)
+library(labelled)
+library(plotly)
+library(lmerTest)
+home_dir <- switch(
+  Sys.info()["sysname"],
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/EnVision CF",
+  "Linux" = "/home/tim/OneDrive/Vigers/CF/Christine Chan/EnVision CF"
+)
+github_dir <- switch(
+  Sys.info()["sysname"],
+  "Darwin" = "/Users/tim/Documents/GitHub",
+  "Windows" = "C:/Users/Tim/Documents/GitHub",
+  "Linux" = "/home/tim/Documents/GitHub"
+)
+knitr::opts_knit$set(root.dir = home_dir)
+```
+
+```{r data cleaning}
+# Import cleaned data
+load("./Data_Clean/fsOGTT_pre_post_ETI.RData")
+# Subset to people with more than one pre-ETI fsOGTT
+multi_pre_df = df |>
+  group_by(study_id) |>
+  mutate(
+    n_pre = sum(pre_post == "Pre"),
+    time_diff_first_last = as.numeric(difftime(
+      last(Date),
+      first(Date),
+      units = "days"
+    ))
+  ) |>
+  filter(n_pre > 1)
+var_label(multi_pre_df$n_pre) = "Number of fsOGTT pre-ETI"
+var_label(multi_pre_df$time_diff_first_last) = "Days From First to Last fsOGTT"
+# Save for Christine and Monique
+write.csv(
+  multi_pre_df,
+  file = "./Data_Clean/fsOGTT_pre_post_ETI.csv",
+  row.names = F,
+  na = ""
+)
+```
+
+# Participants with > 1 pre-ETI fsOGTT
+
+## Table 1: Participant characteristics at first fsOGTT
+
+```{r}
+#| label: tbl-1
+multi_pre_df |>
+  group_by(study_id) |>
+  filter(row_number() == 1) |>
+  ungroup() |>
+  select(
+    n_pre,
+    time_diff_first_last,
+    sex,
+    age_visit,
+    bmi,
+    bmi_adult,
+    bmi_perc,
+    fev1,
+    CFTR,
+    pancreatic_status,
+    Diagnosis,
+    Insulin_0,
+    Glucose_0,
+    igi,
+    iAUC30ins_over_gluc,
+    iAUC120ins_over_gluc,
+    iAUC180ins_over_gluc,
+    odi_igi,
+    odi_iauc
+  ) |>
+  tbl_summary(type = c("Insulin_0") ~ "continuous")
+```
+
+## IGI (delta 30min insulin/delta 30min glucose)
+
+```{r}
+#| warning: false
+# Plot
+p = ggplot(
+  multi_pre_df,
+  aes(x = years_from_eti_start, y = igi, group = study_id, color = study_id)
+) +
+  geom_point() +
+  geom_line() +
+  theme_bw()
+ggplotly(p)
+# Model
+m = lmer(
+  igi ~ years_from_eti_start_model + slope_change + (1 | study_id),
+  data = multi_pre_df
+)
+m |>
+  tbl_regression(
+    exponentiate = F,
+    estimate_fun = label_style_sigfig(digits = 4),
+    pvalue_fun = label_style_pvalue(digits = 2),
+  )
+```
+
+## iAUC30ins/iAUC30gluc
+
+```{r}
+#| warning: false
+# Plot
+p = ggplot(
+  multi_pre_df,
+  aes(
+    x = years_from_eti_start,
+    y = iAUC30ins_over_gluc,
+    group = study_id,
+    color = study_id
+  )
+) +
+  geom_point() +
+  geom_line() +
+  theme_bw()
+ggplotly(p)
+# Model
+m = lmer(
+  iAUC30ins_over_gluc ~ years_from_eti_start_model +
+    slope_change +
+    (1 | study_id),
+  data = multi_pre_df
+)
+m |>
+  tbl_regression(
+    exponentiate = F,
+    estimate_fun = label_style_sigfig(digits = 4),
+    pvalue_fun = label_style_pvalue(digits = 2),
+  )
+```
+
+## iAUC120ins/iAUC120gluc
+
+```{r}
+#| warning: false
+# Plot
+p = ggplot(
+  multi_pre_df,
+  aes(
+    x = years_from_eti_start,
+    y = iAUC120ins_over_gluc,
+    group = study_id,
+    color = study_id
+  )
+) +
+  geom_point() +
+  geom_line() +
+  theme_bw()
+ggplotly(p)
+# Model
+m = lmer(
+  iAUC120ins_over_gluc ~ years_from_eti_start_model +
+    slope_change +
+    (1 | study_id),
+  data = multi_pre_df
+)
+m |>
+  tbl_regression(
+    exponentiate = F,
+    estimate_fun = label_style_sigfig(digits = 4),
+    pvalue_fun = label_style_pvalue(digits = 2),
+  )
+```
+
+## iAUC180ins/iAUC180gluc
+
+```{r}
+#| warning: false
+# Plot
+p = ggplot(
+  multi_pre_df,
+  aes(
+    x = years_from_eti_start,
+    y = iAUC180ins_over_gluc,
+    group = study_id,
+    color = study_id
+  )
+) +
+  geom_point() +
+  geom_line() +
+  theme_bw()
+ggplotly(p)
+# Model
+m = lmer(
+  iAUC180ins_over_gluc ~ years_from_eti_start_model +
+    slope_change +
+    (1 | study_id),
+  data = multi_pre_df
+)
+m |>
+  tbl_regression(
+    exponentiate = F,
+    estimate_fun = label_style_sigfig(digits = 4),
+    pvalue_fun = label_style_pvalue(digits = 2),
+  )
+```
+
+## ODI (IGI*Matsuda)
+
+```{r}
+#| warning: false
+# Plot
+p = ggplot(
+  multi_pre_df,
+  aes(x = years_from_eti_start, y = odi_igi, group = study_id, color = study_id)
+) +
+  geom_point() +
+  geom_line() +
+  theme_bw()
+ggplotly(p)
+# Model
+m = lmer(
+  odi_igi ~ years_from_eti_start_model + slope_change + (1 | study_id),
+  data = multi_pre_df
+)
+m |>
+  tbl_regression(
+    exponentiate = F,
+    estimate_fun = label_style_sigfig(digits = 4),
+    pvalue_fun = label_style_pvalue(digits = 2),
+  )
+```
+
+## ODI [(iAUC30ins/iAUC30gluc)*Matsuda]
+
+```{r}
+#| warning: false
+# Plot
+p = ggplot(
+  multi_pre_df,
+  aes(
+    x = years_from_eti_start,
+    y = odi_iauc,
+    group = study_id,
+    color = study_id
+  )
+) +
+  geom_point() +
+  geom_line() +
+  theme_bw()
+ggplotly(p)
+# Model
+m = lmer(
+  odi_iauc ~ years_from_eti_start_model + slope_change + (1 | study_id),
+  data = multi_pre_df
+)
+m |>
+  tbl_regression(
+    exponentiate = F,
+    estimate_fun = label_style_sigfig(digits = 4),
+    pvalue_fun = label_style_pvalue(digits = 2),
+  )
+```

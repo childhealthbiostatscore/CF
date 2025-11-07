@@ -1,7 +1,8 @@
 library(tidyverse)
 library(readxl)
-library(Hmisc)
+library(labelled)
 library(pracma)
+library(childsds)
 home_dir <- switch(
     Sys.info()["sysname"],
     "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/EnVision CF",
@@ -338,7 +339,7 @@ df$iAUC30gluc <- apply(df, 1, function(r) {
         return(auc)
     }
 })
-label(df$iAUC30gluc) <- "iAUC 30 Minute Glucose"
+var_label(df$iAUC30gluc) <- "iAUC 30 Minute Glucose"
 df$iAUC60gluc <- apply(df, 1, function(r) {
     y <- as.numeric(r[glucose[1:4]]) - as.numeric(r[glucose[1]])
     if (is.na(first(y)) | is.na(last(y))) {
@@ -350,7 +351,7 @@ df$iAUC60gluc <- apply(df, 1, function(r) {
         return(auc)
     }
 })
-label(df$iAUC60gluc) <- "iAUC 60 Minute Glucose"
+var_label(df$iAUC60gluc) <- "iAUC 60 Minute Glucose"
 df$iAUC120gluc <- apply(df, 1, function(r) {
     y <- as.numeric(r[glucose[1:6]]) - as.numeric(r[glucose[1]])
     if (is.na(first(y)) | is.na(last(y))) {
@@ -362,7 +363,7 @@ df$iAUC120gluc <- apply(df, 1, function(r) {
         return(auc)
     }
 })
-label(df$iAUC120gluc) <- "iAUC 120 Minute Glucose"
+var_label(df$iAUC120gluc) <- "iAUC 120 Minute Glucose"
 df$iAUC180gluc <- apply(df, 1, function(r) {
     y <- as.numeric(r[glucose]) - as.numeric(r[glucose[1]])
     if (is.na(first(y)) | is.na(last(y))) {
@@ -374,7 +375,7 @@ df$iAUC180gluc <- apply(df, 1, function(r) {
         return(auc)
     }
 })
-label(df$iAUC180gluc) <- "iAUC 180 Minute Glucose"
+var_label(df$iAUC180gluc) <- "iAUC 180 Minute Glucose"
 df$iAUC30ins <- apply(df, 1, function(r) {
     y <- as.numeric(r[insulin[1:3]]) - as.numeric(r[insulin[1]])
     if (is.na(first(y)) | is.na(last(y))) {
@@ -386,7 +387,7 @@ df$iAUC30ins <- apply(df, 1, function(r) {
         return(auc)
     }
 })
-label(df$iAUC30ins) <- "iAUC 30 Minute Insulin"
+var_label(df$iAUC30ins) <- "iAUC 30 Minute Insulin"
 df$iAUC60ins <- apply(df, 1, function(r) {
     y <- as.numeric(r[insulin[1:4]]) - as.numeric(r[insulin[1]])
     if (is.na(first(y)) | is.na(last(y))) {
@@ -398,7 +399,7 @@ df$iAUC60ins <- apply(df, 1, function(r) {
         return(auc)
     }
 })
-label(df$iAUC60ins) <- "iAUC 60 Minute Insulin"
+var_label(df$iAUC60ins) <- "iAUC 60 Minute Insulin"
 df$iAUC120ins <- apply(df, 1, function(r) {
     y <- as.numeric(r[insulin[1:6]]) - as.numeric(r[insulin[1]])
     if (is.na(first(y)) | is.na(last(y))) {
@@ -410,7 +411,7 @@ df$iAUC120ins <- apply(df, 1, function(r) {
         return(auc)
     }
 })
-label(df$iAUC120ins) <- "iAUC 120 Minute Insulin"
+var_label(df$iAUC120ins) <- "iAUC 120 Minute Insulin"
 df$iAUC180ins <- apply(df, 1, function(r) {
     y <- as.numeric(r[insulin]) - as.numeric(r[insulin[1]])
     if (is.na(first(y)) | is.na(last(y))) {
@@ -422,12 +423,19 @@ df$iAUC180ins <- apply(df, 1, function(r) {
         return(auc)
     }
 })
-label(df$iAUC180ins) <- "iAUC 180 Minute Insulin"
+var_label(df$iAUC180ins) <- "iAUC 180 Minute Insulin"
 # Calculate ODI, etc.
 df$iAUC30ins_over_gluc <- df$iAUC30ins / df$iAUC30gluc
-label(df$iAUC30ins_over_gluc) <- "iAUC30ins/iAUC30gluc"
+var_label(df$iAUC30ins_over_gluc) <- "iAUC30ins/iAUC30gluc"
+df$iAUC120ins_over_gluc <- df$iAUC120ins / df$iAUC120gluc
+var_label(df$iAUC120ins_over_gluc) <- "iAUC120ins/iAUC120gluc"
+df$iAUC180ins_over_gluc <- df$iAUC180ins / df$iAUC180gluc
+var_label(df$iAUC180ins_over_gluc) <- "iAUC180ins/iAUC180gluc"
+df$igi = (df$Insulin_30 - df$Insulin_0) / (df$Glucose_30 - df$Glucose_0)
+var_label(df$igi) <- "IGI (delta 30min insulin/delta 30min glucose)"
 # HOMA IR
 df$homa_ir <- (df$Glucose_0 * df$Insulin_0) / 405
+var_label(df$homa_ir) <- "HOMA-IR"
 # Matsuda
 df$matsuda <- 10000 /
     sqrt(
@@ -442,6 +450,13 @@ df$matsuda <- 10000 /
                     na.rm = T
                 ))
     )
+var_label(df$matsuda) <- "Matsuda Index"
+# IGIxMatsuda
+df$odi_igi = df$igi * df$matsuda
+var_label(df$odi_igi) <- "ODI (IGI*Matsuda)"
+# iAUCins30/iAUCglc30xMatsuda
+df$odi_iauc = df$iAUC30ins_over_gluc * df$matsuda
+var_label(df$odi_iauc) <- "ODI [(iAUC30ins/iAUC30gluc)*Matsuda]"
 # Fill ETI start date
 df <- df %>%
     group_by(study_id) %>%
@@ -449,18 +464,46 @@ df <- df %>%
     fill(eti_start, .direction = "downup") %>%
     # Calculate time from ETI start and create spline variable for knot at 0
     mutate(
-        days_from_eti_start = as.numeric(difftime(
+        years_from_eti_start = as.numeric(difftime(
             Date,
             eti_start,
             units = "days"
-        )),
-        slope_change = (days_from_eti_start > 0) * days_from_eti_start
+        )) /
+            365.25,
+        slope_change = (years_from_eti_start > 0) * years_from_eti_start
     )
-label(df$days_from_eti_start) <- "Days From ETI Start"
+df$years_from_eti_start_model = df$years_from_eti_start
+var_label(df$years_from_eti_start) <- "Years From ETI Start"
+var_label(
+    df$years_from_eti_start_model
+) <- "Slope (Average Change per Year) Pre-ETI"
+var_label(df$slope_change) <- "Change in Slope Post-ETI"
+# Calculate BMI percentiles
+df$bmi_perc = sds(
+    value = df$bmi,
+    age = df$age_visit,
+    sex = df$sex,
+    item = "bmi",
+    type = "perc",
+    male = "Male",
+    female = "Female",
+    ref = cdc.ref
+) *
+    100
+# Raw values for adults
+df$bmi_adult = df$bmi
+df$bmi_adult[df$age_visit <= 20] = NA
+# More labels
+var_label(df$age_visit) = "Age (years)"
+var_label(df$bmi) = "BMI (all participants)"
+var_label(df$bmi_perc) = "BMI percentile (age <= 20)"
+var_label(df$bmi_adult) = "BMI value (age > 20)"
+var_label(df$fev1) = "FEV1 % predicted"
+var_label(df$pancreatic_status) = "Pancreatic"
+# Other formatting
+df$Diagnosis = droplevels(df$Diagnosis)
 # Write for checking
-write.csv(
+save(
     df,
-    file = "./Data_Clean/fsOGTT_pre_post_ETI.csv",
-    row.names = F,
-    na = ""
+    file = "./Data_Clean/fsOGTT_pre_post_ETI.RData"
 )

@@ -26,6 +26,8 @@ library(gtsummary)
 library(gt)
 library(pROC)
 library(ggrepel)
+library(childsds)
+library(labelled)
 home_dir <- switch(
   Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
@@ -112,48 +114,6 @@ annual <- read.csv(
 )
 annual <- annual %>% rename(reviewyear = ReviewYear)
 annual <- left_join(annual, demo %>% select(eDWID, Gender), by = join_by(eDWID))
-# Get BMI group_by
-annual$bmi_cat <- apply(annual, 1, function(r) {
-  age <- as.numeric(r["Age_YrEnd"])
-  gender <- as.character(r["Gender"])
-  bmi <- as.numeric(r["A_bmivalue"])
-  bmi_perc <- as.numeric(r["A_bmipercentile"])
-  if (age <= 20) {
-    return(cut(
-      bmi_perc,
-      c(-Inf, 10, 50, 85, Inf),
-      right = F,
-      labels = c("Undernourished", "At Risk", "Target/Goal", "Overweight")
-    ))
-  } else if (age > 20) {
-    if (gender == "M") {
-      return(cut(
-        bmi,
-        c(-Inf, 18.5, 23, 25, Inf),
-        right = F,
-        labels = c(
-          "Undernourished",
-          "At Risk",
-          "Target/Goal",
-          "Overweight"
-        )
-      ))
-    } else if (gender == "F") {
-      return(cut(
-        bmi,
-        c(-Inf, 18.5, 22, 25, Inf),
-        right = F,
-        labels = c(
-          "Undernourished",
-          "At Risk",
-          "Target/Goal",
-          "Overweight"
-        )
-      ))
-    }
-  }
-})
-annual$bmi_cat <- relevel(annual$bmi_cat, ref = "Target/Goal")
 # Merge
 encounter <- left_join(
   encounter,
@@ -168,7 +128,6 @@ encounter <- left_join(
       reviewyear,
       Age_YrEnd,
       A_IsOnEnzymes,
-      bmi_cat,
       A_FEV1_pct_predicted,
       A_FVC_pct_predicted
     ),
@@ -205,9 +164,6 @@ roc_df <- encounter %>%
     Vx809comb,
     height,
     weight,
-    bmivalue,
-    bmipercentile,
-    bmi_cat,
     A_FEV1_pct_predicted,
     A_FVC_pct_predicted,
     hgba1c,
@@ -242,6 +198,69 @@ roc_df <- encounter %>%
     ),
     `Age Group` = cut(Age_YrEnd, breaks = c(10, 18, 30, Inf), right = F)
   )
+# Calculate BMI percentiles
+roc_df$bmi = roc_df$weight / ((roc_df$height / 100)^2)
+roc_df$bmi_perc = sds(
+  value = roc_df$bmi,
+  age = roc_df$Age_YrEnd,
+  sex = roc_df$Gender,
+  item = "bmi",
+  type = "perc",
+  male = "M",
+  female = "F",
+  ref = cdc.ref
+) *
+  100
+# Raw values for adults
+roc_df$bmi_adult = roc_df$bmi
+roc_df$bmi_adult[roc_df$Age_YrEnd > 20] = NA
+# Get BMI group
+roc_df$bmi_cat <- apply(roc_df, 1, function(r) {
+  age <- as.numeric(r["Age_YrEnd"])
+  gender <- as.character(r["Gender"])
+  bmi <- as.numeric(r["bmi"])
+  bmi_perc <- as.numeric(r["bmi_perc"])
+  if (age <= 20) {
+    return(cut(
+      bmi_perc,
+      c(-Inf, 10, 50, 85, Inf),
+      right = F,
+      labels = c("Undernourished", "At Risk", "Target/Goal", "Overweight")
+    ))
+  } else if (age > 20) {
+    if (gender == "M") {
+      return(cut(
+        bmi,
+        c(-Inf, 18.5, 23, 25, Inf),
+        right = F,
+        labels = c(
+          "Undernourished",
+          "At Risk",
+          "Target/Goal",
+          "Overweight"
+        )
+      ))
+    } else if (gender == "F") {
+      return(cut(
+        bmi,
+        c(-Inf, 18.5, 22, 25, Inf),
+        right = F,
+        labels = c(
+          "Undernourished",
+          "At Risk",
+          "Target/Goal",
+          "Overweight"
+        )
+      ))
+    }
+  }
+})
+roc_df$bmi_cat <- relevel(roc_df$bmi_cat, ref = "Target/Goal")
+# Labels
+var_label(roc_df$bmi) = "BMI (all participants)"
+var_label(roc_df$bmi_perc) = "BMI percentile (age <= 20)"
+var_label(roc_df$bmi_adult) = "BMI value (age > 20)"
+var_label(roc_df$bmi_cat) = "BMI category"
 ```
 
 ```{r}
@@ -1592,7 +1611,7 @@ plot_df <- annual %>%
     `Years to CFRD or Last Visit` = case_when(
       Diagnosis == 3 ~
         Age_YrEnd -
-          first(Age_YrEnd[cfrd_status_annual == 3]),
+        first(Age_YrEnd[cfrd_status_annual == 3]),
       .default = Age_YrEnd - max(Age_YrEnd, na.rm = T)
     )
   )
