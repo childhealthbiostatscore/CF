@@ -112,17 +112,17 @@ annual <- read.csv(
   "./Data_Raw/CFF19_Annualized_Del1.csv",
   na.strings = c("", "N/A")
 )
-annual <- annual %>% rename(reviewyear = ReviewYear)
-annual <- left_join(annual, demo %>% select(eDWID, Gender), by = join_by(eDWID))
+annual <- annual |> rename(reviewyear = ReviewYear)
+annual <- left_join(annual, demo |> select(eDWID, Gender), by = join_by(eDWID))
 # Merge
 encounter <- left_join(
   encounter,
-  demo %>% select(eDWID, Race, Hispanicrace, Gender, F508, MutClass),
+  demo |> select(eDWID, Race, Hispanicrace, Gender, F508, MutClass),
   by = join_by(eDWID)
 )
 encounter <- left_join(
   encounter,
-  annual %>%
+  annual |>
     select(
       eDWID,
       reviewyear,
@@ -148,8 +148,8 @@ encounter$Vx809comb <- factor(
 )
 # Limit to those with two hour OGTT and HbA1c at the same encounter
 # Also remove years before 2010 and those under age 10
-roc_df <- encounter %>%
-  arrange(eDWID, reviewyear, encounternum) %>%
+roc_df <- encounter |>
+  arrange(eDWID, reviewyear, encounternum) |>
   select(
     eDWID,
     reviewyear,
@@ -168,13 +168,15 @@ roc_df <- encounter %>%
     A_FVC_pct_predicted,
     hgba1c,
     fast_bloodglucose,
-    twohour_bloodglucose
-  ) %>%
+    twohour_bloodglucose,
+    Vx770,
+    Vx809comb
+  ) |>
   filter(
     reviewyear >= 2010,
     Age_YrEnd >= 10,
     hgba1c >= 3.5 & hgba1c <= 15
-  ) %>%
+  ) |>
   drop_na(
     eDWID,
     reviewyear,
@@ -186,10 +188,10 @@ roc_df <- encounter %>%
     MutClass,
     twohour_bloodglucose,
     hgba1c
-  ) %>%
-  group_by(eDWID) %>%
-  filter(row_number() == n()) %>%
-  ungroup() %>%
+  ) |>
+  group_by(eDWID) |>
+  filter(row_number() == n()) |>
+  ungroup() |>
   mutate(
     `OGTT 2-hour` = cut(
       twohour_bloodglucose,
@@ -266,6 +268,8 @@ var_label(roc_df$bmi_cat) = "BMI category"
 ```{r}
 # Plotting function
 roc_plot <- function(roc_obj) {
+  a <- ci.auc(roc_obj)
+  a <- round(as.numeric(a[1:3]), 2)
   c <- coords(roc_obj, "best")
   plot_df <- coords(roc_obj)
   point_df <- plot_df[plot_df$threshold == as.numeric(c[1]), ]
@@ -278,10 +282,17 @@ roc_plot <- function(roc_obj) {
     c[2],
     "\n",
     "Sensitivity: ",
-    c[3]
+    c[3],
+    "\n",
+    "AUC: ",
+    a[2],
+    " (95%CI: ",
+    a[1],
+    ", ",
+    a[3],
+    ")"
   )
-  p <- ggplot(plot_df, aes(x = specificity, y = sensitivity)) +
-    scale_x_reverse() +
+  p <- ggplot(plot_df, aes(x = 1 - specificity, y = sensitivity)) +
     geom_line() +
     geom_point(data = point_df) +
     geom_label_repel(
@@ -291,7 +302,7 @@ roc_plot <- function(roc_obj) {
       segment.color = "grey50",
       size = 5
     ) +
-    xlab("Specificity") +
+    xlab("1-Specificity") +
     ylab("Sensitivity") +
     theme_bw(base_size = 20)
   return(p)
@@ -311,8 +322,8 @@ roc_plot <- function(roc_obj) {
 ## By two hour OGTT value
 
 ```{r}
-roc_df %>%
-  select(-eDWID) %>%
+roc_df |>
+  select(-eDWID) |>
   tbl_summary(
     by = `OGTT 2-hour`,
     missing_text = "Missing",
@@ -331,13 +342,13 @@ roc_df %>%
       reviewyear = "Year",
       Age_YrEnd = "Age at Year End"
     )
-  ) %>%
-  add_overall() %>%
+  ) |>
+  add_overall() |>
   add_p(
     test = list(reviewyear = "fisher.test"),
     test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
-  ) %>%
-  separate_p_footnotes() %>%
+  ) |>
+  separate_p_footnotes() |>
   as_gt()
 ```
 
@@ -346,10 +357,10 @@ roc_df %>%
 #### <140 vs. [140,200)
 
 ```{r}
-roc_df %>%
-  select(`OGTT 2-hour`, Gender, MutClass, hgba1c) %>%
-  filter(`OGTT 2-hour` != ">=200") %>%
-  mutate(`OGTT 2-hour` = droplevels(`OGTT 2-hour`)) %>%
+roc_df |>
+  select(`OGTT 2-hour`, Gender, MutClass, hgba1c) |>
+  filter(`OGTT 2-hour` != ">=200") |>
+  mutate(`OGTT 2-hour` = droplevels(`OGTT 2-hour`)) |>
   tbl_summary(
     by = `OGTT 2-hour`,
     missing_text = "Missing",
@@ -365,23 +376,23 @@ roc_df %>%
       reviewyear = "Year",
       Age_YrEnd = "Age at Year End"
     )
-  ) %>%
-  add_overall() %>%
+  ) |>
+  add_overall() |>
   add_p(
     test = list(reviewyear = "fisher.test"),
     test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
-  ) %>%
-  separate_p_footnotes() %>%
+  ) |>
+  separate_p_footnotes() |>
   as_gt()
 ```
 
 #### [140,200) vs. >=200    
 
 ```{r}
-roc_df %>%
-  select(`OGTT 2-hour`, Gender, MutClass, hgba1c) %>%
-  filter(`OGTT 2-hour` != "<140") %>%
-  mutate(`OGTT 2-hour` = droplevels(`OGTT 2-hour`)) %>%
+roc_df |>
+  select(`OGTT 2-hour`, Gender, MutClass, hgba1c) |>
+  filter(`OGTT 2-hour` != "<140") |>
+  mutate(`OGTT 2-hour` = droplevels(`OGTT 2-hour`)) |>
   tbl_summary(
     by = `OGTT 2-hour`,
     missing_text = "Missing",
@@ -397,23 +408,23 @@ roc_df %>%
       reviewyear = "Year",
       Age_YrEnd = "Age at Year End"
     )
-  ) %>%
-  add_overall() %>%
+  ) |>
+  add_overall() |>
   add_p(
     test = list(reviewyear = "fisher.test"),
     test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
-  ) %>%
-  separate_p_footnotes() %>%
+  ) |>
+  separate_p_footnotes() |>
   as_gt()
 ```
 
 #### <140 vs. >=200
 
 ```{r}
-roc_df %>%
-  select(`OGTT 2-hour`, Gender, MutClass, hgba1c) %>%
-  filter(`OGTT 2-hour` != "[140,200)") %>%
-  mutate(`OGTT 2-hour` = droplevels(`OGTT 2-hour`)) %>%
+roc_df |>
+  select(`OGTT 2-hour`, Gender, MutClass, hgba1c) |>
+  filter(`OGTT 2-hour` != "[140,200)") |>
+  mutate(`OGTT 2-hour` = droplevels(`OGTT 2-hour`)) |>
   tbl_summary(
     by = `OGTT 2-hour`,
     missing_text = "Missing",
@@ -429,20 +440,20 @@ roc_df %>%
       reviewyear = "Year",
       Age_YrEnd = "Age at Year End"
     )
-  ) %>%
-  add_overall() %>%
+  ) |>
+  add_overall() |>
   add_p(
     test = list(reviewyear = "fisher.test"),
     test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
-  ) %>%
-  separate_p_footnotes() %>%
+  ) |>
+  separate_p_footnotes() |>
   as_gt()
 ```
 
 ## By age
 
 ```{r}
-roc_df %>%
+roc_df |>
   select(
     reviewyear,
     hgba1c,
@@ -454,7 +465,7 @@ roc_df %>%
     Gender,
     F508,
     MutClass
-  ) %>%
+  ) |>
   tbl_summary(
     by = `Age Group`,
     missing_text = "Missing",
@@ -466,13 +477,13 @@ roc_df %>%
       reviewyear = "Year",
       Age_YrEnd = "Age at Year End"
     )
-  ) %>%
-  add_overall() %>%
+  ) |>
+  add_overall() |>
   add_p(
     test = list(reviewyear = "fisher.test"),
     test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
-  ) %>%
-  separate_p_footnotes() %>%
+  ) |>
+  separate_p_footnotes() |>
   as_gt()
 ```
 
@@ -519,30 +530,43 @@ ggplot(roc_df, aes(x = `OGTT 2-hour`, y = hgba1c)) +
 
 For each ROC curve, we performed 2000 bootstrap replicates. Here the median best threshold (based on Youden index), sensitivity, and specificity are presented along with the bootstrapped 95% confidence intervals. Column names are printed in terms of percentiles, so `threshold.2.5.` indicates the lower limit of the confidence interval, `threshold.50.` indicates the median best threshold, and `threshold.97.5.` indicates the upper limit of the confidence interval. All non-bootstrapped thresholds are also reported.
 
-## NGT vs. AGT and AGT vs. CFRD
+## NGT vs. (AGT + CFRD) and (NGT + AGT) vs. CFRD
 
 For the following analyses, we considered those with a two hour glucose value >= 140 and < 200 as a distinct group (AGT) and use receiver operating characteristic curves to find cutoffs that predict: 
 
-1. NGT vs. AGT
+1. NGT vs. (AGT + CFRD)
 
-2. AGT vs. CFRD
+2. (NGT + AGT) vs. CFRD
 
 ```{r}
-ngt_agt <- roc_df %>% filter(`OGTT 2-hour` != ">=200")
-ngt_agt$ogtt <- droplevels(ngt_agt$`OGTT 2-hour`)
-agt_cfrd <- roc_df %>% filter(`OGTT 2-hour` != "<140")
-agt_cfrd$ogtt <- droplevels(agt_cfrd$`OGTT 2-hour`)
+ngt_agt <- roc_df |>
+  mutate(
+    ogtt = factor(
+      `OGTT 2-hour`,
+      levels = c("<140", "[140,200)", ">=200"),
+      labels = c("NGT", "AGT + CFRD", "AGT + CFRD")
+    )
+  )
+agt_cfrd <- roc_df |>
+  mutate(
+    ogtt = factor(
+      `OGTT 2-hour`,
+      levels = c("<140", "[140,200)", ">=200"),
+      labels = c("NGT + AGT", "NGT + AGT", "CFRD")
+    )
+  )
 ```
 
 ### Full cohort
 
-#### NGT vs. AGT
+#### NGT vs. (AGT + CFRD)
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = ngt_agt)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -550,24 +574,27 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
-#### AGT vs. CFRD
+#### (NGT + AGT) vs. CFRD
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = agt_cfrd)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -575,15 +602,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ### Peds vs. Adults
@@ -591,17 +620,18 @@ gt(data.frame(coords(
 #### Peds
 
 ```{r}
-peds_ngt_agt <- ngt_agt %>% filter(Age_YrEnd < 18)
-peds_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd < 18)
+peds_ngt_agt <- ngt_agt |> filter(Age_YrEnd < 18)
+peds_agt_cfrd <- agt_cfrd |> filter(Age_YrEnd < 18)
 ```
 
-##### NGT vs. AGT
+##### NGT vs. (AGT + CFRD)
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = peds_ngt_agt)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -609,24 +639,27 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
-##### AGT vs. CFRD
+##### (NGT + AGT) vs. CFRD
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = peds_agt_cfrd)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -634,31 +667,34 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 #### Adults
 
 ```{r}
-adult_ngt_agt <- ngt_agt %>% filter(Age_YrEnd >= 18)
-adult_agt_cfrd <- agt_cfrd %>% filter(Age_YrEnd >= 18)
+adult_ngt_agt <- ngt_agt |> filter(Age_YrEnd >= 18)
+adult_agt_cfrd <- agt_cfrd |> filter(Age_YrEnd >= 18)
 ```
 
-##### NGT vs. AGT
+##### NGT vs. (AGT + CFRD)
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = adult_ngt_agt)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -666,24 +702,27 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
-##### AGT vs. CFRD
+##### (NGT + AGT) vs. CFRD
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = adult_agt_cfrd)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -691,15 +730,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ### By race
@@ -707,17 +748,18 @@ gt(data.frame(coords(
 #### White
 
 ```{r}
-white_ngt_agt <- ngt_agt %>% filter(Race == "White")
-white_agt_cfrd <- agt_cfrd %>% filter(Race == "White")
+white_ngt_agt <- ngt_agt |> filter(Race == "White")
+white_agt_cfrd <- agt_cfrd |> filter(Race == "White")
 ```
 
-##### NGT vs. AGT
+##### NGT vs. (AGT + CFRD)
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = white_ngt_agt)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -725,24 +767,27 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
-##### AGT vs. CFRD
+##### (NGT + AGT) vs. CFRD
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = white_agt_cfrd)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -750,31 +795,34 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 #### Black or African American
 
 ```{r}
-black_ngt_agt <- ngt_agt %>% filter(Race == "Black or African American")
-black_agt_cfrd <- agt_cfrd %>% filter(Race == "Black or African American")
+black_ngt_agt <- ngt_agt |> filter(Race == "Black or African American")
+black_agt_cfrd <- agt_cfrd |> filter(Race == "Black or African American")
 ```
 
-##### NGT vs. AGT
+##### NGT vs. (AGT + CFRD)
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = black_ngt_agt)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -782,18 +830,20 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
-##### AGT vs. CFRD
+##### (NGT + AGT) vs. CFRD
 
 Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
 
@@ -801,10 +851,10 @@ Bootstrap replicates found more than one "best" threshold, so the non-bootstrapp
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = black_agt_cfrd)
 roc_plot(r)
-gt(data.frame(coords(r, "best"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
-  fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -812,31 +862,38 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 #### More than one race
 
 ```{r}
-more_ngt_agt <- ngt_agt %>% filter(Race == "More than one race")
-more_agt_cfrd <- agt_cfrd %>% filter(Race == "More than one race")
+more_ngt_agt <- ngt_agt |> filter(Race == "More than one race")
+more_agt_cfrd <- agt_cfrd |> filter(Race == "More than one race")
 ```
 
-##### NGT vs. AGT
+##### NGT vs. (AGT + CFRD)
+
+Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = more_ngt_agt)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -844,24 +901,27 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
-##### AGT vs. CFRD
+##### (NGT + AGT) vs. CFRD
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = more_agt_cfrd)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -869,25 +929,27 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 #### Other race
 
 ```{r}
-other_ngt_agt <- ngt_agt %>% filter(Race == "Other race")
-other_agt_cfrd <- agt_cfrd %>% filter(Race == "Other race")
+other_ngt_agt <- ngt_agt |> filter(Race == "Other race")
+other_agt_cfrd <- agt_cfrd |> filter(Race == "Other race")
 ```
 
-##### NGT vs. AGT
+##### NGT vs. (AGT + CFRD)
 
 Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
 
@@ -895,10 +957,10 @@ Bootstrap replicates found more than one "best" threshold, so the non-bootstrapp
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = other_ngt_agt)
 roc_plot(r)
-gt(data.frame(coords(r, "best"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
-  fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -906,18 +968,20 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
-##### AGT vs. CFRD
+##### (NGT + AGT) vs. CFRD
 
 Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
 
@@ -925,10 +989,10 @@ Bootstrap replicates found more than one "best" threshold, so the non-bootstrapp
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = other_agt_cfrd)
 roc_plot(r)
-gt(data.frame(coords(r, "best"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
-  fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -936,15 +1000,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ### By ethnicity
@@ -952,17 +1018,18 @@ gt(data.frame(coords(
 #### Hispanic
 
 ```{r}
-hispanic_ngt_agt <- ngt_agt %>% filter(Hispanicrace == "Yes")
-hispanic_agt_cfrd <- agt_cfrd %>% filter(Hispanicrace == "No")
+hispanic_ngt_agt <- ngt_agt |> filter(Hispanicrace == "Yes")
+hispanic_agt_cfrd <- agt_cfrd |> filter(Hispanicrace == "No")
 ```
 
-##### NGT vs. AGT
+##### NGT vs. (AGT + CFRD)
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = hispanic_ngt_agt)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -970,24 +1037,27 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
-##### AGT vs. CFRD
+##### (NGT + AGT) vs. CFRD
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = hispanic_agt_cfrd)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -995,33 +1065,40 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 #### Non-Hispanic
 
 ```{r}
 non_hispanic_ngt_agt <-
-  ngt_agt %>% filter(Race == "Black or African American")
+  ngt_agt |> filter(Race == "Black or African American")
 non_hispanic_agt_cfrd <-
-  agt_cfrd %>% filter(Race == "Black or African American")
+  agt_cfrd |> filter(Race == "Black or African American")
 ```
 
-##### NGT vs. AGT
+##### NGT vs. (AGT + CFRD)
+
+Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
 
 ```{r}
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = non_hispanic_ngt_agt)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1029,18 +1106,20 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
-##### AGT vs. CFRD
+##### (NGT + AGT) vs. CFRD
 
 Bootstrap replicates found more than one "best" threshold, so the non-bootstrapped threshold is reported first, and a random bootstrapped "best" interval second.
 
@@ -1048,10 +1127,10 @@ Bootstrap replicates found more than one "best" threshold, so the non-bootstrapp
 #| message: false
 r <- roc(ogtt ~ hgba1c, data = non_hispanic_agt_cfrd)
 roc_plot(r)
-gt(data.frame(coords(r, "best"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
-  fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1059,15 +1138,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ## Two hour OGTT >= 140 or >= 200
@@ -1087,7 +1168,8 @@ roc_df$cfrd <- as.numeric(roc_df$twohour_bloodglucose >= 200)
 #| message: false
 r <- roc(agt ~ hgba1c, data = roc_df)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1095,15 +1177,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 #### $\geq$ 200
@@ -1112,7 +1196,8 @@ gt(data.frame(coords(
 #| message: false
 r <- roc(cfrd ~ hgba1c, data = roc_df)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1120,15 +1205,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ### Peds vs. Adults
@@ -1136,7 +1223,7 @@ gt(data.frame(coords(
 #### Peds
 
 ```{r}
-peds_roc <- roc_df %>% filter(Age_YrEnd < 18)
+peds_roc <- roc_df |> filter(Age_YrEnd < 18)
 ```
 
 ##### $\geq$ 140
@@ -1145,7 +1232,8 @@ peds_roc <- roc_df %>% filter(Age_YrEnd < 18)
 #| message: false
 r <- roc(agt ~ hgba1c, data = peds_roc)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1153,15 +1241,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ##### $\geq$ 200
@@ -1170,7 +1260,8 @@ gt(data.frame(coords(
 #| message: false
 r <- roc(cfrd ~ hgba1c, data = peds_roc)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1178,21 +1269,23 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 #### Adults
 
 ```{r}
-adult_roc <- roc_df %>% filter(Age_YrEnd >= 18)
+adult_roc <- roc_df |> filter(Age_YrEnd >= 18)
 ```
 
 ##### $\geq$ 140
@@ -1201,7 +1294,8 @@ adult_roc <- roc_df %>% filter(Age_YrEnd >= 18)
 #| message: false
 r <- roc(agt ~ hgba1c, data = adult_roc)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1209,15 +1303,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ##### $\geq$ 200
@@ -1226,7 +1322,8 @@ gt(data.frame(coords(
 #| message: false
 r <- roc(cfrd ~ hgba1c, data = adult_roc)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1234,15 +1331,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ### By race
@@ -1250,7 +1349,7 @@ gt(data.frame(coords(
 #### White
 
 ```{r}
-white_roc <- roc_df %>% filter(Race == "White")
+white_roc <- roc_df |> filter(Race == "White")
 ```
 
 ##### $\geq$ 140
@@ -1259,7 +1358,8 @@ white_roc <- roc_df %>% filter(Race == "White")
 #| message: false
 r <- roc(agt ~ hgba1c, data = white_roc)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1267,15 +1367,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ##### $\geq$ 200
@@ -1284,7 +1386,8 @@ gt(data.frame(coords(
 #| message: false
 r <- roc(cfrd ~ hgba1c, data = white_roc)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1292,21 +1395,23 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 #### Black or African American
 
 ```{r}
-black_roc <- roc_df %>% filter(Race == "Black or African American")
+black_roc <- roc_df |> filter(Race == "Black or African American")
 ```
 
 ##### $\geq$ 140
@@ -1315,7 +1420,8 @@ black_roc <- roc_df %>% filter(Race == "Black or African American")
 #| message: false
 r <- roc(agt ~ hgba1c, data = black_roc)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1323,15 +1429,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ##### $\geq$ 200
@@ -1342,8 +1450,8 @@ Bootstrap replicates found more than one "best" threshold, so the non-bootstrapp
 #| message: false
 r <- roc(cfrd ~ hgba1c, data = black_roc)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
-  fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1351,21 +1459,23 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 #### More than one race
 
 ```{r}
-more_roc <- roc_df %>% filter(Race == "More than one race")
+more_roc <- roc_df |> filter(Race == "More than one race")
 ```
 
 ##### $\geq$ 140
@@ -1374,7 +1484,8 @@ more_roc <- roc_df %>% filter(Race == "More than one race")
 #| message: false
 r <- roc(agt ~ hgba1c, data = more_roc)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1382,15 +1493,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ##### $\geq$ 200
@@ -1399,7 +1512,8 @@ gt(data.frame(coords(
 #| message: false
 r <- roc(cfrd ~ hgba1c, data = more_roc)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1407,21 +1521,23 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 #### Other race
 
 ```{r}
-other_roc <- roc_df %>% filter(Race == "Other race")
+other_roc <- roc_df |> filter(Race == "Other race")
 ```
 
 ##### $\geq$ 140
@@ -1432,10 +1548,10 @@ Bootstrap replicates found more than one "best" threshold, so the non-bootstrapp
 #| message: false
 r <- roc(agt ~ hgba1c, data = other_roc)
 roc_plot(r)
-gt(data.frame(coords(r, "best"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(ci.coords(r, "best", best.policy = "random"))) %>%
-  fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1443,15 +1559,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ##### $\geq$ 200
@@ -1460,10 +1578,10 @@ gt(data.frame(coords(
 #| message: false
 r <- roc(cfrd ~ hgba1c, data = other_roc)
 roc_plot(r)
-gt(data.frame(coords(r, "best"))) %>%
-  fmt_number(n_sigfig = 3)
-gt(data.frame(ci.coords(r, "best"))) %>%
-  fmt_number(n_sigfig = 3)
+gt(data.frame(coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
+gt(data.frame(ci.coords(r, "best", best.policy = "random"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1471,15 +1589,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ### By ethnicity
@@ -1487,7 +1607,7 @@ gt(data.frame(coords(
 #### Hispanic
 
 ```{r}
-hispanic_roc <- roc_df %>% filter(Hispanicrace == "Yes")
+hispanic_roc <- roc_df |> filter(Hispanicrace == "Yes")
 ```
 
 ##### $\geq$ 140
@@ -1496,7 +1616,8 @@ hispanic_roc <- roc_df %>% filter(Hispanicrace == "Yes")
 #| message: false
 r <- roc(agt ~ hgba1c, data = hispanic_roc)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1504,15 +1625,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ##### $\geq$ 200
@@ -1521,7 +1644,8 @@ gt(data.frame(coords(
 #| message: false
 r <- roc(cfrd ~ hgba1c, hispanic_roc)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1529,21 +1653,23 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 #### Non-Hispanic
 
 ```{r}
-non_hispanic_roc <- roc_df %>% filter(Hispanicrace == "No")
+non_hispanic_roc <- roc_df |> filter(Hispanicrace == "No")
 ```
 
 ##### $\geq$ 140
@@ -1552,7 +1678,8 @@ non_hispanic_roc <- roc_df %>% filter(Hispanicrace == "No")
 #| message: false
 r <- roc(agt ~ hgba1c, data = non_hispanic_roc)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1560,15 +1687,17 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 ##### $\geq$ 200
@@ -1577,7 +1706,8 @@ gt(data.frame(coords(
 #| message: false
 r <- roc(cfrd ~ hgba1c, data = non_hispanic_roc)
 roc_plot(r)
-gt(data.frame(ci.coords(r, "best"))) %>% fmt_number(n_sigfig = 3)
+gt(data.frame(ci.coords(r, "best"))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 gt(data.frame(coords(
   r,
   "all",
@@ -1585,27 +1715,29 @@ gt(data.frame(coords(
     "threshold",
     "sensitivity",
     "specificity",
-    "tpr",
-    "tnr",
-    "fpr",
-    "fnr",
+    "tp",
+    "tn",
+    "fp",
+    "fn",
     "npv",
-    "ppv"
+    "ppv",
+    "tnr",
+    "fnr"
   )
-))) %>%
-  fmt_number(n_sigfig = 3)
+))) |>
+  fmt_number(decimals = 3, drop_trailing_zeros = T)
 ```
 
 # FEV1 over time plot
 
 ```{r}
-plot_df <- annual %>%
+plot_df <- annual |>
   filter(
     !is.na(cfrd_status_annual),
     Age_YrEnd >= 10,
     !cfrd_status_annual %in% c(4, 5)
-  ) %>%
-  group_by(eDWID) %>%
+  ) |>
+  group_by(eDWID) |>
   mutate(
     Diagnosis = max(cfrd_status_annual),
     `Years to CFRD or Last Visit` = case_when(
