@@ -349,135 +349,6 @@ label(annual[, which(colnames(annual) %in% names(labels))]) <-
 #     (is.na(A_VX809comb) | A_VX809comb == "No"))
 ```
 
-# Diagnosis comparisons for HbA1c registry paper
-
-```{r}
-# Per reviewer, out of X individuals with a diagnosis of CFRD, X number had an
-# OGTT (and X had an A1c, but no OGTT) that year or the year prior.
-# This is super slow but idc idc
-cfrd_only <- apply(first_cfrd, 1, function(r) {
-  id <- as.numeric(r["eDWID"])
-  year <- as.numeric(r["first_cfrd"])
-  d <- annual[annual$eDWID == id & annual$ReviewYear %in% c(year, year - 1), ]
-  a1c <- as.numeric(last(d["A_hgba1c"], na_rm = TRUE))
-  ogtt0hr <- as.numeric(last(d["A_ogttfast_bloodglucose"], na_rm = TRUE))
-  ogtt2hr <- as.numeric(last(d["A_twohour_bloodglucose"], na_rm = TRUE))
-  return(c(id, year, a1c, ogtt0hr, ogtt2hr))
-})
-cfrd_only <- data.frame(t(cfrd_only))
-colnames(cfrd_only) <- c("id", "year", "a1c", "ogtt0hr", "ogtt2hr")
-cfrd_only <- left_join(
-  cfrd_only,
-  annual %>% mutate(eDWID = as.numeric(eDWID)),
-  by = join_by(id == eDWID, year == ReviewYear)
-)
-cfrd_only$a1c_ogtt <- apply(cfrd_only, 1, function(r) {
-  not_missing <- paste(
-    which(!is.na(r[c("a1c", "ogtt0hr", "ogtt2hr")])),
-    collapse = "_"
-  )
-  return(not_missing)
-})
-cfrd_only$a1c_ogtt <- factor(
-  cfrd_only$a1c_ogtt,
-  levels = c("", "1", "1_2", "1_2_3", "1_3", "2", "2_3", "3"),
-  labels = c(
-    "Neither",
-    "HbA1c Only",
-    "OGTT",
-    "OGTT",
-    "OGTT",
-    "OGTT",
-    "OGTT",
-    "OGTT"
-  )
-)
-cfrd_only %>%
-  select(
-    a1c_ogtt,
-    Age_YrEnd,
-    A_weight,
-    A_height,
-    A_bmivalue,
-    A_bmipercentile,
-    A_FEV1_pct_predicted,
-    A_FVC_pct_predicted,
-    Race,
-    Hispanicrace,
-    MutClass,
-    a1c,
-    A_ogttfast_bloodglucose,
-    A_twohour_bloodglucose,
-    A_IsOnEnzymes,
-    liver_disease,
-    A_cultureresults3
-  ) %>%
-  tbl_summary(
-    by = a1c_ogtt,
-    missing_text = "Missing",
-    statistic = list(all_continuous() ~ "{mean} ({sd})")
-  ) %>%
-  add_overall() %>%
-  add_p(test = list(all_continuous() ~ "oneway.test")) %>%
-  modify_caption("**All Groups**")
-cfrd_only %>%
-  filter(a1c_ogtt %in% c("OGTT", "HbA1c Only")) %>%
-  mutate(a1c_ogtt = droplevels(a1c_ogtt)) %>%
-  select(
-    a1c_ogtt,
-    Age_YrEnd,
-    A_weight,
-    A_height,
-    A_bmivalue,
-    A_bmipercentile,
-    A_FEV1_pct_predicted,
-    A_FVC_pct_predicted,
-    Race,
-    Hispanicrace,
-    MutClass,
-    a1c,
-    A_ogttfast_bloodglucose,
-    A_twohour_bloodglucose,
-    A_IsOnEnzymes,
-    liver_disease,
-    A_cultureresults3
-  ) %>%
-  tbl_summary(
-    by = a1c_ogtt,
-    missing_text = "Missing",
-    statistic = list(all_continuous() ~ "{mean} ({sd})")
-  ) %>%
-  add_overall() %>%
-  add_p(test = list(all_continuous() ~ "oneway.test")) %>%
-  modify_caption("**OGTT vs. HbA1c Only**")
-# Plot by diagnosis type
-plot_df = cfrd_only %>%
-  select(id, a1c_ogtt) %>%
-  rename(eDWID = id)
-plot_df = left_join(
-  annual %>% mutate(eDWID = as.numeric(eDWID)),
-  plot_df,
-  by = join_by(eDWID)
-)
-plot_df = plot_df %>%
-  group_by(eDWID) %>%
-  mutate(`Years to CFRD` = ReviewYear - first_cfrd)
-ggplot(
-  plot_df %>% filter(!is.na(a1c_ogtt)),
-  aes(
-    y = A_FEV1_pct_predicted,
-    x = `Years to CFRD`,
-    color = a1c_ogtt,
-    group = a1c_ogtt
-  )
-) +
-  xlim(c(-10, 10)) +
-  geom_point(alpha = 0.1, shape = ".") +
-  geom_smooth(formula = y ~ s(x, bs = "cr")) +
-  theme_bw() +
-  theme(legend.title = element_blank())
-```
-
 Registry fields included in our liver disease yes/no variable were:
 
 ```{r}
@@ -1016,11 +887,11 @@ f_vx809comb <- update(
   f,
   . ~
     . +
-      A_VX809comb -
-      A_corticosteroids1 -
-      NumPulmExacerbation -
-      age_group -
-      Hispanicrace
+    A_VX809comb -
+    A_corticosteroids1 -
+    NumPulmExacerbation -
+    age_group -
+    Hispanicrace
 )
 vx809comb_cox_res <- coxph(
   f_vx809comb,
