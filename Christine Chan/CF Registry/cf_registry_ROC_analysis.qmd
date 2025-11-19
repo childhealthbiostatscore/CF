@@ -19,7 +19,6 @@ editor: source
 
 ```{r setup}
 #| include: false
-library(tidyverse)
 library(ggplot2)
 library(gtsummary)
 library(gt)
@@ -27,6 +26,10 @@ library(pROC)
 library(ggrepel)
 library(childsds)
 library(labelled)
+library(Hmisc)
+library(lmerTest)
+library(multcomp)
+library(tidyverse)
 home_dir <- switch(
   Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
@@ -1724,8 +1727,6 @@ gt(data.frame(coords(
 ```{r}
 #| warning: false
 #| message: false
-library(Hmisc)
-library(lmerTest)
 # Import data and codebook
 annual <- read.csv(
   "./Data_Raw/CFF19_Annualized_Del1.csv",
@@ -1955,7 +1956,7 @@ annual$Hispanicrace <- factor(annual$Hispanicrace, levels = c("No", "Yes"))
 first_cfrd <- annual %>%
   filter(cfrd_status_annual == "CFRD+") %>%
   group_by(eDWID) %>%
-  summarise(first_cfrd = min(ReviewYear))
+  summarise(first_cfrd = min(ReviewYear), age_dx = min(Age_YrEnd))
 annual <- left_join(annual, first_cfrd, by = join_by(eDWID))
 # Year prior to first CFRD in registry - assume negative for CFRD. Assume all
 # years following are CFRD+
@@ -2143,17 +2144,19 @@ cfrd_only %>%
 #| message: false
 # Plot by diagnosis type
 mod_df = cfrd_only %>%
-  select(id, a1c_ogtt) %>%
+  select(id, a1c_ogtt, Age_YrEnd) %>%
   rename(eDWID = id)
 mod_df = left_join(
-  annual %>% mutate(eDWID = as.numeric(eDWID)),
+  annual %>% select(-Age_YrEnd) |> mutate(eDWID = as.numeric(eDWID)),
   mod_df,
   by = join_by(eDWID)
 )
 mod_df = mod_df %>%
+  drop_na(first_cfrd) |>
   group_by(eDWID) %>%
   mutate(years_to_cfrd = ReviewYear - first_cfrd)
 var_label(mod_df$years_to_cfrd) = "Years to CFRD"
+var_label(mod_df$Age_YrEnd) = "Age at Diagnosis"
 ggplot(
   mod_df %>% filter(!is.na(a1c_ogtt)),
   aes(
@@ -2163,6 +2166,7 @@ ggplot(
     group = a1c_ogtt
   )
 ) +
+  xlab("Years from CFRD") +
   xlim(c(-10, 10)) +
   geom_point(alpha = 0.1, shape = ".") +
   geom_smooth(formula = y ~ s(x, bs = "cr")) +
@@ -2172,21 +2176,208 @@ ggplot(
 
 ### Piecewise linear model results
 
+There were not enough pancreatic sufficient people in this dataset to include that varaible in the model.
+
 ```{r}
-# Fit model
+# Fit model - adjust for age at dx, sex, genotype (severe vs mild), pancreatic
+# insufficiency, age at CF diagnosis (do we know this?), number of clinic
+# visits/year, use of CFTR modulators
 mod_df$x = mod_df$years_to_cfrd * (mod_df$years_to_cfrd >= 0)
 label(mod_df$x) = "Change in Slope Post-CFRD"
 label(mod_df$years_to_cfrd) = "Slope Pre-CFRD"
 label(mod_df$a1c_ogtt) = "Diagnosis Method"
+label(mod_df$Age_YrEnd) = "Age at Diagnosis"
 m <- lmer(
   A_FEV1_pct_predicted ~ years_to_cfrd *
     a1c_ogtt +
     x * a1c_ogtt +
+    Age_YrEnd +
+    Gender +
+    MutClass +
+    A_Vx770 +
+    A_VX809comb +
     (1 | eDWID),
   data = mod_df
 )
 # Population-averaged plot
-
+pop_dat <- data.frame(expand.grid(
+  years_to_cfrd = -10:10,
+  a1c_ogtt = unique(mod_df$a1c_ogtt),
+  Age_YrEnd = mean(mod_df$Age_YrEnd, na.rm = T),
+  Gender = "M",
+  MutClass = "1-3",
+  A_Vx770 = "No",
+  A_VX809comb = "No"
+))
+pop_dat$x <- (pop_dat$years_to_cfrd >= 0) * pop_dat$years_to_cfrd
+pred <- predict(m, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(
+  pop_dat,
+  aes(x = years_to_cfrd, y = pred, group = a1c_ogtt, colour = a1c_ogtt)
+) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
+  xlab("Years from CFRD") +
+  ylab("FEV1 % Predicted") +
+  theme_classic(base_size = 15)
 # Model table
 m |> tbl_regression()
+# Contrasts
+neither_pre <- rep(0, nrow(summary(m)$coefficients))
+neither_change <- rep(0, nrow(summary(m)$coefficients))
+neither_pre[which(rownames(summary(m)$coefficients) == "years_to_cfrd")] = 1
+neither_change[which(rownames(summary(m)$coefficients) == "x")] = 1
+a1c_pre <- rep(0, nrow(summary(m)$coefficients))
+a1c_change <- rep(0, nrow(summary(m)$coefficients))
+a1c_pre[which(
+  rownames(summary(m)$coefficients) %in%
+    c("years_to_cfrd", "years_to_cfrd:a1c_ogttHbA1c Only")
+)] = 1
+a1c_change[which(
+  rownames(summary(m)$coefficients) %in%
+    c("x", "a1c_ogttHbA1c Only:x")
+)] = 1
+ogtt_pre <- rep(0, nrow(summary(m)$coefficients))
+ogtt_change <- rep(0, nrow(summary(m)$coefficients))
+ogtt_pre[which(
+  rownames(summary(m)$coefficients) %in%
+    c("years_to_cfrd", "years_to_cfrd:a1c_ogttOGTT")
+)] = 1
+ogtt_change[which(
+  rownames(summary(m)$coefficients) %in%
+    c("x", "a1c_ogttOGTT:x")
+)] = 1
+contr <- rbind(
+  "HbA1c Only Pre-CFRD" = a1c_pre,
+  "HbA1c Only Post-CFRD" = a1c_pre + a1c_change,
+  "OGTT Pre-CFRD" = ogtt_pre,
+  "OGTT Post-CFRD" = ogtt_pre + ogtt_change,
+  "Neither Pre-CFRD" = neither_pre,
+  "Neither Post-CFRD" = neither_pre + neither_change
+)
+change_mod_slopes <- glht(m, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Diagnosis Method", rownames_to_stub = T) %>%
+  fmt_number(decimals = 2)
+```
+
+## FVC trends by diagnosis method
+
+### LOESS-smoothed plot
+
+```{r} 
+ggplot(
+  mod_df %>% filter(!is.na(a1c_ogtt)),
+  aes(
+    y = A_FVC_pct_predicted,
+    x = years_to_cfrd,
+    color = a1c_ogtt,
+    group = a1c_ogtt
+  )
+) +
+  xlab("Years from CFRD") +
+  xlim(c(-10, 10)) +
+  geom_point(alpha = 0.1, shape = ".") +
+  geom_smooth(formula = y ~ s(x, bs = "cr")) +
+  theme_bw() +
+  theme(legend.title = element_blank())
+```
+
+### Piecewise linear model results
+
+There were not enough pancreatic sufficient people in this dataset to include that varaible in the model.
+
+```{r}
+# Fit model - adjust for age at dx, sex, genotype (severe vs mild), pancreatic
+# insufficiency, age at CF diagnosis (do we know this?), number of clinic
+# visits/year, use of CFTR modulators
+mod_df$x = mod_df$years_to_cfrd * (mod_df$years_to_cfrd >= 0)
+label(mod_df$x) = "Change in Slope Post-CFRD"
+label(mod_df$years_to_cfrd) = "Slope Pre-CFRD"
+label(mod_df$a1c_ogtt) = "Diagnosis Method"
+label(mod_df$Age_YrEnd) = "Age at Diagnosis"
+m <- lmer(
+  A_FVC_pct_predicted ~ years_to_cfrd *
+    a1c_ogtt +
+    x * a1c_ogtt +
+    Age_YrEnd +
+    Gender +
+    MutClass +
+    A_Vx770 +
+    A_VX809comb +
+    (1 | eDWID),
+  data = mod_df
+)
+# Population-averaged plot
+pop_dat <- data.frame(expand.grid(
+  years_to_cfrd = -10:10,
+  a1c_ogtt = unique(mod_df$a1c_ogtt),
+  Age_YrEnd = mean(mod_df$Age_YrEnd, na.rm = T),
+  Gender = "M",
+  MutClass = "1-3",
+  A_Vx770 = "No",
+  A_VX809comb = "No"
+))
+pop_dat$x <- (pop_dat$years_to_cfrd >= 0) * pop_dat$years_to_cfrd
+pred <- predict(m, re.form = NA, newdata = pop_dat, se.fit = T)
+pop_dat$pred <- pred$fit
+pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
+pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
+ggplot(
+  pop_dat,
+  aes(x = years_to_cfrd, y = pred, group = a1c_ogtt, colour = a1c_ogtt)
+) +
+  geom_point() +
+  geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
+  geom_line() +
+  xlab("Years from CFRD") +
+  ylab("FVC % Predicted") +
+  theme_classic(base_size = 15)
+# Model table
+m |> tbl_regression()
+# Contrasts
+neither_pre <- rep(0, nrow(summary(m)$coefficients))
+neither_change <- rep(0, nrow(summary(m)$coefficients))
+neither_pre[which(rownames(summary(m)$coefficients) == "years_to_cfrd")] = 1
+neither_change[which(rownames(summary(m)$coefficients) == "x")] = 1
+a1c_pre <- rep(0, nrow(summary(m)$coefficients))
+a1c_change <- rep(0, nrow(summary(m)$coefficients))
+a1c_pre[which(
+  rownames(summary(m)$coefficients) %in%
+    c("years_to_cfrd", "years_to_cfrd:a1c_ogttHbA1c Only")
+)] = 1
+a1c_change[which(
+  rownames(summary(m)$coefficients) %in%
+    c("x", "a1c_ogttHbA1c Only:x")
+)] = 1
+ogtt_pre <- rep(0, nrow(summary(m)$coefficients))
+ogtt_change <- rep(0, nrow(summary(m)$coefficients))
+ogtt_pre[which(
+  rownames(summary(m)$coefficients) %in%
+    c("years_to_cfrd", "years_to_cfrd:a1c_ogttOGTT")
+)] = 1
+ogtt_change[which(
+  rownames(summary(m)$coefficients) %in%
+    c("x", "a1c_ogttOGTT:x")
+)] = 1
+contr <- rbind(
+  "HbA1c Only Pre-CFRD" = a1c_pre,
+  "HbA1c Only Post-CFRD" = a1c_pre + a1c_change,
+  "OGTT Pre-CFRD" = ogtt_pre,
+  "OGTT Post-CFRD" = ogtt_pre + ogtt_change,
+  "Neither Pre-CFRD" = neither_pre,
+  "Neither Post-CFRD" = neither_pre + neither_change
+)
+change_mod_slopes <- glht(m, linfct = contr)
+change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
+change_mod_slopes_ci$confint %>%
+  as.data.frame() %>%
+  gt(caption = "Slopes by Diagnosis Method", rownames_to_stub = T) %>%
+  fmt_number(decimals = 2)
 ```
