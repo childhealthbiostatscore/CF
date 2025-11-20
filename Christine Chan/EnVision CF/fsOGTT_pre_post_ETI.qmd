@@ -38,6 +38,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data cleaning}
+setwd(home_dir)
 # Import cleaned data
 load("./Data_Clean/fsOGTT_pre_post_ETI.RData")
 # Subset to people with more than one pre-ETI fsOGTT
@@ -92,7 +93,8 @@ multi_pre_df |>
     iAUC120ins_over_gluc,
     iAUC180ins_over_gluc,
     odi_igi,
-    odi_iauc
+    odi_iauc,
+    matsuda
   ) |>
   tbl_summary(type = c("Insulin_0") ~ "continuous")
 ```
