@@ -1735,7 +1735,7 @@ annual <- read.csv(
 data_dict <- readxl::read_excel("./Data_Raw/Copy of Codes for CFFPR_2018.xlsx")
 data_dict$var <- paste(data_dict$field_name, data_dict$code_value, sep = "_")
 # Remove those with T1D or T2D
-annual <- annual %>% arrange(eDWID, ReviewYear)
+annual <- annual |> arrange(eDWID, ReviewYear)
 annual <- annual[!annual$cfrd_status_annual %in% c(4, 5), ]
 annual$cfrd_status_annual <- factor(
   annual$cfrd_status_annual,
@@ -1786,7 +1786,7 @@ demogs$Hispanicrace <- factor(
   levels = 1:2,
   labels = c("Yes", "No")
 )
-demogs <- demogs %>% select(eDWID, Gender, MutClass, Race, Hispanicrace)
+demogs <- demogs |> select(eDWID, Gender, MutClass, Race, Hispanicrace)
 annual <- left_join(annual, demogs, by = join_by(eDWID))
 # Variable formatting
 # If A_supplement_feeding is 0, then A_feeding2 is also 0 because they are not
@@ -1953,9 +1953,9 @@ annual$Gender <- factor(annual$Gender, levels = c("M", "F"))
 # Hispanic no as reference
 annual$Hispanicrace <- factor(annual$Hispanicrace, levels = c("No", "Yes"))
 # Get first year of CFRD
-first_cfrd <- annual %>%
-  filter(cfrd_status_annual == "CFRD+") %>%
-  group_by(eDWID) %>%
+first_cfrd <- annual |>
+  filter(cfrd_status_annual == "CFRD+") |>
+  group_by(eDWID) |>
   summarise(first_cfrd = min(ReviewYear), age_dx = min(Age_YrEnd))
 annual <- left_join(annual, first_cfrd, by = join_by(eDWID))
 # Year prior to first CFRD in registry - assume negative for CFRD. Assume all
@@ -1968,13 +1968,13 @@ annual$CFRD <- factor(annual$CFRD, levels = c("CFRD-", "CFRD+"))
 # Add formatted columns for survival analysis
 annual$tstop <- ymd(paste0(annual$ReviewYear, "-12-31"))
 annual$tstart <- ymd(paste0(annual$ReviewYear, "-01-01"))
-annual <- annual %>%
-  group_by(eDWID) %>%
-  mutate(entry_date = tstart[1]) %>%
+annual <- annual |>
+  group_by(eDWID) |>
+  mutate(entry_date = tstart[1]) |>
   ungroup()
 # Remove those under 10
 annual$age_group <- relevel(annual$age_group, ref = "[10,19)")
-annual <- annual %>% filter(Age_YrEnd != 0, Age_YrEnd >= 10)
+annual <- annual |> filter(Age_YrEnd != 0, Age_YrEnd >= 10)
 annual$age_group <- droplevels(annual$age_group)
 # List of covariates
 vars <- c(
@@ -2044,7 +2044,7 @@ cfrd_only <- data.frame(t(cfrd_only))
 colnames(cfrd_only) <- c("id", "year", "a1c", "ogtt0hr", "ogtt2hr")
 cfrd_only <- left_join(
   cfrd_only,
-  annual %>% mutate(eDWID = as.numeric(eDWID)),
+  annual |> mutate(eDWID = as.numeric(eDWID)),
   by = join_by(id == eDWID, year == ReviewYear)
 )
 cfrd_only$a1c_ogtt <- apply(cfrd_only, 1, function(r) {
@@ -2068,7 +2068,7 @@ cfrd_only$a1c_ogtt <- factor(
     "OGTT"
   )
 )
-cfrd_only %>%
+cfrd_only |>
   select(
     a1c_ogtt,
     Age_YrEnd,
@@ -2091,18 +2091,18 @@ cfrd_only %>%
     A_fungalyeast1,
     A_mycocultureresults3,
     A_cultureresults3
-  ) %>%
+  ) |>
   tbl_summary(
     by = a1c_ogtt,
     missing_text = "Missing",
     statistic = list(all_continuous() ~ "{mean} ({sd})")
-  ) %>%
-  add_overall() %>%
-  add_p(test = list(all_continuous() ~ "oneway.test")) %>%
+  ) |>
+  add_overall() |>
+  add_p(test = list(all_continuous() ~ "oneway.test")) |>
   modify_caption("**All Groups**")
-cfrd_only %>%
-  filter(a1c_ogtt %in% c("OGTT", "HbA1c Only")) %>%
-  mutate(a1c_ogtt = droplevels(a1c_ogtt)) %>%
+cfrd_only |>
+  filter(a1c_ogtt %in% c("OGTT", "HbA1c Only")) |>
+  mutate(a1c_ogtt = droplevels(a1c_ogtt)) |>
   select(
     a1c_ogtt,
     Age_YrEnd,
@@ -2124,14 +2124,14 @@ cfrd_only %>%
     A_fungalyeast1,
     A_mycocultureresults3,
     A_cultureresults3
-  ) %>%
+  ) |>
   tbl_summary(
     by = a1c_ogtt,
     missing_text = "Missing",
     statistic = list(all_continuous() ~ "{mean} ({sd})")
-  ) %>%
-  add_overall() %>%
-  add_p(test = list(all_continuous() ~ "oneway.test")) %>%
+  ) |>
+  add_overall() |>
+  add_p(test = list(all_continuous() ~ "oneway.test")) |>
   modify_caption("**OGTT vs. HbA1c Only**")
 ```
 
@@ -2143,17 +2143,17 @@ cfrd_only %>%
 #| warning: false
 #| message: false
 # Plot by diagnosis type
-mod_df = cfrd_only %>%
-  select(id, a1c_ogtt, Age_YrEnd) %>%
+mod_df = cfrd_only |>
+  select(id, a1c_ogtt, Age_YrEnd) |>
   rename(eDWID = id)
 mod_df = left_join(
-  annual %>% select(-Age_YrEnd) |> mutate(eDWID = as.numeric(eDWID)),
+  annual |> select(-Age_YrEnd) |> mutate(eDWID = as.numeric(eDWID)),
   mod_df,
   by = join_by(eDWID)
 )
-mod_df = mod_df %>%
+mod_df = mod_df |>
   drop_na(first_cfrd) |>
-  group_by(eDWID) %>%
+  group_by(eDWID) |>
   mutate(years_to_cfrd = ReviewYear - first_cfrd)
 var_label(mod_df$years_to_cfrd) = "Years to CFRD"
 var_label(mod_df$Age_YrEnd) = "Age at Diagnosis"
@@ -2277,9 +2277,9 @@ contr <- rbind(
 )
 change_mod_slopes <- glht(m, linfct = contr)
 change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
-change_mod_slopes_ci$confint %>%
-  as.data.frame() %>%
-  gt(caption = "Slopes by Diagnosis Method", rownames_to_stub = T) %>%
+change_mod_slopes_ci$confint |>
+  as.data.frame() |>
+  gt(caption = "Slopes by Diagnosis Method", rownames_to_stub = T) |>
   fmt_number(decimals = 2)
 # Model table
 m |> tbl_regression() |> add_n(location = "level")
@@ -2392,9 +2392,9 @@ contr <- rbind(
 )
 change_mod_slopes <- glht(m, linfct = contr)
 change_mod_slopes_ci <- confint(change_mod_slopes, calpha = univariate_calpha())
-change_mod_slopes_ci$confint %>%
-  as.data.frame() %>%
-  gt(caption = "Slopes by Diagnosis Method", rownames_to_stub = T) %>%
+change_mod_slopes_ci$confint |>
+  as.data.frame() |>
+  gt(caption = "Slopes by Diagnosis Method", rownames_to_stub = T) |>
   fmt_number(decimals = 2)
 # Model table
 m |> tbl_regression() |> add_n(location = "level")
