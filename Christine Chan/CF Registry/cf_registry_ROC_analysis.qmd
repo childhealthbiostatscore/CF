@@ -1936,7 +1936,7 @@ annual[, yn_vars] <- lapply(
 annual$A_IsOnEnzymes <- factor(
   annual$A_IsOnEnzymes,
   levels = c(1, 0),
-  labels = c(" Yes", " No")
+  labels = c("Yes", " No")
 )
 # FEV1 to categorical
 annual$ppFEV1_cat <- cut(
@@ -2158,7 +2158,7 @@ mod_df = mod_df %>%
 var_label(mod_df$years_to_cfrd) = "Years to CFRD"
 var_label(mod_df$Age_YrEnd) = "Age at Diagnosis"
 ggplot(
-  mod_df %>% filter(!is.na(a1c_ogtt)),
+  mod_df |> filter(!is.na(a1c_ogtt)),
   aes(
     y = A_FEV1_pct_predicted,
     x = years_to_cfrd,
@@ -2167,7 +2167,7 @@ ggplot(
   )
 ) +
   xlab("Years from CFRD") +
-  xlim(c(-10, 10)) +
+  xlim(c(-5, 5)) +
   geom_point(alpha = 0.1, shape = ".") +
   geom_smooth(formula = y ~ s(x, bs = "cr")) +
   theme_bw() +
@@ -2175,8 +2175,6 @@ ggplot(
 ```
 
 ### Piecewise linear model results
-
-There were not enough pancreatic sufficient people in this dataset to include that varaible in the model.
 
 ```{r}
 # Fit model - adjust for age at dx, sex, genotype (severe vs mild), pancreatic
@@ -2187,6 +2185,24 @@ label(mod_df$x) = "Change in Slope Post-CFRD"
 label(mod_df$years_to_cfrd) = "Slope Pre-CFRD"
 label(mod_df$a1c_ogtt) = "Diagnosis Method"
 label(mod_df$Age_YrEnd) = "Age at Diagnosis"
+# Write data so Christine can see missing data
+t = mod_df |>
+  select(
+    eDWID,
+    years_to_cfrd,
+    A_FEV1_pct_predicted,
+    A_FVC_pct_predicted,
+    a1c_ogtt,
+    Age_YrEnd,
+    Gender,
+    MutClass,
+    A_IsOnEnzymes,
+    A_Vx770,
+    A_VX809comb
+  ) |>
+  drop_na(A_FEV1_pct_predicted)
+write.csv(t, "./Data_Clean/fev1_model_data.csv", row.names = F, na = "")
+# Fit the model
 m <- lmer(
   A_FEV1_pct_predicted ~ years_to_cfrd *
     a1c_ogtt +
@@ -2194,6 +2210,7 @@ m <- lmer(
     Age_YrEnd +
     Gender +
     MutClass +
+    A_IsOnEnzymes +
     A_Vx770 +
     A_VX809comb +
     (1 | eDWID),
@@ -2201,11 +2218,12 @@ m <- lmer(
 )
 # Population-averaged plot
 pop_dat <- data.frame(expand.grid(
-  years_to_cfrd = -10:10,
+  years_to_cfrd = -5:5,
   a1c_ogtt = unique(mod_df$a1c_ogtt),
   Age_YrEnd = mean(mod_df$Age_YrEnd, na.rm = T),
   Gender = "M",
   MutClass = "1-3",
+  A_IsOnEnzymes = "Yes",
   A_Vx770 = "No",
   A_VX809comb = "No"
 ))
@@ -2224,8 +2242,6 @@ ggplot(
   xlab("Years from CFRD") +
   ylab("FEV1 % Predicted") +
   theme_classic(base_size = 15)
-# Model table
-m |> tbl_regression()
 # Contrasts
 neither_pre <- rep(0, nrow(summary(m)$coefficients))
 neither_change <- rep(0, nrow(summary(m)$coefficients))
@@ -2265,6 +2281,8 @@ change_mod_slopes_ci$confint %>%
   as.data.frame() %>%
   gt(caption = "Slopes by Diagnosis Method", rownames_to_stub = T) %>%
   fmt_number(decimals = 2)
+# Model table
+m |> tbl_regression() |> add_n(location = "level")
 ```
 
 ## FVC trends by diagnosis method
@@ -2273,7 +2291,7 @@ change_mod_slopes_ci$confint %>%
 
 ```{r} 
 ggplot(
-  mod_df %>% filter(!is.na(a1c_ogtt)),
+  mod_df |> filter(!is.na(a1c_ogtt)),
   aes(
     y = A_FVC_pct_predicted,
     x = years_to_cfrd,
@@ -2282,7 +2300,7 @@ ggplot(
   )
 ) +
   xlab("Years from CFRD") +
-  xlim(c(-10, 10)) +
+  xlim(c(-5, 5)) +
   geom_point(alpha = 0.1, shape = ".") +
   geom_smooth(formula = y ~ s(x, bs = "cr")) +
   theme_bw() +
@@ -2290,8 +2308,6 @@ ggplot(
 ```
 
 ### Piecewise linear model results
-
-There were not enough pancreatic sufficient people in this dataset to include that varaible in the model.
 
 ```{r}
 # Fit model - adjust for age at dx, sex, genotype (severe vs mild), pancreatic
@@ -2309,6 +2325,7 @@ m <- lmer(
     Age_YrEnd +
     Gender +
     MutClass +
+    A_IsOnEnzymes +
     A_Vx770 +
     A_VX809comb +
     (1 | eDWID),
@@ -2316,11 +2333,12 @@ m <- lmer(
 )
 # Population-averaged plot
 pop_dat <- data.frame(expand.grid(
-  years_to_cfrd = -10:10,
+  years_to_cfrd = -5:5,
   a1c_ogtt = unique(mod_df$a1c_ogtt),
   Age_YrEnd = mean(mod_df$Age_YrEnd, na.rm = T),
   Gender = "M",
   MutClass = "1-3",
+  A_IsOnEnzymes = "Yes",
   A_Vx770 = "No",
   A_VX809comb = "No"
 ))
@@ -2339,8 +2357,6 @@ ggplot(
   xlab("Years from CFRD") +
   ylab("FVC % Predicted") +
   theme_classic(base_size = 15)
-# Model table
-m |> tbl_regression()
 # Contrasts
 neither_pre <- rep(0, nrow(summary(m)$coefficients))
 neither_change <- rep(0, nrow(summary(m)$coefficients))
@@ -2380,4 +2396,6 @@ change_mod_slopes_ci$confint %>%
   as.data.frame() %>%
   gt(caption = "Slopes by Diagnosis Method", rownames_to_stub = T) %>%
   fmt_number(decimals = 2)
+# Model table
+m |> tbl_regression() |> add_n(location = "level")
 ```
