@@ -82,6 +82,30 @@ chco <- chco %>%
 # Fix CHCO diagnoses per Angela
 chco_diagnoses <- read.csv("./Data_Cleaned/chco_diagnoses.csv")
 chco <- full_join(chco, chco_diagnoses, by = join_by(PatientID))
+# Manual fixes per Angela's 11/21/25 email
+chco$Diagnosis[chco$PatientID == 549] = "CFTR-related disorder"
+chco$Diagnosis[chco$PatientID == 650] = "Cystic Fibrosis"
+chco$Diagnosis[chco$PatientID == 653] = "CFTR-related disorder"
+chco$Diagnosis[chco$PatientID == 693] = "Cystic Fibrosis"
+chco$Diagnosis[chco$PatientID == 702] = "Cystic Fibrosis"
+chco$Diagnosis[chco$PatientID == 721] = "Cystic Fibrosis"
+chco$Diagnosis[chco$PatientID == 736] = "CFTR-related disorder"
+chco[nrow(chco) + 1, ] <- NA
+chco$PatientID[nrow(chco)] = 692
+chco$Age[nrow(chco)] = (mdy("3/24/2014") - mdy("9/26/13")) / 365.25
+chco$Diagnosis[nrow(chco)] = "CRMS"
+chco$Na_Left[nrow(chco)] = 24.1
+chco$Na_Right[nrow(chco)] = 21.1
+chco$Cl[nrow(chco)] = 30
+chco$Cl_Right[nrow(chco)] = 30
+chco[nrow(chco) + 1, ] <- NA
+chco$PatientID[nrow(chco)] = 724
+chco$Age[nrow(chco)] = (mdy("5/08/2015") - mdy("1/18/09")) / 365.25
+chco$Diagnosis[nrow(chco)] = "CFTR-related disorder"
+chco$Na_Left[nrow(chco)] = 72.4
+chco$Na_Right[nrow(chco)] = 72.4
+chco$Cl_Left[nrow(chco)] = 64
+chco$Cl_Right[nrow(chco)] = 59
 chco$PatientID <- NULL
 # Manually add some Na and Cl values that Angela was able to find (using
 # numbers so that no PHI is on GitHub)
