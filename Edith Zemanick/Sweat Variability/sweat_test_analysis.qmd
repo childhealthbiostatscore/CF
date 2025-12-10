@@ -10,7 +10,7 @@ format:
     toc-float: true
     number-sections: true
     code-fold: true
-    self-contained: true
+    embed-resources: true
     fig-cap-location: top
     page-layout: full
 editor: source
@@ -25,6 +25,7 @@ library(readxl)
 library(tidyverse)
 library(arsenal)
 library(pROC)
+library(patchwork)
 home_dir <- switch(
   Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability",
@@ -326,9 +327,103 @@ df <- df %>%
   rename(`Genotype Risk` = geno_risk) %>%
   filter(Age < 50)
 df <- df[-which(duplicated(df$Name)), ]
+# Age groups
+df$`Age Group` = cut(
+  df$Age,
+  breaks = c(-Inf, 18, Inf),
+  labels = c("< 18", ">= 18"),
+  right = FALSE
+)
+# Specific genotypes
+df$Genotypes1[
+  !df$Genotypes1 %in%
+    c(
+      "F508del",
+      "G542X",
+      "G551D",
+      "W1282X",
+      "N1303K",
+      "R117H"
+    )
+] = "Other"
+df$Genotypes2[
+  !df$Genotypes2 %in%
+    c(
+      "F508del",
+      "G542X",
+      "G551D",
+      "W1282X",
+      "N1303K",
+      "R117H"
+    )
+] = "Other"
+df$Genotype = paste0(df$Genotypes1, "/", df$Genotypes2)
+df$Genotype = factor(
+  df$Genotype,
+  levels = c(
+    "F508del/F508del",
+    "F508del/G542X",
+    "F508del/G551D",
+    "F508del/N1303K",
+    "F508del/Other",
+    "F508del/R117H",
+    "F508del/W1282X",
+    "G542X/G551D",
+    "G542X/N1303K",
+    "G542X/Other",
+    "G542X/R117H",
+    "G551D/Other",
+    "G551D/R117H",
+    "N1303K/G542X",
+    "N1303K/N1303K",
+    "N1303K/Other",
+    "Other/F508del",
+    "Other/G542X",
+    "Other/Other",
+    "Other/W1282X",
+    "R117H/F508del",
+    "R117H/Other",
+    "W1282X/N1303K"
+  ),
+  labels = c(
+    "F508del/F508del",
+    "F508del/G542X",
+    "F508del/G551D",
+    "F508del/N1303K",
+    "F508del/Other",
+    "F508del/R117H",
+    "F508del/W1282X",
+    "Other",
+    "Other",
+    "Other",
+    "Other",
+    "Other",
+    "Other",
+    "Other",
+    "Other",
+    "Other",
+    "F508del/Other",
+    "Other",
+    "Other",
+    "Other",
+    "F508del/R117H",
+    "Other",
+    "Other"
+  )
+)
+# Order factor variables
+df$Diagnosis = factor(
+  df$Diagnosis,
+  levels = c("Non-CF", "CFTR-RD or CRMS", "Cystic Fibrosis")
+)
+df$`Genotype Risk` = factor(
+  df$`Genotype Risk`,
+  levels = c("Not CF", "Mild", "Severe", "Unknown")
+)
 # Set table options
 mycontrols <- tableby.control(
-  numeric.stats = c("N", "Nmiss", "meansd", "medianq1q3", "iqr", "range")
+  numeric.stats = c("N", "Nmiss", "meansd", "medianq1q3", "iqr", "range"),
+  simulate.p.value = TRUE
 )
 # Save this for Angela et al. to check
 write.csv(
@@ -360,6 +455,8 @@ summary(
       Method +
       Sex +
       Age +
+      fe(`Age Group`) +
+      fe(Genotype) +
       fe(`Genotype Risk`) +
       fe(`Cl Group`) +
       Cl +
@@ -382,6 +479,8 @@ summary(
     `Genotype Risk` ~
       Sex +
       Age +
+      fe(`Age Group`) +
+      fe(Genotype) +
       fe(`Cl Group`) +
       Cl +
       Na +
@@ -402,7 +501,14 @@ summary(
 ```{r results='asis'}
 summary(
   tableby(
-    `Cl Group` ~ Sex + Age + Cl + Na + `Na:Cl` + K,
+    `Cl Group` ~ Sex +
+      Age +
+      fe(`Age Group`) +
+      fe(Genotype) +
+      Cl +
+      Na +
+      `Na:Cl` +
+      K,
     data = df,
     control = mycontrols
   ),
@@ -418,20 +524,33 @@ summary(
 
 ```{r}
 #| warning: false
-clp <- ggplot(df, aes(x = Diagnosis, y = Cl)) +
+group_n <- df |> group_by(Diagnosis) |> summarise(n = n()) |> mutate(pos = 160)
+clp_d <- ggplot(df, aes(x = Diagnosis, y = Cl)) +
   geom_boxplot() +
+  geom_label(
+    data = group_n,
+    aes(x = Diagnosis, y = pos, label = paste("n =", n))
+  ) +
   theme_bw()
-clp
+clp_d
 ```
 
 #### By genotype risk
 
 ```{r}
 #| warning: false
-clp <- ggplot(df, aes(x = `Genotype Risk`, y = Cl)) +
+geno_n <- df |>
+  group_by(`Genotype Risk`) |>
+  summarise(n = n()) |>
+  mutate(pos = 160)
+clp_g <- ggplot(df, aes(x = `Genotype Risk`, y = Cl)) +
   geom_boxplot() +
+  geom_label(
+    data = geno_n,
+    aes(x = `Genotype Risk`, y = pos, label = paste("n =", n))
+  ) +
   theme_bw()
-clp
+clp_g
 ```
 
 ### Sodium
@@ -440,20 +559,28 @@ clp
 
 ```{r}
 #| warning: false
-nap <- ggplot(df, aes(x = Diagnosis, y = Na)) +
+nap_d <- ggplot(df, aes(x = Diagnosis, y = Na)) +
   geom_boxplot() +
+  geom_label(
+    data = group_n,
+    aes(x = Diagnosis, y = pos, label = paste("n =", n))
+  ) +
   theme_bw()
-nap
+nap_d
 ```
 
 #### By genotype risk
 
 ```{r}
 #| warning: false
-nap <- ggplot(df, aes(x = `Genotype Risk`, y = Na)) +
+nap_g <- ggplot(df, aes(x = `Genotype Risk`, y = Na)) +
   geom_boxplot() +
+  geom_label(
+    data = geno_n,
+    aes(x = `Genotype Risk`, y = pos, label = paste("n =", n))
+  ) +
   theme_bw()
-nap
+nap_g
 ```
 
 ### Na:Cl
@@ -462,46 +589,49 @@ nap
 
 ```{r}
 #| warning: false
-ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
+group_n$pos = 4
+ratiop_d <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
   geom_boxplot() +
+  geom_label(
+    data = group_n,
+    aes(x = Diagnosis, y = pos, label = paste("n =", n))
+  ) +
   geom_hline(yintercept = 1, color = "red") +
   geom_hline(yintercept = 1.25, color = "red") +
   theme_bw() +
-  ylab("Na:Cl") +
-  xlab("Modulator")
-ratiop
-ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
-  geom_boxplot() +
-  geom_hline(yintercept = 1, color = "red") +
-  geom_hline(yintercept = 1.25, color = "red") +
-  ylim(0, 2) +
-  theme_bw() +
-  ylab("Na:Cl") +
-  xlab("Modulator")
-ratiop
+  ylab("Na:Cl")
+ratiop_d
 ```
 
 #### By genotype risk
 
 ```{r}
 #| warning: false
-ratiop <- ggplot(df, aes(x = `Genotype Risk`, y = `Na:Cl`)) +
+geno_n$pos = 4
+ratiop_g <- ggplot(df, aes(x = `Genotype Risk`, y = `Na:Cl`)) +
   geom_boxplot() +
+  geom_label(
+    data = geno_n,
+    aes(x = `Genotype Risk`, y = pos, label = paste("n =", n))
+  ) +
   geom_hline(yintercept = 1, color = "red") +
   geom_hline(yintercept = 1.25, color = "red") +
   theme_bw() +
-  ylab("Na:Cl") +
-  xlab("Modulator")
-ratiop
-ratiop <- ggplot(df, aes(x = `Genotype Risk`, y = `Na:Cl`)) +
-  geom_boxplot() +
-  geom_hline(yintercept = 1, color = "red") +
-  geom_hline(yintercept = 1.25, color = "red") +
-  ylim(0, 2) +
-  theme_bw() +
-  ylab("Na:Cl") +
-  xlab("Modulator")
-ratiop
+  ylab("Na:Cl")
+ratiop_g
+```
+
+```{r}
+p1 = (clp_d + ratiop_d) / (clp_g + ratiop_g)
+p1
+ggsave(
+  filename = "./Dissemination/Figures/fig1.png",
+  plot = p1,
+  height = 9,
+  width = 12,
+  units = "in",
+  dpi = 600
+)
 ```
 
 ## Na:Cl ROC Curves
@@ -613,6 +743,8 @@ summary(
       Method +
       Sex +
       Age +
+      fe(`Age Group`) +
+      fe(Genotype) +
       fe(`Genotype Risk`) +
       fe(`Cl Group`) +
       Cl +
@@ -635,6 +767,8 @@ summary(
     `Genotype Risk` ~
       Sex +
       Age +
+      fe(`Age Group`) +
+      fe(Genotype) +
       fe(`Cl Group`) +
       Cl +
       Na +
@@ -655,7 +789,14 @@ summary(
 ```{r results='asis'}
 summary(
   tableby(
-    `Cl Group` ~ Sex + Age + Cl + Na + `Na:Cl` + K,
+    `Cl Group` ~ Sex +
+      Age +
+      fe(`Age Group`) +
+      fe(Genotype) +
+      Cl +
+      Na +
+      `Na:Cl` +
+      K,
     data = df,
     control = mycontrols
   ),
@@ -671,20 +812,33 @@ summary(
 
 ```{r}
 #| warning: false
-clp <- ggplot(df, aes(x = Diagnosis, y = Cl)) +
+group_n <- df |> group_by(Diagnosis) |> summarise(n = n()) |> mutate(pos = 160)
+clp_d <- ggplot(df, aes(x = Diagnosis, y = Cl)) +
   geom_boxplot() +
+  geom_label(
+    data = group_n,
+    aes(x = Diagnosis, y = pos, label = paste("n =", n))
+  ) +
   theme_bw()
-clp
+clp_d
 ```
 
 #### By genotype risk
 
 ```{r}
 #| warning: false
-clp <- ggplot(df, aes(x = `Genotype Risk`, y = Cl)) +
+geno_n <- df |>
+  group_by(`Genotype Risk`) |>
+  summarise(n = n()) |>
+  mutate(pos = 160)
+clp_g <- ggplot(df, aes(x = `Genotype Risk`, y = Cl)) +
   geom_boxplot() +
+  geom_label(
+    data = geno_n,
+    aes(x = `Genotype Risk`, y = pos, label = paste("n =", n))
+  ) +
   theme_bw()
-clp
+clp_g
 ```
 
 ### Sodium
@@ -693,20 +847,28 @@ clp
 
 ```{r}
 #| warning: false
-nap <- ggplot(df, aes(x = Diagnosis, y = Na)) +
+nap_d <- ggplot(df, aes(x = Diagnosis, y = Na)) +
   geom_boxplot() +
+  geom_label(
+    data = group_n,
+    aes(x = Diagnosis, y = pos, label = paste("n =", n))
+  ) +
   theme_bw()
-nap
+nap_d
 ```
 
 #### By genotype risk
 
 ```{r}
 #| warning: false
-nap <- ggplot(df, aes(x = `Genotype Risk`, y = Na)) +
+nap_g <- ggplot(df, aes(x = `Genotype Risk`, y = Na)) +
   geom_boxplot() +
+  geom_label(
+    data = geno_n,
+    aes(x = `Genotype Risk`, y = pos, label = paste("n =", n))
+  ) +
   theme_bw()
-nap
+nap_g
 ```
 
 ### Na:Cl
@@ -715,46 +877,49 @@ nap
 
 ```{r}
 #| warning: false
-ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
+group_n$pos = 4
+ratiop_d <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
   geom_boxplot() +
+  geom_label(
+    data = group_n,
+    aes(x = Diagnosis, y = pos, label = paste("n =", n))
+  ) +
   geom_hline(yintercept = 1, color = "red") +
   geom_hline(yintercept = 1.25, color = "red") +
   theme_bw() +
-  ylab("Na:Cl") +
-  xlab("Modulator")
-ratiop
-ratiop <- ggplot(df, aes(x = Diagnosis, y = `Na:Cl`)) +
-  geom_boxplot() +
-  geom_hline(yintercept = 1, color = "red") +
-  geom_hline(yintercept = 1.25, color = "red") +
-  ylim(0, 2) +
-  theme_bw() +
-  ylab("Na:Cl") +
-  xlab("Modulator")
-ratiop
+  ylab("Na:Cl")
+ratiop_d
 ```
 
 #### By genotype risk
 
 ```{r}
 #| warning: false
-ratiop <- ggplot(df, aes(x = `Genotype Risk`, y = `Na:Cl`)) +
+geno_n$pos = 4
+ratiop_g <- ggplot(df, aes(x = `Genotype Risk`, y = `Na:Cl`)) +
   geom_boxplot() +
+  geom_label(
+    data = geno_n,
+    aes(x = `Genotype Risk`, y = pos, label = paste("n =", n))
+  ) +
   geom_hline(yintercept = 1, color = "red") +
   geom_hline(yintercept = 1.25, color = "red") +
   theme_bw() +
-  ylab("Na:Cl") +
-  xlab("Modulator")
-ratiop
-ratiop <- ggplot(df, aes(x = `Genotype Risk`, y = `Na:Cl`)) +
-  geom_boxplot() +
-  geom_hline(yintercept = 1, color = "red") +
-  geom_hline(yintercept = 1.25, color = "red") +
-  ylim(0, 2) +
-  theme_bw() +
-  ylab("Na:Cl") +
-  xlab("Modulator")
-ratiop
+  ylab("Na:Cl")
+ratiop_g
+```
+
+```{r}
+p2 = (clp_d + ratiop_d) / (clp_g + ratiop_g)
+p2
+ggsave(
+  filename = "./Dissemination/Figures/fig2.png",
+  plot = p2,
+  height = 9,
+  width = 12,
+  units = "in",
+  dpi = 600
+)
 ```
 
 ## Na:Cl ROC Curves
