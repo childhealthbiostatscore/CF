@@ -71,7 +71,8 @@ cf_genotype_class_severity <- function(
     "R347H",
     "D1152H",
     "3849+10kbC>T",
-    "TG11-5T"
+    "TG11-5T",
+    "TG11"
   )
   IV <- unique(tolower(gsub("[[:punct:]]|\\s", "", IV)))
   IV <- matrix(c(IV, class = rep("IV", length(IV))), ncol = 2)

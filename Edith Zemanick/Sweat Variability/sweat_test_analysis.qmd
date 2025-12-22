@@ -301,11 +301,11 @@ df$geno_risk <- factor(
     "Not CF/Not CF"
   ),
   labels = c(
-    "Mild",
-    "Mild",
+    "Low",
+    "Low",
     "Unknown",
-    "Mild",
-    "Severe",
+    "Low",
+    "High",
     "Unknown",
     "Unknown",
     "Unknown",
@@ -335,6 +335,8 @@ df$`Age Group` = cut(
   labels = c("< 18", ">= 18"),
   right = FALSE
 )
+# All genotypes
+df$`Detailed Genotype` = paste0(df$Genotypes1, "/", df$Genotypes2)
 # Specific genotypes
 df$Genotypes1[
   !df$Genotypes1 %in%
@@ -415,11 +417,11 @@ df$Genotype = factor(
 # Order factor variables
 df$Diagnosis = factor(
   df$Diagnosis,
-  levels = c("Non-CF", "CFTR-RD or CRMS", "Cystic Fibrosis")
+  levels = c("Cystic Fibrosis", "CFTR-RD or CRMS", "Non-CF")
 )
 df$`Genotype Risk` = factor(
   df$`Genotype Risk`,
-  levels = c("Not CF", "Mild", "Severe", "Unknown")
+  levels = c("Not CF", "Low", "High", "Unknown")
 )
 # Set table options
 mycontrols <- tableby.control(
@@ -430,6 +432,43 @@ mycontrols <- tableby.control(
 write.csv(
   df,
   file = "./Data_Cleaned/sweat_variability_analysis_dataset.csv",
+  row.names = F,
+  na = ""
+)
+# Make detailed genotype table for manuscript
+geno_tab = xtabs(
+  ~ `Detailed Genotype` + `Genotype Risk` + Diagnosis,
+  data = df,
+  addNA = T
+) |>
+  data.frame() |>
+  filter(Diagnosis == "Cystic Fibrosis") |>
+  select(-Diagnosis) |>
+  pivot_wider(names_from = Genotype.Risk, values_from = Freq)
+categories = c("Not CF", "Low", "High", "Unknown")
+geno_tab$Category = apply(geno_tab[, categories], 1, function(r) {
+  w = which(r != 0)
+  if (length(w) > 0) {
+    return(categories[w])
+  } else {
+    return(NA)
+  }
+})
+geno_tab$Count = rowSums(geno_tab[, c("Not CF", "Low", "High", "Unknown")])
+geno_tab$Percentage = scales::percent(geno_tab$Count / sum(geno_tab$Count))
+geno_tab$`Num. CF Participants` = paste0(
+  geno_tab$Count,
+  " (",
+  geno_tab$Percentage,
+  ")"
+)
+geno_tab = geno_tab |>
+  filter(!is.na(Category)) |>
+  select(Detailed.Genotype, `Num. CF Participants`, Category) |>
+  rename(`Detailed Genotype` = Detailed.Genotype)
+write.csv(
+  geno_tab,
+  file = "./Dissemination/Genotypes.csv",
   row.names = F,
   na = ""
 )
@@ -472,7 +511,7 @@ summary(
 )
 ```
 
-## Table 2: Participant Demographics by Genotype Risk
+## Table 2: CF Demographics by Genotype Risk
 
 ```{r results='asis'}
 summary(
@@ -643,11 +682,10 @@ mc_roc <- multiclass.roc(
   quiet = T,
   levels = c("Non-CF", "CFTR-RD or CRMS", "Cystic Fibrosis")
 )
-roc_list <- list(
-  "Cystic Fibrosis vs. Non-CF" = mc_roc$rocs[[2]],
-  "CFTR-RD or CRMS vs. Cystic Fibrosis" = mc_roc$rocs[[3]],
-  "CFTR-RD or CRMS vs. Non-CF" = mc_roc$rocs[[1]]
-)
+roc_list = mc_roc$rocs
+names(roc_list) <- lapply(mc_roc$rocs, function(r) {
+  paste(r$levels, collapse = " vs. ")
+})
 ggroc(roc_list, legacy.axes = T) +
   theme_bw() +
   theme(legend.title = element_blank())
@@ -678,22 +716,22 @@ kable(roc_table, digits = 3)
 
 ```{r}
 plot(
-  roc_list[[2]],
-  print.auc = T,
-  print.thres = T,
-  main = "Cystic Fibrosis vs. CFTR-RD or CRMS"
-)
-plot(
   roc_list[[1]],
   print.auc = T,
   print.thres = T,
-  main = "Cystic Fibrosis vs. Non-CF"
+  main = names(roc_list)[1]
+)
+plot(
+  roc_list[[2]],
+  print.auc = T,
+  print.thres = T,
+  main = names(roc_list)[2]
 )
 plot(
   roc_list[[3]],
   print.auc = T,
   print.thres = T,
-  main = "CFTR-RD or CRMS vs. Non-CF"
+  main = names(roc_list)[3]
 )
 ```
 
@@ -704,14 +742,14 @@ plot(
 gr_roc <- roc(
   `Genotype Risk` ~ `Na:Cl`,
   data = df,
-  levels = c("Mild", "Severe"),
+  levels = c("Low", "High"),
   quiet = T
 )
 plot(
   gr_roc,
   print.auc = T,
   print.thres = T,
-  main = "Mild vs. Severe Genotype"
+  main = "Low vs. High Risk Genotype"
 )
 kable(coords(
   gr_roc,
@@ -932,11 +970,10 @@ mc_roc <- multiclass.roc(
   quiet = T,
   levels = c("Non-CF", "CFTR-RD or CRMS", "Cystic Fibrosis")
 )
-roc_list <- list(
-  "Cystic Fibrosis vs. Non-CF" = mc_roc$rocs[[2]],
-  "CFTR-RD or CRMS vs. Cystic Fibrosis" = mc_roc$rocs[[3]],
-  "CFTR-RD or CRMS vs. Non-CF" = mc_roc$rocs[[1]]
-)
+roc_list = mc_roc$rocs
+names(roc_list) <- lapply(mc_roc$rocs, function(r) {
+  paste(r$levels, collapse = " vs. ")
+})
 ggroc(roc_list, legacy.axes = T) +
   theme_bw() +
   theme(legend.title = element_blank())
@@ -967,22 +1004,22 @@ kable(roc_table, digits = 3)
 
 ```{r}
 plot(
-  roc_list[[2]],
-  print.auc = T,
-  print.thres = T,
-  main = "Cystic Fibrosis vs. CFTR-RD or CRMS"
-)
-plot(
   roc_list[[1]],
   print.auc = T,
   print.thres = T,
-  main = "Cystic Fibrosis vs. Non-CF"
+  main = names(roc_list)[1]
+)
+plot(
+  roc_list[[2]],
+  print.auc = T,
+  print.thres = T,
+  main = names(roc_list)[2]
 )
 plot(
   roc_list[[3]],
   print.auc = T,
   print.thres = T,
-  main = "CFTR-RD or CRMS vs. Non-CF"
+  main = names(roc_list)[3]
 )
 ```
 
@@ -993,14 +1030,14 @@ plot(
 gr_roc <- roc(
   `Genotype Risk` ~ `Na:Cl`,
   data = df,
-  levels = c("Mild", "Severe"),
+  levels = c("Low", "High"),
   quiet = T
 )
 plot(
   gr_roc,
   print.auc = T,
   print.thres = T,
-  main = "Mild vs. Severe Genotype"
+  main = "Low vs. High Risk Genotype"
 )
 kable(coords(
   gr_roc,
