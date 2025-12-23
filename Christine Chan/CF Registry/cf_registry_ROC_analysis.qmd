@@ -359,17 +359,22 @@ roc_df |>
 
 ### Pairwise comparisons
 
+P values below are FDR-adjusted for multiple comparisons.
+
 #### <140 vs. [140,200)
 
 ```{r}
 roc_df |>
-  select(`OGTT 2-hour`, Gender, MutClass, hgba1c) |>
+  select(-eDWID) |>
   filter(`OGTT 2-hour` != ">=200") |>
   mutate(`OGTT 2-hour` = droplevels(`OGTT 2-hour`)) |>
   tbl_summary(
     by = `OGTT 2-hour`,
     missing_text = "Missing",
-    type = list(all_continuous() ~ "continuous2"),
+    type = list(
+      reviewyear ~ "categorical",
+      all_continuous() ~ "continuous2"
+    ),
     statistic = list(
       all_continuous() ~
         c("{mean} ({sd})", "{median} ({p25}, {p75})", "{min}, {max}")
@@ -387,7 +392,9 @@ roc_df |>
     test = list(reviewyear = "fisher.test"),
     test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
   ) |>
+  add_q() |>
   separate_p_footnotes() |>
+  modify_column_hide(p.value) |>
   as_gt()
 ```
 
@@ -395,13 +402,16 @@ roc_df |>
 
 ```{r}
 roc_df |>
-  select(`OGTT 2-hour`, Gender, MutClass, hgba1c) |>
+  select(-eDWID) |>
   filter(`OGTT 2-hour` != "<140") |>
   mutate(`OGTT 2-hour` = droplevels(`OGTT 2-hour`)) |>
   tbl_summary(
     by = `OGTT 2-hour`,
     missing_text = "Missing",
-    type = list(all_continuous() ~ "continuous2"),
+    type = list(
+      reviewyear ~ "categorical",
+      all_continuous() ~ "continuous2"
+    ),
     statistic = list(
       all_continuous() ~
         c("{mean} ({sd})", "{median} ({p25}, {p75})", "{min}, {max}")
@@ -419,7 +429,9 @@ roc_df |>
     test = list(reviewyear = "fisher.test"),
     test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
   ) |>
+  add_q() |>
   separate_p_footnotes() |>
+  modify_column_hide(p.value) |>
   as_gt()
 ```
 
@@ -427,13 +439,16 @@ roc_df |>
 
 ```{r}
 roc_df |>
-  select(`OGTT 2-hour`, Gender, MutClass, hgba1c) |>
+  select(-eDWID) |>
   filter(`OGTT 2-hour` != "[140,200)") |>
   mutate(`OGTT 2-hour` = droplevels(`OGTT 2-hour`)) |>
   tbl_summary(
     by = `OGTT 2-hour`,
     missing_text = "Missing",
-    type = list(all_continuous() ~ "continuous2"),
+    type = list(
+      reviewyear ~ "categorical",
+      all_continuous() ~ "continuous2"
+    ),
     statistic = list(
       all_continuous() ~
         c("{mean} ({sd})", "{median} ({p25}, {p75})", "{min}, {max}")
@@ -451,7 +466,9 @@ roc_df |>
     test = list(reviewyear = "fisher.test"),
     test.args = all_tests("fisher.test") ~ list(simulate.p.value = T)
   ) |>
+  add_q() |>
   separate_p_footnotes() |>
+  modify_column_hide(p.value) |>
   as_gt()
 ```
 

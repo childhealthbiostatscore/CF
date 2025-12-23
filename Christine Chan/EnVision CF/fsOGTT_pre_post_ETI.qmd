@@ -43,6 +43,7 @@ setwd(home_dir)
 load("./Data_Clean/fsOGTT_pre_post_ETI.RData")
 # Subset to people with more than one pre-ETI fsOGTT
 multi_pre_df = df |>
+  arrange(study_id, Date) |>
   group_by(study_id) |>
   mutate(
     n_pre = sum(pre_post == "Pre"),
@@ -50,11 +51,23 @@ multi_pre_df = df |>
       last(Date),
       first(Date),
       units = "days"
+    )),
+    time_diff_last_first = as.numeric(difftime(
+      first(Date[pre_post == "Post"]),
+      last(Date[pre_post == "Pre"]),
+      units = "days"
     ))
   ) |>
   filter(n_pre > 1)
 var_label(multi_pre_df$n_pre) = "Number of fsOGTT pre-ETI"
 var_label(multi_pre_df$time_diff_first_last) = "Days From First to Last fsOGTT"
+var_label(
+  multi_pre_df$time_diff_last_first
+) = "Days From Last Pre-ETI fsOGTT to First Post-ETI fsOGTT"
+# Calculate days between pre- and post-ETI fsOGTTs
+times = multi_pre_df |>
+  group_by(study_id, pre_post) |>
+  reframe(d = difftime(Date, lag(Date), units = "days"))
 # Save for Christine and Monique
 write.csv(
   multi_pre_df,
@@ -67,6 +80,8 @@ write.csv(
 # Participants with > 1 pre-ETI fsOGTT
 
 ## Table 1: Participant characteristics at first fsOGTT
+
+The median number of days between pre-ETI fsOGTTs was `r as.numeric(summary(times$d[times$pre_post=="Pre"])[3])` (IQR: `r as.numeric(summary(times$d[times$pre_post=="Pre"])[2])`, `r as.numeric(summary(times$d[times$pre_post=="Pre"])[5])`). The median number of days between post-ETI fsOGTTs was `r as.numeric(summary(times$d[times$pre_post=="Post"])[3])` (IQR: `r as.numeric(summary(times$d[times$pre_post=="Post"])[2])`, `r as.numeric(summary(times$d[times$pre_post=="Post"])[5])`).
 
 ```{r}
 #| label: tbl-1
@@ -271,6 +286,37 @@ ggplotly(p)
 # Model
 m = lmer(
   odi_iauc ~ years_from_eti_start_model + slope_change + (1 | study_id),
+  data = multi_pre_df
+)
+m |>
+  tbl_regression(
+    exponentiate = F,
+    estimate_fun = label_style_sigfig(digits = 4),
+    pvalue_fun = label_style_pvalue(digits = 2),
+  )
+```
+
+## Matsuda
+
+```{r}
+#| warning: false
+# Plot
+p = ggplot(
+  multi_pre_df,
+  aes(
+    x = years_from_eti_start,
+    y = matsuda,
+    group = study_id,
+    color = study_id
+  )
+) +
+  geom_point() +
+  geom_line() +
+  theme_bw()
+ggplotly(p)
+# Model
+m = lmer(
+  matsuda ~ years_from_eti_start_model + slope_change + (1 | study_id),
   data = multi_pre_df
 )
 m |>
