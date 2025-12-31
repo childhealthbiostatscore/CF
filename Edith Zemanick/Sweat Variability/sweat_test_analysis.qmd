@@ -437,41 +437,16 @@ write.csv(
 )
 # Make detailed genotype table for manuscript
 geno_tab = xtabs(
-  ~ `Detailed Genotype` + `Genotype Risk` + Diagnosis,
+  ~ `Detailed Genotype` + `Genotype Risk`,
   data = df,
   addNA = T
 ) |>
   data.frame() |>
-  filter(Diagnosis == "Cystic Fibrosis") |>
-  select(-Diagnosis) |>
   pivot_wider(names_from = Genotype.Risk, values_from = Freq)
-categories = c("Not CF", "Low", "High", "Unknown")
-geno_tab$Category = apply(geno_tab[, categories], 1, function(r) {
-  w = which(r != 0)
-  if (length(w) > 0) {
-    return(categories[w])
-  } else {
-    return(NA)
-  }
-})
-geno_tab$Count = rowSums(geno_tab[, c("Not CF", "Low", "High", "Unknown")])
-geno_tab$Percentage = scales::percent(geno_tab$Count / sum(geno_tab$Count))
-geno_tab$`Num. CF Participants` = paste0(
-  geno_tab$Count,
-  " (",
-  geno_tab$Percentage,
-  ")"
-)
-geno_tab = geno_tab |>
-  filter(!is.na(Category)) |>
-  select(Detailed.Genotype, `Num. CF Participants`, Category) |>
-  rename(`Detailed Genotype` = Detailed.Genotype)
-write.csv(
-  geno_tab,
-  file = "./Dissemination/Genotypes.csv",
-  row.names = F,
-  na = ""
-)
+geno_diag = table(df$`Detailed Genotype`, df$Diagnosis) |>
+  data.frame() |>
+  filter(Freq != 0, Var1 != "NA/NA") |>
+  arrange(Var1)
 ```
 
 # Data Cleaning
