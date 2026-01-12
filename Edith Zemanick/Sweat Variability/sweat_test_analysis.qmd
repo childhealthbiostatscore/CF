@@ -442,11 +442,32 @@ geno_tab = xtabs(
   addNA = T
 ) |>
   data.frame() |>
-  pivot_wider(names_from = Genotype.Risk, values_from = Freq)
+  filter(Freq > 0, Detailed.Genotype != "NA/NA") |>
+  select(-Freq)
 geno_diag = table(df$`Detailed Genotype`, df$Diagnosis) |>
   data.frame() |>
   filter(Freq != 0, Var1 != "NA/NA") |>
-  arrange(Var1)
+  arrange(Var1) |>
+  pivot_wider(names_from = Var2, values_from = Freq)
+geno_diag = left_join(
+  geno_diag,
+  geno_tab,
+  by = join_by(Var1 == Detailed.Genotype)
+)
+geno_diag[is.na(geno_diag)] = 0
+geno_diag[, c("Cystic Fibrosis", "CFTR-RD or CRMS", "Non-CF")] = lapply(
+  geno_diag[, c("Cystic Fibrosis", "CFTR-RD or CRMS", "Non-CF")],
+  function(c) {
+    return(paste0(c, " (", scales::percent(c / sum(c)), ")"))
+  }
+)
+geno_diag = geno_diag |> rename(Genotype = Var1, Risk = Genotype.Risk)
+write.csv(
+  geno_diag,
+  file = "./Data_Cleaned/genotype_counts.csv",
+  row.names = F,
+  na = ""
+)
 ```
 
 # Data Cleaning
