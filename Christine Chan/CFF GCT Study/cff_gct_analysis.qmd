@@ -38,7 +38,7 @@ library(patchwork)
 library(ggflowchart)
 home_dir <- switch(
   Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Darwin" = "/Users/tim/OneDrive - The University of Colorado Denver/Vigers/CF",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
   "Linux" = "/home/tim/OneDrive/Vigers/CF"
 )
@@ -53,6 +53,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 
 ```{r data cleaning}
 #| warning: false
+setwd(home_dir)
 # Import from REDCap
 df <- read.csv(
   "./Christine Chan/CFF GCT Study/Data_Raw/CysticFibrosisScreen_DATA_LABELS_2024-04-19_1740.csv",
@@ -120,8 +121,8 @@ df <- df %>%
     "Type 2 diabetes in the family - Mother" = factor(
       Type.2.diabetes.in.the.family...Mother
     ),
-    "Brothers (number with diabetes)" = factor(Brothers..number.with.diabetes.),
-    "Sisters (number with diabetes)" = factor(Sisters..number.with.diabetes.),
+    "Brothers (number with diabetes)" = Brothers..number.with.diabetes.,
+    "Sisters (number with diabetes)" = Sisters..number.with.diabetes.,
     "Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)" = Number.of.other.relatives.with.diabetes..aunts..uncles..cousins..grandparents.
   ) %>%
   select(
@@ -143,6 +144,16 @@ df <- df %>%
     contains("OGTT "),
     "OGTT.Date.Time",
     "Study.visit.PFTs.Date."
+  )
+# Any family history of diabetes
+df$`Any Family History of Diabetes` =
+  factor(
+    df$`Type 2 diabetes in the family - Father` == "Yes" |
+      df$`Type 2 diabetes in the family - Mother` == "Yes" |
+      df$`Brothers (number with diabetes)` > 0 |
+      df$`Sisters (number with diabetes)` > 0,
+    levels = c(F, T),
+    labels = c("No", "Yes")
   )
 # Remove C044
 df <- df %>% filter(ID != "C044")
@@ -273,8 +284,9 @@ f <- ~ HbA1c +
   fe(`Pancreatic insufficient`) +
   fe(`Type 2 diabetes in the family - Father`) +
   fe(`Type 2 diabetes in the family - Mother`) +
-  fe(`Brothers (number with diabetes)`) +
-  fe(`Sisters (number with diabetes)`) +
+  kwt(`Brothers (number with diabetes)`) +
+  kwt(`Sisters (number with diabetes)`) +
+  `Any Family History of Diabetes` +
   kwt(
     `Number of other relatives with diabetes (aunts, uncles, cousins, grandparents)`,
     "N",
@@ -497,7 +509,7 @@ dot_rpg <- ggplot(
   ylab("Glucose (mg/dL)") +
   ggtitle("RPG") +
   theme_bw(base_size = 15) +
-  scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
+  scale_colour_manual(values = c("#00ADB5", "#F4B814FF", "#222831")) +
   theme(
     plot.title = element_text(hjust = 0.5),
     axis.title.x = element_blank(),
@@ -514,7 +526,7 @@ dot_gctpl <- ggplot(
   ylab("Glucose (mg/dL)") +
   ggtitle("GCTpl") +
   theme_bw(base_size = 15) +
-  scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
+  scale_colour_manual(values = c("#00ADB5", "#F4B814FF", "#222831")) +
   theme(
     plot.title = element_text(hjust = 0.5),
     axis.title.y = element_blank(),
@@ -532,7 +544,7 @@ dot_rcg <- ggplot(
   ylim(c(50, 300)) +
   ggtitle("RCG") +
   theme_bw(base_size = 15) +
-  scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
+  scale_colour_manual(values = c("#00ADB5", "#F4B814FF", "#222831")) +
   theme(
     legend.position = "none",
     plot.title = element_text(hjust = 0.5),
@@ -551,7 +563,7 @@ dot_gctcap <- ggplot(
   ylim(c(50, 300)) +
   ggtitle("GCTcap") +
   theme_bw(base_size = 15) +
-  scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
+  scale_colour_manual(values = c("#00ADB5", "#F4B814FF", "#222831")) +
   theme(
     plot.title = element_text(hjust = 0.5),
     axis.title.y = element_blank(),
@@ -570,7 +582,7 @@ dot_hba1c <- ggplot(
   ylab("%") +
   ggtitle("HbA1c") +
   theme_bw(base_size = 15) +
-  scale_colour_manual(values = c("#00ADB5", "#F4CE14", "#222831")) +
+  scale_colour_manual(values = c("#00ADB5", "#F4B814FF", "#222831")) +
   scale_linetype_manual(values = c("Youden Index" = "dashed")) +
   theme(
     legend.title = element_blank(),
