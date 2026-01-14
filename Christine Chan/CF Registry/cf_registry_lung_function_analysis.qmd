@@ -33,19 +33,17 @@ library(multcomp)
 library(tidyverse)
 library(parallel)
 library(knitr)
-base_dir <- switch(
-  Sys.info()["nodename"],
-  "togo" = "/home/tvigers/Documents/Data",
-  "Tims-MacBook-Air.local" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers",
-  "Tims-Mac-mini.local" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers",
-  "Mac" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers"
+base_dir <- switch(Sys.info()["nodename"],
+    "togo" = "/home/tvigers/Documents/Data",
+    "Tims-MacBook-Air.local" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers",
+    "Tims-Mac-mini.local" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers",
+    "Mac" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers"
 )
-data_dir <- switch(
-  Sys.info()["nodename"],
-  "togo" = "/CF/Christine Chan/CF Registry",
-  "Tims-MacBook-Air.local" = "/CF/Christine Chan/CF Registry",
-  "Tims-Mac-mini.local" = "/CF/Christine Chan/CF Registry",
-  "Mac" = "/CF/Christine Chan/CF Registry"
+data_dir <- switch(Sys.info()["nodename"],
+    "togo" = "/CF/Christine Chan/CF Registry",
+    "Tims-MacBook-Air.local" = "/CF/Christine Chan/CF Registry",
+    "Tims-Mac-mini.local" = "/CF/Christine Chan/CF Registry",
+    "Mac" = "/CF/Christine Chan/CF Registry"
 )
 home_dir <- paste0(base_dir, data_dir)
 knitr::opts_knit$set(root.dir = home_dir)
@@ -57,138 +55,138 @@ knitr::opts_knit$set(root.dir = home_dir)
 # Import data and codebook
 setwd(home_dir)
 annual <- read.csv(
-  "./Data_Raw/CFF19_Annualized_Del1.csv",
-  na.strings = c("", "N/A")
+    "./Data_Raw/CFF19_Annualized_Del1.csv",
+    na.strings = c("", "N/A")
 )
 # Remove those with T1D or T2D
 annual <- annual |> arrange(eDWID, ReviewYear)
 annual <- annual[!annual$cfrd_status_annual %in% c(4, 5), ]
 annual$cfrd_status_annual <- factor(
-  annual$cfrd_status_annual,
-  levels = 1:3,
-  labels = c("CFRD-", "CFRD-", "CFRD+")
+    annual$cfrd_status_annual,
+    levels = 1:3,
+    labels = c("CFRD-", "CFRD-", "CFRD+")
 )
 # Get mutations
 demogs <- read.csv("./Data_Raw/CFF19_DemogCFDiag_Del1.csv")
 races <- c(
-  "White",
-  "Black or African American",
-  "American Indian or Alaska Native",
-  "Asian",
-  "Native Hawaiian or Other Pacific ",
-  "Some other race"
-)
-demogs$Race <- apply(demogs, 1, function(r) {
-  w <- which(r[paste0("Race", 1:6)] == 1)
-  if (length(w) > 1) {
-    return("More than one race")
-  } else {
-    return(races[w])
-  }
-})
-demogs$Race <- factor(
-  demogs$Race,
-  levels = c(
     "White",
+    "Black or African American",
     "American Indian or Alaska Native",
     "Asian",
-    "Black or African American",
-    "More than one race",
     "Native Hawaiian or Other Pacific ",
     "Some other race"
-  ),
-  labels = c(
-    "White",
-    "Other race",
-    "Other race",
-    "Black or African American",
-    "More than one race",
-    "Other race",
-    "Other race"
-  )
+)
+demogs$Race <- apply(demogs, 1, function(r) {
+    w <- which(r[paste0("Race", 1:6)] == 1)
+    if (length(w) > 1) {
+        return("More than one race")
+    } else {
+        return(races[w])
+    }
+})
+demogs$Race <- factor(
+    demogs$Race,
+    levels = c(
+        "White",
+        "American Indian or Alaska Native",
+        "Asian",
+        "Black or African American",
+        "More than one race",
+        "Native Hawaiian or Other Pacific ",
+        "Some other race"
+    ),
+    labels = c(
+        "White",
+        "Other race",
+        "Other race",
+        "Black or African American",
+        "More than one race",
+        "Other race",
+        "Other race"
+    )
 )
 demogs$Hispanicrace <- factor(
-  demogs$Hispanicrace,
-  levels = 1:2,
-  labels = c("Yes", "No")
+    demogs$Hispanicrace,
+    levels = 1:2,
+    labels = c("Yes", "No")
 )
 demogs <- demogs |> select(eDWID, Gender, MutClass, Race, Hispanicrace)
 annual <- left_join(annual, demogs, by = join_by(eDWID))
 # Liver disease
 liver_fields <- c("A_hepatobiliary1_3", paste0("A_hepatobiliary2_", 1:4))
 annual$liver_disease <-
-  apply(annual[, liver_fields], 1, function(r) {
-    if (all(is.na(r))) {
-      return(NA)
-    } else {
-      return(max(as.numeric(r), na.rm = T))
-    }
-  })
+    apply(annual[, liver_fields], 1, function(r) {
+        if (all(is.na(r))) {
+            return(NA)
+        } else {
+            return(max(as.numeric(r), na.rm = T))
+        }
+    })
 # Get BMI categories
 annual$bmi <- annual$A_weight / ((annual$A_height / 100)^2)
 annual$bmi <- coalesce(annual$A_bmivalue, annual$bmi)
 annual$bmi_perc_cdc <- sds(
-  annual$bmi,
-  age = annual$Age_YrEnd,
-  sex = annual$Gender,
-  male = "M",
-  female = "F",
-  item = "bmi",
-  ref = cdc.ref,
-  type = "perc"
+    annual$bmi,
+    age = annual$Age_YrEnd,
+    sex = annual$Gender,
+    male = "M",
+    female = "F",
+    item = "bmi",
+    ref = cdc.ref,
+    type = "perc"
 ) *
-  100
+    100
 annual$bmi_perc_who <- sds(
-  annual$bmi,
-  age = annual$Age_YrEnd,
-  sex = annual$Gender,
-  male = "M",
-  female = "F",
-  item = "bmi",
-  ref = who.ref,
-  type = "perc"
+    annual$bmi,
+    age = annual$Age_YrEnd,
+    sex = annual$Gender,
+    male = "M",
+    female = "F",
+    item = "bmi",
+    ref = who.ref,
+    type = "perc"
 ) *
-  100
+    100
 annual$bmi_perc <- coalesce(annual$bmi_perc_cdc, annual$bmi_perc_who)
 annual$bmi_cat <- apply(annual, 1, function(r) {
-  age <- as.numeric(r["Age_YrEnd"])
-  gender <- as.character(r["Gender"])
-  bmi <- as.numeric(r["bmi"])
-  bmi_perc <- as.numeric(r["bmi_perc"])
-  if (age <= 20) {
-    return(cut(
-      bmi_perc,
-      c(-Inf, 10, 50, 85, Inf),
-      right = F,
-      labels = c("Undernourished", "At Risk", "Target/Goal", "Overweight")
-    ))
-  } else if (age > 20) {
-    if (gender == "M") {
-      return(cut(
-        bmi,
-        c(-Inf, 18.5, 23, 25, Inf),
-        right = F,
-        labels = c(
-          "Undernourished",
-          "At Risk",
-          "Target/Goal",
-          "Overweight"
-        )
-      ))
-    } else if (gender == "F") {
-      return(cut(
-        bmi,
-        c(-Inf, 18.5, 22, 25, Inf),
-        right = F,
-        labels = c(
-          "Undernourished",
-          "At Risk",
-          "Target/Goal",
-          "Overweight"
-        )
-      ))
+    age <- as.numeric(r["Age_YrEnd"])
+    gender <- as.character(r["Gender"])
+    bmi <- as.numeric(r["bmi"])
+    bmi_perc <- as.numeric(r["bmi_perc"])
+    if (age <= 20) {
+        return(cut(
+            bmi_perc,
+            c(-Inf, 10, 50, 85, Inf),
+            right = F,
+            labels = c("Undernourished", "At Risk", "Target/Goal", "Overweight")
+        ))
+    } else if (age > 20) {
+        if (gender == "M") {
+            return(cut(
+                bmi,
+                c(-Inf, 18.5, 23, 25, Inf),
+                right = F,
+                labels = c(
+                    "Undernourished",
+                    "At Risk",
+                    "Target/Goal",
+                    "Overweight"
+                )
+            ))
+        } else if (gender == "F") {
+            return(cut(
+                bmi,
+                c(-Inf, 18.5, 22, 25, Inf),
+                right = F,
+                labels = c(
+                    "Undernourished",
+                    "At Risk",
+                    "Target/Goal",
+                    "Overweight"
+                )
+            ))
+        }
     }
-  }
 })
 annual$bmi_cat <- relevel(annual$bmi_cat, ref = "Target/Goal")
 # Raw values for adults, percentiles for peds
@@ -197,54 +195,54 @@ annual$bmi_adult[annual$Age_YrEnd <= 20] <- NA
 annual$bmi_perc <- annual$bmi_perc
 annual$bmi_perc[annual$Age_YrEnd > 20] <- NA
 # Labels
-var_label(annual$bmi) = "BMI (all participants)"
-var_label(annual$bmi_perc) = "BMI percentile (age <= 20)"
-var_label(annual$bmi_adult) = "BMI value (age > 20)"
-var_label(annual$bmi_cat) = "BMI category"
+var_label(annual$bmi) <- "BMI (all participants)"
+var_label(annual$bmi_perc) <- "BMI percentile (age <= 20)"
+var_label(annual$bmi_adult) <- "BMI value (age > 20)"
+var_label(annual$bmi_cat) <- "BMI category"
 # Format columns
 annual$MutClass <- factor(
-  annual$MutClass,
-  levels = c("1-3", "4-5", "Oth", "N/A"),
-  labels = c("1-3", "4-5", "Oth", "Unknown")
+    annual$MutClass,
+    levels = c("1-3", "4-5", "Oth", "N/A"),
+    labels = c("1-3", "4-5", "Oth", "Unknown")
 )
 annual$NumPulmExacerbation <- cut(
-  annual$NumPulmExacerbation,
-  labels = c("0", "1", "2", ">=3"),
-  breaks = c(0, 1, 2, 3, Inf),
-  right = F
+    annual$NumPulmExacerbation,
+    labels = c("0", "1", "2", ">=3"),
+    breaks = c(0, 1, 2, 3, Inf),
+    right = F
 )
 # Bugs
 bugs <- c(
-  "A_pseudomonasaeruginosa",
-  "A_fungalyeast1",
-  "A_pulmonarycomplications1",
-  "A_mycocultureresults3",
-  "A_cultureresults3"
+    "A_pseudomonasaeruginosa",
+    "A_fungalyeast1",
+    "A_pulmonarycomplications1",
+    "A_mycocultureresults3",
+    "A_cultureresults3"
 )
 # Yes/No variables
 annual$cfrd_treatment_options1[annual$cfrd_treatment_options1 == 2] <- NA
 annual$cfrd_treatment_options4[annual$cfrd_treatment_options4 == 4] <- NA
 yn_vars <- c(
-  "A_corticosteroids1",
-  "A_feeding2",
-  "A_Vx770",
-  "A_VX809comb",
-  "liver_disease",
-  bugs,
-  "cfrd_treatment_options2",
-  "cfrd_treatment_options3",
-  "cfrd_treatment_options4"
+    "A_corticosteroids1",
+    "A_feeding2",
+    "A_Vx770",
+    "A_VX809comb",
+    "liver_disease",
+    bugs,
+    "cfrd_treatment_options2",
+    "cfrd_treatment_options3",
+    "cfrd_treatment_options4"
 )
 annual[, yn_vars] <- lapply(
-  annual[, yn_vars],
-  factor,
-  levels = 0:1,
-  labels = c("No", "Yes")
+    annual[, yn_vars],
+    factor,
+    levels = 0:1,
+    labels = c("No", "Yes")
 )
 annual$A_IsOnEnzymes <- factor(
-  annual$A_IsOnEnzymes,
-  levels = c(1, 0),
-  labels = c("Yes", " No")
+    annual$A_IsOnEnzymes,
+    levels = c(1, 0),
+    labels = c("Yes", " No")
 )
 # Males to reference group
 annual$Gender <- factor(annual$Gender, levels = c("M", "F"))
@@ -252,9 +250,9 @@ annual$Gender <- factor(annual$Gender, levels = c("M", "F"))
 annual$Hispanicrace <- factor(annual$Hispanicrace, levels = c("No", "Yes"))
 # Get first year of CFRD
 first_cfrd <- annual |>
-  filter(cfrd_status_annual == "CFRD+") |>
-  group_by(eDWID) |>
-  summarise(first_cfrd = min(ReviewYear), age_dx = min(Age_YrEnd))
+    filter(cfrd_status_annual == "CFRD+") |>
+    group_by(eDWID) |>
+    summarise(first_cfrd = min(ReviewYear), age_dx = min(Age_YrEnd))
 annual <- left_join(annual, first_cfrd, by = join_by(eDWID))
 # Year prior to first CFRD in registry - assume negative for CFRD. Assume all
 # years following are CFRD+
@@ -267,110 +265,68 @@ annual$CFRD <- factor(annual$CFRD, levels = c("CFRD-", "CFRD+"))
 # prior. This is super slow but idc idc.
 cl <- makeCluster(type = "FORK", 8)
 cfrd_only <- parApply(
-  cl,
-  first_cfrd,
-  1,
-  function(r) {
-    id <- as.numeric(r["eDWID"])
-    year <- as.numeric(r["first_cfrd"])
-    d <- annual[annual$eDWID == id & annual$ReviewYear %in% c(year, year - 1), ]
-    a1c <- as.numeric(last(d["A_hgba1c"], na_rm = TRUE))
-    ogtt0hr <- as.numeric(last(d["A_ogttfast_bloodglucose"], na_rm = TRUE))
-    ogtt2hr <- as.numeric(last(d["A_twohour_bloodglucose"], na_rm = TRUE))
-    d <- annual[annual$eDWID == id & annual$ReviewYear %in% c(year, year + 1), ]
-    treatment = any(
-      d[, c(
-        "cfrd_treatment_options2",
-        "cfrd_treatment_options3",
-        "cfrd_treatment_options4"
-      )] ==
-        "Yes",
-      na.rm = TRUE
-    )
-    return(c(id, year, a1c, ogtt0hr, ogtt2hr, treatment))
-  }
+    cl,
+    first_cfrd,
+    1,
+    function(r) {
+        id <- as.numeric(r["eDWID"])
+        year <- as.numeric(r["first_cfrd"])
+        d <- annual[annual$eDWID == id & annual$ReviewYear %in% c(year, year - 1), ]
+        a1c <- as.numeric(last(d["A_hgba1c"], na_rm = TRUE))
+        ogtt0hr <- as.numeric(last(d["A_ogttfast_bloodglucose"], na_rm = TRUE))
+        ogtt2hr <- as.numeric(last(d["A_twohour_bloodglucose"], na_rm = TRUE))
+        d <- annual[annual$eDWID == id & annual$ReviewYear %in% c(year, year + 1), ]
+        treatment <- any(
+            d[, c(
+                "cfrd_treatment_options2",
+                "cfrd_treatment_options3",
+                "cfrd_treatment_options4"
+            )] ==
+                "Yes",
+            na.rm = TRUE
+        )
+        return(c(id, year, a1c, ogtt0hr, ogtt2hr, treatment))
+    }
 )
 stopCluster(cl)
 cfrd_only <- data.frame(t(cfrd_only))
 colnames(cfrd_only) <- c(
-  "eDWID",
-  "dx_year",
-  "a1c",
-  "ogtt0hr",
-  "ogtt2hr",
-  "treatment"
+    "eDWID",
+    "dx_year",
+    "a1c",
+    "ogtt0hr",
+    "ogtt2hr",
+    "treatment"
 )
 # cfrd_only_store <- cfrd_only
 cfrd_only$a1c_ogtt <- apply(cfrd_only, 1, function(r) {
-  not_missing <- paste(
-    which(!is.na(r[c("a1c", "ogtt0hr", "ogtt2hr")])),
-    collapse = "_"
-  )
-  return(not_missing)
+    not_missing <- paste(
+        which(!is.na(r[c("a1c", "ogtt0hr", "ogtt2hr")])),
+        collapse = "_"
+    )
+    return(not_missing)
 })
 cfrd_only$a1c_ogtt <- factor(
-  cfrd_only$a1c_ogtt,
-  levels = c("", "1", "1_2", "1_2_3", "1_3", "2", "2_3", "3"),
-  labels = c(
-    "Neither",
-    "HbA1c Only",
-    "OGTT",
-    "OGTT",
-    "OGTT",
-    "OGTT",
-    "OGTT",
-    "OGTT"
-  )
+    cfrd_only$a1c_ogtt,
+    levels = c("", "1", "1_2", "1_2_3", "1_3", "2", "2_3", "3"),
+    labels = c(
+        "Neither",
+        "HbA1c Only",
+        "OGTT",
+        "OGTT",
+        "OGTT",
+        "OGTT",
+        "OGTT",
+        "OGTT"
+    )
 )
 var_label(cfrd_only$a1c_ogtt) <- "Diagnosis Method"
-cfrd_only$treatment = factor(
-  cfrd_only$treatment,
-  levels = 0:1,
-  labels = c("No Treatment", "Treatment")
+cfrd_only$treatment <- factor(
+    cfrd_only$treatment,
+    levels = 0:1,
+    labels = c("No Treatment", "Treatment")
 )
-var_label(cfrd_only$treatment) = "CFRD Treatment Started Within 1 Year?"
-# Write data for Christine to look at
-mod_df |>
-  select(
-    eDWID,
-    Race,
-    Hispanicrace,
-    MutClass,
-    ReviewYear,
-    Age_YrEnd,
-    CFRD,
-    first_cfrd,
-    age_dx,
-    A_weight,
-    A_height,
-    bmi_adult,
-    bmi_perc,
-    bmi_cat,
-    A_FEV1_pct_predicted,
-    A_FVC_pct_predicted,
-    a1c_ogtt,
-    A_hgba1c,
-    A_ogttfast_bloodglucose,
-    A_twohour_bloodglucose,
-    A_IsOnEnzymes,
-    liver_disease,
-    A_pseudomonasaeruginosa,
-    A_fungalyeast1,
-    A_mycocultureresults3,
-    A_cultureresults3,
-    treatment,
-    cfrd_treatment_options2,
-    cfrd_treatment_options3,
-    cfrd_treatment_options4,
-    NumFEV1,
-    NumFVC
-  ) %>%
-  write.csv(
-    .,
-    file = "./Data_Clean/fev1_model_data_2010.csv",
-    row.names = FALSE,
-    na = ""
-  )
+var_label(cfrd_only$treatment) <- "CFRD Treatment Started Within 1 Year?"
 ```
 
 # Diagnosed with CFRD between 2010 - 2018
@@ -379,50 +335,88 @@ mod_df |>
 
 ```{r}
 # Create a model dataframe
-mod_df = inner_join(
-  annual,
-  cfrd_only |> filter(dx_year >= 2010),
-  by = join_by(eDWID)
+mod_df <- inner_join(
+    annual,
+    cfrd_only |> filter(dx_year >= 2010),
+    by = join_by(eDWID)
 ) |>
-  drop_na(a1c_ogtt) |>
-  mutate(years_to_cfrd = ReviewYear - first_cfrd) |>
-  filter(years_to_cfrd <= 5 & years_to_cfrd >= -5) |>
-  mutate(years_to_cfrd = factor(years_to_cfrd))
-var_label(mod_df$years_to_cfrd) = "Years From CFRD Dx"
+    drop_na(a1c_ogtt) |>
+    mutate(years_to_cfrd = ReviewYear - first_cfrd) |>
+    filter(years_to_cfrd <= 5 & years_to_cfrd >= -5) |>
+    mutate(years_to_cfrd = factor(years_to_cfrd))
+var_label(mod_df$years_to_cfrd) <- "Years From CFRD Dx"
+# Write data for Christine to look at
+mod_df |>
+    select(
+        eDWID,
+        Race,
+        Hispanicrace,
+        MutClass,
+        ReviewYear,
+        Age_YrEnd,
+        CFRD,
+        first_cfrd,
+        age_dx,
+        A_weight,
+        A_height,
+        bmi_adult,
+        bmi_perc,
+        bmi_cat,
+        A_FEV1_pct_predicted,
+        A_FVC_pct_predicted,
+        a1c_ogtt,
+        A_hgba1c,
+        A_ogttfast_bloodglucose,
+        A_twohour_bloodglucose,
+        A_IsOnEnzymes,
+        liver_disease,
+        A_pseudomonasaeruginosa,
+        A_fungalyeast1,
+        A_mycocultureresults3,
+        A_cultureresults3,
+        treatment,
+        cfrd_treatment_options2,
+        cfrd_treatment_options3,
+        cfrd_treatment_options4,
+        NumFEV1,
+        NumFVC
+    ) %>%
+    write.csv(
+        .,
+        file = "./Data_Clean/fev1_model_data_2010.csv",
+        row.names = FALSE,
+        na = ""
+    )
 # Table 1 variable list
-t1_vars = c(
-  "eDWID",
-  "Race",
-  "Hispanicrace",
-  "MutClass",
-  "ReviewYear",
-  "Age_YrEnd",
-  "CFRD",
-  "first_cfrd",
-  "age_dx",
-  "A_weight",
-  "A_height",
-  "bmi_adult",
-  "bmi_perc",
-  "bmi_cat",
-  "A_FEV1_pct_predicted",
-  "A_FVC_pct_predicted",
-  "a1c_ogtt",
-  "A_hgba1c",
-  "A_ogttfast_bloodglucose",
-  "A_twohour_bloodglucose",
-  "A_IsOnEnzymes",
-  "liver_disease",
-  "A_pseudomonasaeruginosa",
-  "A_fungalyeast1",
-  "A_mycocultureresults3",
-  "A_cultureresults3",
-  "treatment",
-  "cfrd_treatment_options2",
-  "cfrd_treatment_options3",
-  "cfrd_treatment_options4",
-  "NumFEV1",
-  "NumFVC"
+t1_vars <- c(
+    "eDWID",
+    "Race",
+    "Hispanicrace",
+    "MutClass",
+    "age_dx",
+    "A_weight",
+    "A_height",
+    "bmi_adult",
+    "bmi_perc",
+    "bmi_cat",
+    "A_FEV1_pct_predicted",
+    "A_FVC_pct_predicted",
+    "a1c_ogtt",
+    "A_hgba1c",
+    "A_ogttfast_bloodglucose",
+    "A_twohour_bloodglucose",
+    "A_IsOnEnzymes",
+    "liver_disease",
+    "A_pseudomonasaeruginosa",
+    "A_fungalyeast1",
+    "A_mycocultureresults3",
+    "A_cultureresults3",
+    "treatment",
+    "cfrd_treatment_options2",
+    "cfrd_treatment_options3",
+    "cfrd_treatment_options4",
+    "NumFEV1",
+    "NumFVC"
 )
 ```
 
@@ -430,16 +424,16 @@ t1_vars = c(
 
 ```{r}
 mod_df |>
-  filter(ReviewYear == first_cfrd) |>
-  select(all_of(t1_vars)) |>
-  tbl_summary(
-    by = a1c_ogtt,
-    missing_text = "Missing",
-    statistic = list(all_continuous() ~ "{mean} ({sd})")
-  ) |>
-  add_overall() |>
-  add_p() |>
-  modify_caption("**All Groups**")
+    filter(ReviewYear == first_cfrd) |>
+    select(all_of(t1_vars)) |>
+    tbl_summary(
+        by = a1c_ogtt,
+        missing_text = "Missing",
+        statistic = list(all_continuous() ~ "{mean} ({sd})")
+    ) |>
+    add_overall() |>
+    add_p() |>
+    modify_caption("**All Groups**")
 ```
 
 ### Pairwise comparisons
@@ -448,47 +442,47 @@ P values FDR-adjusted for multiple comparisons.
 
 ```{r}
 mod_df |>
-  filter(ReviewYear == first_cfrd) |>
-  filter(a1c_ogtt %in% c("OGTT", "HbA1c Only")) |>
-  mutate(a1c_ogtt = droplevels(a1c_ogtt)) |>
-  select(all_of(t1_vars)) |>
-  tbl_summary(
-    by = a1c_ogtt,
-    missing_text = "Missing",
-    statistic = list(all_continuous() ~ "{mean} ({sd})")
-  ) |>
-  add_overall() |>
-  add_p(test = list(all_continuous() ~ "oneway.test")) |>
-  add_q() |>
-  modify_caption("**OGTT vs. HbA1c Only**")
+    filter(ReviewYear == first_cfrd) |>
+    filter(a1c_ogtt %in% c("OGTT", "HbA1c Only")) |>
+    mutate(a1c_ogtt = droplevels(a1c_ogtt)) |>
+    select(all_of(t1_vars)) |>
+    tbl_summary(
+        by = a1c_ogtt,
+        missing_text = "Missing",
+        statistic = list(all_continuous() ~ "{mean} ({sd})")
+    ) |>
+    add_overall() |>
+    add_p(test = list(all_continuous() ~ "oneway.test")) |>
+    add_q() |>
+    modify_caption("**OGTT vs. HbA1c Only**")
 mod_df |>
-  filter(ReviewYear == first_cfrd) |>
-  filter(a1c_ogtt %in% c("OGTT", "Neither")) |>
-  mutate(a1c_ogtt = droplevels(a1c_ogtt)) |>
-  select(all_of(t1_vars)) |>
-  tbl_summary(
-    by = a1c_ogtt,
-    missing_text = "Missing",
-    statistic = list(all_continuous() ~ "{mean} ({sd})")
-  ) |>
-  add_overall() |>
-  add_p(test = list(all_continuous() ~ "oneway.test")) |>
-  add_q() |>
-  modify_caption("**OGTT vs. Neither**")
+    filter(ReviewYear == first_cfrd) |>
+    filter(a1c_ogtt %in% c("OGTT", "Neither")) |>
+    mutate(a1c_ogtt = droplevels(a1c_ogtt)) |>
+    select(all_of(t1_vars)) |>
+    tbl_summary(
+        by = a1c_ogtt,
+        missing_text = "Missing",
+        statistic = list(all_continuous() ~ "{mean} ({sd})")
+    ) |>
+    add_overall() |>
+    add_p(test = list(all_continuous() ~ "oneway.test")) |>
+    add_q() |>
+    modify_caption("**OGTT vs. Neither**")
 mod_df |>
-  filter(ReviewYear == first_cfrd) |>
-  filter(a1c_ogtt %in% c("HbA1c Only", "Neither")) |>
-  mutate(a1c_ogtt = droplevels(a1c_ogtt)) |>
-  select(all_of(t1_vars)) |>
-  tbl_summary(
-    by = a1c_ogtt,
-    missing_text = "Missing",
-    statistic = list(all_continuous() ~ "{mean} ({sd})")
-  ) |>
-  add_overall() |>
-  add_p(test = list(all_continuous() ~ "oneway.test")) |>
-  add_q() |>
-  modify_caption("**HbA1c Only vs. Neither**")
+    filter(ReviewYear == first_cfrd) |>
+    filter(a1c_ogtt %in% c("HbA1c Only", "Neither")) |>
+    mutate(a1c_ogtt = droplevels(a1c_ogtt)) |>
+    select(all_of(t1_vars)) |>
+    tbl_summary(
+        by = a1c_ogtt,
+        missing_text = "Missing",
+        statistic = list(all_continuous() ~ "{mean} ({sd})")
+    ) |>
+    add_overall() |>
+    add_p(test = list(all_continuous() ~ "oneway.test")) |>
+    add_q() |>
+    modify_caption("**HbA1c Only vs. Neither**")
 ```
 
 ## FEV1
@@ -498,32 +492,50 @@ Adjusted for age at diagnosis, number of FEV1 measures, sex, mutation class, and
 ```{r}
 # Fit the model
 m <- lmer(
-  A_FEV1_pct_predicted ~ years_to_cfrd *
-    a1c_ogtt *
-    treatment +
-    age_dx +
-    NumFEV1 +
-    Gender +
-    MutClass +
-    A_IsOnEnzymes +
-    (1 | eDWID),
-  data = mod_df
+    A_FEV1_pct_predicted ~ years_to_cfrd *
+        a1c_ogtt +
+        years_to_cfrd * treatment +
+        age_dx +
+        NumFEV1 +
+        Gender +
+        MutClass +
+        A_IsOnEnzymes +
+        (1 | eDWID),
+    data = mod_df
 )
-t3 = car::Anova(m, type = 'III', contrasts = "contr.sum")
-emm = emmeans(m, specs = ~ years_to_cfrd + a1c_ogtt, pbkrtest.limit = 1e5)
+t3 <- car::Anova(m, type = "III", contrasts = "contr.sum")
+emm <- emmeans(
+    m,
+    specs = ~ years_to_cfrd + a1c_ogtt + treatment,
+    pbkrtest.limit = 1e5
+)
 ggplot(
-  data.frame(emm),
-  aes(x = years_to_cfrd, y = emmean, group = a1c_ogtt, color = a1c_ogtt)
+    data.frame(emm),
+    aes(
+        x = years_to_cfrd,
+        y = emmean,
+        group = interaction(a1c_ogtt, treatment),
+        color = a1c_ogtt,
+        shape = treatment
+    )
 ) +
-  geom_point() +
-  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.25) +
-  geom_line() +
-  xlab("Years From CFRD Dx") +
-  ylab("Estimated Mean ppFEV1") +
-  labs(color = "Diagnosis Method") +
-  theme_bw()
+    geom_point() +
+    geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+    geom_line(aes(linetype = treatment)) +
+    xlab("Years From CFRD Dx") +
+    ylab("Estimated Mean ppFEV1") +
+    labs(
+        color = "Diagnosis Method",
+        shape = "CFRD Treatment Within 1 Year",
+        linetype = "CFRD Treatment Within 1 Year",
+        caption = "Results are averaged over the levels of gender, mutation class, and pancreatic enzye use."
+    ) +
+    theme_bw() +
+    facet_wrap(~a1c_ogtt)
 # Model table
-m |> tbl_regression() |> add_n(location = "level")
+m |>
+    tbl_regression() |>
+    add_n(location = "level")
 ```
 
 The type 3 ANOVA indicates a significant interaction between time and diagnosis method (p =`r format.pval(t3[nrow(t3),"Pr(>Chisq)"], eps = 0.001)`).
@@ -531,21 +543,21 @@ The type 3 ANOVA indicates a significant interaction between time and diagnosis 
 ```{r}
 # Test contrasts
 F <- contrast(
-  emm,
-  list(
-    "Neither: -5 to 0 years" = neither_0 - neither_m_5,
-    "Neither: 0 to 5 years" = neither_5 - neither_0,
-    "Neither: -1 to 0 years" = neither_0 - neither_m_1,
-    "Neither: 0 to 1 years" = neither_1 - neither_0,
-    "HbA1c Only: -5 to 0 years" = hba1c_0 - hba1c_m_5,
-    "HbA1c Only: 0 to 5 years" = hba1c_5 - hba1c_0,
-    "HbA1c Only: -1 to 0 years" = hba1c_0 - hba1c_m_1,
-    "HbA1c Only: 0 to 1 years" = hba1c_1 - hba1c_0,
-    "OGTT: -5 to 0 years" = ogtt_0 - ogtt_m_5,
-    "OGTT: 0 to 5 years" = ogtt_5 - ogtt_0,
-    "OGTT: -1 to 0 years" = ogtt_0 - ogtt_m_1,
-    "OGTT: 0 to 1 years" = ogtt_1 - ogtt_0
-  )
+    emm,
+    list(
+        "Neither: -5 to 0 years" = neither_0 - neither_m_5,
+        "Neither: 0 to 5 years" = neither_5 - neither_0,
+        "Neither: -1 to 0 years" = neither_0 - neither_m_1,
+        "Neither: 0 to 1 years" = neither_1 - neither_0,
+        "HbA1c Only: -5 to 0 years" = hba1c_0 - hba1c_m_5,
+        "HbA1c Only: 0 to 5 years" = hba1c_5 - hba1c_0,
+        "HbA1c Only: -1 to 0 years" = hba1c_0 - hba1c_m_1,
+        "HbA1c Only: 0 to 1 years" = hba1c_1 - hba1c_0,
+        "OGTT: -5 to 0 years" = ogtt_0 - ogtt_m_5,
+        "OGTT: 0 to 5 years" = ogtt_5 - ogtt_0,
+        "OGTT: -1 to 0 years" = ogtt_0 - ogtt_m_1,
+        "OGTT: 0 to 1 years" = ogtt_1 - ogtt_0
+    )
 )
 kable(F, digits = 3)
 kable(data.frame(emm), digits = 3)
@@ -562,31 +574,33 @@ Adjusted for age at diagnosis, number of FVC measures, sex, mutation class, and 
 ```{r}
 # Fit the model
 m <- lmer(
-  A_FVC_pct_predicted ~ years_to_cfrd *
-    a1c_ogtt +
-    age_dx +
-    NumFVC +
-    Gender +
-    MutClass +
-    A_IsOnEnzymes +
-    (1 | eDWID),
-  data = mod_df
+    A_FVC_pct_predicted ~ years_to_cfrd *
+        a1c_ogtt +
+        age_dx +
+        NumFVC +
+        Gender +
+        MutClass +
+        A_IsOnEnzymes +
+        (1 | eDWID),
+    data = mod_df
 )
-t3 = car::Anova(m, type = 'III', contrasts = "contr.sum")
-emm = emmeans(m, specs = ~ years_to_cfrd + a1c_ogtt, pbkrtest.limit = 1e5)
+t3 <- car::Anova(m, type = "III", contrasts = "contr.sum")
+emm <- emmeans(m, specs = ~ years_to_cfrd + a1c_ogtt, pbkrtest.limit = 1e5)
 ggplot(
-  data.frame(emm),
-  aes(x = years_to_cfrd, y = emmean, group = a1c_ogtt, color = a1c_ogtt)
+    data.frame(emm),
+    aes(x = years_to_cfrd, y = emmean, group = a1c_ogtt, color = a1c_ogtt)
 ) +
-  geom_point() +
-  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.25) +
-  geom_line() +
-  xlab("Years From CFRD Dx") +
-  ylab("Estimated Mean ppFVC") +
-  labs(color = "Diagnosis Method") +
-  theme_bw()
+    geom_point() +
+    geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.25) +
+    geom_line() +
+    xlab("Years From CFRD Dx") +
+    ylab("Estimated Mean ppFVC") +
+    labs(color = "Diagnosis Method") +
+    theme_bw()
 # Model table
-m |> tbl_regression() |> add_n(location = "level")
+m |>
+    tbl_regression() |>
+    add_n(location = "level")
 ```
 
 The type 3 ANOVA indicates a significant interaction between time and diagnosis method (p =`r format.pval(t3[nrow(t3),"Pr(>Chisq)"], eps = 0.001)`).
@@ -594,21 +608,21 @@ The type 3 ANOVA indicates a significant interaction between time and diagnosis 
 ```{r}
 # Test contrasts
 F <- contrast(
-  emm,
-  list(
-    "Neither: -5 to 0 years" = neither_0 - neither_m_5,
-    "Neither: 0 to 5 years" = neither_5 - neither_0,
-    "Neither: -1 to 0 years" = neither_0 - neither_m_1,
-    "Neither: 0 to 1 years" = neither_1 - neither_0,
-    "HbA1c Only: -5 to 0 years" = hba1c_0 - hba1c_m_5,
-    "HbA1c Only: 0 to 5 years" = hba1c_5 - hba1c_0,
-    "HbA1c Only: -1 to 0 years" = hba1c_0 - hba1c_m_1,
-    "HbA1c Only: 0 to 1 years" = hba1c_1 - hba1c_0,
-    "OGTT: -5 to 0 years" = ogtt_0 - ogtt_m_5,
-    "OGTT: 0 to 5 years" = ogtt_5 - ogtt_0,
-    "OGTT: -1 to 0 years" = ogtt_0 - ogtt_m_1,
-    "OGTT: 0 to 1 years" = ogtt_1 - ogtt_0
-  )
+    emm,
+    list(
+        "Neither: -5 to 0 years" = neither_0 - neither_m_5,
+        "Neither: 0 to 5 years" = neither_5 - neither_0,
+        "Neither: -1 to 0 years" = neither_0 - neither_m_1,
+        "Neither: 0 to 1 years" = neither_1 - neither_0,
+        "HbA1c Only: -5 to 0 years" = hba1c_0 - hba1c_m_5,
+        "HbA1c Only: 0 to 5 years" = hba1c_5 - hba1c_0,
+        "HbA1c Only: -1 to 0 years" = hba1c_0 - hba1c_m_1,
+        "HbA1c Only: 0 to 1 years" = hba1c_1 - hba1c_0,
+        "OGTT: -5 to 0 years" = ogtt_0 - ogtt_m_5,
+        "OGTT: 0 to 5 years" = ogtt_5 - ogtt_0,
+        "OGTT: -1 to 0 years" = ogtt_0 - ogtt_m_1,
+        "OGTT: 0 to 1 years" = ogtt_1 - ogtt_0
+    )
 )
 kable(F, digits = 3)
 kable(data.frame(emm), digits = 3)
@@ -623,32 +637,34 @@ Adjusted for age at diagnosis, number of FVC measures, sex, mutation class, panc
 ```{r}
 # Fit the model
 m <- lmer(
-  A_FVC_pct_predicted ~ years_to_cfrd *
-    a1c_ogtt +
-    age_dx +
-    NumFVC +
-    Gender +
-    MutClass +
-    A_IsOnEnzymes +
-    treatment +
-    (1 | eDWID),
-  data = mod_df
+    A_FVC_pct_predicted ~ years_to_cfrd *
+        a1c_ogtt +
+        age_dx +
+        NumFVC +
+        Gender +
+        MutClass +
+        A_IsOnEnzymes +
+        treatment +
+        (1 | eDWID),
+    data = mod_df
 )
-t3 = car::Anova(m, type = 'III', contrasts = "contr.sum")
-emm = emmeans(m, specs = ~ years_to_cfrd + a1c_ogtt, pbkrtest.limit = 1e5)
+t3 <- car::Anova(m, type = "III", contrasts = "contr.sum")
+emm <- emmeans(m, specs = ~ years_to_cfrd + a1c_ogtt, pbkrtest.limit = 1e5)
 ggplot(
-  data.frame(emm),
-  aes(x = years_to_cfrd, y = emmean, group = a1c_ogtt, color = a1c_ogtt)
+    data.frame(emm),
+    aes(x = years_to_cfrd, y = emmean, group = a1c_ogtt, color = a1c_ogtt)
 ) +
-  geom_point() +
-  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.25) +
-  geom_line() +
-  xlab("Years From CFRD Dx") +
-  ylab("Estimated Mean ppFVC") +
-  labs(color = "Diagnosis Method") +
-  theme_bw()
+    geom_point() +
+    geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.25) +
+    geom_line() +
+    xlab("Years From CFRD Dx") +
+    ylab("Estimated Mean ppFVC") +
+    labs(color = "Diagnosis Method") +
+    theme_bw()
 # Model table
-m |> tbl_regression() |> add_n(location = "level")
+m |>
+    tbl_regression() |>
+    add_n(location = "level")
 ```
 
 The type 3 ANOVA indicates a significant interaction between time and diagnosis method (p =`r format.pval(t3[nrow(t3),"Pr(>Chisq)"], eps = 0.001)`).
@@ -656,21 +672,21 @@ The type 3 ANOVA indicates a significant interaction between time and diagnosis 
 ```{r}
 # Test contrasts
 F <- contrast(
-  emm,
-  list(
-    "Neither: -5 to 0 years" = neither_0 - neither_m_5,
-    "Neither: 0 to 5 years" = neither_5 - neither_0,
-    "Neither: -1 to 0 years" = neither_0 - neither_m_1,
-    "Neither: 0 to 1 years" = neither_1 - neither_0,
-    "HbA1c Only: -5 to 0 years" = hba1c_0 - hba1c_m_5,
-    "HbA1c Only: 0 to 5 years" = hba1c_5 - hba1c_0,
-    "HbA1c Only: -1 to 0 years" = hba1c_0 - hba1c_m_1,
-    "HbA1c Only: 0 to 1 years" = hba1c_1 - hba1c_0,
-    "OGTT: -5 to 0 years" = ogtt_0 - ogtt_m_5,
-    "OGTT: 0 to 5 years" = ogtt_5 - ogtt_0,
-    "OGTT: -1 to 0 years" = ogtt_0 - ogtt_m_1,
-    "OGTT: 0 to 1 years" = ogtt_1 - ogtt_0
-  )
+    emm,
+    list(
+        "Neither: -5 to 0 years" = neither_0 - neither_m_5,
+        "Neither: 0 to 5 years" = neither_5 - neither_0,
+        "Neither: -1 to 0 years" = neither_0 - neither_m_1,
+        "Neither: 0 to 1 years" = neither_1 - neither_0,
+        "HbA1c Only: -5 to 0 years" = hba1c_0 - hba1c_m_5,
+        "HbA1c Only: 0 to 5 years" = hba1c_5 - hba1c_0,
+        "HbA1c Only: -1 to 0 years" = hba1c_0 - hba1c_m_1,
+        "HbA1c Only: 0 to 1 years" = hba1c_1 - hba1c_0,
+        "OGTT: -5 to 0 years" = ogtt_0 - ogtt_m_5,
+        "OGTT: 0 to 5 years" = ogtt_5 - ogtt_0,
+        "OGTT: -1 to 0 years" = ogtt_0 - ogtt_m_1,
+        "OGTT: 0 to 1 years" = ogtt_1 - ogtt_0
+    )
 )
 kable(F, digits = 3)
 kable(data.frame(emm), digits = 3)
