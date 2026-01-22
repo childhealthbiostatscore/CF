@@ -33,15 +33,13 @@ library(multcomp)
 library(tidyverse)
 library(parallel)
 library(knitr)
-base_dir <- switch(
-    Sys.info()["nodename"],
+base_dir <- switch(Sys.info()["nodename"],
     "togo" = "/home/tvigers/Documents/Data",
     "Tims-MacBook-Air.local" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers",
     "Tims-Mac-mini.local" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers",
     "Mac" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers"
 )
-data_dir <- switch(
-    Sys.info()["nodename"],
+data_dir <- switch(Sys.info()["nodename"],
     "togo" = "/CF/Christine Chan/CF Registry",
     "Tims-MacBook-Air.local" = "/CF/Christine Chan/CF Registry",
     "Tims-Mac-mini.local" = "/CF/Christine Chan/CF Registry",
