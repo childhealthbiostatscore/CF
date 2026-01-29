@@ -30,8 +30,11 @@ continuous_outcomes <- c(
   "gli_fev1_ppred_rn",
   "gli_fvc_ppred_rn",
   "gli_fev1fvc_ppred_rn",
+  "bmivalue",
   "bmipercentile",
+  "height",
   "heightpercentile",
+  "weight",
   "weightpercentile"
 )
 # Race variable

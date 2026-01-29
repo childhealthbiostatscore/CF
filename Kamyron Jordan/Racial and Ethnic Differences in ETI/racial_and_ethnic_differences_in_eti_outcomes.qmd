@@ -24,6 +24,7 @@ editor: source
 library(Hmisc)
 library(multcomp)
 library(tidyverse)
+library(patchwork)
 library(gt)
 library(gtsummary)
 library(ggflowchart)
@@ -32,9 +33,9 @@ library(broom)
 library(emmeans)
 home_dir <- switch(
   Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/tim/OneDrive/Vigers/CF"
+  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI",
+  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI",
+  "Linux" = "/home/tim/OneDrive/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI"
 )
 github_dir <- switch(
   Sys.info()["sysname"],
@@ -47,10 +48,11 @@ knitr::opts_knit$set(root.dir = home_dir)
 
 ```{r data import}
 # source("/home/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_outcomes_dataset.R")
+setwd(home_dir)
 load(
-  "./Kamyron Jordan/Racial and Ethnic Differences in ETI/Data_Cleaned/outcomes_dataset.RData"
+  "./Data_Cleaned/outcomes_dataset.RData"
 )
-# Change age group reference level
+# Change reference levels
 encounter$age_group <- relevel(encounter$age_group, ref = "[18,30)")
 ```
 
@@ -120,6 +122,7 @@ prior_mods$prior_modulator <- factor(
   labels = c("Yes", "No")
 )
 encounter <- left_join(encounter, prior_mods, by = join_by(eDWID))
+encounter$prior_modulator <- relevel(encounter$prior_modulator, ref = "No")
 # On enzymes for pancreatic insufficiency
 encounter$isOnEnzymes <-
   factor(encounter$isOnEnzymes, levels = 0:1, labels = c("No", "Yes"))
@@ -137,6 +140,45 @@ The following models are adjusted for age group and insurance status. We fit a G
 ## FEV1 % predicted
 
 ### Full cohort
+
+#### Quick annualized model check (unadjusted)
+
+In the model below, we categorized days from ETI start into categorical years, and averaged FEV1 within these buckets. Then, we fix a mixed model with years from ETI as a categorical variable and a random intercept for participant. This model is not adjusted for any covariates.
+
+```{r}
+#| include: false
+# Quick check of a categorical model
+annualized <- encounter |>
+  filter(Days >= -3 * 365.25 & Days <= 2 * 365.25) |>
+  mutate(
+    Days_cat = cut(
+      Days,
+      breaks = c(-3:2 * 365.25),
+      dig.lab = 6
+    )
+  ) |>
+  group_by(eDWID, Days_cat) |>
+  summarise(
+    Race = first(Race),
+    age_eti_group = first(age_eti_group),
+    Insurance = first(Insurance),
+    prior_modulator = first(prior_modulator),
+    isOnEnzymes = first(isOnEnzymes),
+    pseudomonasaeruginosa = first(pseudomonasaeruginosa),
+    fev1 = mean(gli_fev1_ppred_rn, na.rm = T),
+    .groups = "drop"
+  )
+ann_mod <- lmer(fev1 ~ Days_cat * Race + (1 | eDWID), data = annualized)
+emm <- data.frame(emmeans(
+  ann_mod,
+  specs = ~ Race + Days_cat,
+  pbkrtest.limit = 1e6
+))
+ggplot(emm, aes(x = Days_cat, y = emmean, group = Race, color = Race)) +
+  geom_point() +
+  geom_line() +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1)
+```
 
 #### GLI 2022 equations
 
@@ -170,13 +212,26 @@ pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
 pop_dat$pred <- pred$fit
 pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
 pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
-ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+p = ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   geom_point() +
   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
   geom_line() +
   xlab("Years from ETI Start") +
   ylab("FEV1 % Predicted") +
-  theme_classic(base_size = 15)
+  theme_classic(base_size = 15) +
+  scale_color_manual(
+    values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
+    labels = c("White", "Black", "Hispanic", "Other")
+  )
+p
+ggsave(
+  "./Dissemination/Figures/fig2.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Model summary
 change_mod %>%
   gtsummary::tbl_regression(
@@ -592,13 +647,26 @@ pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
 pop_dat$pred <- pred$fit
 pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
 pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
-ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+p = ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   geom_point() +
   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
   geom_line() +
   xlab("Years from ETI Start") +
-  ylab("gli_fvc_ppred_rn") +
-  theme_classic()
+  ylab("FVC % Predicted") +
+  theme_classic(base_size = 15) +
+  scale_color_manual(
+    values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
+    labels = c("White", "Black", "Hispanic", "Other")
+  )
+p
+ggsave(
+  "./Dissemination/Figures/figS1.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Model summary
 change_mod %>%
   gtsummary::tbl_regression(
@@ -1434,13 +1502,23 @@ pex_logistic <- glmer(
   control = glmerControl(optimizer = "bobyqa"),
   family = "binomial"
 )
-means <- data.frame(emmeans(pex_logistic, ~ Race | ETI, type = "response"))
+pex_logistic |> tbl_regression()
+means <- data.frame(emmeans(pex_logistic, ~ Race + ETI, type = "response"))
 means %>%
   gt(caption = "Probabilities by Race", rownames_to_stub = T) %>%
-  fmt_number(decimals = 1)
+  fmt_number(decimals = 3)
+# Contrasts
+aa_pre <- c(0, 1, 0, 0, 0, 0, 0, 0)
+aa_post <- c(0, 0, 0, 0, 0, 1, 0, 0)
+hl_pre <- c(0, 0, 1, 0, 0, 0, 0, 0)
+hl_post <- c(0, 0, 0, 0, 0, 0, 1, 0)
+nhw_pre <- c(1, 0, 0, 0, 0, 0, 0, 0)
+nhw_post <- c(0, 0, 0, 0, 1, 0, 0, 0)
+other_pre <- c(0, 0, 0, 1, 0, 0, 0, 0)
+other_post <- c(0, 0, 0, 0, 0, 0, 0, 1)
 ```
 
-The table above shows the predicted probability of a pulmonary exacerbation pre- and post-ETI. So for example, NHW pwCF had a PEx probability of `r round(means$prob[means$Race=="Non-Hispanic White"&means$ETI=="Pre-ETI"]*100,1)` (95%CI: `r round(means$asymp.LCL[means$Race=="Non-Hispanic White"&means$ETI=="Pre-ETI"]*100,1)` - `r round(means$asymp.UCL[means$Race=="Non-Hispanic White"&means$ETI=="Pre-ETI"]*100,1)`)  pre-ETI and `r round(means$prob[means$Race=="Non-Hispanic White"&means$ETI=="Post-ETI"]*100,1)` (95%CI: `r round(means$asymp.LCL[means$Race=="Non-Hispanic White"&means$ETI=="Post-ETI"]*100,1)` - `r round(means$asymp.UCL[means$Race=="Non-Hispanic White"&means$ETI=="Post-ETI"]*100,1)` post-ETI. Conversely, Black pwCF had a PEx probability of `r round(means$prob[means$Race=="Black or African American"&means$ETI=="Pre-ETI"]*100,1)` (95%CI: `r round(means$asymp.LCL[means$Race=="Black or African American"&means$ETI=="Pre-ETI"]*100,1)` - `r round(means$asymp.UCL[means$Race=="Black or African American"&means$ETI=="Pre-ETI"]*100,1)`)  pre-ETI and `r round(means$prob[means$Race=="Black or African American"&means$ETI=="Post-ETI"]*100,1)` (95%CI: `r round(means$asymp.LCL[means$Race=="Black or African American"&means$ETI=="Post-ETI"]*100,1)` - `r round(means$asymp.UCL[means$Race=="Black or African American"&means$ETI=="Post-ETI"]*100,1)` post-ETI. 
+The table above shows the predicted probability of a pulmonary exacerbation pre- and post-ETI. So for example, NHW pwCF had a PEx probability of `r round(means$prob[means$Race=="Non-Hispanic White"&means$ETI=="Pre-ETI"]*100,1)` (95%CI: `r round(means$asymp.LCL[means$Race=="Non-Hispanic White"&means$ETI=="Pre-ETI"]*100,1)` - `r round(means$asymp.UCL[means$Race=="Non-Hispanic White"&means$ETI=="Pre-ETI"]*100,1)`)  pre-ETI and `r round(means$prob[means$Race=="Non-Hispanic White"&means$ETI=="Post-ETI"]*100,1)` (95%CI: `r round(means$asymp.LCL[means$Race=="Non-Hispanic White"&means$ETI=="Post-ETI"]*100,1)` - `r round(means$asymp.UCL[means$Race=="Non-Hispanic White"&means$ETI=="Post-ETI"]*100,1)`) post-ETI. Conversely, Black pwCF had a PEx probability of `r round(means$prob[means$Race=="Black or African American"&means$ETI=="Pre-ETI"]*100,1)` (95%CI: `r round(means$asymp.LCL[means$Race=="Black or African American"&means$ETI=="Pre-ETI"]*100,1)` - `r round(means$asymp.UCL[means$Race=="Black or African American"&means$ETI=="Pre-ETI"]*100,1)`)  pre-ETI and `r round(means$prob[means$Race=="Black or African American"&means$ETI=="Post-ETI"]*100,1)` (95%CI: `r round(means$asymp.LCL[means$Race=="Black or African American"&means$ETI=="Post-ETI"]*100,1)` - `r round(means$asymp.UCL[means$Race=="Black or African American"&means$ETI=="Post-ETI"]*100,1)`) post-ETI. 
 
 ### Age < 18 at ETI initiation
 
@@ -1451,10 +1529,11 @@ pex_logistic <- glmer(
   control = glmerControl(optimizer = "bobyqa"),
   family = "binomial"
 )
-means <- data.frame(emmeans(pex_logistic, ~ Race | ETI, type = "response"))
-means %>%
+pex_logistic |> tbl_regression()
+means <- emmeans(pex_logistic, ~ Race + ETI, type = "response")
+data.frame(means) %>%
   gt(caption = "Probabilities by Race", rownames_to_stub = T) %>%
-  fmt_number(decimals = 1)
+  fmt_number(decimals = 3)
 ```
 
 ### Age >= 18 at ETI initiation
@@ -1469,7 +1548,7 @@ pex_logistic <- glmer(
 means <- data.frame(emmeans(pex_logistic, ~ Race | ETI, type = "response"))
 means %>%
   gt(caption = "Probabilities by Race", rownames_to_stub = T) %>%
-  fmt_number(decimals = 1)
+  fmt_number(decimals = 3)
 ```
 
 ## BMI
@@ -1495,13 +1574,26 @@ pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
 pop_dat$pred <- pred$fit
 pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
 pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
-ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+p3a = ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   geom_point() +
   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
   geom_line() +
   xlab("Years from ETI Start") +
   ylab("BMI Percentile") +
-  theme_classic(base_size = 15)
+  theme_classic(base_size = 15) +
+  scale_color_manual(
+    values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
+    labels = c("White", "Black", "Hispanic", "Other")
+  )
+p3a
+ggsave(
+  "./Dissemination/Figures/fig3a.png",
+  plot = p3a,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Model summary
 change_mod %>%
   gtsummary::tbl_regression(
@@ -1562,13 +1654,35 @@ pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
 pop_dat$pred <- pred$fit
 pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
 pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
-ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+p3b = ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   geom_point() +
   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
   geom_line() +
   xlab("Years from ETI Start") +
   ylab("BMI (kg/m2)") +
-  theme_classic(base_size = 15)
+  theme_classic(base_size = 15) +
+  scale_color_manual(
+    values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
+    labels = c("White", "Black", "Hispanic", "Other")
+  )
+p3b
+ggsave(
+  "./Dissemination/Figures/fig3b.png",
+  plot = p3b,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
+p = p3a / p3b + plot_layout(guides = "collect")
+ggsave(
+  "./Dissemination/Figures/fig3ab.png",
+  plot = p,
+  width = 9,
+  height = 7,
+  units = "in",
+  dpi = 600
+)
 # Model summary
 change_mod %>%
   gtsummary::tbl_regression(
