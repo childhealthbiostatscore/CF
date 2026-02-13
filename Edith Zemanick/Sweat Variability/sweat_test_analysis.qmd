@@ -423,6 +423,19 @@ df$`Genotype Risk` = factor(
   df$`Genotype Risk`,
   levels = c("Not CF", "Low", "High", "Unknown")
 )
+# Reclassify genotypes per Angela and Edith
+new_genotypes = read.csv(
+  "./Data_Cleaned/reclassified_genotypes_2026-02-09.csv",
+  na.strings = ""
+)
+new_genotypes$NewRisk = coalesce(
+  new_genotypes$Reclassification,
+  new_genotypes$Risk
+)
+df$`Genotype Risk` = new_genotypes$NewRisk[match(
+  df$`Detailed Genotype`,
+  new_genotypes$Genotype
+)]
 # Set table options
 mycontrols <- tableby.control(
   numeric.stats = c("N", "Nmiss", "meansd", "medianq1q3", "iqr", "range"),

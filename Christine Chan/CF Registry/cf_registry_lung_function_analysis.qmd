@@ -156,10 +156,10 @@ annual$Insurance <- factor(
     "Public",
     "Public",
     "More Than One",
-    "No Insurance",
+    "Other",
     "Other",
     "Public",
-    "Tricare"
+    "Other"
   )
 )
 # Family income
@@ -545,7 +545,7 @@ mod_df |>
     statistic = list(all_continuous() ~ "{mean} ({sd})")
   ) |>
   add_overall() |>
-  add_p() |>
+  add_p(test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE)) |>
   modify_caption("**All Groups**")
 ```
 
@@ -567,7 +567,10 @@ mod_df |>
     statistic = list(all_continuous() ~ "{mean} ({sd})")
   ) |>
   add_overall() |>
-  add_p(test = list(all_continuous() ~ "oneway.test")) |>
+  add_p(
+    test = list(all_continuous() ~ "oneway.test"),
+    test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE)
+  ) |>
   add_q() |>
   modify_caption("**OGTT vs. HbA1c Only**")
 mod_df |>
@@ -581,7 +584,10 @@ mod_df |>
     statistic = list(all_continuous() ~ "{mean} ({sd})")
   ) |>
   add_overall() |>
-  add_p(test = list(all_continuous() ~ "oneway.test")) |>
+  add_p(
+    test = list(all_continuous() ~ "oneway.test"),
+    test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE)
+  ) |>
   add_q() |>
   modify_caption("**OGTT vs. Neither**")
 mod_df |>
@@ -595,7 +601,10 @@ mod_df |>
     statistic = list(all_continuous() ~ "{mean} ({sd})")
   ) |>
   add_overall() |>
-  add_p(test = list(all_continuous() ~ "oneway.test")) |>
+  add_p(
+    test = list(all_continuous() ~ "oneway.test"),
+    test.args = all_tests("fisher.test") ~ list(simulate.p.value = TRUE)
+  ) |>
   add_q() |>
   modify_caption("**HbA1c Only vs. Neither**")
 ```
@@ -629,7 +638,8 @@ m2 <- lme(
     NumFEV1 +
     Gender +
     MutClass +
-    A_IsOnEnzymes,
+    A_IsOnEnzymes +
+    Insurance,
   random = ~ 1 | eDWID,
   correlation = corCAR1(),
   data = mod_df,
@@ -680,6 +690,7 @@ ggplot(
   facet_wrap(~a1c_ogtt)
 # Model table
 m2 |> tbl_regression()
+t3
 ```
 
 The type 3 ANOVA indicates a significant interaction between time and diagnosis method (p =`r format.pval(t3[which(rownames(t3)=="years_to_cfrd:a1c_ogtt"),"Pr(>Chisq)"], eps = 0.001)`) and time and treatment (p =`r format.pval(t3[which(rownames(t3)=="years_to_cfrd:treatment"),"Pr(>Chisq)"], eps = 0.001)`).
@@ -944,7 +955,8 @@ m2 <- lme(
     NumFVC +
     Gender +
     MutClass +
-    A_IsOnEnzymes,
+    A_IsOnEnzymes +
+    Insurance,
   random = ~ 1 | eDWID,
   correlation = corCAR1(),
   data = mod_df,
@@ -981,6 +993,7 @@ ggplot(
   facet_wrap(~a1c_ogtt)
 # Model table
 m2 |> tbl_regression()
+t3
 ```
 
 The type 3 ANOVA indicates a significant interaction between time and diagnosis method (p =`r format.pval(t3[which(rownames(t3)=="years_to_cfrd:a1c_ogtt"),"Pr(>Chisq)"], eps = 0.001)`) and time and treatment (p =`r format.pval(t3[which(rownames(t3)=="years_to_cfrd:treatment"),"Pr(>Chisq)"], eps = 0.001)`).
