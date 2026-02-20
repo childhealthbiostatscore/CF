@@ -294,13 +294,26 @@ pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
 pop_dat$pred <- pred$fit
 pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
 pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
-ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+p = ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   geom_point() +
   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
   geom_line() +
   xlab("Years from ETI Start") +
-  ylab("GLI_FEV1_pct_predicted") +
-  theme_classic()
+  ylab("FEV1 % Predicted (2012 Equation)") +
+  theme_classic() +
+  scale_color_manual(
+    values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
+    labels = c("White", "Black", "Hispanic", "Other")
+  )
+p
+ggsave(
+  "./Dissemination/Figures/fev1_2012.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Model summary
 change_mod %>%
   gtsummary::tbl_regression(
