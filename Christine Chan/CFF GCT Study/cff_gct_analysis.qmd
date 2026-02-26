@@ -31,8 +31,6 @@ library(childsds)
 library(arsenal)
 library(gt)
 library(reporttools)
-library(rpart)
-library(rpart.plot)
 library(rms)
 library(patchwork)
 library(ggflowchart)
@@ -414,7 +412,8 @@ box_p
 ggsave(
   "./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
   box_p,
-  device = "png"
+  device = "png",
+  dpi = 900
 )
 # Dotplot
 dotplot <- ggplot(
@@ -441,7 +440,7 @@ ggsave(
   height = 4,
   width = 6,
   units = "in",
-  dpi = 600,
+  dpi = 900,
   device = "png"
 )
 # Additional boxplots/dotplot per Christine and Larry
@@ -483,7 +482,8 @@ box_p
 ggsave(
   "./Christine Chan/CFF GCT Study/Dissemination/Figures/boxplot.png",
   box_p,
-  device = "png"
+  device = "png",
+  dpi = 900
 )
 # RPG, GCTpl, RCG, HbA1c, OGTT1hr
 plot_df <- df %>%
@@ -603,7 +603,7 @@ ggsave(
   height = 9,
   width = 12,
   units = "in",
-  dpi = 600,
+  dpi = 900,
   device = "png"
 )
 # OGTT 1 hour and GCT 1 hour regression
@@ -623,7 +623,8 @@ scatter_p
 ggsave(
   "./Christine Chan/CFF GCT Study/Dissemination/Figures/scatterplot.png",
   scatter_p,
-  device = "png"
+  device = "png",
+  dpi = 900
 )
 ```
 
