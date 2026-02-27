@@ -728,19 +728,25 @@ plot(
   roc_list[[1]],
   print.auc = T,
   print.thres = T,
-  main = names(roc_list)[1]
+  main = names(roc_list)[1],
+  print.thres.pattern = "%.2f (%.2f-%.2f)",
+  print.auc.pattern = "AUC: %.2f"
 )
 plot(
   roc_list[[2]],
   print.auc = T,
   print.thres = T,
-  main = names(roc_list)[2]
+  main = names(roc_list)[2],
+  print.thres.pattern = "%.2f (%.2f-%.2f)",
+  print.auc.pattern = "AUC: %.2f"
 )
 plot(
   roc_list[[3]],
   print.auc = T,
   print.thres = T,
-  main = names(roc_list)[3]
+  main = names(roc_list)[3],
+  print.thres.pattern = "%.2f (%.2f-%.2f)",
+  print.auc.pattern = "AUC: %.2f"
 )
 ```
 
@@ -758,7 +764,9 @@ plot(
   gr_roc,
   print.auc = T,
   print.thres = T,
-  main = "Low vs. High Risk Genotype"
+  main = "Low vs. High Risk Genotype",
+  print.thres.pattern = "%.2f (%.2f-%.2f)",
+  print.auc.pattern = "AUC: %.2f"
 )
 kable(coords(
   gr_roc,
@@ -1016,19 +1024,25 @@ plot(
   roc_list[[1]],
   print.auc = T,
   print.thres = T,
-  main = names(roc_list)[1]
+  main = names(roc_list)[1],
+  print.thres.pattern = "%.2f (%.2f-%.2f)",
+  print.auc.pattern = "AUC: %.2f"
 )
 plot(
   roc_list[[2]],
   print.auc = T,
   print.thres = T,
-  main = names(roc_list)[2]
+  main = names(roc_list)[2],
+  print.thres.pattern = "%.2f (%.2f-%.2f)",
+  print.auc.pattern = "AUC: %.2f"
 )
 plot(
   roc_list[[3]],
   print.auc = T,
   print.thres = T,
-  main = names(roc_list)[3]
+  main = names(roc_list)[3],
+  print.thres.pattern = "%.2f (%.2f-%.2f)",
+  print.auc.pattern = "AUC: %.2f"
 )
 ```
 
@@ -1046,7 +1060,9 @@ plot(
   gr_roc,
   print.auc = T,
   print.thres = T,
-  main = "Low vs. High Risk Genotype"
+  main = "Low vs. High Risk Genotype",
+  print.thres.pattern = "%.2f (%.2f-%.2f)",
+  print.auc.pattern = "AUC: %.2f"
 )
 kable(coords(
   gr_roc,
