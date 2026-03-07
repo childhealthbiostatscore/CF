@@ -432,12 +432,25 @@ dotplot <- ggplot(
   scale_y_continuous(breaks = c(100, 130, 147, 160)) +
   scale_color_manual(
     values = c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51")
+  ) +
+  theme(
+    plot.caption = ggtext::element_textbox(
+      width = unit(.9, "npc"),
+      hjust = 0,
+      vjust = 1,
+      halign = 0
+    )
+  ) +
+  labs(
+    title = "Figure 2",
+    subtitle = "Dot plots of GCTpl concentrations by glycemic category",
+    caption = "Values are grouped by oral glucose tolerance test (OGTT) defined glucose tolerance categories. Dashed lines represent thresholds of 130 mg/dL  (conservative), 147 mg/dL (Youden index), and 160 mg/dL (permissive). At the identified Youden index of 147 mg/dL (bold dashed line), 90% (9 of 10) of individuals with CFRD would be captured, along with 76% (38 of 50) of those with IGT and 53% (10 of 19) with INDET.  \n  \nNGT = normal glucose tolerance; IFG = impaired fasting glucose; INDET = Indeterminate glucose tolerance; IGT = impaired glucose tolerance; CFRD = CF-related diabetes; GCTpl = plasma glucose at 1 hour following glucose challenge test"
   )
 dotplot
 ggsave(
   "./Christine Chan/CFF GCT Study/Dissemination/Figures/dotplot.png",
   dotplot,
-  height = 4,
+  height = 6,
   width = 6,
   units = "in",
   dpi = 900,
@@ -591,12 +604,35 @@ dot_hba1c <- ggplot(
     axis.title.x = element_blank(),
     axis.ticks.x = element_blank()
   )
-dot_p <- dot_rpg +
-  dot_rcg +
-  dot_gctpl +
-  dot_gctcap +
-  dot_hba1c +
-  plot_layout(ncol = 5, guides = "collect")
+dot_p <- wrap_plots(
+  dot_rpg,
+  dot_rcg,
+  dot_gctpl,
+  dot_gctcap,
+  dot_hba1c,
+  ncol = 5,
+  guides = "collect"
+) +
+  plot_annotation(
+    title = "Figure 1",
+    subtitle = "Distribution of Study Population as Grouped by Glycemic Category Across Alternative Screening Methods",
+    caption = paste(
+      strwrap(
+        "The Youden index for identifying CFRD is shown with a dashed horizontal line. The distribution of glycemic values for RPG, RCG and HbA1c showed a similar spread across glucose tolerance categories. Individuals with CFRD, however, had higher GCT glucose concentrations on average, than individuals with NGT and Pre-CFRD. RPG = Random plasma glucose; GCTpl = 1-hour post-glucose challenge test (GCT) plasma glucose; RCG = Random capillary glucose; GCTcap = 1-hr post-GCT capillary glucose; HbA1c= Hemoglobin A1c; NGT= normal glucose tolerance; Pre-CFRD = Prediabetes in cystic fibrosis (CF); CFRD=cystic-fibrosis related diabetes",
+        width = 100
+      ),
+      sep = "\n"
+    )
+  ) +
+  theme(
+    plot.caption = ggtext::element_textbox(
+      width = unit(.9, "npc"),
+      hjust = 0,
+      vjust = 1,
+      halign = 0
+    )
+  )
+
 ggsave(
   "./Christine Chan/CFF GCT Study/Dissemination/Figures/dotplot2.png",
   dot_p,
