@@ -346,7 +346,8 @@ df$Genotypes1[
       "G551D",
       "W1282X",
       "N1303K",
-      "R117H"
+      "R117H",
+      "Unknown"
     )
 ] = "Other"
 df$Genotypes2[
@@ -357,7 +358,8 @@ df$Genotypes2[
       "G551D",
       "W1282X",
       "N1303K",
-      "R117H"
+      "R117H",
+      "Unknown"
     )
 ] = "Other"
 df$Genotype = paste0(df$Genotypes1, "/", df$Genotypes2)
@@ -386,7 +388,13 @@ df$Genotype = factor(
     "Other/W1282X",
     "R117H/F508del",
     "R117H/Other",
-    "W1282X/N1303K"
+    "W1282X/N1303K",
+    "Other/Unknown",
+    "Unknown/Unknown",
+    "F508del/Unknown",
+    "G542X/Unknown",
+    "G551D/Unknown",
+    "R117H/Unknown"
   ),
   labels = c(
     "F508del/F508del",
@@ -411,7 +419,13 @@ df$Genotype = factor(
     "Other",
     "F508del/R117H",
     "Other",
-    "Other"
+    "Other",
+    "Other/Unknown",
+    "Unknown/Unknown",
+    "F508del/Unknown",
+    "Other/Unknown",
+    "Other/Unknown",
+    "Other/Unknown"
   )
 )
 # Order factor variables

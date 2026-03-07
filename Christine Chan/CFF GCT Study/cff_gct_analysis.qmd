@@ -527,7 +527,16 @@ dot_rpg <- ggplot(
     plot.title = element_text(hjust = 0.5),
     axis.title.x = element_blank(),
     axis.text.x = element_blank(),
-    axis.ticks.x = element_blank()
+    axis.ticks.x = element_blank(),
+  ) +
+  labs(
+    caption = paste(
+      strwrap(
+        "The Youden index for identifying CFRD is shown with a dashed horizontal line. The distribution of glycemic values for RPG, RCG and HbA1c showed a similar spread across glucose tolerance categories. Individuals with CFRD, however, had higher GCT glucose concentrations on average, than individuals with NGT and Pre-CFRD. RPG = Random plasma glucose; GCTpl = 1-hour post-glucose challenge test (GCT) plasma glucose; RCG = Random capillary glucose; GCTcap = 1-hr post-GCT capillary glucose; HbA1c= Hemoglobin A1c; NGT= normal glucose tolerance; Pre-CFRD = Prediabetes in cystic fibrosis (CF); CFRD=cystic-fibrosis related diabetes",
+        width = 100
+      ),
+      sep = "\n"
+    )
   )
 dot_gctpl <- ggplot(
   plot_df[plot_df$Measure == "GCT 60 min plasma", ],
@@ -615,14 +624,7 @@ dot_p <- wrap_plots(
 ) +
   plot_annotation(
     title = "Figure 1",
-    subtitle = "Distribution of Study Population as Grouped by Glycemic Category Across Alternative Screening Methods",
-    caption = paste(
-      strwrap(
-        "The Youden index for identifying CFRD is shown with a dashed horizontal line. The distribution of glycemic values for RPG, RCG and HbA1c showed a similar spread across glucose tolerance categories. Individuals with CFRD, however, had higher GCT glucose concentrations on average, than individuals with NGT and Pre-CFRD. RPG = Random plasma glucose; GCTpl = 1-hour post-glucose challenge test (GCT) plasma glucose; RCG = Random capillary glucose; GCTcap = 1-hr post-GCT capillary glucose; HbA1c= Hemoglobin A1c; NGT= normal glucose tolerance; Pre-CFRD = Prediabetes in cystic fibrosis (CF); CFRD=cystic-fibrosis related diabetes",
-        width = 100
-      ),
-      sep = "\n"
-    )
+    subtitle = "Distribution of Study Population as Grouped by Glycemic Category Across Alternative Screening Methods"
   ) +
   theme(
     plot.caption = ggtext::element_textbox(
