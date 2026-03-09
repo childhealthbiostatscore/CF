@@ -603,10 +603,19 @@ clp_d
 ```{r}
 #| warning: false
 geno_n <- df |>
+  filter(
+    Diagnosis == "Cystic Fibrosis" & `Genotype Risk` %in% c("High", "Low")
+  ) |>
+  mutate(Diagnosis = droplevels(Diagnosis)) |>
   group_by(`Genotype Risk`) |>
   summarise(n = n()) |>
   mutate(pos = 160)
-clp_g <- ggplot(df, aes(x = `Genotype Risk`, y = Cl)) +
+clp_g <- df |>
+  filter(
+    Diagnosis == "Cystic Fibrosis" & `Genotype Risk` %in% c("High", "Low")
+  ) |>
+  mutate(Diagnosis = droplevels(Diagnosis)) |>
+  ggplot(aes(x = `Genotype Risk`, y = Cl)) +
   geom_boxplot() +
   geom_label(
     data = geno_n,
@@ -636,7 +645,12 @@ nap_d
 
 ```{r}
 #| warning: false
-nap_g <- ggplot(df, aes(x = `Genotype Risk`, y = Na)) +
+nap_g <- df |>
+  filter(
+    Diagnosis == "Cystic Fibrosis" & `Genotype Risk` %in% c("High", "Low")
+  ) |>
+  mutate(Diagnosis = droplevels(Diagnosis)) |>
+  ggplot(aes(x = `Genotype Risk`, y = Na)) +
   geom_boxplot() +
   geom_label(
     data = geno_n,
@@ -669,7 +683,12 @@ ratiop_d
 ```{r}
 #| warning: false
 geno_n$pos = 4
-ratiop_g <- ggplot(df, aes(x = `Genotype Risk`, y = `Na:Cl`)) +
+ratiop_g <- df |>
+  filter(
+    Diagnosis == "Cystic Fibrosis" & `Genotype Risk` %in% c("High", "Low")
+  ) |>
+  mutate(Diagnosis = droplevels(Diagnosis)) |>
+  ggplot(aes(x = `Genotype Risk`, y = `Na:Cl`)) +
   geom_boxplot() +
   geom_label(
     data = geno_n,
@@ -899,10 +918,19 @@ clp_d
 ```{r}
 #| warning: false
 geno_n <- df |>
+  filter(
+    Diagnosis == "Cystic Fibrosis" & `Genotype Risk` %in% c("High", "Low")
+  ) |>
+  mutate(Diagnosis = droplevels(Diagnosis)) |>
   group_by(`Genotype Risk`) |>
   summarise(n = n()) |>
   mutate(pos = 160)
-clp_g <- ggplot(df, aes(x = `Genotype Risk`, y = Cl)) +
+clp_g <- df |>
+  filter(
+    Diagnosis == "Cystic Fibrosis" & `Genotype Risk` %in% c("High", "Low")
+  ) |>
+  mutate(Diagnosis = droplevels(Diagnosis)) |>
+  ggplot(aes(x = `Genotype Risk`, y = Cl)) +
   geom_boxplot() +
   geom_label(
     data = geno_n,
@@ -932,7 +960,13 @@ nap_d
 
 ```{r}
 #| warning: false
-nap_g <- ggplot(df, aes(x = `Genotype Risk`, y = Na)) +
+nap_g <-
+  df |>
+  filter(
+    Diagnosis == "Cystic Fibrosis" & `Genotype Risk` %in% c("High", "Low")
+  ) |>
+  mutate(Diagnosis = droplevels(Diagnosis)) |>
+  ggplot(aes(x = `Genotype Risk`, y = Na)) +
   geom_boxplot() +
   geom_label(
     data = geno_n,
@@ -965,7 +999,12 @@ ratiop_d
 ```{r}
 #| warning: false
 geno_n$pos = 4
-ratiop_g <- ggplot(df, aes(x = `Genotype Risk`, y = `Na:Cl`)) +
+ratiop_g <- df |>
+  filter(
+    Diagnosis == "Cystic Fibrosis" & `Genotype Risk` %in% c("High", "Low")
+  ) |>
+  mutate(Diagnosis = droplevels(Diagnosis)) |>
+  ggplot(aes(x = `Genotype Risk`, y = `Na:Cl`)) +
   geom_boxplot() +
   geom_label(
     data = geno_n,
