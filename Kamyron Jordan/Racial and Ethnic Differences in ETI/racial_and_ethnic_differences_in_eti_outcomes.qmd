@@ -31,14 +31,12 @@ library(ggflowchart)
 library(lmerTest)
 library(broom)
 library(emmeans)
-home_dir <- switch(
-  Sys.info()["sysname"],
+home_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI",
   "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI",
   "Linux" = "/home/tim/OneDrive/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI"
 )
-github_dir <- switch(
-  Sys.info()["sysname"],
+github_dir <- switch(Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Documents/GitHub",
   "Windows" = "C:/Users/Tim/Documents/GitHub",
   "Linux" = "/home/tim/Documents/GitHub"
@@ -57,6 +55,11 @@ encounter$age_group <- relevel(encounter$age_group, ref = "[18,30)")
 ```
 
 # Data cleaning
+
+## Questions
+- Ask Olga at CFFPR:
+  - Should we only include encounterlocation = 1? Should we also take the care episodes file and exclude visits within 2 weeks on either side?
+  - Okay to just exclude lung transplant > 1?
 
 ```{r flowchart}
 ggflowchart(flow_chart, text_size = 3, y_nudge = 0.4, x_nudge = 0.45)
@@ -212,7 +215,7 @@ pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
 pop_dat$pred <- pred$fit
 pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
 pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
-p = ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+p <- ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   geom_point() +
   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
   geom_line() +
@@ -294,7 +297,7 @@ pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
 pop_dat$pred <- pred$fit
 pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
 pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
-p = ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+p <- ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   geom_point() +
   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
   geom_line() +
@@ -660,7 +663,7 @@ pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
 pop_dat$pred <- pred$fit
 pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
 pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
-p = ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+p <- ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   geom_point() +
   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
   geom_line() +
@@ -1587,7 +1590,7 @@ pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
 pop_dat$pred <- pred$fit
 pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
 pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
-p3a = ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+p3a <- ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   geom_point() +
   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
   geom_line() +
@@ -1667,7 +1670,7 @@ pred <- predict(change_mod, re.form = NA, newdata = pop_dat, se.fit = T)
 pop_dat$pred <- pred$fit
 pop_dat$ll <- pop_dat$pred - (1.96 * pred$se.fit)
 pop_dat$ul <- pop_dat$pred + (1.96 * pred$se.fit)
-p3b = ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
+p3b <- ggplot(pop_dat, aes(x = Years, y = pred, group = Race, colour = Race)) +
   geom_point() +
   geom_errorbar(aes(ymin = ll, ymax = ul), width = 0.1) +
   geom_line() +
@@ -1687,7 +1690,7 @@ ggsave(
   units = "in",
   dpi = 600
 )
-p = p3a / p3b + plot_layout(guides = "collect")
+p <- p3a / p3b + plot_layout(guides = "collect")
 ggsave(
   "./Dissemination/Figures/fig3ab.png",
   plot = p,
