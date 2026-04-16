@@ -32,6 +32,7 @@ library(gtsummary)
 library(gt)
 library(patchwork)
 library(ggeffects)
+library(ggstatsplot)
 home_dir <- switch(
   Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability",
@@ -58,9 +59,6 @@ chec <- left_join(
 )
 # Only include people with either a pre-modulator or post-modulator sodium
 chec <- chec %>% filter(!is.na(swsavg), site != "005 Buffalo, NY CC and Peds")
-# Calculate ratios
-chec$pre_ratio <- chec$swhsavgpm / chec$swhcavgpm
-chec$post_ratio <- chec$swsavg / chec$swcavg
 # Factor variable formatting
 chec$race_txt <- factor(
   chec$race_txt,
@@ -97,6 +95,17 @@ chec$agecat_txt <- factor(
     ">=26 years"
   )
 )
+# Average the values for people with more than 1 using CFF ID
+chec = chec |>
+  group_by(cffid_first) |>
+  mutate(across(
+    c(swhsavgpm, swhcavgpm, swsavg, swcavg),
+    ~ mean(.x, na.rm = TRUE)
+  )) |>
+  filter(row_number() == 1)
+# Calculate ratios
+chec$pre_ratio <- chec$swhsavgpm / chec$swhcavgpm
+chec$post_ratio <- chec$swsavg / chec$swcavg
 # Long dataset for easier plotting and paired analysis
 chec_long <- chec %>%
   rename(
@@ -161,6 +170,7 @@ summary(t1, pfootnote = T)
 pt1 <- paired(
   pre_post ~ cl + na + signed.rank(ratio, "N", "Nmiss2", "medianq1q3", "range"),
   data = chec_long,
+
   id = subject,
   control = paired.control(signed.rank.exact = F)
 )
@@ -332,95 +342,6 @@ ggplot(chec_long, aes(x = pre_post, y = ratio)) +
 ```
 
 # Updates for John
-
-```{r data cleaning2}
-library(ggstatsplot)
-# Import CHEC data
-chec <- read.csv(
-  "./Data_Raw/CHEC sweat sodium and chloride 2024-04-19.csv",
-  na.strings = c("", "NA")
-)
-ethnicity <- read.csv(
-  "./Data_Raw/CHEC sweat sodium and chloride 2025-07-30.csv",
-  na.strings = c("", "NA")
-)
-chec <- left_join(
-  chec,
-  ethnicity %>% select(subject, crfethnicity_txt),
-  by = join_by(subject)
-)
-# Only include people with either a pre-modulator or post-modulator sodium
-chec <- chec %>% filter(site != "005 Buffalo, NY CC and Peds")
-# Calculate ratios
-chec$pre_ratio <- chec$swhsavgpm / chec$swhcavgpm
-chec$post_ratio <- chec$swsavg / chec$swcavg
-# Factor variable formatting
-chec$race_txt <- factor(
-  chec$race_txt,
-  levels = c(
-    "White",
-    "Black or African American",
-    "American Indian or Alaska Native",
-    "Native Hawaiian or Other Pacific Islander",
-    "More than One Race",
-    "Unknown or Not Reported"
-  )
-)
-chec$crfethnicity_txt <- factor(
-  chec$crfethnicity_txt,
-  levels = c("Not Hispanic or Latino", "Hispanic or Latino")
-)
-chec$modqual <- factor(
-  chec$modqual,
-  levels = c(
-    "Ivacaftor",
-    "Lumacaftor / Ivacaftor",
-    "Tezacaftor / Ivacaftor",
-    "Elexacaftor / Tezacaftor / Ivacaftor"
-  ),
-  labels = c("IVA", "LUM/IVA", "TEZ/IVA", "ELX/TEZ/IVA")
-)
-chec$agecat_txt <- factor(
-  chec$agecat_txt,
-  levels = c(
-    "2-5 years",
-    "6-11 years",
-    "12-17 years",
-    "18-25 years",
-    ">=26 years"
-  )
-)
-# Long dataset for easier plotting and paired analysis
-chec_long <- chec %>%
-  rename(
-    pre_cl = swhcavgpm,
-    pre_na = swhsavgpm,
-    post_cl = swcavg,
-    post_na = swsavg
-  ) %>%
-  pivot_longer(
-    c(pre_cl, pre_na, post_cl, post_na, pre_ratio, post_ratio),
-    names_to = c("pre_post", ".value"),
-    names_pattern = "(.*)_(.*)",
-    values_to = "count"
-  )
-chec_long$pre_post <- factor(
-  chec_long$pre_post,
-  levels = c("pre", "post"),
-  labels = c("Pre-Modulator", "Post-Modulator")
-)
-# Set table options
-mycontrols <-
-  tableby.control(
-    numeric.stats = c("N", "Nmiss", "meansd", "medianrange"),
-    cat.stats = c("N", "Nmiss", "countpct"),
-    digits = 1
-  )
-# Labels
-label(chec_long$cl) <- "Sweat Cl"
-label(chec_long$na) <- "Sweat Na"
-label(chec_long$ratio) <- "Sweat Na:Cl"
-```
 
 ## Boxplots
 
