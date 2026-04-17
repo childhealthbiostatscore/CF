@@ -9,7 +9,7 @@ format:
     toc-depth: 5
     toc-float: true
     code-fold: true
-    self-contained: true
+    embed-resources: true
     fig-cap-location: top
     fig-width: 9
     fig-height: 7
@@ -505,4 +505,27 @@ chec_long |>
   add_p(test = "SCC < 60 AND Na:Cl > 1.2" ~ "fisher.test") |>
   separate_p_footnotes() |>
   remove_footnote_header()
+```
+
+## Figure 2
+
+```{r}
+chec_long |>
+  filter(pre_post == "Pre-Modulator") |>
+  ggplot(aes(x = ratio, y = cl)) +
+  geom_point() +
+  geom_hline(aes(yintercept = 60), color = "red") +
+  geom_vline(aes(xintercept = 1.2), color = "red") +
+  ggtitle("Pre-Modulator") +
+  theme_bw() +
+  facet_wrap(~modqual)
+chec_long |>
+  filter(pre_post == "Post-Modulator") |>
+  ggplot(aes(x = ratio, y = cl)) +
+  geom_point() +
+  geom_hline(aes(yintercept = 60), color = "red") +
+  geom_vline(aes(xintercept = 1.2), color = "red") +
+  ggtitle("Post-Modulator") +
+  theme_bw() +
+  facet_wrap(~modqual)
 ```
