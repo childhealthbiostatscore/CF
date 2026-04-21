@@ -818,6 +818,68 @@ kable(coords(
 ))
 ```
 
+## Na:Cl vs. Cl
+
+```{r}
+# Using models
+# Non-CF vs. CRMS
+non_vs_crms = df |>
+  filter(Diagnosis %in% c("Non-CF", "CFTR-RD or CRMS")) |>
+  mutate(Diagnosis = droplevels(Diagnosis))
+mod1 = glm(Diagnosis ~ Cl, data = non_vs_crms, family = "binomial")
+mod2 = glm(Diagnosis ~ `Na:Cl`, data = non_vs_crms, family = "binomial")
+mod3 = glm(Diagnosis ~ Na + Cl, data = non_vs_crms, family = "binomial")
+roc_cl <- roc(Diagnosis ~ fitted(mod1), data = non_vs_crms)
+roc_ratio <- roc(Diagnosis ~ fitted(mod2), data = non_vs_crms)
+roc_na_cl <- roc(Diagnosis ~ fitted(mod3), data = non_vs_crms)
+roc.test(roc_cl, roc_ratio)
+roc.test(roc_cl, roc_na_cl)
+# CRMS vs. CF
+crms_vs_cf = df |>
+  filter(Diagnosis %in% c("CFTR-RD or CRMS", "Cystic Fibrosis")) |>
+  mutate(Diagnosis = droplevels(Diagnosis))
+mod1 = glm(Diagnosis ~ Cl, data = crms_vs_cf, family = "binomial")
+mod2 = glm(Diagnosis ~ `Na:Cl`, data = crms_vs_cf, family = "binomial")
+roc_cl <- roc(Diagnosis ~ fitted(mod1), data = crms_vs_cf)
+roc_ratio <- roc(Diagnosis ~ fitted(mod2), data = crms_vs_cf)
+roc.test(roc_cl, roc_ratio)
+# Run both ROC curves
+mc_roc_ratio <- multiclass.roc(
+  df$Diagnosis,
+  df$`Na:Cl`,
+  quiet = T,
+  levels = c("Non-CF", "CFTR-RD or CRMS", "Cystic Fibrosis")
+)
+mc_roc_cl <- multiclass.roc(
+  df$Diagnosis,
+  df$Cl,
+  quiet = T,
+  levels = c("Non-CF", "CFTR-RD or CRMS", "Cystic Fibrosis")
+)
+# Get the people misclassified by Cl
+non_vs_crms_cl_thresh = coords(mc_roc_cl$rocs[[1]], "best")$threshold
+df$roc_cl_pred = ifelse(
+  df$Cl >= non_vs_crms_cl_thresh,
+  "CFTR-RD or CRMS",
+  "Non-CF"
+)
+# Same for Na:Cl
+non_vs_crms_ratio_thresh = coords(mc_roc_ratio$rocs[[1]], "best")$threshold
+df$roc_ratio_pred = ifelse(
+  df$`Na:Cl` >= non_vs_crms_ratio_thresh,
+  "CFTR-RD or CRMS",
+  "Non-CF"
+)
+# Compare them
+non_vs_crms_comp = df |>
+  filter(
+    Diagnosis %in% c("Non-CF", "CFTR-RD or CRMS"),
+    Diagnosis != roc_cl_pred
+  ) |>
+  select(Name, Diagnosis, roc_ratio_pred, roc_cl_pred)
+non_vs_crms_comp$Diagnosis = droplevels(non_vs_crms_comp$Diagnosis)
+```
+
 # Excluding Cl < 30
 
 ```{r}
