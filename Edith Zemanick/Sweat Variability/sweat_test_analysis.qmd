@@ -720,7 +720,7 @@ ggsave(
 # Fit a multiclass ROC
 mc_roc <- multiclass.roc(
   df$Diagnosis,
-  df$`Na:Cl`,
+  df$Cl,
   quiet = T,
   levels = c("Non-CF", "CFTR-RD or CRMS", "Cystic Fibrosis")
 )
@@ -820,6 +820,38 @@ kable(coords(
 
 ## Na:Cl vs. Cl
 
+To compare the utility of Na:Cl ratio vs Cl alone, we plotted the Na:Cl ratio for those misclassified by Cl. The Cl threshold that maximized the Youden index when distinguishing Non-CF from CFTR-RD or CRMS was 27.75 (Area under the curve: 0.9021 [95% CI: 0.8539-0.9504 (DeLong)]). So, people with Cl < 27.75 and a diagnosis of CFTR-RD or CRMS were misclassified as Non-CF, and people with Cl >= 27.75 and a diagnosis of Non-CF were misclassified as CFTR-RD or CRMS. A total of 3 people with CFTR-RD or CRMS were missed based on this cutoff, and there did not appear to be a Na:Cl ratio that would clearly separate the two groups. The results were the same when using a threshold of 30 (4 people with CFTR-RD or CRMS were missed)
+
+```{r}
+#| warning: false
+clp_d <- ggplot(
+  df |>
+    filter(
+      (Cl < 27.75 & Diagnosis == "CFTR-RD or CRMS") |
+        (Cl >= 27.75 & Diagnosis == "Non-CF")
+    ) |>
+    mutate(Diagnosis = droplevels(Diagnosis)),
+  aes(x = Diagnosis, y = `Na:Cl`)
+) +
+  geom_point() +
+  theme_bw() +
+  ggtitle("Cl Threshold of 27.75")
+clp_d
+clp_d <- ggplot(
+  df |>
+    filter(
+      (Cl < 30 & Diagnosis == "CFTR-RD or CRMS") |
+        (Cl >= 30 & Diagnosis == "Non-CF")
+    ) |>
+    mutate(Diagnosis = droplevels(Diagnosis)),
+  aes(x = Diagnosis, y = `Na:Cl`)
+) +
+  geom_point() +
+  theme_bw() +
+  ggtitle("Cl Threshold of 30")
+clp_d
+```
+
 ```{r}
 # Using models
 # Non-CF vs. CRMS
@@ -840,45 +872,19 @@ crms_vs_cf = df |>
   mutate(Diagnosis = droplevels(Diagnosis))
 mod1 = glm(Diagnosis ~ Cl, data = crms_vs_cf, family = "binomial")
 mod2 = glm(Diagnosis ~ `Na:Cl`, data = crms_vs_cf, family = "binomial")
+mod3 = glm(Diagnosis ~ Na + Cl, data = crms_vs_cf, family = "binomial")
 roc_cl <- roc(Diagnosis ~ fitted(mod1), data = crms_vs_cf)
 roc_ratio <- roc(Diagnosis ~ fitted(mod2), data = crms_vs_cf)
+roc_na_cl <- roc(Diagnosis ~ fitted(mod3), data = crms_vs_cf)
 roc.test(roc_cl, roc_ratio)
-# Run both ROC curves
-mc_roc_ratio <- multiclass.roc(
-  df$Diagnosis,
-  df$`Na:Cl`,
-  quiet = T,
-  levels = c("Non-CF", "CFTR-RD or CRMS", "Cystic Fibrosis")
-)
-mc_roc_cl <- multiclass.roc(
-  df$Diagnosis,
-  df$Cl,
-  quiet = T,
-  levels = c("Non-CF", "CFTR-RD or CRMS", "Cystic Fibrosis")
-)
-# Get the people misclassified by Cl
-non_vs_crms_cl_thresh = coords(mc_roc_cl$rocs[[1]], "best")$threshold
-df$roc_cl_pred = ifelse(
-  df$Cl >= non_vs_crms_cl_thresh,
-  "CFTR-RD or CRMS",
-  "Non-CF"
-)
-# Same for Na:Cl
-non_vs_crms_ratio_thresh = coords(mc_roc_ratio$rocs[[1]], "best")$threshold
-df$roc_ratio_pred = ifelse(
-  df$`Na:Cl` >= non_vs_crms_ratio_thresh,
-  "CFTR-RD or CRMS",
-  "Non-CF"
-)
-# Compare them
-non_vs_crms_comp = df |>
-  filter(
-    Diagnosis %in% c("Non-CF", "CFTR-RD or CRMS"),
-    Diagnosis != roc_cl_pred
-  ) |>
-  select(Name, Diagnosis, roc_ratio_pred, roc_cl_pred)
-non_vs_crms_comp$Diagnosis = droplevels(non_vs_crms_comp$Diagnosis)
+roc.test(roc_cl, roc_na_cl)
 ```
+
+We also compared the ability of 3 logistic regression models to distinguish between Non-CF vs. CFTR-RD or CRMS and CFTR-RD or CRMS vs. Cystic Fibrosis. Model 1 used only Cl as a predictor, model 2 used only Na:Cl as a predictor, and model 3 used Na, Cl, and an interaction term between Na and Cl as a predictor. 
+
+When classifying participants as Non-CF vs. CFTR-RD or CRMS, chloride alone performed significantly better than Na:Cl ratio (AUC 0.90 vs. 0.78, p = 0.03) and equally as well as the interaction model (AUC 0.90 vs. 0.91, p = 0.9).
+
+When classifying participants as CFTR-RD or CRMS vs. Cystic Fibrosis, chloride alone performed significantly better than Na:Cl ratio (AUC 0.99 vs. 0.86, p = 0.01) and equally as well as the interaction model (AUC 0.99 vs. 0.99, p = 0.05).
 
 # Excluding Cl < 30
 
