@@ -45,6 +45,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 # Set seed for bootstrap
 set.seed(1017)
 # Import data
+setwd(home_dir)
 # See GitHub/CF/Christine Chan/EnVision CF/clean_envision_data.R
 load("./Christine Chan/EnVision CF/Data_Clean/envision_analysis_dataset.RData")
 ```
@@ -98,6 +99,8 @@ t1 <- tableby(
 summary(t1, pfootnote = T)
 ```
 
+Pairwise HbA1c comparisons:
+
 ```{r}
 df %>%
   group_by(study_id) %>%
@@ -128,6 +131,8 @@ t2 <- tableby(
 )
 summary(t2, pfootnote = T)
 ```
+
+Pairwise HbA1c comparisons:
 
 ```{r}
 df %>%
@@ -213,8 +218,9 @@ summary(t1, pfootnote = T)
 r <- roc(CFRD ~ mean_sensor, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
-gt(data.frame(coords(
+mg_best = coords(r, "best", ret = "all")
+gt(mg_best) %>% fmt_number(decimals = 3)
+mg_coords = data.frame(coords(
   r,
   "all",
   ret = c(c(
@@ -228,8 +234,17 @@ gt(data.frame(coords(
     "npv",
     "ppv"
   ))
-))) %>%
+))
+gt(mg_coords) %>%
   fmt_number(decimals = 3)
+# Get thresholds for plotting
+mg_high_sens = max(mg_coords$threshold[
+  which(mg_coords$sensitivity >= 0.9)
+])
+mg_high_spec = min(mg_coords$threshold[
+  which(mg_coords$specificity >= 0.9)
+])
+mg_youden = mg_best$threshold
 ```
 
 ## Percent Time >140 mg/dL 
@@ -238,8 +253,9 @@ gt(data.frame(coords(
 r <- roc(CFRD ~ percent_time_over_140, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
-gt(data.frame(coords(
+tar140_best = coords(r, "best", ret = "all")
+gt(tar140_best) %>% fmt_number(decimals = 3)
+tar140_coords = data.frame(coords(
   r,
   "all",
   ret = c(c(
@@ -253,8 +269,17 @@ gt(data.frame(coords(
     "npv",
     "ppv"
   ))
-))) %>%
+))
+gt(tar140_coords) %>%
   fmt_number(decimals = 3)
+# Get thresholds for plotting
+tar140_high_sens = max(tar140_coords$threshold[
+  which(tar140_coords$sensitivity >= 0.9)
+])
+tar140_high_spec = min(tar140_coords$threshold[
+  which(tar140_coords$specificity >= 0.9)
+])
+tar140_youden = tar140_best$threshold
 ```
 
 ## Percent Time >180 mg/dL
@@ -263,8 +288,9 @@ gt(data.frame(coords(
 r <- roc(CFRD ~ percent_time_over_180, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
-gt(data.frame(coords(
+tar180_best = coords(r, "best", ret = "all")
+gt(tar180_best) %>% fmt_number(decimals = 3)
+tar180_coords = data.frame(coords(
   r,
   "all",
   ret = c(c(
@@ -278,8 +304,17 @@ gt(data.frame(coords(
     "npv",
     "ppv"
   ))
-))) %>%
+))
+gt(tar180_coords) %>%
   fmt_number(decimals = 3)
+# Get thresholds for plotting
+tar180_high_sens = max(tar180_coords$threshold[which(
+  tar180_coords$sensitivity >= 0.9
+)])
+tar180_high_spec = min(tar180_coords$threshold[
+  which(tar180_coords$specificity >= 0.9)
+])
+tar180_youden = tar180_best$threshold
 ```
 
 ## GMI
@@ -288,8 +323,9 @@ gt(data.frame(coords(
 r <- roc(CFRD ~ gmi, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
-gt(data.frame(coords(
+gmi_best = coords(r, "best", ret = "all")
+gt(gmi_best) %>% fmt_number(decimals = 3)
+gmi_coords = data.frame(coords(
   r,
   "all",
   ret = c(c(
@@ -303,8 +339,17 @@ gt(data.frame(coords(
     "npv",
     "ppv"
   ))
-))) %>%
+))
+gt(gmi_coords) %>%
   fmt_number(decimals = 3)
+# Get thresholds for plotting
+gmi_high_sens = max(gmi_coords$threshold[
+  which(gmi_coords$sensitivity >= 0.9)
+])
+gmi_high_spec = min(gmi_coords$threshold[
+  which(gmi_coords$specificity >= 0.9)
+])
+gmi_youden = gmi_best$threshold
 ```
 
 ## SD
@@ -313,8 +358,9 @@ gt(data.frame(coords(
 r <- roc(CFRD ~ standard_deviation, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
-gt(data.frame(coords(
+sd_best = coords(r, "best", ret = "all")
+gt(sd_best) %>% fmt_number(decimals = 3)
+sd_coords = data.frame(coords(
   r,
   "all",
   ret = c(c(
@@ -328,8 +374,17 @@ gt(data.frame(coords(
     "npv",
     "ppv"
   ))
-))) %>%
+))
+gt(sd_coords) %>%
   fmt_number(decimals = 3)
+# Get thresholds for plotting
+sd_high_sens = max(sd_coords$threshold[
+  which(sd_coords$sensitivity >= 0.9)
+])
+sd_high_spec = min(sd_coords$threshold[
+  which(sd_coords$specificity >= 0.9)
+])
+sd_youden = sd_best$threshold
 ```
 
 ## CV
@@ -338,8 +393,9 @@ gt(data.frame(coords(
 r <- roc(CFRD ~ cv, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
-gt(data.frame(coords(
+cv_best = coords(r, "best", ret = "all")
+gt(cv_best) %>% fmt_number(decimals = 3)
+cv_coords = data.frame(coords(
   r,
   "all",
   ret = c(c(
@@ -353,8 +409,17 @@ gt(data.frame(coords(
     "npv",
     "ppv"
   ))
-))) %>%
+))
+gt(cv_coords) %>%
   fmt_number(decimals = 3)
+# Get thresholds for plotting
+cv_high_sens = max(cv_coords$threshold[
+  which(cv_coords$sensitivity >= 0.9)
+])
+cv_high_spec = min(cv_coords$threshold[
+  which(cv_coords$specificity >= 0.9)
+])
+cv_youden = cv_best$threshold
 ```
 
 ## HbA1c
@@ -363,8 +428,9 @@ gt(data.frame(coords(
 r <- roc(CFRD ~ a1c_result, data = df, quiet = T)
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gt(coords(r, "best", ret = "all")) %>% fmt_number(decimals = 3)
-gt(data.frame(coords(
+a1c_best = coords(r, "best", ret = "all")
+gt(a1c_best) %>% fmt_number(decimals = 3)
+a1c_coords = data.frame(coords(
   r,
   "all",
   ret = c(c(
@@ -378,8 +444,17 @@ gt(data.frame(coords(
     "npv",
     "ppv"
   ))
-))) %>%
+))
+gt(a1c_coords) %>%
   fmt_number(decimals = 3)
+# Get thresholds for plotting
+a1c_high_sens = max(a1c_coords$threshold[
+  which(a1c_coords$sensitivity >= 0.9)
+])
+a1c_high_spec = min(a1c_coords$threshold[
+  which(a1c_coords$specificity >= 0.9)
+])
+a1c_youden = a1c_best$threshold
 ```
 
 ## Pulmonary Function Comparisons by CGM
@@ -484,158 +559,162 @@ In the figure below, red lines indicate the cutoffs identified in Scully et al. 
 ```{r}
 #| message: false
 #| warning: false
-#| fig-height: 12
-#| fig-width: 16
+#| fig-height: 16
+#| fig-width: 12
 # Dotplot
-box_p1 <- ggplot(
+box_tar140 <- ggplot(
   df,
   aes(
     x = Dysglycemia,
     y = percent_time_over_140,
-    colour = Dysglycemia,
     text = study_id
   )
 ) +
-  geom_jitter() +
-  geom_hline(yintercept = 17.5, color = "red") +
-  geom_hline(yintercept = 11.3, color = "purple") +
+  geom_jitter(alpha = 0.2) +
+  geom_hline(aes(yintercept = tar140_youden, color = "Youden")) +
+  geom_hline(aes(yintercept = tar140_high_sens, color = "High Sensitivity")) +
+  geom_hline(aes(yintercept = tar140_high_spec, color = "High Specificity")) +
   ggtitle("% Time Over 140 (mg/dL)") +
-  theme_bw(base_size = 15) +
+  theme_bw(base_size = 20) +
   theme(
-    legend.position = "none",
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
     axis.title.y = element_blank(),
     plot.title = element_text(size = rel(1))
   ) +
-  scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
-box_p2 <- ggplot(
+  scale_color_manual(
+    name = "Threshold",
+    values = c("#32936f", "#2274a5", "#ffbf00")
+  )
+box_tar180 <- ggplot(
   df,
   aes(
     x = Dysglycemia,
     y = percent_time_over_180,
-    colour = Dysglycemia,
     text = study_id
   )
 ) +
-  geom_jitter() +
-  geom_hline(yintercept = 3.4, color = "red") +
-  geom_hline(yintercept = 3.1, color = "purple") +
+  geom_jitter(alpha = 0.2) +
+  geom_hline(aes(yintercept = tar180_youden, color = "Youden")) +
+  geom_hline(aes(yintercept = tar180_high_sens, color = "High Sensitivity")) +
+  geom_hline(aes(yintercept = tar180_high_spec, color = "High Specificity")) +
   ggtitle("% Time Over 180 (mg/dL)") +
-  theme_bw(base_size = 15) +
+  theme_bw(base_size = 20) +
   theme(
-    legend.position = "none",
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
     axis.title.y = element_blank(),
     plot.title = element_text(size = rel(1))
   ) +
-  scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
-box_p3 <- ggplot(
+  scale_color_manual(
+    name = "Threshold",
+    values = c("#32936f", "#2274a5", "#ffbf00")
+  )
+box_mg <- ggplot(
   df,
-  aes(x = Dysglycemia, y = mean_sensor, colour = Dysglycemia, text = study_id)
+  aes(
+    x = Dysglycemia,
+    y = mean_sensor,
+    text = study_id
+  )
 ) +
-  geom_jitter() +
-  geom_hline(yintercept = 112, color = "red") +
-  geom_hline(yintercept = 101, color = "purple") +
+  geom_jitter(alpha = 0.2) +
+  geom_hline(aes(yintercept = mg_youden, color = "Youden")) +
+  geom_hline(aes(yintercept = mg_high_sens, color = "High Sensitivity")) +
+  geom_hline(aes(yintercept = mg_high_spec, color = "High Specificity")) +
   ggtitle("Mean glucose (mg/dL)") +
-  theme_bw(base_size = 15) +
+  theme_bw(base_size = 20) +
   theme(
-    legend.position = "none",
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
     axis.title.y = element_blank(),
     plot.title = element_text(size = rel(1))
   ) +
-  scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
-box_p4 <- ggplot(
+  scale_color_manual(
+    name = "Threshold",
+    values = c("#32936f", "#2274a5", "#ffbf00")
+  )
+box_cv <- ggplot(
   df,
-  aes(x = Dysglycemia, y = cv, colour = Dysglycemia, text = study_id)
+  aes(
+    x = Dysglycemia,
+    y = cv,
+    text = study_id
+  )
 ) +
-  geom_jitter() +
-  geom_hline(yintercept = 30.6, color = "red") +
-  geom_hline(yintercept = 27.7, color = "purple") +
+  geom_jitter(alpha = 0.2) +
+  geom_hline(aes(yintercept = cv_youden, color = "Youden")) +
+  geom_hline(aes(yintercept = cv_high_sens, color = "High Sensitivity")) +
+  geom_hline(aes(yintercept = cv_high_spec, color = "High Specificity")) +
   ggtitle("Coefficient of Variation (%)") +
-  theme_bw(base_size = 15) +
+  theme_bw(base_size = 20) +
   theme(
-    legend.position = "none",
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
     axis.title.y = element_blank(),
     plot.title = element_text(size = rel(1))
   ) +
-  scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
-box_p5 <- ggplot(
+  scale_color_manual(
+    name = "Threshold",
+    values = c("#32936f", "#2274a5", "#ffbf00")
+  )
+box_hba1c <- ggplot(
   df,
-  aes(x = Dysglycemia, y = a1c_result, colour = Dysglycemia, text = study_id)
+  aes(
+    x = Dysglycemia,
+    y = a1c_result,
+    text = study_id
+  )
 ) +
-  geom_jitter() +
-  geom_hline(yintercept = 5.8, color = "red") +
-  geom_hline(yintercept = 5.75, color = "purple") +
+  geom_jitter(alpha = 0.2) +
+  geom_hline(aes(yintercept = a1c_youden, color = "Youden")) +
+  geom_hline(aes(yintercept = a1c_high_sens, color = "High Sensitivity")) +
+  geom_hline(aes(yintercept = a1c_high_spec, color = "High Specificity")) +
   ggtitle("HbA1c (%)") +
-  theme_bw(base_size = 15) +
+  theme_bw(base_size = 20) +
   theme(
-    legend.title = element_blank(),
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
     axis.title.y = element_blank(),
     plot.title = element_text(size = rel(1))
   ) +
-  scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
-box_p6 <- ggplot(
-  df,
-  aes(x = Dysglycemia, y = gmi, colour = Dysglycemia, text = study_id)
-) +
-  geom_jitter() +
-  geom_hline(yintercept = 6.05, color = "red") +
-  geom_hline(yintercept = 5.75, color = "purple") +
-  ggtitle("GMI") +
-  theme_bw(base_size = 15) +
-  theme(
-    legend.title = element_blank(),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank(),
-    plot.title = element_text(size = rel(1))
-  ) +
-  scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
-box_p7 <- ggplot(
+  scale_color_manual(
+    name = "Threshold",
+    values = c("#32936f", "#2274a5", "#ffbf00")
+  )
+box_sd <- ggplot(
   df,
   aes(
     x = Dysglycemia,
     y = standard_deviation,
-    colour = Dysglycemia,
     text = study_id
   )
 ) +
-  geom_jitter() +
-  geom_hline(yintercept = 6.05, color = "red") +
-  geom_hline(yintercept = 5.75, color = "purple") +
+  geom_jitter(alpha = 0.2) +
+  geom_hline(aes(yintercept = sd_youden, color = "Youden")) +
+  geom_hline(aes(yintercept = sd_high_sens, color = "High Sensitivity")) +
+  geom_hline(aes(yintercept = sd_high_spec, color = "High Specificity")) +
   ggtitle("SD glucose (mg/dL)") +
-  theme_bw(base_size = 15) +
+  theme_bw(base_size = 20) +
   theme(
-    legend.title = element_blank(),
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
     axis.title.y = element_blank(),
     plot.title = element_text(size = rel(1))
   ) +
-  scale_color_manual(values = c("#4DA8DA", "#80D8C3", "#FFD66B"))
-box_p <- (box_p3 +
-  box_p1 +
-  box_p2) /
-  (box_p4 +
-    box_p7 +
-    plot_spacer()) /
-  (box_p5 +
-    box_p6 +
-    plot_spacer()) +
+  scale_color_manual(
+    name = "Threshold",
+    values = c("#32936f", "#2274a5", "#ffbf00")
+  )
+box_p <- (box_mg + box_hba1c) /
+  (box_tar140 + box_tar180) /
+  (box_cv + box_sd) +
   plot_layout(guides = "collect")
 box_p
 ggsave(
   "./Christine Chan/EnVision CF/Dissemination/ROC Curves/Figures/dotplot_all.png",
-  height = 6,
-  width = 9,
+  height = 16,
+  width = 12,
   units = "in"
 )
 ```
