@@ -206,8 +206,30 @@ t1 <- tableby(
     kwt(percent_time_under_70, "Nmiss", "medianq1q3") +
     kwt(percent_time_under_60, "Nmiss", "medianq1q3") +
     kwt(standard_deviation, "Nmiss", "medianq1q3") +
+    kwt(cv, "Nmiss", "medianq1q3") +
     kwt(r_mage, "Nmiss", "medianq1q3"),
   data = df |> group_by(study_id) |> slice_min(Date)
+)
+summary(t1, pfootnote = T)
+```
+
+```{r results='asis'}
+#| tbl-cap: "CGM Wears"
+t1 <- tableby(
+  Dysglycemia ~
+    Glucose_0 +
+    Glucose_60 +
+    Glucose_120 +
+    mean_sensor +
+    gmi +
+    kwt(percent_time_over_140, "Nmiss", "medianq1q3") +
+    kwt(percent_time_over_180, "Nmiss", "medianq1q3") +
+    kwt(percent_time_over_250, "Nmiss", "medianq1q3") +
+    kwt(percent_time_under_70, "Nmiss", "medianq1q3") +
+    kwt(percent_time_under_60, "Nmiss", "medianq1q3") +
+    kwt(standard_deviation, "Nmiss", "medianq1q3") +
+    kwt(r_mage, "Nmiss", "medianq1q3"),
+  data = df
 )
 summary(t1, pfootnote = T)
 ```
@@ -216,6 +238,7 @@ summary(t1, pfootnote = T)
 
 ```{r}
 r <- roc(CFRD ~ mean_sensor, data = df, quiet = T)
+rmg = r
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
 mg_best = coords(r, "best", ret = "all")
@@ -251,6 +274,7 @@ mg_youden = mg_best$threshold
 
 ```{r}
 r <- roc(CFRD ~ percent_time_over_140, data = df, quiet = T)
+rtar140 = r
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
 tar140_best = coords(r, "best", ret = "all")
@@ -286,6 +310,7 @@ tar140_youden = tar140_best$threshold
 
 ```{r}
 r <- roc(CFRD ~ percent_time_over_180, data = df, quiet = T)
+rtar180 = r
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
 tar180_best = coords(r, "best", ret = "all")
@@ -321,6 +346,7 @@ tar180_youden = tar180_best$threshold
 
 ```{r}
 r <- roc(CFRD ~ gmi, data = df, quiet = T)
+rgmi = r
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
 gmi_best = coords(r, "best", ret = "all")
@@ -356,6 +382,7 @@ gmi_youden = gmi_best$threshold
 
 ```{r}
 r <- roc(CFRD ~ standard_deviation, data = df, quiet = T)
+rsd = r
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
 sd_best = coords(r, "best", ret = "all")
@@ -391,6 +418,7 @@ sd_youden = sd_best$threshold
 
 ```{r}
 r <- roc(CFRD ~ cv, data = df, quiet = T)
+rcv = r
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
 cv_best = coords(r, "best", ret = "all")
@@ -426,6 +454,7 @@ cv_youden = cv_best$threshold
 
 ```{r}
 r <- roc(CFRD ~ a1c_result, data = df, quiet = T)
+ra1c = r
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
 a1c_best = coords(r, "best", ret = "all")
@@ -455,6 +484,23 @@ a1c_high_spec = min(a1c_coords$threshold[
   which(a1c_coords$specificity >= 0.9)
 ])
 a1c_youden = a1c_best$threshold
+```
+
+## ROC Comparisons
+
+```{r}
+cat("### MG vs. CV")
+roc.test(rmg, rcv)
+cat("### MG vs. SD")
+roc.test(rmg, rsd)
+cat("### TAR140 vs. CV")
+roc.test(rtar140, rcv)
+cat("### TAR140 vs. SD")
+roc.test(rtar140, rsd)
+cat("### TAR180 vs. CV")
+roc.test(rtar180, rcv)
+cat("### TAR180 vs. SD")
+roc.test(rtar180, rsd)
 ```
 
 ## Pulmonary Function Comparisons by CGM
@@ -575,7 +621,7 @@ box_tar140 <- ggplot(
   geom_hline(aes(yintercept = tar140_high_sens, color = "High Sensitivity")) +
   geom_hline(aes(yintercept = tar140_high_spec, color = "High Specificity")) +
   ggtitle("% Time Over 140 (mg/dL)") +
-  theme_bw(base_size = 20) +
+  theme_bw(base_size = 25) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
@@ -599,7 +645,7 @@ box_tar180 <- ggplot(
   geom_hline(aes(yintercept = tar180_high_sens, color = "High Sensitivity")) +
   geom_hline(aes(yintercept = tar180_high_spec, color = "High Specificity")) +
   ggtitle("% Time Over 180 (mg/dL)") +
-  theme_bw(base_size = 20) +
+  theme_bw(base_size = 25) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
@@ -623,7 +669,7 @@ box_mg <- ggplot(
   geom_hline(aes(yintercept = mg_high_sens, color = "High Sensitivity")) +
   geom_hline(aes(yintercept = mg_high_spec, color = "High Specificity")) +
   ggtitle("Mean glucose (mg/dL)") +
-  theme_bw(base_size = 20) +
+  theme_bw(base_size = 25) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
@@ -647,7 +693,7 @@ box_cv <- ggplot(
   geom_hline(aes(yintercept = cv_high_sens, color = "High Sensitivity")) +
   geom_hline(aes(yintercept = cv_high_spec, color = "High Specificity")) +
   ggtitle("Coefficient of Variation (%)") +
-  theme_bw(base_size = 20) +
+  theme_bw(base_size = 25) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
@@ -671,7 +717,7 @@ box_hba1c <- ggplot(
   geom_hline(aes(yintercept = a1c_high_sens, color = "High Sensitivity")) +
   geom_hline(aes(yintercept = a1c_high_spec, color = "High Specificity")) +
   ggtitle("HbA1c (%)") +
-  theme_bw(base_size = 20) +
+  theme_bw(base_size = 25) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
@@ -695,7 +741,7 @@ box_sd <- ggplot(
   geom_hline(aes(yintercept = sd_high_sens, color = "High Sensitivity")) +
   geom_hline(aes(yintercept = sd_high_spec, color = "High Specificity")) +
   ggtitle("SD glucose (mg/dL)") +
-  theme_bw(base_size = 20) +
+  theme_bw(base_size = 25) +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1),
     axis.title.x = element_blank(),
