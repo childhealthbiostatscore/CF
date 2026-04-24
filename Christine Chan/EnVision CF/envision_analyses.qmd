@@ -228,6 +228,7 @@ t1 <- tableby(
     kwt(percent_time_under_70, "Nmiss", "medianq1q3") +
     kwt(percent_time_under_60, "Nmiss", "medianq1q3") +
     kwt(standard_deviation, "Nmiss", "medianq1q3") +
+    kwt(cv, "Nmiss", "medianq1q3") +
     kwt(r_mage, "Nmiss", "medianq1q3"),
   data = df
 )
