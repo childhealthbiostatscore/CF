@@ -489,19 +489,36 @@ a1c_youden = a1c_best$threshold
 
 ## ROC Comparisons
 
+### CGM vs. CGM
+
 ```{r}
-cat("### MG vs. CV")
+cat("#### MG vs. CV")
 roc.test(rmg, rcv)
-cat("### MG vs. SD")
+cat("#### MG vs. SD")
 roc.test(rmg, rsd)
-cat("### TAR140 vs. CV")
+cat("#### TAR140 vs. CV")
 roc.test(rtar140, rcv)
-cat("### TAR140 vs. SD")
+cat("#### TAR140 vs. SD")
 roc.test(rtar140, rsd)
-cat("### TAR180 vs. CV")
+cat("#### TAR180 vs. CV")
 roc.test(rtar180, rcv)
-cat("### TAR180 vs. SD")
+cat("#### TAR180 vs. SD")
 roc.test(rtar180, rsd)
+```
+
+### CGM vs. HbA1c
+
+```{r}
+cat("#### MG vs. HbA1c")
+roc.test(rmg, ra1c)
+cat("#### SD vs. HbA1c")
+roc.test(rsd, ra1c)
+cat("#### CV vs. HbA1c")
+roc.test(rcv, ra1c)
+cat("#### TAR140 vs. HbA1c")
+roc.test(rtar140, ra1c)
+cat("#### TAR180 vs. HbA1c")
+roc.test(rtar180, ra1c)
 ```
 
 ## Pulmonary Function Comparisons by CGM
