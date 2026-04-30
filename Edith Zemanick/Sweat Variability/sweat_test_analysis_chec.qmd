@@ -33,6 +33,7 @@ library(gt)
 library(patchwork)
 library(ggeffects)
 library(ggstatsplot)
+library(robustrank)
 home_dir <- switch(
   Sys.info()["sysname"],
   "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability",
@@ -58,7 +59,7 @@ chec <- left_join(
   by = join_by(subject)
 )
 # Only include people with either a pre-modulator or post-modulator sodium
-chec <- chec %>% filter(!is.na(swsavg), site != "005 Buffalo, NY CC and Peds")
+chec <- chec %>% filter(!is.na(swsavg))
 # Factor variable formatting
 chec$race_txt <- factor(
   chec$race_txt,
@@ -95,14 +96,8 @@ chec$agecat_txt <- factor(
     ">=26 years"
   )
 )
-# Average the values for people with more than 1 using CFF ID
-chec = chec |>
-  group_by(cffid_first) |>
-  mutate(across(
-    c(swhsavgpm, swhcavgpm, swsavg, swcavg),
-    ~ mean(.x, na.rm = TRUE)
-  )) |>
-  filter(row_number() == 1)
+# Drop empty sites
+chec$site = droplevels(factor(chec$site))
 # Calculate ratios
 chec$pre_ratio <- chec$swhsavgpm / chec$swhcavgpm
 chec$post_ratio <- chec$swsavg / chec$swcavg
@@ -144,7 +139,8 @@ label(chec_long$ratio) <- "Sweat Na:Cl"
 
 ```{r results='asis'}
 t1 <- tableby(
-  modqual ~ sex +
+  modqual ~ site +
+    sex +
     kwt(age) +
     agecat_txt +
     race_txt +
@@ -164,13 +160,21 @@ t1 <- tableby(
 summary(t1, pfootnote = T)
 ```
 
+```{r}
+chec |>
+  group_by(cffid_first) |>
+  distinct(modqual) |>
+  summarise(`Number of Times Enrolled` = n(), .groups = "drop") |>
+  select(`Number of Times Enrolled`) |>
+  gtsummary::tbl_summary()
+```
+
 ## Table 2: Change in sweat electrolytes
 
 ```{r results='asis'}
 pt1 <- paired(
   pre_post ~ cl + na + signed.rank(ratio, "N", "Nmiss2", "medianq1q3", "range"),
   data = chec_long,
-
   id = subject,
   control = paired.control(signed.rank.exact = F)
 )
@@ -346,7 +350,6 @@ ggplot(chec_long, aes(x = pre_post, y = ratio)) +
 ## Boxplots
 
 ```{r}
-library(robustrank)
 robust_wilcox <- function(a, b) {
   pm <- pm.wilcox.test(a, b)
   return(list(p.value = pm$p.value))
@@ -495,9 +498,12 @@ chec_long |>
   group_by(subject, modqual) |>
   summarise(
     "SCC < 60" = cl < 60,
+    "SCC < 30" = cl < 30,
     "Na:Cl > 1.2" = ratio > 1.2,
     "SCC < 60 AND Na:Cl > 1.2" = cl < 60 & ratio > 1.2,
     "SCC < 60 OR Na:Cl > 1.2" = cl < 60 | ratio > 1.2,
+    "SCC < 30 AND Na:Cl > 1.2" = cl < 30 & ratio > 1.2,
+    "SCC < 30 OR Na:Cl > 1.2" = cl < 30 | ratio > 1.2,
     .groups = "drop"
   ) |>
   tbl_summary(by = modqual, include = -subject, missing_text = "Missing") |>
@@ -515,6 +521,7 @@ chec_long |>
   ggplot(aes(x = ratio, y = cl)) +
   geom_point() +
   geom_hline(aes(yintercept = 60), color = "red") +
+  geom_hline(aes(yintercept = 30), color = "red", linetype = "dashed") +
   geom_vline(aes(xintercept = 1.2), color = "red") +
   ggtitle("Pre-Modulator") +
   theme_bw() +
@@ -524,8 +531,98 @@ chec_long |>
   ggplot(aes(x = ratio, y = cl)) +
   geom_point() +
   geom_hline(aes(yintercept = 60), color = "red") +
+  geom_hline(aes(yintercept = 30), color = "red", linetype = "dashed") +
   geom_vline(aes(xintercept = 1.2), color = "red") +
   ggtitle("Post-Modulator") +
   theme_bw() +
   facet_wrap(~modqual)
+```
+
+## Five boxplots
+
+```{r}
+chec_long$modqual2 = as.character(chec_long$modqual)
+chec_long$modqual2[chec_long$pre_post == "Pre-Modulator"] = "No Modulator"
+chec_long$modqual2 = factor(
+  chec_long$modqual2,
+  levels = c("No Modulator", "IVA", "LUM/IVA", "TEZ/IVA", "ELX/TEZ/IVA")
+)
+```
+
+### Plain
+
+```{r}
+na_boxplot = ggplot(chec_long, aes(x = "", y = na)) +
+  geom_boxplot() +
+  facet_wrap(~modqual2, nrow = 1) +
+  theme_bw()
+cl_boxplot = ggplot(chec_long, aes(x = "", y = cl)) +
+  geom_boxplot() +
+  facet_wrap(~modqual2, nrow = 1) +
+  theme_bw()
+ratio_boxplot = ggplot(chec_long, aes(x = "", y = ratio)) +
+  geom_boxplot() +
+  facet_wrap(~modqual2, nrow = 1) +
+  theme_bw()
+na_boxplot / cl_boxplot / ratio_boxplot
+```
+
+### Plain + jitter
+
+```{r}
+na_boxplot = ggplot(chec_long, aes(x = "", y = na)) +
+  geom_jitter(alpha = 0.5, width = 0.2) +
+  geom_boxplot(alpha = 0.5) +
+  facet_wrap(~modqual2, nrow = 1) +
+  theme_bw()
+cl_boxplot = ggplot(chec_long, aes(x = "", y = cl)) +
+  geom_jitter(alpha = 0.5, width = 0.2) +
+  geom_boxplot(alpha = 0.5) +
+  facet_wrap(~modqual2, nrow = 1) +
+  theme_bw()
+ratio_boxplot = ggplot(chec_long, aes(x = "", y = ratio)) +
+  geom_jitter(alpha = 0.5, width = 0.2) +
+  geom_boxplot(alpha = 0.5) +
+  facet_wrap(~modqual2, nrow = 1) +
+  theme_bw()
+na_boxplot / cl_boxplot / ratio_boxplot
+```
+
+### Violin
+
+```{r}
+na_boxplot = ggplot(chec_long, aes(x = "", y = na)) +
+  geom_violin() +
+  facet_wrap(~modqual2, nrow = 1) +
+  theme_bw()
+cl_boxplot = ggplot(chec_long, aes(x = "", y = cl)) +
+  geom_violin() +
+  facet_wrap(~modqual2, nrow = 1) +
+  theme_bw()
+ratio_boxplot = ggplot(chec_long, aes(x = "", y = ratio)) +
+  geom_violin() +
+  facet_wrap(~modqual2, nrow = 1) +
+  theme_bw()
+na_boxplot / cl_boxplot / ratio_boxplot
+```
+
+### Violin + jitter
+
+```{r}
+na_boxplot = ggplot(chec_long, aes(x = "", y = na)) +
+  geom_jitter(alpha = 0.5, width = 0.2) +
+  geom_violin(alpha = 0.5) +
+  facet_wrap(~modqual2, nrow = 1) +
+  theme_bw()
+cl_boxplot = ggplot(chec_long, aes(x = "", y = cl)) +
+  geom_jitter(alpha = 0.5, width = 0.2) +
+  geom_violin(alpha = 0.5) +
+  facet_wrap(~modqual2, nrow = 1) +
+  theme_bw()
+ratio_boxplot = ggplot(chec_long, aes(x = "", y = ratio)) +
+  geom_jitter(alpha = 0.5, width = 0.2) +
+  geom_violin(alpha = 0.5) +
+  facet_wrap(~modqual2, nrow = 1) +
+  theme_bw()
+na_boxplot / cl_boxplot / ratio_boxplot
 ```
