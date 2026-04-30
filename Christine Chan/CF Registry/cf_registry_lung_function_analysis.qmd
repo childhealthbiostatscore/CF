@@ -38,14 +38,16 @@ base_dir <- switch(
   "togo" = "/home/tvigers/Documents/Data",
   "Tims-MacBook-Air.local" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers",
   "Tims-Mac-mini.local" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers",
-  "Mac" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers"
+  "Mac" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers",
+  "Tims-Mac-Studio.local" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers"
 )
 data_dir <- switch(
   Sys.info()["nodename"],
   "togo" = "/CF/Christine Chan/CF Registry",
   "Tims-MacBook-Air.local" = "/CF/Christine Chan/CF Registry",
   "Tims-Mac-mini.local" = "/CF/Christine Chan/CF Registry",
-  "Mac" = "/CF/Christine Chan/CF Registry"
+  "Mac" = "/CF/Christine Chan/CF Registry",
+  "Tims-Mac-Studio.local" = "/CF/Christine Chan/CF Registry"
 )
 home_dir <- paste0(base_dir, data_dir)
 knitr::opts_knit$set(root.dir = home_dir)
@@ -611,29 +613,15 @@ mod_df |>
 
 ## FEV1
 
-Adjusted for age at diagnosis, number of FEV1 measures, sex, mutation class, and pancreatic enzyme use. A model with random intercept for participant and continuous AR(1) correlation structure was selected based on AIC and visual inspection of diagnostic plots.
+Adjusted for age at diagnosis, number of FEV1 measures, sex, mutation class, pancreatic enzyme use, and insurance status. A model with random intercept for participant and continuous AR(1) correlation structure was selected based on AIC and visual inspection of diagnostic plots.
 
 ```{r}
 #| warning: false
 #| message: false
 # Fit the model
-# m1 <- lme(
-#     A_FEV1_pct_predicted ~ years_to_cfrd *
-#         a1c_ogtt +
-#         years_to_cfrd * treatment +
-#         age_dx +
-#         NumFEV1 +
-#         Gender +
-#         MutClass +
-#         A_IsOnEnzymes,
-#     random = ~ 1 | eDWID,
-#     data = mod_df,
-#     na.action = "na.omit"
-# )
-m2 <- lme(
+m <- lme(
   A_FEV1_pct_predicted ~ years_to_cfrd *
     a1c_ogtt +
-    years_to_cfrd * treatment +
     age_dx +
     NumFEV1 +
     Gender +
@@ -641,28 +629,16 @@ m2 <- lme(
     A_IsOnEnzymes +
     Insurance,
   random = ~ 1 | eDWID,
-  correlation = corCAR1(),
+  correlation = corAR1(
+    form = ~ as.numeric(as.character(years_to_cfrd)) | eDWID
+  ),
   data = mod_df,
   na.action = "na.exclude"
 )
-# m3 <- lme(
-#     A_FEV1_pct_predicted ~ years_to_cfrd *
-#         a1c_ogtt +
-#         years_to_cfrd * treatment +
-#         age_dx +
-#         NumFEV1 +
-#         Gender +
-#         MutClass +
-#         A_IsOnEnzymes,
-#     random = ~ 1 | eDWID,
-#     correlation = corARMA(p = 2, q = 0),
-#     data = mod_df,
-#     na.action = "na.omit"
-# )
-t3 <- car::Anova(m2, type = "III", contrasts = "contr.sum")
+t3 <- car::Anova(m, type = "III", contrasts = "contr.sum")
 emm <- emmeans(
-  m2,
-  specs = ~ years_to_cfrd + a1c_ogtt + treatment,
+  m,
+  specs = ~ years_to_cfrd | a1c_ogtt,
   pbkrtest.limit = 1e5
 )
 ggplot(
@@ -670,287 +646,86 @@ ggplot(
   aes(
     x = years_to_cfrd,
     y = emmean,
-    group = interaction(a1c_ogtt, treatment),
-    color = a1c_ogtt,
-    shape = treatment
+    color = a1c_ogtt
   )
 ) +
   geom_point() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
-  geom_line(aes(linetype = treatment)) +
+  geom_line(aes(group = a1c_ogtt)) +
   xlab("Years From CFRD Dx") +
   ylab("Estimated Mean ppFEV1") +
   labs(
     color = "Diagnosis Method",
-    shape = "CFRD Treatment Within 1 Year",
-    linetype = "CFRD Treatment Within 1 Year",
-    caption = "Results are averaged over the levels of gender, mutation class, and pancreatic enzye use."
+    caption = "Results are averaged over the levels of age at diagnosis, number of FEV1 measures, sex, mutation class, pancreatic enzyme use, and insurance status."
   ) +
   theme_bw() +
   facet_wrap(~a1c_ogtt)
-# Model table
-m2 |> tbl_regression()
+# Type 3 test
 t3
 ```
 
-The type 3 ANOVA indicates a significant interaction between time and diagnosis method (p =`r format.pval(t3[which(rownames(t3)=="years_to_cfrd:a1c_ogtt"),"Pr(>Chisq)"], eps = 0.001)`) and time and treatment (p =`r format.pval(t3[which(rownames(t3)=="years_to_cfrd:treatment"),"Pr(>Chisq)"], eps = 0.001)`).
+The type 3 ANOVA indicates a significant interaction between time and diagnosis method (p =`r format.pval(t3[which(rownames(t3)=="years_to_cfrd:a1c_ogtt"),"Pr(>Chisq)"], eps = 0.001)`).
 
 ```{r}
 #| warning: false
 #| message: false
+summary(emm, infer = TRUE, adjust = "fdr")
+```
+
+The table above indicates the average FEV1 at a given timepoint within each group. For example, people who were diagnosed by OGTT had an estimated mean FEV1 of 73.7 at diagnosis. The "lower.CL" column indicates the lower bound of the 95% CI, and the "upper.CL" column indicates the upper bound. P values are FDR-adjusted for multiple comparisons.
+
+```{r}
 # Create contrasts
-emm_t <- data.frame(emm)
-base <- rep(0, times = nrow(emm_t))
-# Neither, no treatment
-neither_nt_m_5 <- base
-neither_nt_m_5[which(
-  emm_t$a1c_ogtt == "Neither" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == -5
-)] <- 1
-neither_nt_m_1 <- base
-neither_nt_m_1[which(
-  emm_t$a1c_ogtt == "Neither" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == -1
-)] <- 1
-neither_nt_0 <- base
-neither_nt_0[which(
-  emm_t$a1c_ogtt == "Neither" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == 0
-)] <- 1
-neither_nt_1 <- base
-neither_nt_1[which(
-  emm_t$a1c_ogtt == "Neither" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == 1
-)] <- 1
-neither_nt_5 <- base
-neither_nt_5[which(
-  emm_t$a1c_ogtt == "Neither" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == 5
-)] <- 1
-# HbA1c, no treatment
-hba1c_nt_m_5 <- base
-hba1c_nt_m_5[which(
-  emm_t$a1c_ogtt == "HbA1c Only" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == -5
-)] <- 1
-hba1c_nt_m_1 <- base
-hba1c_nt_m_1[which(
-  emm_t$a1c_ogtt == "HbA1c Only" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == -1
-)] <- 1
-hba1c_nt_0 <- base
-hba1c_nt_0[which(
-  emm_t$a1c_ogtt == "HbA1c Only" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == 0
-)] <- 1
-hba1c_nt_1 <- base
-hba1c_nt_1[which(
-  emm_t$a1c_ogtt == "HbA1c Only" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == 1
-)] <- 1
-hba1c_nt_5 <- base
-hba1c_nt_5[which(
-  emm_t$a1c_ogtt == "HbA1c Only" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == 5
-)] <- 1
-# OGTT, no treatment
-ogtt_nt_m_5 <- base
-ogtt_nt_m_5[which(
-  emm_t$a1c_ogtt == "OGTT" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == -5
-)] <- 1
-ogtt_nt_m_1 <- base
-ogtt_nt_m_1[which(
-  emm_t$a1c_ogtt == "OGTT" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == -1
-)] <- 1
-ogtt_nt_0 <- base
-ogtt_nt_0[which(
-  emm_t$a1c_ogtt == "OGTT" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == 0
-)] <- 1
-ogtt_nt_1 <- base
-ogtt_nt_1[which(
-  emm_t$a1c_ogtt == "OGTT" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == 1
-)] <- 1
-ogtt_nt_5 <- base
-ogtt_nt_5[which(
-  emm_t$a1c_ogtt == "OGTT" &
-    emm_t$treatment == "No Treatment" &
-    emm_t$years_to_cfrd == 5
-)] <- 1
-# Neither, treatment
-neither_t_m_5 <- base
-neither_t_m_5[which(
-  emm_t$a1c_ogtt == "Neither" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == -5
-)] <- 1
-neither_t_m_1 <- base
-neither_t_m_1[which(
-  emm_t$a1c_ogtt == "Neither" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == -1
-)] <- 1
-neither_t_0 <- base
-neither_t_0[which(
-  emm_t$a1c_ogtt == "Neither" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == 0
-)] <- 1
-neither_t_1 <- base
-neither_t_1[which(
-  emm_t$a1c_ogtt == "Neither" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == 1
-)] <- 1
-neither_t_5 <- base
-neither_t_5[which(
-  emm_t$a1c_ogtt == "Neither" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == 5
-)] <- 1
-# HbA1c, treatment
-hba1c_t_m_5 <- base
-hba1c_t_m_5[which(
-  emm_t$a1c_ogtt == "HbA1c Only" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == -5
-)] <- 1
-hba1c_t_m_1 <- base
-hba1c_t_m_1[which(
-  emm_t$a1c_ogtt == "HbA1c Only" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == -1
-)] <- 1
-hba1c_t_0 <- base
-hba1c_t_0[which(
-  emm_t$a1c_ogtt == "HbA1c Only" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == 0
-)] <- 1
-hba1c_t_1 <- base
-hba1c_t_1[which(
-  emm_t$a1c_ogtt == "HbA1c Only" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == 1
-)] <- 1
-hba1c_t_5 <- base
-hba1c_t_5[which(
-  emm_t$a1c_ogtt == "HbA1c Only" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == 5
-)] <- 1
-# OGTT, treatment
-ogtt_t_m_5 <- base
-ogtt_t_m_5[which(
-  emm_t$a1c_ogtt == "OGTT" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == -5
-)] <- 1
-ogtt_t_m_1 <- base
-ogtt_t_m_1[which(
-  emm_t$a1c_ogtt == "OGTT" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == -1
-)] <- 1
-ogtt_t_0 <- base
-ogtt_t_0[which(
-  emm_t$a1c_ogtt == "OGTT" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == 0
-)] <- 1
-ogtt_t_1 <- base
-ogtt_t_1[which(
-  emm_t$a1c_ogtt == "OGTT" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == 1
-)] <- 1
-ogtt_t_5 <- base
-ogtt_t_5[which(
-  emm_t$a1c_ogtt == "OGTT" &
-    emm_t$treatment == "Treatment" &
-    emm_t$years_to_cfrd == 5
-)] <- 1
-```
-
-```{r}
-#| warning: false
-#| message: false
-kable(data.frame(emm), digits = 3, caption = "Estimated Marginal Means (EMM)")
-```
-
-The table above indicates the average FEV1 at a given timepoint within each group. For example, people who were diagnosed by OGTT but not started on CFRD treatment within the first year had an estimated mean FEV1 of 76.368 at diagnosis. The "lower.CL" column indicates the lower bound of the 95% CI, and the "upper.CL" column indicates the upper bound.
-
-```{r}
-#| warning: false
-#| message: false
-# Test contrasts
-F <- contrast(
+base = rep(0, length(emm@levels$years_to_cfrd))
+minus5 = base
+minus5[which(emm@levels$years_to_cfrd == "-5")] = 1
+minus1 = base
+minus1[which(emm@levels$years_to_cfrd == "-1")] = 1
+zero = base
+zero[which(emm@levels$years_to_cfrd == "0")] = 1
+m5 = base
+m5[which(emm@levels$years_to_cfrd == "5")] = 1
+m1 = base
+m1[which(emm@levels$years_to_cfrd == "1")] = 1
+# Apply them
+cont_res = contrast(
   emm,
-  list(
-    "Neither: -5 vs 0 years (No Treatment)" = neither_nt_0 - neither_nt_m_5,
-    "Neither: 0 vs 5 years (No Treatment)" = neither_nt_5 - neither_nt_0,
-    "Neither: -1 vs 0 years (No Treatment)" = neither_nt_0 - neither_nt_m_1,
-    "Neither: 0 vs 1 years (No Treatment)" = neither_nt_1 - neither_nt_0,
-    "HbA1c Only: -5 vs 0 years (No Treatment)" = hba1c_nt_0 - hba1c_nt_m_5,
-    "HbA1c Only: 0 vs 5 years (No Treatment)" = hba1c_nt_5 - hba1c_nt_0,
-    "HbA1c Only: -1 vs 0 years (No Treatment)" = hba1c_nt_0 - hba1c_nt_m_1,
-    "HbA1c Only: 0 vs 1 years (No Treatment)" = hba1c_nt_1 - hba1c_nt_0,
-    "OGTT: -5 vs 0 years (No Treatment)" = ogtt_nt_0 - ogtt_nt_m_5,
-    "OGTT: 0 vs 5 years (No Treatment)" = ogtt_nt_5 - ogtt_nt_0,
-    "OGTT: -1 vs 0 years (No Treatment)" = ogtt_nt_0 - ogtt_nt_m_1,
-    "OGTT: 0 vs 1 years (No Treatment)" = ogtt_nt_1 - ogtt_nt_0,
-    "Neither: -5 vs 0 years (Treatment)" = neither_t_0 - neither_t_m_5,
-    "Neither: 0 vs 5 years (Treatment)" = neither_t_5 - neither_t_0,
-    "Neither: -1 vs 0 years (Treatment)" = neither_t_0 - neither_t_m_1,
-    "Neither: 0 vs 1 years (Treatment)" = neither_t_1 - neither_t_0,
-    "HbA1c Only: -5 vs 0 years (Treatment)" = hba1c_t_0 - hba1c_t_m_5,
-    "HbA1c Only: 0 vs 5 years (Treatment)" = hba1c_t_5 - hba1c_t_0,
-    "HbA1c Only: -1 vs 0 years (Treatment)" = hba1c_t_0 - hba1c_t_m_1,
-    "HbA1c Only: 0 vs 1 years (Treatment)" = hba1c_t_1 - hba1c_t_0,
-    "OGTT: -5 vs 0 years (Treatment)" = ogtt_t_0 - ogtt_t_m_5,
-    "OGTT: 0 vs 5 years (Treatment)" = ogtt_t_5 - ogtt_t_0,
-    "OGTT: -1 vs 0 years (Treatment)" = ogtt_t_0 - ogtt_t_m_1,
-    "OGTT: 0 vs 1 years (Treatment)" = ogtt_t_1 - ogtt_t_0
-  ),
-  adjust = "fdr"
+  method = list(
+    "-5 to 0 years" = zero - minus5,
+    "-1 to 0 years" = zero - minus1,
+    "0 to 1 year" = m1 - zero,
+    "0 to 5 years" = m5 - zero
+  )
 )
-F <- data.frame(F)
-F$lower.CL <- F$estimate - 1.96 * F$SE
-F$upper.CL <- F$estimate + 1.96 * F$SE
-kable(F, digits = 3, caption = "EMM Contrasts")
+summary(cont_res, infer = TRUE, adjust = "fdr")
 ```
 
-The table above indicates the change in average FEV1 from a given timepoint to another within each group. For example, FEV1 in people who were diagnosed by OGTT but not started on CFRD treatment within the first year decreased by -8.612 on average over the 5 years prior to CFRD diagnosis. The "lower.CL" column indicates the lower bound of the 95% CI for this change, and the "upper.CL" column indicates the upper bound.
+The table above indicates the average change from one timepoint to another within each group. For example, in the "neither" group, FEV1 changed by -13.46 from 5 years prior to diagnosis. P values are FDR-adjusted for multiple comparisons.
+
+```{r}
+cont_res2 = contrast(
+  cont_res,
+  method = list(
+    "-5 to 0 years vs. 0 to 5 years" = c(-1, 0, 0, 1),
+    "-1 to 0 years vs. 0 to 1 years" = c(0, -1, 1, 0)
+  )
+)
+summary(cont_res2, infer = TRUE, adjust = "fdr")
+```
+
+This table shows a "difference of differences" that compares the changes pre-CFRD to post-CFRD diagnosis. For example, in the "neither" group, the 5 year change prior to CFRD was -13.46 and the 5 year change after diagnosis was -8.71, indicating that while lung function still decreased, the difference was 4.75 points better after diagnosis. P values are FDR-adjusted for multiple comparisons.
 
 ## FVC
 
-Adjusted for age at diagnosis, number of FVC measures, sex, mutation class, and pancreatic enzyme use. We again used a model with random intercept for participant and continuous AR(1) correlation structure, to be consistent with the FEV1 model.
+Adjusted for age at diagnosis, number of FVC measures, sex, mutation class, pancreatic enzyme use, and insurance status. A model with random intercept for participant and continuous AR(1) correlation structure was selected based on AIC and visual inspection of diagnostic plots.
 
 ```{r}
 #| warning: false
 #| message: false
 # Fit the model
-m2 <- lme(
+m <- lme(
   A_FVC_pct_predicted ~ years_to_cfrd *
     a1c_ogtt +
-    years_to_cfrd * treatment +
     age_dx +
     NumFVC +
     Gender +
@@ -958,14 +733,16 @@ m2 <- lme(
     A_IsOnEnzymes +
     Insurance,
   random = ~ 1 | eDWID,
-  correlation = corCAR1(),
+  correlation = corAR1(
+    form = ~ as.numeric(as.character(years_to_cfrd)) | eDWID
+  ),
   data = mod_df,
   na.action = "na.exclude"
 )
-t3 <- car::Anova(m2, type = "III", contrasts = "contr.sum")
+t3 <- car::Anova(m, type = "III", contrasts = "contr.sum")
 emm <- emmeans(
-  m2,
-  specs = ~ years_to_cfrd + a1c_ogtt + treatment,
+  m,
+  specs = ~ years_to_cfrd | a1c_ogtt,
   pbkrtest.limit = 1e5
 )
 ggplot(
@@ -973,77 +750,71 @@ ggplot(
   aes(
     x = years_to_cfrd,
     y = emmean,
-    group = interaction(a1c_ogtt, treatment),
-    color = a1c_ogtt,
-    shape = treatment
+    color = a1c_ogtt
   )
 ) +
   geom_point() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
-  geom_line(aes(linetype = treatment)) +
+  geom_line(aes(group = a1c_ogtt)) +
   xlab("Years From CFRD Dx") +
   ylab("Estimated Mean ppFVC") +
   labs(
     color = "Diagnosis Method",
-    shape = "CFRD Treatment Within 1 Year",
-    linetype = "CFRD Treatment Within 1 Year",
-    caption = "Results are averaged over the levels of gender, mutation class, and pancreatic enzye use."
+    caption = "Results are averaged over the levels of age at diagnosis, number of FVC measures, sex, mutation class, pancreatic enzyme use, and insurance status."
   ) +
   theme_bw() +
   facet_wrap(~a1c_ogtt)
-# Model table
-m2 |> tbl_regression()
+# Type 3
 t3
 ```
 
-The type 3 ANOVA indicates a significant interaction between time and diagnosis method (p =`r format.pval(t3[which(rownames(t3)=="years_to_cfrd:a1c_ogtt"),"Pr(>Chisq)"], eps = 0.001)`) and time and treatment (p =`r format.pval(t3[which(rownames(t3)=="years_to_cfrd:treatment"),"Pr(>Chisq)"], eps = 0.001)`).
+The type 3 ANOVA indicates a significant interaction between time and diagnosis method (p =`r format.pval(t3[which(rownames(t3)=="years_to_cfrd:a1c_ogtt"),"Pr(>Chisq)"], eps = 0.001)`).
 
 ```{r}
 #| warning: false
 #| message: false
-kable(data.frame(emm), digits = 3, caption = "Estimated Marginal Means (EMM)")
+summary(emm, infer = TRUE, adjust = "fdr")
 ```
 
-The table above indicates the average FVC at a given timepoint within each group. For example, people who were diagnosed by OGTT but not started on CFRD treatment within the first year had an estimated mean FVC of 86.267 at diagnosis. The "lower.CL" column indicates the lower bound of the 95% CI, and the "upper.CL" column indicates the upper bound.
+The table above indicates the average FVC at a given timepoint within each group. For example, people who were diagnosed by OGTT had an estimated mean FVC of 83.9 at diagnosis. P values are FDR-adjusted for multiple comparisons.
 
 ```{r}
-#| warning: false
-#| message: false
-# Test contrasts
-F <- contrast(
+# Create contrasts
+base = rep(0, length(emm@levels$years_to_cfrd))
+minus5 = base
+minus5[which(emm@levels$years_to_cfrd == "-5")] = 1
+minus1 = base
+minus1[which(emm@levels$years_to_cfrd == "-1")] = 1
+zero = base
+zero[which(emm@levels$years_to_cfrd == "0")] = 1
+m5 = base
+m5[which(emm@levels$years_to_cfrd == "5")] = 1
+m1 = base
+m1[which(emm@levels$years_to_cfrd == "1")] = 1
+# Apply them
+cont_res = contrast(
   emm,
-  list(
-    "Neither: -5 vs 0 years (No Treatment)" = neither_nt_0 - neither_nt_m_5,
-    "Neither: 0 vs 5 years (No Treatment)" = neither_nt_5 - neither_nt_0,
-    "Neither: -1 vs 0 years (No Treatment)" = neither_nt_0 - neither_nt_m_1,
-    "Neither: 0 vs 1 years (No Treatment)" = neither_nt_1 - neither_nt_0,
-    "HbA1c Only: -5 vs 0 years (No Treatment)" = hba1c_nt_0 - hba1c_nt_m_5,
-    "HbA1c Only: 0 vs 5 years (No Treatment)" = hba1c_nt_5 - hba1c_nt_0,
-    "HbA1c Only: -1 vs 0 years (No Treatment)" = hba1c_nt_0 - hba1c_nt_m_1,
-    "HbA1c Only: 0 vs 1 years (No Treatment)" = hba1c_nt_1 - hba1c_nt_0,
-    "OGTT: -5 vs 0 years (No Treatment)" = ogtt_nt_0 - ogtt_nt_m_5,
-    "OGTT: 0 vs 5 years (No Treatment)" = ogtt_nt_5 - ogtt_nt_0,
-    "OGTT: -1 vs 0 years (No Treatment)" = ogtt_nt_0 - ogtt_nt_m_1,
-    "OGTT: 0 vs 1 years (No Treatment)" = ogtt_nt_1 - ogtt_nt_0,
-    "Neither: -5 vs 0 years (Treatment)" = neither_t_0 - neither_t_m_5,
-    "Neither: 0 vs 5 years (Treatment)" = neither_t_5 - neither_t_0,
-    "Neither: -1 vs 0 years (Treatment)" = neither_t_0 - neither_t_m_1,
-    "Neither: 0 vs 1 years (Treatment)" = neither_t_1 - neither_t_0,
-    "HbA1c Only: -5 vs 0 years (Treatment)" = hba1c_t_0 - hba1c_t_m_5,
-    "HbA1c Only: 0 vs 5 years (Treatment)" = hba1c_t_5 - hba1c_t_0,
-    "HbA1c Only: -1 vs 0 years (Treatment)" = hba1c_t_0 - hba1c_t_m_1,
-    "HbA1c Only: 0 vs 1 years (Treatment)" = hba1c_t_1 - hba1c_t_0,
-    "OGTT: -5 vs 0 years (Treatment)" = ogtt_t_0 - ogtt_t_m_5,
-    "OGTT: 0 vs 5 years (Treatment)" = ogtt_t_5 - ogtt_t_0,
-    "OGTT: -1 vs 0 years (Treatment)" = ogtt_t_0 - ogtt_t_m_1,
-    "OGTT: 0 vs 1 years (Treatment)" = ogtt_t_1 - ogtt_t_0
-  ),
-  adjust = "fdr"
+  method = list(
+    "-5 to 0 years" = zero - minus5,
+    "-1 to 0 years" = zero - minus1,
+    "0 to 1 year" = m1 - zero,
+    "0 to 5 years" = m5 - zero
+  )
 )
-F <- data.frame(F)
-F$lower.CL <- F$estimate - 1.96 * F$SE
-F$upper.CL <- F$estimate + 1.96 * F$SE
-kable(F, digits = 3, caption = "EMM Contrasts")
+summary(cont_res, infer = TRUE, adjust = "fdr")
 ```
 
-The table above indicates the change in average FVC from a given timepoint to another within each group. For example, FVC in people who were diagnosed by OGTT but not started on CFRD treatment within the first year decreased by -5.752 on average over the 5 years prior to CFRD diagnosis. The "lower.CL" column indicates the lower bound of the 95% CI for this change, and the "upper.CL" column indicates the upper bound.
+The table above indicates the average change from a given timepoint to another within each group. For example, in the "neither" group, FVC changed by -10.59 from 5 years prior to diagnosis. P values are FDR-adjusted for multiple comparisons.
+
+```{r}
+cont_res2 = contrast(
+  cont_res,
+  method = list(
+    "-5 to 0 years vs. 0 to 5 years" = c(-1, 0, 0, 1),
+    "-1 to 0 years vs. 0 to 1 years" = c(0, -1, 1, 0)
+  )
+)
+summary(cont_res2, infer = TRUE, adjust = "fdr")
+```
+
+This table shows a "difference of differences" that compares the changes pre-CFRD to post-CFRD diagnosis. For example, in the "neither" group, the 5 year change prior to CFRD was -10.59 and the 5 year change after diagnosis was -6.19, indicating that while lung function still decreased, the difference was 4.4 points better after diagnosis. P values are FDR-adjusted for multiple comparisons.
