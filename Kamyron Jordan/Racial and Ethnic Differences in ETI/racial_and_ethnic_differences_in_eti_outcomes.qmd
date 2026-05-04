@@ -144,11 +144,6 @@ ann_mod_comp_sym <- lme(
   correlation = corCompSymm(form = ~ days_cat_int | eDWID),
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
   method = "ML"
 )
 ann_mod_ar1 <- lme(
@@ -157,27 +152,18 @@ ann_mod_ar1 <- lme(
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
   method = "ML"
 )
-ann_mod_het_ar1_time <- lme(
-  gli_fev1_ppred_rn ~ Days_cat * Race,
-  random = ~ 1 | eDWID,
-  correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
-  data = annualized,
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
-  method = "ML"
-)
+# AR1 changing over time does not converge
+# ann_mod_het_ar1_time <- lme(
+#   gli_fev1_ppred_rn ~ Days_cat * Race,
+#   random = ~ 1 | eDWID,
+#   correlation = corAR1(form = ~ days_cat_int | eDWID),
+#   weights = varIdent(form = ~ 1 | Days_cat),
+#   data = annualized,
+#   na.action = na.exclude,
+#   method = "ML"
+# )
 ann_mod_het_ar1_race <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
@@ -185,29 +171,18 @@ ann_mod_het_ar1_race <- lme(
   weights = varIdent(form = ~ 1 | Race),
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
   method = "ML"
 )
 # Unstructured does not converge
-ann_mod_unst <- lme(
-  gli_fev1_ppred_rn ~ Days_cat * Race,
-  random = ~ 1 | eDWID,
-  correlation = corSymm(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
-  data = annualized,
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
-  method = "ML"
-)
-# Compare the best one to random slope
+# ann_mod_unst <- lme(
+#   gli_fev1_ppred_rn ~ Days_cat * Race,
+#   random = ~ 1 | eDWID,
+#   correlation = corSymm(form = ~ days_cat_int | eDWID),
+#   weights = varIdent(form = ~ 1 | Days_cat),
+#   data = annualized,
+#   na.action = na.exclude,
+#   method = "ML"
+# )
 ann_mod_rs <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ days_cat_int | eDWID,
@@ -218,9 +193,7 @@ ann_mod_rs <- lme(
 )
 kable(performance::compare_performance(
   ann_mod_comp_sym,
-  ann_mod_unst,
   ann_mod_ar1,
-  ann_mod_het_ar1_time,
   ann_mod_het_ar1_race,
   ann_mod_rs
 ))
@@ -229,19 +202,14 @@ kable(performance::compare_performance(
 ### Full cohort
 
 ```{r ppfev1 full}
-# Unstructured is the winner! Refit with REML
+# AR1 varying by race is the winner! Refit with REML
 ann_mod = lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
-  correlation = corSymm(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Race),
   data = annualized,
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  )
+  na.action = na.exclude
 )
 # Summarize
 emm <- emmeans(
@@ -273,15 +241,10 @@ kable(emm)
 ann_mod <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
-  correlation = corSymm(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Race),
   data = annualized |> filter(age_eti_start < 18),
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  )
+  na.action = na.exclude
 )
 # Summarize
 emm <- emmeans(
@@ -313,15 +276,10 @@ kable(emm)
 ann_mod <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
-  correlation = corSymm(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Race),
   data = annualized |> filter(age_eti_start >= 18),
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  )
+  na.action = na.exclude
 )
 # Summarize
 emm <- emmeans(
@@ -349,7 +307,7 @@ kable(emm)
 
 ## ppFVC
 
-```{r ppvc selection}
+```{r ppfvc selection}
 # Random intercept with correlation structure
 ann_mod_comp_sym <- lme(
   gli_fvc_ppred_rn ~ Days_cat * Race,
@@ -357,11 +315,6 @@ ann_mod_comp_sym <- lme(
   correlation = corCompSymm(form = ~ days_cat_int | eDWID),
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
   method = "ML"
 )
 ann_mod_ar1 <- lme(
@@ -370,27 +323,18 @@ ann_mod_ar1 <- lme(
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
   method = "ML"
 )
-ann_mod_het_ar1_time <- lme(
-  gli_fvc_ppred_rn ~ Days_cat * Race,
-  random = ~ 1 | eDWID,
-  correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
-  data = annualized,
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
-  method = "ML"
-)
+# AR1 changing over time does not converge
+# ann_mod_het_ar1_time <- lme(
+#   gli_fvc_ppred_rn ~ Days_cat * Race,
+#   random = ~ 1 | eDWID,
+#   correlation = corAR1(form = ~ days_cat_int | eDWID),
+#   weights = varIdent(form = ~ 1 | Days_cat),
+#   data = annualized,
+#   na.action = na.exclude,
+#   method = "ML"
+# )
 ann_mod_het_ar1_race <- lme(
   gli_fvc_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
@@ -398,29 +342,18 @@ ann_mod_het_ar1_race <- lme(
   weights = varIdent(form = ~ 1 | Race),
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
   method = "ML"
 )
 # Unstructured does not converge
-ann_mod_unst <- lme(
-  gli_fvc_ppred_rn ~ Days_cat * Race,
-  random = ~ 1 | eDWID,
-  correlation = corSymm(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
-  data = annualized,
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
-  method = "ML"
-)
-# Compare the best one to random slope
+# ann_mod_unst <- lme(
+#   gli_fvc_ppred_rn ~ Days_cat * Race,
+#   random = ~ 1 | eDWID,
+#   correlation = corSymm(form = ~ days_cat_int | eDWID),
+#   weights = varIdent(form = ~ 1 | Days_cat),
+#   data = annualized,
+#   na.action = na.exclude,
+#   method = "ML"
+# )
 ann_mod_rs <- lme(
   gli_fvc_ppred_rn ~ Days_cat * Race,
   random = ~ days_cat_int | eDWID,
@@ -431,9 +364,7 @@ ann_mod_rs <- lme(
 )
 kable(performance::compare_performance(
   ann_mod_comp_sym,
-  ann_mod_unst,
   ann_mod_ar1,
-  ann_mod_het_ar1_time,
   ann_mod_het_ar1_race,
   ann_mod_rs
 ))
@@ -446,14 +377,9 @@ ann_mod = lme(
   gli_fvc_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
+  weights = varIdent(form = ~ 1 | Race),
   data = annualized,
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  )
+  na.action = na.exclude
 )
 # Summarize
 emm <- emmeans(
@@ -486,14 +412,9 @@ ann_mod <- lme(
   gli_fvc_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
+  weights = varIdent(form = ~ 1 | Race),
   data = annualized |> filter(age_eti_start < 18),
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  )
+  na.action = na.exclude
 )
 # Summarize
 emm <- emmeans(
@@ -526,14 +447,9 @@ ann_mod <- lme(
   gli_fvc_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
+  weights = varIdent(form = ~ 1 | Race),
   data = annualized |> filter(age_eti_start >= 18),
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  )
+  na.action = na.exclude
 )
 # Summarize
 emm <- emmeans(
@@ -571,11 +487,6 @@ ann_mod_comp_sym <- lme(
   correlation = corCompSymm(form = ~ days_cat_int | eDWID),
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
   method = "ML"
 )
 ann_mod_ar1 <- lme(
@@ -584,27 +495,18 @@ ann_mod_ar1 <- lme(
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
   method = "ML"
 )
-ann_mod_het_ar1_time <- lme(
-  bmipercentile ~ Days_cat * Race,
-  random = ~ 1 | eDWID,
-  correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
-  data = annualized,
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
-  method = "ML"
-)
+# AR1 changing over time does not converge
+# ann_mod_het_ar1_time <- lme(
+#   bmipercentile ~ Days_cat * Race,
+#   random = ~ 1 | eDWID,
+#   correlation = corAR1(form = ~ days_cat_int | eDWID),
+#   weights = varIdent(form = ~ 1 | Days_cat),
+#   data = annualized,
+#   na.action = na.exclude,
+#   method = "ML"
+# )
 ann_mod_het_ar1_race <- lme(
   bmipercentile ~ Days_cat * Race,
   random = ~ 1 | eDWID,
@@ -612,46 +514,29 @@ ann_mod_het_ar1_race <- lme(
   weights = varIdent(form = ~ 1 | Race),
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
   method = "ML"
 )
 # Unstructured does not converge
-ann_mod_unst <- lme(
-  bmipercentile ~ Days_cat * Race,
-  random = ~ 1 | eDWID,
-  correlation = corSymm(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
-  data = annualized,
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
-  method = "ML"
-)
-# Compare the best one to random slope
+# ann_mod_unst <- lme(
+#   bmipercentile ~ Days_cat * Race,
+#   random = ~ 1 | eDWID,
+#   correlation = corSymm(form = ~ days_cat_int | eDWID),
+#   weights = varIdent(form = ~ 1 | Days_cat),
+#   data = annualized,
+#   na.action = na.exclude,
+#   method = "ML"
+# )
 ann_mod_rs <- lme(
   bmipercentile ~ Days_cat * Race,
   random = ~ days_cat_int | eDWID,
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
+  control = lmeControl(opt = "optim"),
   method = "ML"
 )
 kable(performance::compare_performance(
   ann_mod_comp_sym,
-  ann_mod_unst,
   ann_mod_ar1,
-  ann_mod_het_ar1_time,
   ann_mod_het_ar1_race,
   ann_mod_rs
 ))
@@ -662,14 +547,9 @@ ann_mod <- lme(
   bmipercentile ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
+  weights = varIdent(form = ~ 1 | Race),
   data = annualized |> filter(age_eti_start < 20),
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  )
+  na.action = na.exclude
 )
 # Summarize
 emm <- emmeans(
@@ -705,11 +585,6 @@ ann_mod_comp_sym <- lme(
   correlation = corCompSymm(form = ~ days_cat_int | eDWID),
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
   method = "ML"
 )
 ann_mod_ar1 <- lme(
@@ -718,27 +593,18 @@ ann_mod_ar1 <- lme(
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
   method = "ML"
 )
-ann_mod_het_ar1_time <- lme(
-  bmivalue ~ Days_cat * Race,
-  random = ~ 1 | eDWID,
-  correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
-  data = annualized,
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
-  method = "ML"
-)
+# AR1 changing over time does not converge
+# ann_mod_het_ar1_time <- lme(
+#   bmivalue ~ Days_cat * Race,
+#   random = ~ 1 | eDWID,
+#   correlation = corAR1(form = ~ days_cat_int | eDWID),
+#   weights = varIdent(form = ~ 1 | Days_cat),
+#   data = annualized,
+#   na.action = na.exclude,
+#   method = "ML"
+# )
 ann_mod_het_ar1_race <- lme(
   bmivalue ~ Days_cat * Race,
   random = ~ 1 | eDWID,
@@ -746,46 +612,29 @@ ann_mod_het_ar1_race <- lme(
   weights = varIdent(form = ~ 1 | Race),
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
   method = "ML"
 )
 # Unstructured does not converge
-ann_mod_unst <- lme(
-  bmivalue ~ Days_cat * Race,
-  random = ~ 1 | eDWID,
-  correlation = corSymm(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
-  data = annualized,
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
-  method = "ML"
-)
-# Compare the best one to random slope
+# ann_mod_unst <- lme(
+#   bmivalue ~ Days_cat * Race,
+#   random = ~ 1 | eDWID,
+#   correlation = corSymm(form = ~ days_cat_int | eDWID),
+#   weights = varIdent(form = ~ 1 | Days_cat),
+#   data = annualized,
+#   na.action = na.exclude,
+#   method = "ML"
+# )
 ann_mod_rs <- lme(
   bmivalue ~ Days_cat * Race,
   random = ~ days_cat_int | eDWID,
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  ),
+  control = lmeControl(opt = "optim"),
   method = "ML"
 )
 kable(performance::compare_performance(
   ann_mod_comp_sym,
-  ann_mod_unst,
   ann_mod_ar1,
-  ann_mod_het_ar1_time,
   ann_mod_het_ar1_race,
   ann_mod_rs
 ))
@@ -796,14 +645,9 @@ ann_mod <- lme(
   bmivalue ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Days_cat),
+  weights = varIdent(form = ~ 1 | Race),
   data = annualized |> filter(age_eti_start >= 20),
-  na.action = na.exclude,
-  control = lmeControl(
-    maxIter = 1000,
-    msMaxIter = 1000,
-    niterEM = 1000
-  )
+  na.action = na.exclude
 )
 # Summarize
 emm <- emmeans(
