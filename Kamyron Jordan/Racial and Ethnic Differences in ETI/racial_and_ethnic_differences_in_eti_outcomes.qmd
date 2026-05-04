@@ -136,23 +136,33 @@ annualized$days_cat_int = as.integer(annualized$Days_cat)
 
 Mixed model structure was chosen based on FEV1 in the full cohort. We compared models with random intercept and slope to models with random intercept only and three correlation structures: compound symmetry, AR1, and heterogenous AR1. Based on AIC, the best model with one with random intercept and heterogenous AR1. Diagnostic plots for this model looked beautiful and pristine. 
 
-### Full cohort
-
-```{r ppfev1 full}
+```{r ppfev1 selection}
 # Random intercept with correlation structure
 ann_mod_comp_sym <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corCompSymm(form = ~ days_cat_int | eDWID),
   data = annualized,
-  na.action = na.exclude
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
 )
 ann_mod_ar1 <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   data = annualized,
-  na.action = na.exclude
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
 )
 ann_mod_het_ar1_time <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
@@ -165,7 +175,8 @@ ann_mod_het_ar1_time <- lme(
     maxIter = 1000,
     msMaxIter = 1000,
     niterEM = 1000
-  )
+  ),
+  method = "ML"
 )
 ann_mod_het_ar1_race <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
@@ -173,35 +184,65 @@ ann_mod_het_ar1_race <- lme(
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   weights = varIdent(form = ~ 1 | Race),
   data = annualized,
-  na.action = na.exclude
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
 )
 # Unstructured does not converge
-# ann_mod_unst <- lme(
-#   gli_fev1_ppred_rn ~ Days_cat * Race,
-#   random = ~ 1 | eDWID,
-#   correlation = corSymm(form = ~ days_cat_int | eDWID),
-#   weights = varIdent(form = ~ 1 | Days_cat),
-#   data = annualized,
-#   na.action = na.exclude,
-#   control = lmeControl(opt = "optim")
-# )
+ann_mod_unst <- lme(
+  gli_fev1_ppred_rn ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corSymm(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
 # Compare the best one to random slope
 ann_mod_rs <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ days_cat_int | eDWID,
   data = annualized,
   na.action = na.exclude,
-  control = lmeControl(opt = "optim")
+  control = lmeControl(opt = "optim"),
+  method = "ML"
 )
-performance::compare_performance(
+kable(performance::compare_performance(
   ann_mod_comp_sym,
+  ann_mod_unst,
   ann_mod_ar1,
   ann_mod_het_ar1_time,
   ann_mod_het_ar1_race,
   ann_mod_rs
+))
+```
+
+### Full cohort
+
+```{r ppfev1 full}
+# Unstructured is the winner! Refit with REML
+ann_mod = lme(
+  gli_fev1_ppred_rn ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corSymm(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  )
 )
-# Heterogenous AR1 is the winner!
-ann_mod = ann_mod_het_ar1_time
 # Summarize
 emm <- emmeans(
   ann_mod,
@@ -232,7 +273,7 @@ kable(emm)
 ann_mod <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
-  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  correlation = corSymm(form = ~ days_cat_int | eDWID),
   weights = varIdent(form = ~ 1 | Days_cat),
   data = annualized |> filter(age_eti_start < 18),
   na.action = na.exclude,
@@ -243,12 +284,15 @@ ann_mod <- lme(
   )
 )
 # Summarize
-emm <- data.frame(emmeans(
+emm <- emmeans(
   ann_mod,
-  specs = ~ Race + Days_cat,
+  specs = ~ Days_cat | Race,
   pbkrtest.limit = 1e6
-))
-ggplot(emm, aes(x = Days_cat, y = emmean, group = Race, color = Race)) +
+)
+ggplot(
+  data.frame(emm),
+  aes(x = Days_cat, y = emmean, group = Race, color = Race)
+) +
   geom_point() +
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
@@ -269,7 +313,7 @@ kable(emm)
 ann_mod <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
-  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  correlation = corSymm(form = ~ days_cat_int | eDWID),
   weights = varIdent(form = ~ 1 | Days_cat),
   data = annualized |> filter(age_eti_start >= 18),
   na.action = na.exclude,
@@ -280,12 +324,15 @@ ann_mod <- lme(
   )
 )
 # Summarize
-emm <- data.frame(emmeans(
+emm <- emmeans(
   ann_mod,
-  specs = ~ Race + Days_cat,
+  specs = ~ Days_cat | Race,
   pbkrtest.limit = 1e6
-))
-ggplot(emm, aes(x = Days_cat, y = emmean, group = Race, color = Race)) +
+)
+ggplot(
+  data.frame(emm),
+  aes(x = Days_cat, y = emmean, group = Race, color = Race)
+) +
   geom_point() +
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
@@ -301,6 +348,96 @@ kable(emm)
 ```
 
 ## ppFVC
+
+```{r ppvc selection}
+# Random intercept with correlation structure
+ann_mod_comp_sym <- lme(
+  gli_fvc_ppred_rn ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corCompSymm(form = ~ days_cat_int | eDWID),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+ann_mod_ar1 <- lme(
+  gli_fvc_ppred_rn ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+ann_mod_het_ar1_time <- lme(
+  gli_fvc_ppred_rn ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+ann_mod_het_ar1_race <- lme(
+  gli_fvc_ppred_rn ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Race),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+# Unstructured does not converge
+ann_mod_unst <- lme(
+  gli_fvc_ppred_rn ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corSymm(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+# Compare the best one to random slope
+ann_mod_rs <- lme(
+  gli_fvc_ppred_rn ~ Days_cat * Race,
+  random = ~ days_cat_int | eDWID,
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(opt = "optim"),
+  method = "ML"
+)
+kable(performance::compare_performance(
+  ann_mod_comp_sym,
+  ann_mod_unst,
+  ann_mod_ar1,
+  ann_mod_het_ar1_time,
+  ann_mod_het_ar1_race,
+  ann_mod_rs
+))
+```
 
 ### Full cohort
 
@@ -319,12 +456,15 @@ ann_mod = lme(
   )
 )
 # Summarize
-emm <- data.frame(emmeans(
+emm <- emmeans(
   ann_mod,
-  specs = ~ Race + Days_cat,
+  specs = ~ Days_cat | Race,
   pbkrtest.limit = 1e6
-))
-ggplot(emm, aes(x = Days_cat, y = emmean, group = Race, color = Race)) +
+)
+ggplot(
+  data.frame(emm),
+  aes(x = Days_cat, y = emmean, group = Race, color = Race)
+) +
   geom_point() +
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
@@ -356,12 +496,15 @@ ann_mod <- lme(
   )
 )
 # Summarize
-emm <- data.frame(emmeans(
+emm <- emmeans(
   ann_mod,
-  specs = ~ Race + Days_cat,
+  specs = ~ Days_cat | Race,
   pbkrtest.limit = 1e6
-))
-ggplot(emm, aes(x = Days_cat, y = emmean, group = Race, color = Race)) +
+)
+ggplot(
+  data.frame(emm),
+  aes(x = Days_cat, y = emmean, group = Race, color = Race)
+) +
   geom_point() +
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
@@ -393,12 +536,15 @@ ann_mod <- lme(
   )
 )
 # Summarize
-emm <- data.frame(emmeans(
+emm <- emmeans(
   ann_mod,
-  specs = ~ Race + Days_cat,
+  specs = ~ Days_cat | Race,
   pbkrtest.limit = 1e6
-))
-ggplot(emm, aes(x = Days_cat, y = emmean, group = Race, color = Race)) +
+)
+ggplot(
+  data.frame(emm),
+  aes(x = Days_cat, y = emmean, group = Race, color = Race)
+) +
   geom_point() +
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
@@ -417,6 +563,100 @@ kable(emm)
 
 ### BMI %ile (age < 20 at ETI start)
 
+```{r bmipercentile selection}
+# Random intercept with correlation structure
+ann_mod_comp_sym <- lme(
+  bmipercentile ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corCompSymm(form = ~ days_cat_int | eDWID),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+ann_mod_ar1 <- lme(
+  bmipercentile ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+ann_mod_het_ar1_time <- lme(
+  bmipercentile ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+ann_mod_het_ar1_race <- lme(
+  bmipercentile ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Race),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+# Unstructured does not converge
+ann_mod_unst <- lme(
+  bmipercentile ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corSymm(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+# Compare the best one to random slope
+ann_mod_rs <- lme(
+  bmipercentile ~ Days_cat * Race,
+  random = ~ days_cat_int | eDWID,
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+kable(performance::compare_performance(
+  ann_mod_comp_sym,
+  ann_mod_unst,
+  ann_mod_ar1,
+  ann_mod_het_ar1_time,
+  ann_mod_het_ar1_race,
+  ann_mod_rs
+))
+```
+
 ```{r bmi u20}
 ann_mod <- lme(
   bmipercentile ~ Days_cat * Race,
@@ -432,12 +672,15 @@ ann_mod <- lme(
   )
 )
 # Summarize
-emm <- data.frame(emmeans(
+emm <- emmeans(
   ann_mod,
-  specs = ~ Race + Days_cat,
+  specs = ~ Days_cat | Race,
   pbkrtest.limit = 1e6
-))
-ggplot(emm, aes(x = Days_cat, y = emmean, group = Race, color = Race)) +
+)
+ggplot(
+  data.frame(emm),
+  aes(x = Days_cat, y = emmean, group = Race, color = Race)
+) +
   geom_point() +
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
@@ -454,9 +697,103 @@ kable(emm)
 
 ### BMI raw value (age >= 20 at ETI start)
 
+```{r bmivalue selection}
+# Random intercept with correlation structure
+ann_mod_comp_sym <- lme(
+  bmivalue ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corCompSymm(form = ~ days_cat_int | eDWID),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+ann_mod_ar1 <- lme(
+  bmivalue ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+ann_mod_het_ar1_time <- lme(
+  bmivalue ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+ann_mod_het_ar1_race <- lme(
+  bmivalue ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Race),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+# Unstructured does not converge
+ann_mod_unst <- lme(
+  bmivalue ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corSymm(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+# Compare the best one to random slope
+ann_mod_rs <- lme(
+  bmivalue ~ Days_cat * Race,
+  random = ~ days_cat_int | eDWID,
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(
+    maxIter = 1000,
+    msMaxIter = 1000,
+    niterEM = 1000
+  ),
+  method = "ML"
+)
+kable(performance::compare_performance(
+  ann_mod_comp_sym,
+  ann_mod_unst,
+  ann_mod_ar1,
+  ann_mod_het_ar1_time,
+  ann_mod_het_ar1_race,
+  ann_mod_rs
+))
+```
+
 ```{r bmi o20}
 ann_mod <- lme(
-  bmipercentile ~ Days_cat * Race,
+  bmivalue ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   weights = varIdent(form = ~ 1 | Days_cat),
@@ -469,18 +806,21 @@ ann_mod <- lme(
   )
 )
 # Summarize
-emm <- data.frame(emmeans(
+emm <- emmeans(
   ann_mod,
-  specs = ~ Race + Days_cat,
+  specs = ~ Days_cat | Race,
   pbkrtest.limit = 1e6
-))
-ggplot(emm, aes(x = Days_cat, y = emmean, group = Race, color = Race)) +
+)
+ggplot(
+  data.frame(emm),
+  aes(x = Days_cat, y = emmean, group = Race, color = Race)
+) +
   geom_point() +
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
-  ylab("BMI %ile") +
+  ylab("BMI") +
   xlab("Days prior to/after ETI initiation") +
-  ggtitle("Age < 20 at ETI initiation") +
+  ggtitle("Age >= 20 at ETI initiation") +
   scale_color_manual(
     values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
     labels = c("White", "Black", "Hispanic", "Other")
