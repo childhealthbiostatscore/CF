@@ -134,7 +134,7 @@ annualized$days_cat_int = as.integer(annualized$Days_cat)
 
 ## ppFEV1
 
-Mixed model structure was chosen based on FEV1 in the full cohort. We compared models with random intercept and slope to models with random intercept only and three correlation structures: compound symmetry, AR1, and heterogenous AR1. Based on AIC, the best model with one with random intercept and heterogenous AR1. Diagnostic plots for this model looked beautiful and pristine. 
+Mixed model structure was chosen based on FEV1 in the full cohort. We compared models with random intercept and slope to models with random intercept only and three correlation structures: compound symmetry, AR1, and heterogenous AR1. Based on AIC, the best model was with one with random intercept and heterogeneous AR1 (variance differing by race). Diagnostic plots for this model looked beautiful and pristine. 
 
 ```{r ppfev1 selection}
 # Random intercept with correlation structure
@@ -211,6 +211,7 @@ ann_mod = lme(
   data = annualized,
   na.action = na.exclude
 )
+performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
@@ -246,6 +247,7 @@ ann_mod <- lme(
   data = annualized |> filter(age_eti_start < 18),
   na.action = na.exclude
 )
+performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
@@ -281,6 +283,7 @@ ann_mod <- lme(
   data = annualized |> filter(age_eti_start >= 18),
   na.action = na.exclude
 )
+performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
@@ -306,6 +309,8 @@ kable(emm)
 ```
 
 ## ppFVC
+
+Mixed model structure was chosen based on FVC in the full cohort. We compared models with random intercept and slope to models with random intercept only and three correlation structures: compound symmetry, AR1, and heterogenous AR1. Based on AIC, the best model was with one with random intercept and heterogeneous AR1 (variance differing by race). Diagnostic plots for this model looked beautiful and pristine. 
 
 ```{r ppfvc selection}
 # Random intercept with correlation structure
@@ -381,6 +386,7 @@ ann_mod = lme(
   data = annualized,
   na.action = na.exclude
 )
+performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
@@ -416,6 +422,7 @@ ann_mod <- lme(
   data = annualized |> filter(age_eti_start < 18),
   na.action = na.exclude
 )
+performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
@@ -451,6 +458,7 @@ ann_mod <- lme(
   data = annualized |> filter(age_eti_start >= 18),
   na.action = na.exclude
 )
+performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
@@ -479,13 +487,15 @@ kable(emm)
 
 ### BMI %ile (age < 20 at ETI start)
 
+Mixed model structure was chosen based on BMI %ile in the age < 20 at ETI start cohort. We compared models with random intercept and slope to models with random intercept only and three correlation structures: compound symmetry, AR1, and heterogenous AR1. Based on AIC, the best model was with one with random intercept and heterogeneous AR1 (variance differing by race). Diagnostic plots for this model looked beautiful and pristine. 
+
 ```{r bmipercentile selection}
 # Random intercept with correlation structure
 ann_mod_comp_sym <- lme(
   bmipercentile ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corCompSymm(form = ~ days_cat_int | eDWID),
-  data = annualized,
+  data = annualized |> filter(age_eti_start < 20),
   na.action = na.exclude,
   method = "ML"
 )
@@ -493,7 +503,7 @@ ann_mod_ar1 <- lme(
   bmipercentile ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  data = annualized,
+  data = annualized |> filter(age_eti_start < 20),
   na.action = na.exclude,
   method = "ML"
 )
@@ -503,7 +513,7 @@ ann_mod_ar1 <- lme(
 #   random = ~ 1 | eDWID,
 #   correlation = corAR1(form = ~ days_cat_int | eDWID),
 #   weights = varIdent(form = ~ 1 | Days_cat),
-#   data = annualized,
+#   data = annualized |> filter(age_eti_start < 20),
 #   na.action = na.exclude,
 #   method = "ML"
 # )
@@ -512,7 +522,7 @@ ann_mod_het_ar1_race <- lme(
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   weights = varIdent(form = ~ 1 | Race),
-  data = annualized,
+  data = annualized |> filter(age_eti_start < 20),
   na.action = na.exclude,
   method = "ML"
 )
@@ -522,14 +532,14 @@ ann_mod_het_ar1_race <- lme(
 #   random = ~ 1 | eDWID,
 #   correlation = corSymm(form = ~ days_cat_int | eDWID),
 #   weights = varIdent(form = ~ 1 | Days_cat),
-#   data = annualized,
+#   data = annualized |> filter(age_eti_start < 20),
 #   na.action = na.exclude,
 #   method = "ML"
 # )
 ann_mod_rs <- lme(
   bmipercentile ~ Days_cat * Race,
   random = ~ days_cat_int | eDWID,
-  data = annualized,
+  data = annualized |> filter(age_eti_start < 20),
   na.action = na.exclude,
   control = lmeControl(opt = "optim"),
   method = "ML"
@@ -551,6 +561,7 @@ ann_mod <- lme(
   data = annualized |> filter(age_eti_start < 20),
   na.action = na.exclude
 )
+performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
@@ -577,13 +588,15 @@ kable(emm)
 
 ### BMI raw value (age >= 20 at ETI start)
 
+Mixed model structure was chosen based on BMI %ile in the age >= 20 at ETI start cohort. We compared models with random intercept and slope to models with random intercept only and three correlation structures: compound symmetry, AR1, and heterogenous AR1. Based on AIC, the best model was with one with random intercept and heterogeneous AR1 (variance differing by race). Diagnostic plots for this model looked beautiful and pristine. 
+
 ```{r bmivalue selection}
 # Random intercept with correlation structure
 ann_mod_comp_sym <- lme(
   bmivalue ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corCompSymm(form = ~ days_cat_int | eDWID),
-  data = annualized,
+  data = annualized |> filter(age_eti_start >= 20),
   na.action = na.exclude,
   method = "ML"
 )
@@ -591,7 +604,7 @@ ann_mod_ar1 <- lme(
   bmivalue ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  data = annualized,
+  data = annualized |> filter(age_eti_start >= 20),
   na.action = na.exclude,
   method = "ML"
 )
@@ -601,7 +614,7 @@ ann_mod_ar1 <- lme(
 #   random = ~ 1 | eDWID,
 #   correlation = corAR1(form = ~ days_cat_int | eDWID),
 #   weights = varIdent(form = ~ 1 | Days_cat),
-#   data = annualized,
+#   data = annualized |> filter(age_eti_start >= 20),
 #   na.action = na.exclude,
 #   method = "ML"
 # )
@@ -610,7 +623,7 @@ ann_mod_het_ar1_race <- lme(
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   weights = varIdent(form = ~ 1 | Race),
-  data = annualized,
+  data = annualized |> filter(age_eti_start >= 20),
   na.action = na.exclude,
   method = "ML"
 )
@@ -620,14 +633,14 @@ ann_mod_het_ar1_race <- lme(
 #   random = ~ 1 | eDWID,
 #   correlation = corSymm(form = ~ days_cat_int | eDWID),
 #   weights = varIdent(form = ~ 1 | Days_cat),
-#   data = annualized,
+#   data = annualized |> filter(age_eti_start >= 20),
 #   na.action = na.exclude,
 #   method = "ML"
 # )
 ann_mod_rs <- lme(
   bmivalue ~ Days_cat * Race,
   random = ~ days_cat_int | eDWID,
-  data = annualized,
+  data = annualized |> filter(age_eti_start >= 20),
   na.action = na.exclude,
   control = lmeControl(opt = "optim"),
   method = "ML"
@@ -649,6 +662,7 @@ ann_mod <- lme(
   data = annualized |> filter(age_eti_start >= 20),
   na.action = na.exclude
 )
+performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
