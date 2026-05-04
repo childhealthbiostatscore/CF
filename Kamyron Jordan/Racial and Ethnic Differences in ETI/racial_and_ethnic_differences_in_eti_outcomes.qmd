@@ -185,8 +185,17 @@ performance::compare_performance(
   ann_mod_het_ar1,
   ann_mod_rs
 )
-# Heterogenous AR1 is the winner!
-ann_mod = ann_mod_het_ar1
+# Heterogenous AR1 is the winner! Some of the other models require the "optim"
+# optimizer so refit with that for consistency
+ann_mod = lme(
+  gli_fev1_ppred_rn ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized,
+  na.action = na.exclude,
+  control = lmeControl(opt = "optim")
+)
 # Summarize
 emm <- data.frame(emmeans(
   ann_mod,
@@ -217,7 +226,8 @@ ann_mod <- lme(
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   weights = varIdent(form = ~ 1 | Days_cat),
   data = annualized |> filter(age_eti_group == "[-Inf,18)"),
-  na.action = na.exclude
+  na.action = na.exclude,
+  control = lmeControl(opt = "optim")
 )
 # Summarize
 emm <- data.frame(emmeans(
@@ -249,7 +259,8 @@ ann_mod <- lme(
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   weights = varIdent(form = ~ 1 | Days_cat),
   data = annualized |> filter(age_eti_group == "[18, Inf)"),
-  na.action = na.exclude
+  na.action = na.exclude,
+  control = lmeControl(opt = "optim")
 )
 # Summarize
 emm <- data.frame(emmeans(
@@ -283,7 +294,8 @@ ann_mod = lme(
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   weights = varIdent(form = ~ 1 | Days_cat),
   data = annualized,
-  na.action = na.exclude
+  na.action = na.exclude,
+  control = lmeControl(opt = "optim")
 )
 # Summarize
 emm <- data.frame(emmeans(
@@ -315,7 +327,8 @@ ann_mod <- lme(
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   weights = varIdent(form = ~ 1 | Days_cat),
   data = annualized |> filter(age_eti_group == "[-Inf,18)"),
-  na.action = na.exclude
+  na.action = na.exclude,
+  control = lmeControl(opt = "optim")
 )
 # Summarize
 emm <- data.frame(emmeans(
@@ -347,7 +360,8 @@ ann_mod <- lme(
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   weights = varIdent(form = ~ 1 | Days_cat),
   data = annualized |> filter(age_eti_group == "[18, Inf)"),
-  na.action = na.exclude
+  na.action = na.exclude,
+  control = lmeControl(opt = "optim")
 )
 # Summarize
 emm <- data.frame(emmeans(
@@ -381,7 +395,8 @@ ann_mod <- lme(
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   weights = varIdent(form = ~ 1 | Days_cat),
   data = annualized |> filter(age_eti_start < 20),
-  na.action = na.exclude
+  na.action = na.exclude,
+  control = lmeControl(opt = "optim")
 )
 # Summarize
 emm <- data.frame(emmeans(
@@ -413,7 +428,8 @@ ann_mod <- lme(
   correlation = corAR1(form = ~ days_cat_int | eDWID),
   weights = varIdent(form = ~ 1 | Days_cat),
   data = annualized |> filter(age_eti_start >= 20),
-  na.action = na.exclude
+  na.action = na.exclude,
+  control = lmeControl(opt = "optim")
 )
 # Summarize
 emm <- data.frame(emmeans(
