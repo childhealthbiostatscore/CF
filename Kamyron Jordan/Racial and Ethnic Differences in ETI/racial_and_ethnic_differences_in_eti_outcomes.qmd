@@ -9,8 +9,8 @@ format:
     toc-depth: 5
     toc-float: true
     number-sections: true
-    code-fold: false
-    self-contained: true
+    code-fold: true
+    embed-resources: true
     fig-cap-location: top
     fig-height: 10
     fig-width: 10
@@ -49,6 +49,7 @@ knitr::opts_knit$set(root.dir = home_dir)
 ```
 
 ```{r data import}
+set.seed(1017)
 # source("/home/timvigers/GitHub/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI/create_outcomes_dataset.R")
 setwd(home_dir)
 load(
@@ -107,6 +108,8 @@ For the analyses below, we categorized encounter-level data by time from ETI sta
 
 For BMI, we took each person's age at their last encounter within each time bucket (i.e. their maximum age). We used BMI raw values for those with age >=20 at ETI start, and BMI percentile for those age < 20. 
 
+Mixed model structure was chosen based on FEV1 in the full cohort. We compared models with random intercept and slope to models with random intercept only and three correlation structures: compound symmetry, AR1, and heterogenous AR1. Based on AIC, the best model was with one with random intercept and heterogeneous AR1 (variance differing by race). However, this model structure was relatively unstable and estimates differed when run on different computers, which suggests some weirdness in the likelihood. Because of this, we elected to use a simpler AR1 correlation structure that did not vary over time or between groups. Also, this simplified model worked for all outcomes and data subsets, so using it across the board makes sense for ease of interpretation. We experimented with increasing the number of iterations used by `nlminb` and switching to the `optim` optimizer, but estimates remained unstable or failed to converge entirely. 
+
 ```{r annualize data}
 annualized <- encounter |>
   filter(Days >= -3 * 365.25 & Days <= 2 * 365.25) |>
@@ -134,9 +137,8 @@ annualized$days_cat_int = as.integer(annualized$Days_cat)
 
 ## ppFEV1
 
-Mixed model structure was chosen based on FEV1 in the full cohort. We compared models with random intercept and slope to models with random intercept only and three correlation structures: compound symmetry, AR1, and heterogenous AR1. Based on AIC, the best model was with one with random intercept and heterogeneous AR1 (variance differing by race). Diagnostic plots for this model looked beautiful and pristine. 
-
 ```{r ppfev1 selection}
+#| eval: false
 # Random intercept with correlation structure
 ann_mod_comp_sym <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
@@ -155,15 +157,17 @@ ann_mod_ar1 <- lme(
   method = "ML"
 )
 # AR1 changing over time does not converge
-# ann_mod_het_ar1_time <- lme(
-#   gli_fev1_ppred_rn ~ Days_cat * Race,
-#   random = ~ 1 | eDWID,
-#   correlation = corAR1(form = ~ days_cat_int | eDWID),
-#   weights = varIdent(form = ~ 1 | Days_cat),
-#   data = annualized,
-#   na.action = na.exclude,
-#   method = "ML"
-# )
+ann_mod_het_ar1_time <- lme(
+  gli_fev1_ppred_rn ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized,
+  na.action = na.exclude,
+  method = "ML"
+)
+# This model doesn't converge on the Studio but does on the laptop, so we aren't
+# using it. Something is up with the likelihood.
 ann_mod_het_ar1_race <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
@@ -174,15 +178,16 @@ ann_mod_het_ar1_race <- lme(
   method = "ML"
 )
 # Unstructured does not converge
-# ann_mod_unst <- lme(
-#   gli_fev1_ppred_rn ~ Days_cat * Race,
-#   random = ~ 1 | eDWID,
-#   correlation = corSymm(form = ~ days_cat_int | eDWID),
-#   weights = varIdent(form = ~ 1 | Days_cat),
-#   data = annualized,
-#   na.action = na.exclude,
-#   method = "ML"
-# )
+ann_mod_unst <- lme(
+  gli_fev1_ppred_rn ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corSymm(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized,
+  na.action = na.exclude,
+  method = "ML"
+)
+# Random slope generally doesn't do better than AR1
 ann_mod_rs <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ days_cat_int | eDWID,
@@ -191,12 +196,6 @@ ann_mod_rs <- lme(
   control = lmeControl(opt = "optim"),
   method = "ML"
 )
-kable(performance::compare_performance(
-  ann_mod_comp_sym,
-  ann_mod_ar1,
-  ann_mod_het_ar1_race,
-  ann_mod_rs
-))
 ```
 
 ### Full cohort
@@ -207,7 +206,6 @@ ann_mod = lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Race),
   data = annualized,
   na.action = na.exclude
 )
@@ -215,8 +213,20 @@ performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
-  specs = ~ Days_cat | Race,
+  specs = ~ Days_cat + Race,
   pbkrtest.limit = 1e6
+)
+emm_change <- contrast(
+  emm,
+  list("Pre- to Post- Change" = c(0, 0, -1, 1, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
 )
 ggplot(
   data.frame(emm),
@@ -233,7 +243,60 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
-kable(emm)
+# Organize tables per Kam
+emm |>
+  data.frame() |>
+  mutate(
+    combined = paste0(
+      round(emmean, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    )
+  ) |>
+  select(Race, Days_cat, combined) |>
+  pivot_wider(
+    names_from = Days_cat,
+    values_from = combined
+  ) |>
+  kable(caption = "Time to and following ETI Initiation (Time 0)")
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 1 Year Pre-ETI to 1 year Post-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
 ```
 
 ### Age < 18 at ETI initiation
@@ -243,7 +306,6 @@ ann_mod <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Race),
   data = annualized |> filter(age_eti_start < 18),
   na.action = na.exclude
 )
@@ -251,8 +313,20 @@ performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
-  specs = ~ Days_cat | Race,
+  specs = ~ Days_cat + Race,
   pbkrtest.limit = 1e6
+)
+emm_change <- contrast(
+  emm,
+  list("Pre- to Post- Change" = c(0, 0, -1, 1, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
 )
 ggplot(
   data.frame(emm),
@@ -269,7 +343,60 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
-kable(emm)
+# Organize tables per Kam
+emm |>
+  data.frame() |>
+  mutate(
+    combined = paste0(
+      round(emmean, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    )
+  ) |>
+  select(Race, Days_cat, combined) |>
+  pivot_wider(
+    names_from = Days_cat,
+    values_from = combined
+  ) |>
+  kable(caption = "Time to and following ETI Initiation (Time 0)")
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 1 Year Pre-ETI to 1 year Post-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
 ```
 
 ### Age >= 18 at ETI initiation
@@ -279,7 +406,6 @@ ann_mod <- lme(
   gli_fev1_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Race),
   data = annualized |> filter(age_eti_start >= 18),
   na.action = na.exclude
 )
@@ -287,8 +413,20 @@ performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
-  specs = ~ Days_cat | Race,
+  specs = ~ Days_cat + Race,
   pbkrtest.limit = 1e6
+)
+emm_change <- contrast(
+  emm,
+  list("Pre- to Post- Change" = c(0, 0, -1, 1, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
 )
 ggplot(
   data.frame(emm),
@@ -305,14 +443,66 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
-kable(emm)
+# Organize tables per Kam
+emm |>
+  data.frame() |>
+  mutate(
+    combined = paste0(
+      round(emmean, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    )
+  ) |>
+  select(Race, Days_cat, combined) |>
+  pivot_wider(
+    names_from = Days_cat,
+    values_from = combined
+  ) |>
+  kable(caption = "Time to and following ETI Initiation (Time 0)")
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 1 Year Pre-ETI to 1 year Post-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
 ```
 
 ## ppFVC
 
-Mixed model structure was chosen based on FVC in the full cohort. We compared models with random intercept and slope to models with random intercept only and three correlation structures: compound symmetry, AR1, and heterogenous AR1. Based on AIC, the best model was with one with random intercept and heterogeneous AR1 (variance differing by race). Diagnostic plots for this model looked beautiful and pristine. 
-
 ```{r ppfvc selection}
+#| eval: false
 # Random intercept with correlation structure
 ann_mod_comp_sym <- lme(
   gli_fvc_ppred_rn ~ Days_cat * Race,
@@ -331,15 +521,16 @@ ann_mod_ar1 <- lme(
   method = "ML"
 )
 # AR1 changing over time does not converge
-# ann_mod_het_ar1_time <- lme(
-#   gli_fvc_ppred_rn ~ Days_cat * Race,
-#   random = ~ 1 | eDWID,
-#   correlation = corAR1(form = ~ days_cat_int | eDWID),
-#   weights = varIdent(form = ~ 1 | Days_cat),
-#   data = annualized,
-#   na.action = na.exclude,
-#   method = "ML"
-# )
+ann_mod_het_ar1_time <- lme(
+  gli_fvc_ppred_rn ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized,
+  na.action = na.exclude,
+  method = "ML"
+)
+# See above
 ann_mod_het_ar1_race <- lme(
   gli_fvc_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
@@ -350,15 +541,16 @@ ann_mod_het_ar1_race <- lme(
   method = "ML"
 )
 # Unstructured does not converge
-# ann_mod_unst <- lme(
-#   gli_fvc_ppred_rn ~ Days_cat * Race,
-#   random = ~ 1 | eDWID,
-#   correlation = corSymm(form = ~ days_cat_int | eDWID),
-#   weights = varIdent(form = ~ 1 | Days_cat),
-#   data = annualized,
-#   na.action = na.exclude,
-#   method = "ML"
-# )
+ann_mod_unst <- lme(
+  gli_fvc_ppred_rn ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corSymm(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized,
+  na.action = na.exclude,
+  method = "ML"
+)
+# Random slope generally doesn't do better than AR1
 ann_mod_rs <- lme(
   gli_fvc_ppred_rn ~ Days_cat * Race,
   random = ~ days_cat_int | eDWID,
@@ -367,12 +559,6 @@ ann_mod_rs <- lme(
   control = lmeControl(opt = "optim"),
   method = "ML"
 )
-kable(performance::compare_performance(
-  ann_mod_comp_sym,
-  ann_mod_ar1,
-  ann_mod_het_ar1_race,
-  ann_mod_rs
-))
 ```
 
 ### Full cohort
@@ -382,7 +568,6 @@ ann_mod = lme(
   gli_fvc_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Race),
   data = annualized,
   na.action = na.exclude
 )
@@ -390,8 +575,20 @@ performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
-  specs = ~ Days_cat | Race,
+  specs = ~ Days_cat + Race,
   pbkrtest.limit = 1e6
+)
+emm_change <- contrast(
+  emm,
+  list("Pre- to Post- Change" = c(0, 0, -1, 1, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
 )
 ggplot(
   data.frame(emm),
@@ -408,7 +605,60 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
-kable(emm)
+# Organize tables per Kam
+emm |>
+  data.frame() |>
+  mutate(
+    combined = paste0(
+      round(emmean, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    )
+  ) |>
+  select(Race, Days_cat, combined) |>
+  pivot_wider(
+    names_from = Days_cat,
+    values_from = combined
+  ) |>
+  kable(caption = "Time to and following ETI Initiation (Time 0)")
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 1 Year Pre-ETI to 1 year Post-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
 ```
 
 ### Age < 18 at ETI initiation
@@ -418,7 +668,6 @@ ann_mod <- lme(
   gli_fvc_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Race),
   data = annualized |> filter(age_eti_start < 18),
   na.action = na.exclude
 )
@@ -426,8 +675,20 @@ performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
-  specs = ~ Days_cat | Race,
+  specs = ~ Days_cat + Race,
   pbkrtest.limit = 1e6
+)
+emm_change <- contrast(
+  emm,
+  list("Pre- to Post- Change" = c(0, 0, -1, 1, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
 )
 ggplot(
   data.frame(emm),
@@ -444,7 +705,60 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
-kable(emm)
+# Organize tables per Kam
+emm |>
+  data.frame() |>
+  mutate(
+    combined = paste0(
+      round(emmean, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    )
+  ) |>
+  select(Race, Days_cat, combined) |>
+  pivot_wider(
+    names_from = Days_cat,
+    values_from = combined
+  ) |>
+  kable(caption = "Time to and following ETI Initiation (Time 0)")
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 1 Year Pre-ETI to 1 year Post-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
 ```
 
 ### Age >= 18 at ETI initiation
@@ -454,7 +768,6 @@ ann_mod <- lme(
   gli_fvc_ppred_rn ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Race),
   data = annualized |> filter(age_eti_start >= 18),
   na.action = na.exclude
 )
@@ -462,8 +775,20 @@ performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
-  specs = ~ Days_cat | Race,
+  specs = ~ Days_cat + Race,
   pbkrtest.limit = 1e6
+)
+emm_change <- contrast(
+  emm,
+  list("Pre- to Post- Change" = c(0, 0, -1, 1, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
 )
 ggplot(
   data.frame(emm),
@@ -480,84 +805,73 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
-kable(emm)
+# Organize tables per Kam
+emm |>
+  data.frame() |>
+  mutate(
+    combined = paste0(
+      round(emmean, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    )
+  ) |>
+  select(Race, Days_cat, combined) |>
+  pivot_wider(
+    names_from = Days_cat,
+    values_from = combined
+  ) |>
+  kable(caption = "Time to and following ETI Initiation (Time 0)")
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 1 Year Pre-ETI to 1 year Post-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
 ```
 
 ## BMI 
 
 ### BMI %ile (age < 20 at ETI start)
 
-Mixed model structure was chosen based on BMI %ile in the age < 20 at ETI start cohort. We compared models with random intercept and slope to models with random intercept only and three correlation structures: compound symmetry, AR1, and heterogenous AR1. Based on AIC, the best model was with one with random intercept and heterogeneous AR1 (variance differing by race). Diagnostic plots for this model looked beautiful and pristine. 
+#### Assuming Gaussian
 
-```{r bmipercentile selection}
-# Random intercept with correlation structure
-ann_mod_comp_sym <- lme(
-  bmipercentile ~ Days_cat * Race,
-  random = ~ 1 | eDWID,
-  correlation = corCompSymm(form = ~ days_cat_int | eDWID),
-  data = annualized |> filter(age_eti_start < 20),
-  na.action = na.exclude,
-  method = "ML"
-)
-ann_mod_ar1 <- lme(
-  bmipercentile ~ Days_cat * Race,
-  random = ~ 1 | eDWID,
-  correlation = corAR1(form = ~ days_cat_int | eDWID),
-  data = annualized |> filter(age_eti_start < 20),
-  na.action = na.exclude,
-  method = "ML"
-)
-# AR1 changing over time does not converge
-# ann_mod_het_ar1_time <- lme(
-#   bmipercentile ~ Days_cat * Race,
-#   random = ~ 1 | eDWID,
-#   correlation = corAR1(form = ~ days_cat_int | eDWID),
-#   weights = varIdent(form = ~ 1 | Days_cat),
-#   data = annualized |> filter(age_eti_start < 20),
-#   na.action = na.exclude,
-#   method = "ML"
-# )
-ann_mod_het_ar1_race <- lme(
-  bmipercentile ~ Days_cat * Race,
-  random = ~ 1 | eDWID,
-  correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Race),
-  data = annualized |> filter(age_eti_start < 20),
-  na.action = na.exclude,
-  method = "ML"
-)
-# Unstructured does not converge
-# ann_mod_unst <- lme(
-#   bmipercentile ~ Days_cat * Race,
-#   random = ~ 1 | eDWID,
-#   correlation = corSymm(form = ~ days_cat_int | eDWID),
-#   weights = varIdent(form = ~ 1 | Days_cat),
-#   data = annualized |> filter(age_eti_start < 20),
-#   na.action = na.exclude,
-#   method = "ML"
-# )
-ann_mod_rs <- lme(
-  bmipercentile ~ Days_cat * Race,
-  random = ~ days_cat_int | eDWID,
-  data = annualized |> filter(age_eti_start < 20),
-  na.action = na.exclude,
-  control = lmeControl(opt = "optim"),
-  method = "ML"
-)
-kable(performance::compare_performance(
-  ann_mod_comp_sym,
-  ann_mod_ar1,
-  ann_mod_het_ar1_race,
-  ann_mod_rs
-))
-```
-
-```{r bmi u20}
+```{r bmi u20 Gaussian}
 ann_mod <- lme(
   bmipercentile ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Race),
   data = annualized |> filter(age_eti_start < 20),
   na.action = na.exclude
 )
@@ -565,8 +879,20 @@ performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
-  specs = ~ Days_cat | Race,
+  specs = ~ Days_cat + Race,
   pbkrtest.limit = 1e6
+)
+emm_change <- contrast(
+  emm,
+  list("Pre- to Post- Change" = c(0, 0, -1, 1, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
 )
 ggplot(
   data.frame(emm),
@@ -583,14 +909,180 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
-kable(emm)
+# Organize tables per Kam
+emm |>
+  data.frame() |>
+  mutate(
+    combined = paste0(
+      round(emmean, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    )
+  ) |>
+  select(Race, Days_cat, combined) |>
+  pivot_wider(
+    names_from = Days_cat,
+    values_from = combined
+  ) |>
+  kable(caption = "Time to and following ETI Initiation (Time 0)")
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 1 Year Pre-ETI to 1 year Post-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
+```
+
+#### Beta regression
+
+Because BMI percentile is not a normally distributed variable and is bounded at 0 and 100, we used beta regression (with Smithson–Verkuilen squeeze for 0 values). We fit a beta regression generalized linear mixed model with a logit link on the mean $\mu$. The mean submodel included fixed effects for time bin, race, and their interaction, plus a random intercept per participant and a first-order autoregressive (AR1) correlation across time bins within participant.
+
+Similar to the approach used in Miranda Afonso P, Rizopoulos D, Palipana AK, et al. A Joint Model for (Un)Bounded Longitudinal Markers, Competing Risks, and Recurrent Events Using Patient Registry Data. Stat Med. 2025;44(8-9):e70057. doi:10.1002/sim.70057.
+
+```{r bmi u20 Beta}
+# Beta regression with random intercept + AR1 within subject
+library(glmmTMB)
+library(DHARMa)
+sub <- annualized |> filter(age_eti_start < 20)
+n <- sum(!is.na(sub$bmipercentile))
+sub$bmi_p <- (sub$bmipercentile / 100 * (n - 1) + 0.5) / n
+ann_mod <- glmmTMB(
+  bmi_p ~ Days_cat * Race + ar1(Days_cat + 0 | eDWID),
+  data = sub,
+  family = beta_family(link = "logit")
+)
+sim_res <- simulateResiduals(ann_mod)
+plot(sim_res)
+# Summarize
+emm <- emmeans(
+  ann_mod,
+  specs = ~ Days_cat + Race,
+  type = "response"
+)
+emm_change <- contrast(
+  emm,
+  list("Pre- to Post- Change" = c(0, 0, -1, 1, 0)),
+  by = "Race",
+  type = "response"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1,
+  type = "response"
+)
+ggplot(
+  data.frame(emm),
+  aes(x = Days_cat, y = response, group = Race, color = Race)
+) +
+  geom_point() +
+  geom_line() +
+  geom_errorbar(
+    aes(ymin = asymp.LCL, ymax = asymp.UCL),
+    width = 0.1
+  ) +
+  ylab("BMI %ile") +
+  xlab("Days prior to/after ETI initiation") +
+  ggtitle("Age < 20 at ETI initiation") +
+  scale_color_manual(
+    values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
+    labels = c("White", "Black", "Hispanic", "Other")
+  ) +
+  theme_bw()
+# Organize tables per Kam
+emm |>
+  data.frame() |>
+  mutate(
+    combined = paste0(
+      round(response, 1),
+      " (",
+      round(asymp.LCL, 1),
+      "-",
+      round(asymp.UCL, 1),
+      ")"
+    )
+  ) |>
+  select(Race, Days_cat, combined) |>
+  pivot_wider(
+    names_from = Days_cat,
+    values_from = combined
+  ) |>
+  kable(caption = "Time to and following ETI Initiation (Time 0)")
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    `Odds Ratio` = paste0(
+      round(odds.ratio, 1),
+      " (",
+      round(asymp.LCL, 1),
+      "-",
+      round(asymp.UCL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, `Odds Ratio`, p.value) |>
+  kable(
+    caption = "Average Change from 1 Year Pre-ETI to 1 year Post-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    `Odds Ratio` = paste0(
+      round(odds.ratio, 1),
+      " (",
+      round(asymp.LCL, 1),
+      "-",
+      round(asymp.UCL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, `Odds Ratio`, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
 ```
 
 ### BMI raw value (age >= 20 at ETI start)
 
-Mixed model structure was chosen based on BMI %ile in the age >= 20 at ETI start cohort. We compared models with random intercept and slope to models with random intercept only and three correlation structures: compound symmetry, AR1, and heterogenous AR1. Based on AIC, the best model was with one with random intercept and heterogeneous AR1 (variance differing by race). Diagnostic plots for this model looked beautiful and pristine. 
-
 ```{r bmivalue selection}
+#| eval: false
 # Random intercept with correlation structure
 ann_mod_comp_sym <- lme(
   bmivalue ~ Days_cat * Race,
@@ -609,15 +1101,16 @@ ann_mod_ar1 <- lme(
   method = "ML"
 )
 # AR1 changing over time does not converge
-# ann_mod_het_ar1_time <- lme(
-#   bmivalue ~ Days_cat * Race,
-#   random = ~ 1 | eDWID,
-#   correlation = corAR1(form = ~ days_cat_int | eDWID),
-#   weights = varIdent(form = ~ 1 | Days_cat),
-#   data = annualized |> filter(age_eti_start >= 20),
-#   na.action = na.exclude,
-#   method = "ML"
-# )
+ann_mod_het_ar1_time <- lme(
+  bmivalue ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized |> filter(age_eti_start >= 20),
+  na.action = na.exclude,
+  method = "ML"
+)
+# See above
 ann_mod_het_ar1_race <- lme(
   bmivalue ~ Days_cat * Race,
   random = ~ 1 | eDWID,
@@ -628,15 +1121,16 @@ ann_mod_het_ar1_race <- lme(
   method = "ML"
 )
 # Unstructured does not converge
-# ann_mod_unst <- lme(
-#   bmivalue ~ Days_cat * Race,
-#   random = ~ 1 | eDWID,
-#   correlation = corSymm(form = ~ days_cat_int | eDWID),
-#   weights = varIdent(form = ~ 1 | Days_cat),
-#   data = annualized |> filter(age_eti_start >= 20),
-#   na.action = na.exclude,
-#   method = "ML"
-# )
+ann_mod_unst <- lme(
+  bmivalue ~ Days_cat * Race,
+  random = ~ 1 | eDWID,
+  correlation = corSymm(form = ~ days_cat_int | eDWID),
+  weights = varIdent(form = ~ 1 | Days_cat),
+  data = annualized |> filter(age_eti_start >= 20),
+  na.action = na.exclude,
+  method = "ML"
+)
+# Random slope generally doesn't do better than AR1
 ann_mod_rs <- lme(
   bmivalue ~ Days_cat * Race,
   random = ~ days_cat_int | eDWID,
@@ -645,12 +1139,6 @@ ann_mod_rs <- lme(
   control = lmeControl(opt = "optim"),
   method = "ML"
 )
-kable(performance::compare_performance(
-  ann_mod_comp_sym,
-  ann_mod_ar1,
-  ann_mod_het_ar1_race,
-  ann_mod_rs
-))
 ```
 
 ```{r bmi o20}
@@ -658,7 +1146,6 @@ ann_mod <- lme(
   bmivalue ~ Days_cat * Race,
   random = ~ 1 | eDWID,
   correlation = corAR1(form = ~ days_cat_int | eDWID),
-  weights = varIdent(form = ~ 1 | Race),
   data = annualized |> filter(age_eti_start >= 20),
   na.action = na.exclude
 )
@@ -666,8 +1153,20 @@ performance::check_model(ann_mod)
 # Summarize
 emm <- emmeans(
   ann_mod,
-  specs = ~ Days_cat | Race,
+  specs = ~ Days_cat + Race,
   pbkrtest.limit = 1e6
+)
+emm_change <- contrast(
+  emm,
+  list("Pre- to Post- Change" = c(0, 0, -1, 1, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
 )
 ggplot(
   data.frame(emm),
@@ -684,7 +1183,60 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
-kable(emm)
+# Organize tables per Kam
+emm |>
+  data.frame() |>
+  mutate(
+    combined = paste0(
+      round(emmean, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    )
+  ) |>
+  select(Race, Days_cat, combined) |>
+  pivot_wider(
+    names_from = Days_cat,
+    values_from = combined
+  ) |>
+  kable(caption = "Time to and following ETI Initiation (Time 0)")
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 1 Year Pre-ETI to 1 year Post-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 1),
+      " (",
+      round(lower.CL, 1),
+      "-",
+      round(upper.CL, 1),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
 ```
 
 # Segmented models
