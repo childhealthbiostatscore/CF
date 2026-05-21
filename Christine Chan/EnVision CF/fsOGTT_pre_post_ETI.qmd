@@ -9,7 +9,7 @@ format:
     toc-depth: 5
     toc-float: true
     code-fold: true
-    self-contained: true
+    embed-resources: true
     fig-cap-location: top
     page-layout: full
 editor: source
@@ -64,6 +64,8 @@ var_label(multi_pre_df$time_diff_first_last) = "Days From First to Last fsOGTT"
 var_label(
   multi_pre_df$time_diff_last_first
 ) = "Days From Last Pre-ETI fsOGTT to First Post-ETI fsOGTT"
+# Per Christine, exclude IA0077
+multi_pre_df = multi_pre_df |> filter(study_id != "IA0077")
 # Calculate days between pre- and post-ETI fsOGTTs
 times = multi_pre_df |>
   group_by(study_id, pre_post) |>

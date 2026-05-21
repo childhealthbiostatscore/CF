@@ -325,12 +325,12 @@ hypo_symptoms$Date <- ymd(hypo_symptoms$Date)
 # Clean data (does not need to be run every time)
 # Many of these files appeared to be manually edited and are missing some or all
 # of the first 2 rows. Some were saved as XLSX or TXT files as well.
-cleandata(
-  inputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM/Manually Edited",
-  outputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM/Cleaned",
-  id_filename = TRUE,
-  verbose = TRUE
-)
+# cleandata(
+#   inputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM/Manually Edited",
+#   outputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM/Cleaned",
+#   id_filename = TRUE,
+#   verbose = TRUE
+# )
 # Before calculating variables, remove some data that appears to be due to
 # poor sensor calibration per Christine's visual review.
 # CC0024
@@ -363,11 +363,11 @@ write.csv(
   na = ""
 )
 # CGM variables
-cgmvariables(
-  inputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM/Cleaned",
-  outputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM",
-  outputname = "cgm_variables"
-)
+# cgmvariables(
+#   inputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM/Cleaned",
+#   outputdirectory = "./Christine Chan/EnVision CF/Data_Clean/CGM",
+#   outputname = "cgm_variables"
+# )
 cgm <- read.csv(
   "./Christine Chan/EnVision CF/Data_Clean/CGM/cgm_variables.csv",
   na.strings = ""
@@ -811,4 +811,10 @@ label(final_df$matsuda) <- "Matsuda Index"
 save(
   final_df,
   file = "./Christine Chan/EnVision CF/Data_Clean/envision_analysis_dataset.RData"
+)
+write.csv(
+  final_df,
+  file = "./Christine Chan/EnVision CF/Data_Clean/envision_analysis_dataset.csv",
+  na = "",
+  row.names = FALSE
 )

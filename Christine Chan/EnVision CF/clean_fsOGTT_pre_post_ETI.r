@@ -439,12 +439,11 @@ var_label(df$homa_ir) <- "HOMA-IR"
 # Matsuda
 df$matsuda <- 10000 /
     sqrt(
-        ((df$Glucose_0 / 18) * df$Insulin_0) *
+        ((df$Glucose_0) * df$Insulin_0) *
             ((rowMeans(
                 df[, paste0("Glucose_", c(0, 30, 60, 90, 120))],
                 na.rm = T
-            ) /
-                18) *
+            )) *
                 rowMeans(
                     df[, paste0("Insulin_", c(0, 30, 60, 90, 120))],
                     na.rm = T
