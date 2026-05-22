@@ -219,6 +219,7 @@ emm <- emmeans(
   specs = ~ Days_cat + Race,
   pbkrtest.limit = 1e6
 )
+# Compare pre to post
 emm_change <- contrast(
   emm,
   list("Pre- to Post- Change" = c(0, 0, -1, 1, 0)),
@@ -231,6 +232,7 @@ emm_change_comp = contrast(
   by = NULL,
   ref = 1
 )
+# Plot
 ggplot(
   data.frame(emm),
   aes(x = Days_cat, y = emmean, group = Race, color = Race)
@@ -251,11 +253,11 @@ emm |>
   data.frame() |>
   mutate(
     combined = paste0(
-      round(emmean, 1),
+      round(emmean, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     )
   ) |>
@@ -269,11 +271,11 @@ summary(emm_change, infer = T) |>
   data.frame() |>
   mutate(
     Change = paste0(
-      round(estimate, 1),
+      round(estimate, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -286,11 +288,59 @@ summary(emm_change_comp, infer = T) |>
   data.frame() |>
   mutate(
     Difference = paste0(
-      round(estimate, 1),
+      round(estimate, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
+# Same again for change pre-ETI
+emm_change <- contrast(
+  emm,
+  list("Pre-ETI Change" = c(-1, 0, 1, 0, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
+)
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 2),
+      " (",
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 3 Year Pre-ETI to 1 year Pre-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 2),
+      " (",
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -351,11 +401,11 @@ emm |>
   data.frame() |>
   mutate(
     combined = paste0(
-      round(emmean, 1),
+      round(emmean, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     )
   ) |>
@@ -369,11 +419,11 @@ summary(emm_change, infer = T) |>
   data.frame() |>
   mutate(
     Change = paste0(
-      round(estimate, 1),
+      round(estimate, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -386,11 +436,59 @@ summary(emm_change_comp, infer = T) |>
   data.frame() |>
   mutate(
     Difference = paste0(
-      round(estimate, 1),
+      round(estimate, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
+# Same again for change pre-ETI
+emm_change <- contrast(
+  emm,
+  list("Pre-ETI Change" = c(-1, 0, 1, 0, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
+)
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 2),
+      " (",
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 3 Year Pre-ETI to 1 year Pre-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 2),
+      " (",
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -451,11 +549,11 @@ emm |>
   data.frame() |>
   mutate(
     combined = paste0(
-      round(emmean, 1),
+      round(emmean, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     )
   ) |>
@@ -469,11 +567,11 @@ summary(emm_change, infer = T) |>
   data.frame() |>
   mutate(
     Change = paste0(
-      round(estimate, 1),
+      round(estimate, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -486,11 +584,59 @@ summary(emm_change_comp, infer = T) |>
   data.frame() |>
   mutate(
     Difference = paste0(
-      round(estimate, 1),
+      round(estimate, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
+# Same again for change pre-ETI
+emm_change <- contrast(
+  emm,
+  list("Pre-ETI Change" = c(-1, 0, 1, 0, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
+)
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 2),
+      " (",
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 3 Year Pre-ETI to 1 year Pre-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 2),
+      " (",
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -613,11 +759,11 @@ emm |>
   data.frame() |>
   mutate(
     combined = paste0(
-      round(emmean, 1),
+      round(emmean, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     )
   ) |>
@@ -631,11 +777,11 @@ summary(emm_change, infer = T) |>
   data.frame() |>
   mutate(
     Change = paste0(
-      round(estimate, 1),
+      round(estimate, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -648,11 +794,59 @@ summary(emm_change_comp, infer = T) |>
   data.frame() |>
   mutate(
     Difference = paste0(
-      round(estimate, 1),
+      round(estimate, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
+# Same again for change pre-ETI
+emm_change <- contrast(
+  emm,
+  list("Pre-ETI Change" = c(-1, 0, 1, 0, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
+)
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 2),
+      " (",
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 3 Year Pre-ETI to 1 year Pre-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 2),
+      " (",
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -713,11 +907,11 @@ emm |>
   data.frame() |>
   mutate(
     combined = paste0(
-      round(emmean, 1),
+      round(emmean, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     )
   ) |>
@@ -731,11 +925,11 @@ summary(emm_change, infer = T) |>
   data.frame() |>
   mutate(
     Change = paste0(
-      round(estimate, 1),
+      round(estimate, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -748,11 +942,59 @@ summary(emm_change_comp, infer = T) |>
   data.frame() |>
   mutate(
     Difference = paste0(
-      round(estimate, 1),
+      round(estimate, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
+# Same again for change pre-ETI
+emm_change <- contrast(
+  emm,
+  list("Pre-ETI Change" = c(-1, 0, 1, 0, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
+)
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 2),
+      " (",
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 3 Year Pre-ETI to 1 year Pre-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 2),
+      " (",
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -813,11 +1055,11 @@ emm |>
   data.frame() |>
   mutate(
     combined = paste0(
-      round(emmean, 1),
+      round(emmean, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     )
   ) |>
@@ -831,11 +1073,11 @@ summary(emm_change, infer = T) |>
   data.frame() |>
   mutate(
     Change = paste0(
-      round(estimate, 1),
+      round(estimate, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -848,11 +1090,59 @@ summary(emm_change_comp, infer = T) |>
   data.frame() |>
   mutate(
     Difference = paste0(
-      round(estimate, 1),
+      round(estimate, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
+# Same again for change pre-ETI
+emm_change <- contrast(
+  emm,
+  list("Pre-ETI Change" = c(-1, 0, 1, 0, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
+)
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 2),
+      " (",
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 3 Year Pre-ETI to 1 year Pre-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 2),
+      " (",
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -927,11 +1217,11 @@ emm |>
   data.frame() |>
   mutate(
     combined = paste0(
-      round(response, 3),
+      round(response, 2),
       " (",
-      round(asymp.LCL, 3),
-      "-",
-      round(asymp.UCL, 3),
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
       ")"
     )
   ) |>
@@ -945,11 +1235,11 @@ summary(emm_change, infer = T) |>
   data.frame() |>
   mutate(
     Change = paste0(
-      round(estimate, 3),
+      round(estimate, 2),
       " (",
-      round(asymp.LCL, 3),
-      "-",
-      round(asymp.UCL, 3),
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -962,11 +1252,59 @@ summary(emm_change_comp, infer = T) |>
   data.frame() |>
   mutate(
     Difference = paste0(
-      round(estimate, 3),
+      round(estimate, 2),
       " (",
-      round(asymp.LCL, 3),
-      "-",
-      round(asymp.UCL, 3),
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
+# Same again for change pre-ETI
+emm_change <- contrast(
+  emm,
+  list("Pre-ETI Change" = c(-1, 0, 1, 0, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
+)
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 2),
+      " (",
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 3 Year Pre-ETI to 1 year Pre-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 2),
+      " (",
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -1087,11 +1425,11 @@ emm |>
   data.frame() |>
   mutate(
     combined = paste0(
-      round(emmean, 1),
+      round(emmean, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     )
   ) |>
@@ -1105,11 +1443,11 @@ summary(emm_change, infer = T) |>
   data.frame() |>
   mutate(
     Change = paste0(
-      round(estimate, 1),
+      round(estimate, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -1122,11 +1460,59 @@ summary(emm_change_comp, infer = T) |>
   data.frame() |>
   mutate(
     Difference = paste0(
-      round(estimate, 1),
+      round(estimate, 2),
       " (",
-      round(lower.CL, 1),
-      "-",
-      round(upper.CL, 1),
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
+# Same again for change pre-ETI
+emm_change <- contrast(
+  emm,
+  list("Pre-ETI Change" = c(-1, 0, 1, 0, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
+)
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 2),
+      " (",
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 3 Year Pre-ETI to 1 year Pre-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 2),
+      " (",
+      round(lower.CL, 2),
+      ", ",
+      round(upper.CL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -1193,11 +1579,11 @@ emm |>
   data.frame() |>
   mutate(
     combined = paste0(
-      round(rate, 3),
+      round(rate, 2),
       " (",
-      round(asymp.LCL, 3),
-      "-",
-      round(asymp.UCL, 3),
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
       ")"
     )
   ) |>
@@ -1211,11 +1597,11 @@ summary(emm_change, infer = T) |>
   data.frame() |>
   mutate(
     Change = paste0(
-      round(estimate, 3),
+      round(estimate, 2),
       " (",
-      round(asymp.LCL, 3),
-      "-",
-      round(asymp.UCL, 3),
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -1228,11 +1614,59 @@ summary(emm_change_comp, infer = T) |>
   data.frame() |>
   mutate(
     Difference = paste0(
-      round(estimate, 3),
+      round(estimate, 2),
       " (",
-      round(asymp.LCL, 3),
-      "-",
-      round(asymp.UCL, 3),
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
+# Same again for change pre-ETI
+emm_change <- contrast(
+  emm,
+  list("Pre-ETI Change" = c(-1, 0, 1, 0, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
+)
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 2),
+      " (",
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 3 Year Pre-ETI to 1 year Pre-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 2),
+      " (",
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -1295,11 +1729,11 @@ emm |>
   data.frame() |>
   mutate(
     combined = paste0(
-      round(rate, 3),
+      round(rate, 2),
       " (",
-      round(asymp.LCL, 3),
-      "-",
-      round(asymp.UCL, 3),
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
       ")"
     )
   ) |>
@@ -1313,11 +1747,11 @@ summary(emm_change, infer = T) |>
   data.frame() |>
   mutate(
     Change = paste0(
-      round(estimate, 3),
+      round(estimate, 2),
       " (",
-      round(asymp.LCL, 3),
-      "-",
-      round(asymp.UCL, 3),
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -1330,11 +1764,59 @@ summary(emm_change_comp, infer = T) |>
   data.frame() |>
   mutate(
     Difference = paste0(
-      round(estimate, 3),
+      round(estimate, 2),
       " (",
-      round(asymp.LCL, 3),
-      "-",
-      round(asymp.UCL, 3),
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
+# Same again for change pre-ETI
+emm_change <- contrast(
+  emm,
+  list("Pre-ETI Change" = c(-1, 0, 1, 0, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
+)
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 2),
+      " (",
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 3 Year Pre-ETI to 1 year Pre-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 2),
+      " (",
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -1393,16 +1875,15 @@ ggplot(
   ) +
   theme_bw()
 # Organize tables per Kam
-# Organize tables per Kam
 emm |>
   data.frame() |>
   mutate(
     combined = paste0(
-      round(rate, 3),
+      round(rate, 2),
       " (",
-      round(asymp.LCL, 3),
-      "-",
-      round(asymp.UCL, 3),
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
       ")"
     )
   ) |>
@@ -1416,11 +1897,11 @@ summary(emm_change, infer = T) |>
   data.frame() |>
   mutate(
     Change = paste0(
-      round(estimate, 3),
+      round(estimate, 2),
       " (",
-      round(asymp.LCL, 3),
-      "-",
-      round(asymp.UCL, 3),
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
@@ -1433,11 +1914,59 @@ summary(emm_change_comp, infer = T) |>
   data.frame() |>
   mutate(
     Difference = paste0(
-      round(estimate, 3),
+      round(estimate, 2),
       " (",
-      round(asymp.LCL, 3),
-      "-",
-      round(asymp.UCL, 3),
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(contrast, Difference, p.value) |>
+  rename(Comparison = contrast) |>
+  kable(
+    caption = "Differences in Change by Race"
+  )
+# Same again for change pre-ETI
+emm_change <- contrast(
+  emm,
+  list("Pre-ETI Change" = c(-1, 0, 1, 0, 0)),
+  by = "Race"
+)
+# Now compare those changes pairwise across races
+emm_change_comp = contrast(
+  emm_change,
+  method = "trt.vs.ctrl",
+  by = NULL,
+  ref = 1
+)
+summary(emm_change, infer = T) |>
+  data.frame() |>
+  mutate(
+    Change = paste0(
+      round(estimate, 2),
+      " (",
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
+      ")"
+    ),
+    p.value = format.pval(p.value, eps = 0.001)
+  ) |>
+  select(Race, Change, p.value) |>
+  kable(
+    caption = "Average Change from 3 Year Pre-ETI to 1 year Pre-ETI"
+  )
+summary(emm_change_comp, infer = T) |>
+  data.frame() |>
+  mutate(
+    Difference = paste0(
+      round(estimate, 2),
+      " (",
+      round(asymp.LCL, 2),
+      ", ",
+      round(asymp.UCL, 2),
       ")"
     ),
     p.value = format.pval(p.value, eps = 0.001)
