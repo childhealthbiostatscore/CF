@@ -641,7 +641,7 @@ emm <- emmeans(
   specs = ~ years_to_cfrd | a1c_ogtt,
   pbkrtest.limit = 1e5
 )
-ggplot(
+p = ggplot(
   data.frame(emm),
   aes(
     x = years_to_cfrd,
@@ -656,10 +656,18 @@ ggplot(
   ylab("Estimated Mean ppFEV1") +
   labs(
     color = "Diagnosis Method",
-    caption = "Results are averaged over the levels of age at diagnosis, number of FEV1 measures, sex, mutation class, pancreatic enzyme use, and insurance status."
+    caption = "Results are averaged over the levels of age at diagnosis, number of FEV1 measures,\n sex, mutation class, pancreatic enzyme use, and insurance status."
   ) +
-  theme_bw() +
-  facet_wrap(~a1c_ogtt)
+  theme_bw(base_size = 15)
+p
+ggsave(
+  "./Dissemination/Figures/fev1_by_screen_method.png",
+  plot = p,
+  width = 9,
+  height = 6,
+  units = "in",
+  dpi = 300
+)
 # Type 3 test
 t3
 ```
@@ -745,7 +753,7 @@ emm <- emmeans(
   specs = ~ years_to_cfrd | a1c_ogtt,
   pbkrtest.limit = 1e5
 )
-ggplot(
+p = ggplot(
   data.frame(emm),
   aes(
     x = years_to_cfrd,
@@ -762,8 +770,16 @@ ggplot(
     color = "Diagnosis Method",
     caption = "Results are averaged over the levels of age at diagnosis, number of FVC measures, sex, mutation class, pancreatic enzyme use, and insurance status."
   ) +
-  theme_bw() +
-  facet_wrap(~a1c_ogtt)
+  theme_bw(base_size = 15)
+p
+ggsave(
+  "./Dissemination/Figures/fvc_by_screen_method.png",
+  plot = p,
+  width = 9,
+  height = 6,
+  units = "in",
+  dpi = 300
+)
 # Type 3
 t3
 ```
