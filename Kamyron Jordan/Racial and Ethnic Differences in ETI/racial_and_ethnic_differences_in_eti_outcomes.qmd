@@ -36,15 +36,15 @@ library(kableExtra)
 library(GLMMadaptive)
 home_dir <- switch(
   Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI",
-  "Linux" = "/home/tim/OneDrive/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI"
+  "Darwin" = "/Users/tvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI",
+  "Windows" = "C:/Users/tvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI",
+  "Linux" = "/home/tvigers/OneDrive/Vigers/CF/Kamyron Jordan/Racial and Ethnic Differences in ETI"
 )
 github_dir <- switch(
   Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Documents/GitHub",
-  "Windows" = "C:/Users/Tim/Documents/GitHub",
-  "Linux" = "/home/tim/Documents/GitHub"
+  "Darwin" = "/Users/tvigers/Documents/GitHub",
+  "Windows" = "C:/Users/tvigers/Documents/GitHub",
+  "Linux" = "/home/tvigers/Documents/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 ```
@@ -103,7 +103,7 @@ encounter %>%
   tbl_summary(by = Race, missing_text = "Missing")
 ```
 
-# Unadjusted analyses
+# New analyses
 
 For the analyses below, we categorized encounter-level data by time from ETI start (e.g. "(-1095.75,-730.5]" includes all encounters from -3 years to -2 years relative to ETI start). Within each time bucket we averaged each outcome (race neutral for lung function measures), then fit an unadjusted model with a time by race interaction and random intercept for subject. Model results are presented as estimated marginal means at each "timepoint."
 
@@ -118,6 +118,7 @@ annualized <- encounter |>
     Days_cat = cut(
       Days,
       breaks = c(c(-3, -2, -1, 0, 1, 2) * 365.25),
+      labels = c("-3", "-2", "-1 (Includes 0)", "1", "2"),
       dig.lab = 6
     )
   ) |>
@@ -350,6 +351,51 @@ summary(emm_change_comp, infer = T) |>
   kable(
     caption = "Differences in Change by Race"
   )
+```
+
+### Full cohort adjusted for age at ETI initiation
+
+```{r ppfev1 full adjusted}
+# AR1 varying by race is the winner! Refit with REML
+ann_mod = lme(
+  gli_fev1_ppred_rn ~ Days_cat * Race + age_eti_start,
+  random = ~ 1 | eDWID,
+  correlation = corAR1(form = ~ days_cat_int | eDWID),
+  data = annualized,
+  na.action = na.exclude
+)
+# performance::check_model(ann_mod)
+# Summarize
+emm <- emmeans(
+  ann_mod,
+  specs = ~ Days_cat + Race,
+  pbkrtest.limit = 1e6
+)
+# Plot
+p = ggplot(
+  data.frame(emm),
+  aes(x = Days_cat, y = emmean, group = Race, color = Race)
+) +
+  geom_point() +
+  geom_line() +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
+  ylab("ppFEV1") +
+  xlab("Days prior to/after ETI initiation") +
+  ggtitle("Full Cohort") +
+  scale_color_manual(
+    values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
+    labels = c("White", "Black", "Hispanic", "Other")
+  ) +
+  theme_bw()
+p
+ggsave(
+  "./Dissemination/Figures/ppFEV1_adjusted.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 ```
 
 ### Age < 18 at ETI initiation
