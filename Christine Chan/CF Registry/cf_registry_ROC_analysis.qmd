@@ -32,15 +32,15 @@ library(multcomp)
 library(tidyverse)
 home_dir <- switch(
   Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
-  "Windows" = "C:/Users/tim/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry",
-  "Linux" = "/home/tim/OneDrive/Vigers/CF/Christine Chan/CF Registry"
+  "Darwin" = "/Users/tvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Christine Chan/CF Registry",
+  "Windows" = "C:/Users/tvigers/OneDrive - The University of Colorado Denver/Vigers/CF/Christine Chan/CF Registry",
+  "Linux" = "/home/tvigers/OneDrive/Vigers/CF/Christine Chan/CF Registry"
 )
 github_dir <- switch(
   Sys.info()["sysname"],
-  "Darwin" = "/Users/timvigers/GitHub",
-  "Windows" = "C:/Users/Tim/GitHub",
-  "Linux" = "/home/tim/GitHub"
+  "Darwin" = "/Users/timvigers/Documents/GitHub",
+  "Windows" = "C:/Users/tvigers/GitHub",
+  "Linux" = "/home/tvigers/GitHub"
 )
 knitr::opts_knit$set(root.dir = home_dir)
 set.seed(1017)
@@ -520,7 +520,18 @@ ggplot(roc_df, aes(x = `OGTT 2-hour`, y = hgba1c)) +
   geom_hline(yintercept = 5.5, linetype = "dashed") +
   geom_hline(yintercept = 5.7, linetype = "dashed") +
   ylab("HbA1c") +
-  theme_classic(base_size = 20)
+  theme_classic(base_size = 20) +
+  scale_x_discrete(
+    labels = c(
+      "<140 mg/dL",
+      "140-199 mg/dL",
+      "≥ 200 mg/dL "
+    )
+  ) +
+  scale_y_continuous(
+    breaks = c(5, 5.3, 5.5, 5.7, 7, 10, 12),
+    guide = guide_axis(n.dodge = 2)
+  )
 ```
 
 ## Dotplot
