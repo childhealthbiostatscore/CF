@@ -242,7 +242,7 @@ p = ggplot(
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
   ylab("ppFEV1") +
-  xlab("Days prior to/after ETI initiation") +
+  xlab("Years prior to/after ETI initiation") +
   ggtitle("Full Cohort") +
   scale_color_manual(
     values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
@@ -389,7 +389,7 @@ p = ggplot(
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
   ylab("ppFEV1") +
-  xlab("Days prior to/after ETI initiation") +
+  xlab("Years prior to/after ETI initiation") +
   ggtitle("Full Cohort") +
   scale_color_manual(
     values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
@@ -444,7 +444,7 @@ p = ggplot(
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
   ylab("ppFEV1") +
-  xlab("Days prior to/after ETI initiation") +
+  xlab("Years prior to/after ETI initiation") +
   ggtitle("Age < 18 at ETI initiation") +
   scale_color_manual(
     values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
@@ -601,7 +601,7 @@ p = ggplot(
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
   ylab("ppFEV1") +
-  xlab("Days prior to/after ETI initiation") +
+  xlab("Years prior to/after ETI initiation") +
   ggtitle("Age >= 18 at ETI initiation") +
   scale_color_manual(
     values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
@@ -820,7 +820,7 @@ p = ggplot(
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
   ylab("ppFVC") +
-  xlab("Days prior to/after ETI initiation") +
+  xlab("Years prior to/after ETI initiation") +
   ggtitle("Full Cohort") +
   scale_color_manual(
     values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
@@ -977,7 +977,7 @@ p = ggplot(
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
   ylab("ppFVC") +
-  xlab("Days prior to/after ETI initiation") +
+  xlab("Years prior to/after ETI initiation") +
   ggtitle("Age < 18 at ETI initiation") +
   scale_color_manual(
     values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
@@ -1134,7 +1134,7 @@ p = ggplot(
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
   ylab("ppFVC") +
-  xlab("Days prior to/after ETI initiation") +
+  xlab("Years prior to/after ETI initiation") +
   ggtitle("Age >= 18 at ETI initiation") +
   scale_color_manual(
     values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
@@ -1305,7 +1305,7 @@ p = ggplot(
     width = 0.1
   ) +
   ylab("BMI %ile") +
-  xlab("Days prior to/after ETI initiation") +
+  xlab("Years prior to/after ETI initiation") +
   ggtitle("Age < 20 at ETI initiation") +
   scale_color_manual(
     values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
@@ -1522,7 +1522,7 @@ p = ggplot(
   geom_line() +
   geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.1) +
   ylab("BMI") +
-  xlab("Days prior to/after ETI initiation") +
+  xlab("Years prior to/after ETI initiation") +
   ggtitle("Age >= 20 at ETI initiation") +
   scale_color_manual(
     values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
@@ -1685,7 +1685,7 @@ p = ggplot(
     width = 0.1
   ) +
   ylab("PEx Rate") +
-  xlab("Days prior to/after ETI initiation") +
+  xlab("Years prior to/after ETI initiation") +
   ggtitle("Full Cohort") +
   scale_color_manual(
     values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
@@ -1844,7 +1844,7 @@ p = ggplot(
     width = 0.1
   ) +
   ylab("PEx Rate") +
-  xlab("Days prior to/after ETI initiation") +
+  xlab("Years prior to/after ETI initiation") +
   ggtitle("Age < 18 at ETI initiation") +
   scale_color_manual(
     values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
@@ -2003,7 +2003,7 @@ p = ggplot(
     width = 0.1
   ) +
   ylab("PEx Rate") +
-  xlab("Days prior to/after ETI initiation") +
+  xlab("Years prior to/after ETI initiation") +
   ggtitle("Age >= 18 at ETI initiation") +
   scale_color_manual(
     values = c("#1e212b", "#4d8b31", "#ffc800", "#ff8427"),
