@@ -234,7 +234,7 @@ emm_change_comp = contrast(
   ref = 1
 )
 # Plot
-ggplot(
+p = ggplot(
   data.frame(emm),
   aes(x = Days_cat, y = emmean, group = Race, color = Race)
 ) +
@@ -249,6 +249,15 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
+p
+ggsave(
+  "./Dissemination/Figures/fev1_full.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Organize tables per Kam
 emm |>
   data.frame() |>
@@ -389,7 +398,7 @@ p = ggplot(
   theme_bw()
 p
 ggsave(
-  "./Dissemination/Figures/ppFEV1_adjusted.png",
+  "./Dissemination/Figures/fev1_full_adjusted.png",
   plot = p,
   width = 7,
   height = 5,
@@ -427,7 +436,7 @@ emm_change_comp = contrast(
   by = NULL,
   ref = 1
 )
-ggplot(
+p = ggplot(
   data.frame(emm),
   aes(x = Days_cat, y = emmean, group = Race, color = Race)
 ) +
@@ -442,6 +451,15 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
+p
+ggsave(
+  "./Dissemination/Figures/fev1_peds.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Organize tables per Kam
 emm |>
   data.frame() |>
@@ -575,7 +593,7 @@ emm_change_comp = contrast(
   by = NULL,
   ref = 1
 )
-ggplot(
+p = ggplot(
   data.frame(emm),
   aes(x = Days_cat, y = emmean, group = Race, color = Race)
 ) +
@@ -590,6 +608,15 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
+p
+ggsave(
+  "./Dissemination/Figures/fev1_adults.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Organize tables per Kam
 emm |>
   data.frame() |>
@@ -785,7 +812,7 @@ emm_change_comp = contrast(
   by = NULL,
   ref = 1
 )
-ggplot(
+p = ggplot(
   data.frame(emm),
   aes(x = Days_cat, y = emmean, group = Race, color = Race)
 ) +
@@ -800,6 +827,15 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
+p
+ggsave(
+  "./Dissemination/Figures/fvc_full.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Organize tables per Kam
 emm |>
   data.frame() |>
@@ -933,7 +969,7 @@ emm_change_comp = contrast(
   by = NULL,
   ref = 1
 )
-ggplot(
+p = ggplot(
   data.frame(emm),
   aes(x = Days_cat, y = emmean, group = Race, color = Race)
 ) +
@@ -948,6 +984,15 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
+p
+ggsave(
+  "./Dissemination/Figures/fvc_peds.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Organize tables per Kam
 emm |>
   data.frame() |>
@@ -1081,7 +1126,7 @@ emm_change_comp = contrast(
   by = NULL,
   ref = 1
 )
-ggplot(
+p = ggplot(
   data.frame(emm),
   aes(x = Days_cat, y = emmean, group = Race, color = Race)
 ) +
@@ -1096,6 +1141,15 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
+p
+ggsave(
+  "./Dissemination/Figures/fvc_adults.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Organize tables per Kam
 emm |>
   data.frame() |>
@@ -1240,7 +1294,7 @@ emm_change_comp = contrast(
   by = NULL,
   ref = 1
 )
-ggplot(
+p = ggplot(
   data.frame(emm),
   aes(x = Days_cat, y = response, group = Race, color = Race)
 ) +
@@ -1258,6 +1312,15 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
+p
+ggsave(
+  "./Dissemination/Figures/bmi_perc.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Organize tables per Kam
 emm |>
   data.frame() |>
@@ -1451,7 +1514,7 @@ emm_change_comp = contrast(
   by = NULL,
   ref = 1
 )
-ggplot(
+p = ggplot(
   data.frame(emm),
   aes(x = Days_cat, y = emmean, group = Race, color = Race)
 ) +
@@ -1466,6 +1529,15 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
+p
+ggsave(
+  "./Dissemination/Figures/bmi_value.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Organize tables per Kam
 emm |>
   data.frame() |>
@@ -1602,7 +1674,7 @@ emm_change_comp = contrast(
   by = NULL,
   ref = 1
 )
-ggplot(
+p = ggplot(
   data.frame(emm),
   aes(x = Days_cat, y = rate, group = Race, color = Race)
 ) +
@@ -1620,6 +1692,15 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
+p
+ggsave(
+  "./Dissemination/Figures/pex_full.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Organize tables per Kam
 emm |>
   data.frame() |>
@@ -1752,7 +1833,7 @@ emm_change_comp = contrast(
   by = NULL,
   ref = 1
 )
-ggplot(
+p = ggplot(
   data.frame(emm),
   aes(x = Days_cat, y = rate, group = Race, color = Race)
 ) +
@@ -1770,6 +1851,15 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
+p
+ggsave(
+  "./Dissemination/Figures/pex_peds.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Organize tables per Kam
 emm |>
   data.frame() |>
@@ -1902,7 +1992,7 @@ emm_change_comp = contrast(
   by = NULL,
   ref = 1
 )
-ggplot(
+p = ggplot(
   data.frame(emm),
   aes(x = Days_cat, y = rate, group = Race, color = Race)
 ) +
@@ -1920,6 +2010,15 @@ ggplot(
     labels = c("White", "Black", "Hispanic", "Other")
   ) +
   theme_bw()
+p
+ggsave(
+  "./Dissemination/Figures/pex_adults.png",
+  plot = p,
+  width = 7,
+  height = 5,
+  units = "in",
+  dpi = 600
+)
 # Organize tables per Kam
 emm |>
   data.frame() |>
