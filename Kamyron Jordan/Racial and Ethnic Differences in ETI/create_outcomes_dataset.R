@@ -3,9 +3,9 @@ library(lubridate)
 # Paths
 home_dir <- switch(
   Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
-  "Windows" = "C:/Users/Tim/OneDrive - The University of Colorado Denver/Vigers/CF",
-  "Linux" = "/home/tim/CF"
+  "Darwin" = "/Users/tvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF",
+  "Windows" = "C:/Users/tvigers/OneDrive - The University of Colorado Denver/Vigers/CF",
+  "Linux" = "/home/tvigers/CF"
 )
 setwd(home_dir)
 # Import
@@ -144,7 +144,14 @@ encounter$cultureresults <- factor(
 # Merge
 encounter <- left_join(
   encounter,
-  demo %>% select(eDWID, Race, Gender, Modulator_trikafta_first_date),
+  demo %>%
+    select(
+      eDWID,
+      Race,
+      Gender,
+      Modulator_trikafta_first_date,
+      First_LungTransplantDate
+    ),
   by = join_by(eDWID)
 )
 encounter <- left_join(
@@ -234,6 +241,11 @@ n_people_preg <- length(unique(encounter$eDWID[preg]))
 encounter <- encounter[-preg, ]
 n_enc_4 <- nrow(encounter)
 n_people_4 <- length(unique(encounter$eDWID))
+# Lung transplant
+encounter <- encounter[
+  is.na(encounter$First_LungTransplantDate) |
+    encounter$reviewyear < year(mdy(encounter$First_LungTransplantDate)),
+]
 # Days from ETI start
 early <- which(encounter$Days < -365.25 * 3)
 n_people_early <- length(unique(encounter$eDWID[early]))
