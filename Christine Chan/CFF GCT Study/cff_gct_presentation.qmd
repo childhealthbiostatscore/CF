@@ -1,0 +1,32 @@
+---
+title: "Screening for Diabetes and Prediabetes in Cystic Fibrosis Using a Nonfasting 50-Gram 1-Hour Oral Glucose Challenge Test"
+author: 
+  - name: Tim Vigers
+  - name: Monique Maher
+  - name: Celia Kohler
+  - name: Arlene Stecenko
+  - name: Antoinette Moran
+  - name: Christine Chan
+  - name: Lawrence Phillips
+title-slide-attributes:
+  data-background-color: "#ffffff"
+  style: "font-size: 0.85em;"
+format:
+  revealjs: 
+    embed-resources: true
+    lightbox: true
+execute:
+  echo: true
+bibliography: zotero.bib
+nocite: |
+  @*
+---
+
+## Background
+
+- With increased survival, we are seeing increased prevalence of CF-related complications.
+- CF-related diabetes (CFRD) is a comorbidity that ultimately affects nearly half of the CF population.
+  - Associated with worse pulmonary function, malnutrition, and a three- to fivefold increased risk of mortality.
+- Timely diagnosis and treatment with insulin has been shown to reverse declines in clinical trajectories.
+
+## References
