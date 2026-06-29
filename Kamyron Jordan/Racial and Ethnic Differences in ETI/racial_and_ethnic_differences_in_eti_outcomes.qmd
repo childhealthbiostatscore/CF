@@ -27,7 +27,6 @@ library(tidyverse)
 library(patchwork)
 library(gt)
 library(gtsummary)
-library(ggflowchart)
 library(lmerTest)
 library(nlme)
 library(broom)
@@ -61,15 +60,6 @@ encounter$age_group <- relevel(encounter$age_group, ref = "[18,30)")
 ```
 
 # Data cleaning
-
-## Questions
-- Ask Olga at CFFPR:
-  - Should we only include encounterlocation = 1? Should we also take the care episodes file and exclude visits within 2 weeks on either side?
-  - Okay to just exclude lung transplant > 1?
-
-```{r flowchart}
-ggflowchart(flow_chart, text_size = 3, y_nudge = 0.4, x_nudge = 0.45)
-```
 
 # Table 1
 
