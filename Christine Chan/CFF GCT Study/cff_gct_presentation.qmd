@@ -21,10 +21,6 @@ nocite: |
   @*
 ---
 
-<style>
-.grViz, .html-widget, div[id^="htmlwidget-"] { overflow: hidden !important; }
-</style>
-
 ## Background
 
 - With increased survival, we are seeing increased prevalence of CF-related complications.
@@ -90,13 +86,11 @@ nocite: |
   - fasting plasma glucose (FPG) <100 mg/dL
   - 1-h plasma glucose (OGTT1hPG) <200 mg/dL
   - 2-h plasma glucose (OGTT-2hPG) <140 mg/dL
-- Impaired fasting glucose (IFG):
-  - FPG 100–125 mg/dL with OGTT-2hPG <140 mg/dL; 
 - Impaired glucose tolerance (IGT): was defined as 
   - FPG <126 mg/dL
   - OGTT-2hPG 140–199 mg/dL
 - CFRD:
-  - FPG ≥126 mg/L and/or OGTT-2hPG ≥ 200 mg/dL.
+  - FPG $\geq$ 126 mg/dL and/or OGTT-2hPG $\geq$ 200 mg/dL.
 
 ## Statistical analysis
 
@@ -128,7 +122,7 @@ nocite: |
   - 84% of those with IGT and
   - 63% of those with INDET
 
-## Limitations
+## Limitations{.smaller}
 
 - Relatively small number of individuals diagnosed with CFRD
 - Unable to assess the impact of GCTpl screening on clinical outcomes.
@@ -177,37 +171,54 @@ kable(m)
 Correlations are between two index test results given positive and negative disease status.
 :::
 
-## Sensitivity of the OR rule
+## Sensitivity of the AND rule
 
 \begin{aligned}
-Se(X_1 \vee X_2) &= 1 - P((X_1 = 0, X_2 = 0) \mid D = 1) \\
-                 &= 1 - P(X_2 = 0 \mid X_1 = 0, D = 1)(1 − Se(X_1)) \\
-                 &=Se(X1) + (1 − Se(X1))Se(X2) − \tau_{+}
-
+Se(X_1 \wedge X_2) &= P((X_1 = 1, X_2 = 1) \mid D = 1) \\
+                 &= P(X_2 = 1 \mid X_1 = 1, D = 1)Se(X_1) \\
+                 &=Se(X_1)Se(X_2) + \tau_{+}
 \end{aligned}
 
-where $\tau_{+} = \rho_{+}[Se(X_1)Se(X_2)(1 − Se(X_1))(1 − Se(X_2))]^{0.5}$
+where 
+$$
+\tau_{+} = \rho_{+}[Se(X_1)Se(X_2)(1 − Se(X_1))(1 − Se(X_2))]^{0.5}
+$$
 
-## Specificity of the OR rule
+## Specificity of the AND rule
 
 \begin{aligned}
-Sp(X_1 \vee X_2) &= P((X_1 = 0, X2 = 0) \mid D = 0) \\
-                 &= P(X2 = 0 \mid X1 = 0, D = 0)Sp(X1) \\
-                 &=Sp(X1)Sp(X2) + \tau_{-}
-
+Sp(X_1 \wedge X_2) &= 1 - P((X_1 = 1, X_2 = 1) \mid D = 0) \\
+                 &= 1 - P(X_2 = 1 \mid X_1 = 1, D = 0)(1 - Sp(X_1)) \\
+                 &=1 - (1 - Sp(X_1))(1 - Sp(X_2)) - \tau_{-}
 \end{aligned}
 
-where $\tau_{-} = \rho_{+}[Sp(X_1)Sp(X_2)(1 − Sp(X_1))(1 − Sp(X_2))]^{0.5}$
+where 
+$$
+\tau_{-} = \rho_{-}[Sp(X_1)Sp(X_2)(1 - Sp(X_1))(1 - Sp(X_2))]^{0.5}
+$$
+
+## Sensitivity and specificity bounds
+
+$$
+Se(X_1 ∨ X_2) \geq max\{Se(X_1), Se(X_2)\} \\
+Sp(X_1 ∨ X_2) \leq min\{Sp(X_1), Sp(X_2)\} \\
+Se(X_1 ∧ X_2) \leq min\{Se(X_1), Se(X_2)\} \\
+Sp(X_1 ∧ X_2) \geq max\{Sp(X_1), Sp(X_2)\}
+$$
 
 ## All this to say...
 
 - Sensitivity and specificity can be expressed in terms of conditional correlations given positive or negative true disease status ($\rho_{+}$ and $\rho_{-}$).
-- Combined sensitivity increases when the two tests are **negatively correlated** given disease **positive**.
-- Combined specificity increases when the two tests are **positively correlated** given disease **negative**.
-- The sensitivity of the combined test is greater than or equal to that of either test administered on its own. 
-- The specificity is less than or equal to an individual test.
+- Combined *sensitivity* increases when the two tests are **positively** correlated given disease positive.
+- Combined *specificity* increases when the two tests are **negatively** correlated given disease negative.
+- The sensitivity of the combined test is less than or equal to that of either test administered on its own. 
+- The specificity is greater than or equal to an individual test.
 
 ## Conditional testing
+
+<style>
+.grViz, .html-widget, div[id^="htmlwidget-"] { overflow: hidden !important; }
+</style>
 
 - Things become even more complicated when the decision to perform one test depends on the results of the first test. 
 
@@ -264,15 +275,15 @@ where the $x_{ij}$ are the number of individuals for each possible combination o
 
 ## Yet another complication
 
-- Missclassification of reference standard tests.
+- Misclassification of reference standard tests.
   - Estimates of diagnostic accuracy are biased when there is incomplete disease status knowledge.
     - We have known for a while that the OGTT is likely not the best way to identify CFRD.
     - If some patients do not undergo the reference standard, estimation of sensitivity, specificity, and prevalence are imperfect.
 
-## Analyzing test sequences with an imperfect standard
+## Analyzing test sequences with an imperfect standard{.smaller}
 
 - One approach is to model the conditional dependence between tests using the covariance between tests, treating disease status as a latent variable.
-  - Unfortunately, the fully-parameterised model is not identifiable.
+  - Unfortunately, the fully-parameterised model is unidentifiable.
     - Either fix some parameters deterministically or use Bayesian methods with informative priors
 - Can also model conditional dependence between test results in terms of individual-level random effects.
   - A latent measure of disease "intensity"
