@@ -36,7 +36,7 @@ library(ggstatsplot)
 library(robustrank)
 home_dir <- switch(
   Sys.info()["sysname"],
-  "Darwin" = "/Users/tim/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability",
+  "Darwin" = "/Users/tvigers/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/Vigers/CF/Edith Zemanick/Sweat Variability",
   "Linux" = "/home/timvigers/OneDrive/Vigers/CF/Edith Zemanick/Sweat Variability"
 )
 knitr::opts_knit$set(root.dir = home_dir)
@@ -97,7 +97,7 @@ chec$agecat_txt <- factor(
   )
 )
 # Drop empty sites
-chec$site = droplevels(factor(chec$site))
+chec$site <- droplevels(factor(chec$site))
 # Calculate ratios
 chec$pre_ratio <- chec$swhsavgpm / chec$swhcavgpm
 chec$post_ratio <- chec$swsavg / chec$swcavg
@@ -178,13 +178,24 @@ chec_long |>
 ## Table 2: Change in sweat electrolytes
 
 ```{r results='asis'}
+hl.ci <- function(x, ...) {
+  x <- x[!is.na(x)]
+  res <- wilcox.test(x, conf.int = TRUE, exact = FALSE)
+  sprintf("%.2f [%.2f, %.2f]", res$estimate, res$conf.int[1], res$conf.int[2])
+}
 pt1 <- paired(
-  pre_post ~ cl + na + signed.rank(ratio, "N", "Nmiss2", "medianq1q3", "range"),
+  pre_post ~
+    signed.rank(cl, "N", "medianq1q3", "hl.ci") +
+    signed.rank(na, "N", "medianq1q3", "hl.ci") +
+    signed.rank(ratio, "N", "medianq1q3", "hl.ci"),
   data = chec_long,
   id = subject,
-  control = paired.control(signed.rank.exact = F)
+  control = paired.control(
+    signed.rank.exact = FALSE,
+    stats.labels = list(hl.ci = "HL Estimate [95% CI]")
+  )
 )
-summary(pt1, pfootnote = T)
+summary(pt1, pfootnote = TRUE)
 ```
 
 ## Table 3: Change in sweat electrolytes by modulator
@@ -192,15 +203,19 @@ summary(pt1, pfootnote = T)
 ```{r results='asis'}
 pt2 <- paired(
   pre_post ~
-    signed.rank(cl, "N", "Nmiss2", "medianq1q3", "range") +
-    signed.rank(na, "N", "Nmiss2", "medianq1q3", "range") +
-    signed.rank(ratio, "N", "Nmiss2", "medianq1q3", "range"),
+    signed.rank(cl, "N", "medianq1q3", "hl.ci") +
+    signed.rank(na, "N", "medianq1q3", "hl.ci") +
+    signed.rank(ratio, "N", "medianq1q3", "hl.ci"),
   data = chec_long,
   id = subject,
   strata = modqual,
-  control = paired.control(signed.rank.exact = F)
+  control = paired.control(
+    signed.rank.exact = FALSE,
+
+    stats.labels = list(hl.ci = "HL Estimate [95% CI]")
+  )
 )
-summary(pt2, pfootnote = T)
+summary(pt2, pfootnote = TRUE)
 ```
 
 # Histograms and density plots
@@ -583,10 +598,10 @@ chec_long |>
 ## Five boxplots
 
 ```{r}
-chec_long$Modulator = as.character(chec_long$modqual)
-chec_long$Modulator[chec_long$pre_post == "Pre-Modulator"] = "Pre-Modulator"
+chec_long$Modulator <- as.character(chec_long$modqual)
+chec_long$Modulator[chec_long$pre_post == "Pre-Modulator"] <- "Pre-Modulator"
 # Add n to the labels (just do this manually for now)
-chec_long$Modulator = factor(
+chec_long$Modulator <- factor(
   chec_long$Modulator,
   levels = c("Pre-Modulator", "LUM/IVA", "TEZ/IVA", "IVA", "ELX/TEZ/IVA"),
   labels = c(
@@ -597,7 +612,7 @@ chec_long$Modulator = factor(
     "Elexacaftor/Tezacaftor/Ivacaftor"
   )
 )
-levels(chec_long$Modulator) = paste0(
+levels(chec_long$Modulator) <- paste0(
   levels(chec_long$Modulator),
   paste0(" (n = ", table(chec_long$Modulator), ")")
 )
@@ -606,17 +621,17 @@ levels(chec_long$Modulator) = paste0(
 ### Plain
 
 ```{r}
-na_boxplot = ggplot(chec_long, aes(x = Modulator, y = na)) +
+na_boxplot <- ggplot(chec_long, aes(x = Modulator, y = na)) +
   geom_boxplot() +
   theme_bw() +
   theme(axis.title.x = element_blank())
-cl_boxplot = ggplot(chec_long, aes(x = Modulator, y = cl)) +
+cl_boxplot <- ggplot(chec_long, aes(x = Modulator, y = cl)) +
   geom_boxplot() +
   theme_bw() +
   geom_hline(aes(yintercept = 30), color = "red", linetype = "dashed") +
   geom_hline(aes(yintercept = 60), color = "red") +
   theme(axis.title.x = element_blank())
-ratio_boxplot = ggplot(chec_long, aes(x = Modulator, y = ratio)) +
+ratio_boxplot <- ggplot(chec_long, aes(x = Modulator, y = ratio)) +
   geom_boxplot() +
   theme_bw() +
   geom_hline(aes(yintercept = 1.2), color = "red") +
