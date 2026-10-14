@@ -165,7 +165,6 @@ t1 <- tableby(
 summary(t1, pfootnote = T)
 ```
 
-
 ```{r results='asis'}
 #| tbl-cap: "CGM Wears"
 t2 <- tableby(
@@ -239,12 +238,12 @@ summary(t1, pfootnote = T)
 
 ```{r}
 r <- roc(CFRD ~ mean_sensor, data = df, quiet = T)
-rmg = r
+rmg <- r
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-mg_best = coords(r, "best", ret = "all")
+mg_best <- coords(r, "best", ret = "all")
 gt(mg_best) %>% fmt_number(decimals = 3)
-mg_coords = data.frame(coords(
+mg_coords <- data.frame(coords(
   r,
   "all",
   ret = c(c(
@@ -262,25 +261,25 @@ mg_coords = data.frame(coords(
 gt(mg_coords) %>%
   fmt_number(decimals = 3)
 # Get thresholds for plotting
-mg_high_sens = max(mg_coords$threshold[
+mg_high_sens <- max(mg_coords$threshold[
   which(mg_coords$sensitivity >= 0.9)
 ])
-mg_high_spec = min(mg_coords$threshold[
+mg_high_spec <- min(mg_coords$threshold[
   which(mg_coords$specificity >= 0.9)
 ])
-mg_youden = mg_best$threshold
+mg_youden <- mg_best$threshold
 ```
 
 ## Percent Time >140 mg/dL 
 
 ```{r}
 r <- roc(CFRD ~ percent_time_over_140, data = df, quiet = T)
-rtar140 = r
+rtar140 <- r
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-tar140_best = coords(r, "best", ret = "all")
+tar140_best <- coords(r, "best", ret = "all")
 gt(tar140_best) %>% fmt_number(decimals = 3)
-tar140_coords = data.frame(coords(
+tar140_coords <- data.frame(coords(
   r,
   "all",
   ret = c(c(
@@ -298,25 +297,25 @@ tar140_coords = data.frame(coords(
 gt(tar140_coords) %>%
   fmt_number(decimals = 3)
 # Get thresholds for plotting
-tar140_high_sens = max(tar140_coords$threshold[
+tar140_high_sens <- max(tar140_coords$threshold[
   which(tar140_coords$sensitivity >= 0.9)
 ])
-tar140_high_spec = min(tar140_coords$threshold[
+tar140_high_spec <- min(tar140_coords$threshold[
   which(tar140_coords$specificity >= 0.9)
 ])
-tar140_youden = tar140_best$threshold
+tar140_youden <- tar140_best$threshold
 ```
 
 ## Percent Time >180 mg/dL
 
 ```{r}
 r <- roc(CFRD ~ percent_time_over_180, data = df, quiet = T)
-rtar180 = r
+rtar180 <- r
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-tar180_best = coords(r, "best", ret = "all")
+tar180_best <- coords(r, "best", ret = "all")
 gt(tar180_best) %>% fmt_number(decimals = 3)
-tar180_coords = data.frame(coords(
+tar180_coords <- data.frame(coords(
   r,
   "all",
   ret = c(c(
@@ -334,25 +333,25 @@ tar180_coords = data.frame(coords(
 gt(tar180_coords) %>%
   fmt_number(decimals = 3)
 # Get thresholds for plotting
-tar180_high_sens = max(tar180_coords$threshold[which(
+tar180_high_sens <- max(tar180_coords$threshold[which(
   tar180_coords$sensitivity >= 0.9
 )])
-tar180_high_spec = min(tar180_coords$threshold[
+tar180_high_spec <- min(tar180_coords$threshold[
   which(tar180_coords$specificity >= 0.9)
 ])
-tar180_youden = tar180_best$threshold
+tar180_youden <- tar180_best$threshold
 ```
 
 ## GMI
 
 ```{r}
 r <- roc(CFRD ~ gmi, data = df, quiet = T)
-rgmi = r
+rgmi <- r
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-gmi_best = coords(r, "best", ret = "all")
+gmi_best <- coords(r, "best", ret = "all")
 gt(gmi_best) %>% fmt_number(decimals = 3)
-gmi_coords = data.frame(coords(
+gmi_coords <- data.frame(coords(
   r,
   "all",
   ret = c(c(
@@ -370,25 +369,25 @@ gmi_coords = data.frame(coords(
 gt(gmi_coords) %>%
   fmt_number(decimals = 3)
 # Get thresholds for plotting
-gmi_high_sens = max(gmi_coords$threshold[
+gmi_high_sens <- max(gmi_coords$threshold[
   which(gmi_coords$sensitivity >= 0.9)
 ])
-gmi_high_spec = min(gmi_coords$threshold[
+gmi_high_spec <- min(gmi_coords$threshold[
   which(gmi_coords$specificity >= 0.9)
 ])
-gmi_youden = gmi_best$threshold
+gmi_youden <- gmi_best$threshold
 ```
 
 ## SD
 
 ```{r}
 r <- roc(CFRD ~ standard_deviation, data = df, quiet = T)
-rsd = r
+rsd <- r
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-sd_best = coords(r, "best", ret = "all")
+sd_best <- coords(r, "best", ret = "all")
 gt(sd_best) %>% fmt_number(decimals = 3)
-sd_coords = data.frame(coords(
+sd_coords <- data.frame(coords(
   r,
   "all",
   ret = c(c(
@@ -406,25 +405,25 @@ sd_coords = data.frame(coords(
 gt(sd_coords) %>%
   fmt_number(decimals = 3)
 # Get thresholds for plotting
-sd_high_sens = max(sd_coords$threshold[
+sd_high_sens <- max(sd_coords$threshold[
   which(sd_coords$sensitivity >= 0.9)
 ])
-sd_high_spec = min(sd_coords$threshold[
+sd_high_spec <- min(sd_coords$threshold[
   which(sd_coords$specificity >= 0.9)
 ])
-sd_youden = sd_best$threshold
+sd_youden <- sd_best$threshold
 ```
 
 ## CV
 
 ```{r}
 r <- roc(CFRD ~ cv, data = df, quiet = T)
-rcv = r
+rcv <- r
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-cv_best = coords(r, "best", ret = "all")
+cv_best <- coords(r, "best", ret = "all")
 gt(cv_best) %>% fmt_number(decimals = 3)
-cv_coords = data.frame(coords(
+cv_coords <- data.frame(coords(
   r,
   "all",
   ret = c(c(
@@ -442,25 +441,25 @@ cv_coords = data.frame(coords(
 gt(cv_coords) %>%
   fmt_number(decimals = 3)
 # Get thresholds for plotting
-cv_high_sens = max(cv_coords$threshold[
+cv_high_sens <- max(cv_coords$threshold[
   which(cv_coords$sensitivity >= 0.9)
 ])
-cv_high_spec = min(cv_coords$threshold[
+cv_high_spec <- min(cv_coords$threshold[
   which(cv_coords$specificity >= 0.9)
 ])
-cv_youden = cv_best$threshold
+cv_youden <- cv_best$threshold
 ```
 
 ## HbA1c
 
 ```{r}
 r <- roc(CFRD ~ a1c_result, data = df, quiet = T)
-ra1c = r
+ra1c <- r
 plot(r, print.auc = T, print.thres = T, legacy.axes = T)
 ci.auc(r)
-a1c_best = coords(r, "best", ret = "all")
+a1c_best <- coords(r, "best", ret = "all")
 gt(a1c_best) %>% fmt_number(decimals = 3)
-a1c_coords = data.frame(coords(
+a1c_coords <- data.frame(coords(
   r,
   "all",
   ret = c(c(
@@ -478,47 +477,67 @@ a1c_coords = data.frame(coords(
 gt(a1c_coords) %>%
   fmt_number(decimals = 3)
 # Get thresholds for plotting
-a1c_high_sens = max(a1c_coords$threshold[
+a1c_high_sens <- max(a1c_coords$threshold[
   which(a1c_coords$sensitivity >= 0.9)
 ])
-a1c_high_spec = min(a1c_coords$threshold[
+a1c_high_spec <- min(a1c_coords$threshold[
   which(a1c_coords$specificity >= 0.9)
 ])
-a1c_youden = a1c_best$threshold
+a1c_youden <- a1c_best$threshold
 ```
 
 ## ROC Comparisons
 
+```{r}
+auc_summary <- function(
+  roc1,
+  roc2,
+  labels = c("Marker 1", "Marker 2"),
+  conf.level = 0.95
+) {
+  ci1 <- ci.auc(roc1, conf.level = conf.level)
+  ci2 <- ci.auc(roc2, conf.level = conf.level)
+  tt <- roc.test(roc1, roc2, method = "delong", conf.level = conf.level)
+  data.frame(
+    term = c(labels, "Difference"),
+    auc = c(ci1[2], ci2[2], diff(rev(tt$estimate))),
+    lower = c(ci1[1], ci2[1], tt$conf.int[1]),
+    upper = c(ci1[3], ci2[3], tt$conf.int[2]),
+    p = c(NA, NA, tt$p.value)
+  )
+}
+```
+
 ### CGM vs. CGM
 
 ```{r}
-cat("#### MG vs. CV")
-roc.test(rmg, rcv)
-cat("#### MG vs. SD")
-roc.test(rmg, rsd)
-cat("#### TAR140 vs. CV")
-roc.test(rtar140, rcv)
-cat("#### TAR140 vs. SD")
-roc.test(rtar140, rsd)
-cat("#### TAR180 vs. CV")
-roc.test(rtar180, rcv)
-cat("#### TAR180 vs. SD")
-roc.test(rtar180, rsd)
+gt(auc_summary(rmg, rcv, labels = c("MG", "CV"))) %>%
+  fmt_number(decimals = 3)
+gt(auc_summary(rmg, rsd, labels = c("MG", "SD"))) %>%
+  fmt_number(decimals = 3)
+gt(auc_summary(rtar140, rcv, labels = c("TAR140", "CV"))) %>%
+  fmt_number(decimals = 3)
+gt(auc_summary(rtar140, rsd, labels = c("TAR140", "SD"))) %>%
+  fmt_number(decimals = 3)
+gt(auc_summary(rtar180, rcv, labels = c("TAR180", "CV"))) %>%
+  fmt_number(decimals = 3)
+gt(auc_summary(rtar180, rsd, labels = c("TAR180", "SD"))) %>%
+  fmt_number(decimals = 3)
 ```
 
 ### CGM vs. HbA1c
 
 ```{r}
-cat("#### MG vs. HbA1c")
-roc.test(rmg, ra1c)
-cat("#### SD vs. HbA1c")
-roc.test(rsd, ra1c)
-cat("#### CV vs. HbA1c")
-roc.test(rcv, ra1c)
-cat("#### TAR140 vs. HbA1c")
-roc.test(rtar140, ra1c)
-cat("#### TAR180 vs. HbA1c")
-roc.test(rtar180, ra1c)
+gt(auc_summary(rmg, ra1c, labels = c("MG", "HbA1c"))) %>%
+  fmt_number(decimals = 3)
+gt(auc_summary(rsd, ra1c, labels = c("SD", "HbA1c"))) %>%
+  fmt_number(decimals = 3)
+gt(auc_summary(rcv, ra1c, labels = c("CV", "HbA1c"))) %>%
+  fmt_number(decimals = 3)
+gt(auc_summary(rtar140, ra1c, labels = c("TAR140", "HbA1c"))) %>%
+  fmt_number(decimals = 3)
+gt(auc_summary(rtar180, ra1c, labels = c("TAR180", "HbA1c"))) %>%
+  fmt_number(decimals = 3)
 ```
 
 ## Pulmonary Function Comparisons by CGM
