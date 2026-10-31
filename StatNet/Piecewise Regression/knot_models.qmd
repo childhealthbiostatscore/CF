@@ -343,7 +343,7 @@ hypothesis(bayes_fit, "cp_3 = 20")
 model = list(
   Vitamin.D ~ 1 + Time, # intercept + slope
   ~ 0 + Time,  # joined slope
-  1 + (1|Patient.ID) ~ 0 + Time
+  ~ cp(1 + (1|Patient.ID)) + 0 + Time
 )
 priors = list(
   cp_1 = "dirichlet(1)"
